@@ -1,0 +1,82 @@
+name: Build all platforms
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            target: aarch64-apple-darwin
+            binary: dn
+          - os: macos-15-intel
+            target: x86_64-apple-darwin
+            binary: dn
+          - os: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+            binary: dn
+          - os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            binary: dn
+          - os: windows-2022
+            target: x86_64-pc-windows-msvc
+            binary: dn.exe
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - name: Test
+        run: cargo test --locked --target ${{ matrix.target }}
+      - name: Build release
+        run: cargo build --release --locked --target ${{ matrix.target }}
+      - name: Verify executable
+        run: ./target/${{ matrix.target }}/release/${{ matrix.binary }} --version
+      - name: Package macOS or Linux
+        if: runner.os != 'Windows'
+        shell: bash
+        env:
+          BUILD_TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist/package/docs
+          cp "target/${BUILD_TARGET}/release/dn" LICENSE README.md dist/package/
+          cp docs/USER_GUIDE.md dist/package/docs/
+          COPYFILE_DISABLE=1 tar -czf "dist/dn-${BUILD_TARGET}.tar.gz" -C dist/package .
+          cd dist
+          shasum -a 256 "dn-${BUILD_TARGET}.tar.gz" > "dn-${BUILD_TARGET}.tar.gz.sha256"
+      - name: Package Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          BUILD_TARGET: ${{ matrix.target }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force dist/package/docs | Out-Null
+          Copy-Item "target/$env:BUILD_TARGET/release/dn.exe", LICENSE, README.md dist/package/
+          Copy-Item docs/USER_GUIDE.md dist/package/docs/
+          $archive = "dn-$env:BUILD_TARGET.zip"
+          Compress-Archive -Path dist/package/* -DestinationPath "dist/$archive"
+          $hash = (Get-FileHash "dist/$archive" -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  $archive" | Set-Content -Encoding ascii "dist/$archive.sha256"
+      - name: Upload binary and checksum
+        uses: actions/upload-artifact@v7
+        with:
+          name: dn-${{ matrix.target }}
+          path: dist/dn-*
+          if-no-files-found: error
+          retention-days: 30

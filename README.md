@@ -1,0 +1,123 @@
+# Directory Navigator
+
+**By Dmitry Yarygin**
+
+A modern, native terminal file manager inspired by **DOS Navigator**.
+Directory Navigator is a DOS Navigator–inspired clone: familiar two-panel browsing,
+classic colors, keyboard shortcuts and mouse controls, rebuilt in Rust for modern
+computers. It runs directly in your terminal—no DOS emulator or graphical frontend.
+
+## What you can do
+
+- Browse two folders side by side, mark files, and copy, move or rename them.
+- Create directories and send files to Trash with confirmation.
+- Find files, compare directories, calculate folder sizes and use bookmarks.
+- Preview text or hex, edit UTF-8 files, and search or replace text.
+- Browse ZIP, TAR and TAR.GZ archives without extracting them.
+- Type shell commands directly into the bottom command prompt.
+- Customize the layout, colors, clock and screensaver; settings save on exit.
+- Use the calculator, character table and configurable user menus—or play Tetris.
+
+## Get started
+
+### Run a supplied binary
+
+On macOS or Linux, open a terminal in the folder containing a compatible `dn`:
+
+```sh
+chmod +x dn
+./dn
+```
+
+Use `dn --version` (or `dn -V`) to check the installed version.
+
+It starts in your current directory. Use a terminal at least **80 columns × 25 rows**.
+The current macOS build is for **Apple Silicon** and is not Developer ID signed or
+notarized, so macOS may block downloaded copies. Test builds need no Rust installation.
+
+### Build from source
+
+With the stable Rust toolchain installed:
+
+```sh
+cargo build --release
+./target/release/dn
+```
+
+On Windows, the executable is `target\release\dn.exe`.
+
+| Platform | Current status |
+| --- | --- |
+| macOS Apple Silicon | Primary development and tested platform |
+| Linux x86_64 / ARM64 | Targeted; runtime validation still pending |
+| Windows 10/11 | Best effort; runtime validation still pending |
+
+## Everyday controls
+
+| Key | Action |
+| --- | --- |
+| Tab | Switch panels |
+| Arrows / Page Up / Page Down | Navigate files |
+| Enter / Backspace | Open the highlighted entry / go to its parent directory |
+| Insert / Space | Mark or unmark an entry |
+| F1 | Help |
+| F2 | User menu |
+| F3 / F4 | View / edit |
+| F5 / F6 | Copy / move or rename |
+| F7 / F8 | Create directory / Trash or delete with confirmation |
+| F9 / F10 | Menu / exit |
+| Ctrl+F7 / Alt+F7 | Recursive Find / quick filename search |
+| Ctrl+Q / Ctrl+T | Quick view / directory tree |
+
+Click to select, double-click to open, and Ctrl+click to mark. Inside the viewer
+or editor, use F1 for that screen's controls. macOS may require Fn with function keys.
+
+The bottom row is a command prompt. Type a command and press **Enter** to run it
+in the active panel's directory; **Esc** clears it. **Ctrl+E / Ctrl+X** recall command
+history. `cd "folder name"` changes the active panel's directory. With no command
+entered, Enter opens the highlighted entry as usual. Shell commands run with your
+normal permissions, independently of the file manager's confirmation safeguards.
+
+## Settings and file handling
+
+Preferences load automatically and save on normal exit. **Options → Save desktop**
+saves immediately; **Options → Configuration → System Setup** controls saving on exit.
+
+- macOS/Linux: `~/.config/dn/config.conf`, or `$XDG_CONFIG_HOME/dn/config.conf`.
+- Windows: `%APPDATA%\DOSNavigator\config.conf`.
+- Older `config.txt` files migrate on save; the old file is retained as a backup.
+
+File operations refuse existing destinations. Trash is the default deletion mode;
+a Trash failure never falls back to permanent deletion. Permanent deletion can be
+selected in File Manager Setup and still requires confirmation.
+
+This is a **beta**. Archive browsing is read-only; the viewer is a bounded preview,
+and the editor handles UTF-8 files up to 2 MiB / 100,000 lines. Test important
+workflows on copies and report problems with your OS, terminal and reproduction steps.
+
+For detailed shortcuts, limits and user-menu configuration, see the
+[user guide](docs/USER_GUIDE.md).
+
+## Development
+
+```sh
+cargo fmt --check
+cargo clippy -- -D warnings
+cargo test
+cargo build --release
+```
+
+On GitHub, open **Actions → Build all platforms → Run workflow** to test and build
+macOS (Apple Silicon and Intel), Linux (x86_64 and ARM64), and Windows (x86_64).
+Each successful job uploads an archive containing the executable, README and MIT
+license, plus a SHA-256 checksum. Downloads are under that run's **Artifacts** and
+are retained for 30 days. These are unsigned builds; this workflow does not publish
+a GitHub Release. **Rust checks** also runs on pushes/PRs and can be started manually.
+
+The Rust application lives in `src/`, with tests in `tests/`.
+
+## License
+
+Directory Navigator is available under the [MIT license](LICENSE).
+
+Copyright (c) 2026 Dmitry Yarygin.

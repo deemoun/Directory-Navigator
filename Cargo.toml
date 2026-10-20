@@ -1,0 +1,32 @@
+[package]
+name = "dn"
+version = "1.0.0-beta"
+edition = "2021"
+description = "Native terminal file manager inspired by DOS Navigator 1.51"
+authors = ["Dmitry Yarygin"]
+license = "MIT"
+readme = "README.md"
+exclude = ["original-dn/**", "dist/**", "release/**", "dn", "dn.exe"]
+
+[dependencies]
+ratatui = { version = "0.29", default-features = false, features = ["crossterm"] }
+crossterm = "0.28"
+unicode-segmentation = "1"
+zip = { version = "9", default-features = false, features = ["deflate-flate2"] }
+tar = { version = "0.4", default-features = false }
+flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+trash = "5.2.9"
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62", features = ["Win32_System_Com", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
+
+[profile.release]
+lto = "thin"
+strip = true
+

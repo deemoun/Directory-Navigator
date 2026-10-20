@@ -1,0 +1,21 @@
+/target/
+
+# Original DOS Navigator reference sources (kept locally, not part of the Rust build)
+/original-dn/
+
+# Local builds and release bundles
+/dn
+/dn.exe
+/dist/
+/release/
+*.dSYM/
+*.pdb
+
+# Operating-system and editor files
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.swp
+*.swo
+*~
+

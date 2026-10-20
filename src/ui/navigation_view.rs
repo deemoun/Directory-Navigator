@@ -1,0 +1,119 @@
+use crate::{
+    app::App,
+    filesystem::display_name,
+    formatting::tail,
+    mouse::Target,
+    navigation_tools::{Action, Modal},
+};
+use ratatui::{layout::Rect, text::Line, widgets::Paragraph, Frame};
+pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
+    let profile = app.config.palette;
+    let dos = profile.styles();
+    let Some(modal) = &app.navigation_dialog else {
+        return;
+    };
+    let height = if matches!(modal, Modal::Bookmarks { .. }) {
+        18
+    } else {
+        11
+    };
+    let width = area.width.saturating_sub(6).min(94);
+    let rect = Rect::new(
+        area.x + (area.width - width) / 2,
+        area.y + (area.height - height) / 2,
+        width,
+        height,
+    );
+    let title = if matches!(modal, Modal::Bookmarks { .. }) {
+        " Quick directories "
+    } else {
+        " Filename filter "
+    };
+    super::dialog_style::window(frame, profile, rect, rect.width, rect.height, title);
+    app.mouse.regions.clear();
+    super::dialog_style::close_button(
+        frame,
+        profile,
+        rect,
+        &mut app.mouse.regions,
+        Target::Navigation(Action::Close),
+    );
+    let x = rect.x + 2;
+    let w = rect.width - 4;
+    let mut buttons = Vec::new();
+    match modal {
+        Modal::Bookmarks { slot, focus } => {
+            for i in 0..9 {
+                let value = app.config.bookmarks[i]
+                    .as_ref()
+                    .map(|p| display_name(&p.to_string_lossy()))
+                    .unwrap_or_else(|| "<empty>".into());
+                let row = Rect::new(x, rect.y + 1 + i as u16, w, 1);
+                frame.render_widget(
+                    Paragraph::new(format!("{}  {}", i + 1, tail(&value, w - 3)))
+                        .style(dos(if *slot == i { 0x30 } else { 0x70 })),
+                    row,
+                );
+                app.mouse
+                    .regions
+                    .push((row, Target::Navigation(Action::Slot(i))));
+            }
+            frame.render_widget(
+                Paragraph::new("↑↓ / 1–9 choose · Tab moves · Ctrl+1–9 set · Alt+1–9 go")
+                    .style(dos(0x70)),
+                Rect::new(x, rect.y + 11, w, 2),
+            );
+            for (i, label, action) in [
+                (0, "[ Go To ]", Action::Go),
+                (1, "[ Set Current ]", Action::Set),
+                (2, "[ Clear ]", Action::Clear),
+                (3, "[ Close ]", Action::Close),
+            ] {
+                buttons.push((
+                    Rect::new(x + i as u16 * (w / 4), rect.bottom() - 3, w / 4, 1),
+                    label,
+                    action,
+                    *focus == i + 1,
+                ));
+            }
+        }
+        Modal::Filter {
+            field,
+            cursor,
+            focus,
+        } => {
+            frame.render_widget(Paragraph::new("Visible cached filenames · case-sensitive * and ?\nEmpty or * clears · Parent stays visible\nFiltered marks are preserved; operations use visible marks").style(dos(0x70)),Rect::new(x,rect.y+1,w,3));
+            let input = Rect::new(x, rect.y + 5, w, 1);
+            let column = Line::from(&field[..*cursor]).width();
+            let scroll = column.saturating_sub(w.saturating_sub(1) as usize);
+            frame.render_widget(
+                Paragraph::new(display_name(field))
+                    .scroll((0, scroll as u16))
+                    .style(super::dialog_style::input_style(profile, *focus == 0)),
+                input,
+            );
+            app.mouse
+                .regions
+                .push((input, Target::Navigation(Action::FilterField)));
+            if *focus == 0 {
+                frame.set_cursor_position((x + (column - scroll) as u16, input.y));
+            }
+            buttons.push((
+                Rect::new(x + 8, rect.bottom() - 2, 16, 1),
+                "[ Apply ]",
+                Action::ApplyFilter,
+                *focus == 1,
+            ));
+            buttons.push((
+                Rect::new(rect.right() - 24, rect.bottom() - 2, 16, 1),
+                "[ Cancel ]",
+                Action::Close,
+                *focus == 2,
+            ));
+        }
+    }
+    for (rect, label, action, focus) in buttons {
+        super::dialog_style::button(frame, profile, rect, label, focus);
+        app.mouse.regions.push((rect, Target::Navigation(action)));
+    }
+}

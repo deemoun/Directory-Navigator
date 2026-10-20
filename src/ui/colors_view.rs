@@ -1,0 +1,89 @@
+use crate::{app::App, mouse::Target, palette::PaletteProfile};
+use ratatui::{layout::Rect, widgets::Paragraph, Frame};
+pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
+    let Some(dialog) = &app.color_dialog else {
+        return;
+    };
+    let cursor = dialog.cursor;
+    let profile = app.config.palette;
+    let dos = profile.styles();
+    let rect = Rect::new(
+        area.x + (area.width - 72) / 2,
+        area.y + (area.height - 18) / 2,
+        72,
+        18,
+    );
+    super::dialog_style::window(frame, profile, rect, rect.width, rect.height, " Colors ");
+    app.mouse.regions.clear();
+    super::dialog_style::close_button(
+        frame,
+        profile,
+        rect,
+        &mut app.mouse.regions,
+        Target::CancelColors,
+    );
+    for (i, label, value) in [
+        (
+            0,
+            "Classic DN — fixed 256 colors",
+            PaletteProfile::ClassicDn,
+        ),
+        (
+            1,
+            "Terminal palette — legacy ANSI colors",
+            PaletteProfile::Terminal,
+        ),
+    ] {
+        let row = Rect::new(rect.x + 3, rect.y + 2 + i as u16 * 2, 66, 1);
+        frame.render_widget(
+            Paragraph::new(format!(
+                "({}) {label}",
+                if profile == value { '●' } else { ' ' }
+            ))
+            .style(dos(if cursor == i { 0x30 } else { 0x70 })),
+            row,
+        );
+        app.mouse.regions.push((row, Target::ColorChoice(value)));
+    }
+    frame.render_widget(
+        Paragraph::new("Preview").style(dos(0x70)),
+        Rect::new(rect.x + 3, rect.y + 6, 65, 1),
+    );
+    for (i, attr, label) in [
+        (0, 0x8e, " Name      marked"),
+        (1, 0x8f, " folder"),
+        (2, 0x87, " ordinary file"),
+        (3, 0x8b, " source.rs"),
+        (4, 0x30, " selected file"),
+    ] {
+        frame.render_widget(
+            Paragraph::new(label).style(dos(attr)),
+            Rect::new(rect.x + 4, rect.y + 7 + i, 38, 1),
+        );
+    }
+    frame.render_widget(
+        Paragraph::new(" 12:34:56 ").style(dos(0x71)),
+        Rect::new(rect.right() - 17, rect.y + 7, 10, 1),
+    );
+    frame.render_widget(
+        Paragraph::new(profile.function(5, "Copy", true)).style(profile.bar(true)),
+        Rect::new(rect.x + 4, rect.y + 12, 62, 1),
+    );
+    frame.render_widget(
+        Paragraph::new("C/T or Space chooses · Enter applies · Esc restores").style(dos(0x70)),
+        Rect::new(rect.x + 3, rect.y + 14, 66, 1),
+    );
+    for (label, target, selected, x) in [
+        ("[ Apply ]", Target::AcceptColors, cursor == 2, rect.x + 12),
+        (
+            "[ Cancel ]",
+            Target::CancelColors,
+            cursor == 3,
+            rect.right() - 26,
+        ),
+    ] {
+        let row = Rect::new(x, rect.bottom() - 2, 16, 1);
+        super::dialog_style::button(frame, profile, row, label, selected);
+        app.mouse.regions.push((row, target));
+    }
+}
