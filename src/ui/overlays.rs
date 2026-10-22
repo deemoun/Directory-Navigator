@@ -26,7 +26,7 @@ pub(super) fn draw_info_dialog(
             message.rect,
             message.rect.width,
             message.rect.height,
-            dialog.title,
+            app.config.language.text(dialog.title),
         );
         let lines = &message.lines;
         let visible = message.visible;
@@ -52,12 +52,19 @@ pub(super) fn draw_info_dialog(
         );
         if maximum > 0 {
             frame.render_widget(
-                Paragraph::new("↑↓ / PgUp/PgDn scroll").style(profile.dos(0x70)),
+                Paragraph::new(app.config.language.text("↑↓ / PgUp/PgDn scroll"))
+                    .style(profile.dos(0x70)),
                 Rect::new(rect.x + 2, rect.bottom() - 3, rect.width - 4, 1),
             );
         }
         let close = Rect::new(rect.x + (rect.width - 12) / 2, rect.bottom() - 2, 12, 1);
-        dialog_style::button(frame, profile, close, "[ Close ]", true);
+        dialog_style::button(
+            frame,
+            profile,
+            close,
+            app.config.language.text("[ Close ]"),
+            true,
+        );
         app.mouse.regions.clear();
         super::dialog_style::close_button(
             frame,
@@ -94,7 +101,7 @@ pub(super) fn draw_operation_overlays(frame: &mut Frame, app: &mut App, area: Re
             area,
             width,
             if simple { 7 } else { 11 },
-            prompt.title(),
+            app.config.language.text(prompt.title()),
         );
         app.mouse.regions.clear();
         super::dialog_style::close_button(
@@ -107,13 +114,25 @@ pub(super) fn draw_operation_overlays(frame: &mut Frame, app: &mut App, area: Re
         if deleting {
             let mut lines = if matches!(prompt.kind, PromptKind::Operation(Kind::Trash)) {
                 vec![
-                    format!("Move {} item(s) to Trash?", prompt.sources.len()),
-                    "Restore using your desktop file manager.".to_string(),
+                    app.config
+                        .language
+                        .text("Move {} item(s) to Trash?")
+                        .replace("{}", &prompt.sources.len().to_string()),
+                    app.config
+                        .language
+                        .text("Restore using your desktop file manager.")
+                        .to_string(),
                 ]
             } else {
                 vec![
-                    format!("Permanently delete {} item(s)?", prompt.sources.len()),
-                    "This cannot be undone.".to_string(),
+                    app.config
+                        .language
+                        .text("Permanently delete {} item(s)?")
+                        .replace("{}", &prompt.sources.len().to_string()),
+                    app.config
+                        .language
+                        .text("This cannot be undone.")
+                        .to_string(),
                 ]
             };
             for path in prompt.sources.iter().take(3) {
@@ -127,15 +146,16 @@ pub(super) fn draw_operation_overlays(frame: &mut Frame, app: &mut App, area: Re
                 Rect::new(rect.x + 2, rect.y + 2, rect.width - 4, 5),
             );
         } else {
-            let label = if simple {
+            let label = app.config.language.text(if simple {
                 "Directory name"
             } else {
                 "Destination"
-            };
+            });
+            let first = label.chars().next().map_or(0, char::len_utf8);
             frame.render_widget(
                 Paragraph::new(Line::from(vec![
-                    Span::styled(&label[..1], dos(0x7e)),
-                    Span::styled(&label[1..], dos(0x7f)),
+                    Span::styled(&label[..first], dos(0x7e)),
+                    Span::styled(&label[first..], dos(0x7f)),
                 ])),
                 Rect::new(rect.x + 2, rect.y + 1, rect.width - 4, 1),
             );
@@ -157,7 +177,12 @@ pub(super) fn draw_operation_overlays(frame: &mut Frame, app: &mut App, area: Re
             }
             if !simple {
                 frame.render_widget(
-                    Paragraph::new("Existing destinations are refused.").style(dos(0x70)),
+                    Paragraph::new(
+                        app.config
+                            .language
+                            .text("Existing destinations are refused."),
+                    )
+                    .style(dos(0x70)),
                     Rect::new(rect.x + 2, rect.y + 3, rect.width - 4, 1),
                 );
                 let mut lines = vec![format!("{} item(s):", prompt.sources.len())];
@@ -187,21 +212,34 @@ pub(super) fn draw_operation_overlays(frame: &mut Frame, app: &mut App, area: Re
                 frame,
                 profile,
                 button,
-                label,
+                app.config.language.text(label),
                 prompt.focus == i as usize || (i == 1 && prompt.focus == 0),
             );
             app.mouse.regions.push((button, target));
         }
     }
     if let Some(job) = &app.job {
-        let rect = dialog_style::window(frame, profile, area, 59, 9, " File operation ");
+        let rect = dialog_style::window(
+            frame,
+            profile,
+            area,
+            59,
+            9,
+            app.config.language.text(" File operation "),
+        );
         let text=format!("{:?} in progress…\n{} items · {} bytes\n{}\nEsc cancels; completed items are retained.",job.kind,job.progress.files,job.progress.bytes,formatting::tail(&display_name(&job.progress.path.to_string_lossy()),rect.width-4));
         frame.render_widget(
             Paragraph::new(text).style(dos(0x70)),
             Rect::new(rect.x + 2, rect.y + 1, rect.width - 4, 4),
         );
         let cancel = Rect::new(rect.x + (rect.width - 12) / 2, rect.bottom() - 2, 12, 1);
-        dialog_style::button(frame, profile, cancel, "[ Cancel ]", true);
+        dialog_style::button(
+            frame,
+            profile,
+            cancel,
+            app.config.language.text("[ Cancel ]"),
+            true,
+        );
         app.mouse.regions.clear();
         super::dialog_style::close_button(
             frame,

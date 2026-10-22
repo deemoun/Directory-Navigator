@@ -68,6 +68,13 @@ fn complete_preferences_roundtrip_and_unknown_keys_survive() -> io::Result<()> {
     let mut store = Store::new(Some(t.path()));
     let mut config = store.load()?;
     assert_eq!(config.layouts, [PanelLayout::Details; 2]);
+    config.language = dn::localization::Language::Russian;
+    config.datetime = dn::regional::DateTimeFormat {
+        date_order: dn::regional::DateOrder::Dmy,
+        date_separator: '.',
+        twelve_hour: true,
+        time_separator: '.',
+    };
     config.save_on_exit = false;
     config.show_hidden = false;
     config.highlight_files = false;

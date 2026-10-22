@@ -7,6 +7,7 @@ use ratatui::{
 mod archive_view;
 mod clock;
 mod colors_view;
+mod command_history_view;
 mod dialog_style;
 mod directory_tree_view;
 mod discovery_view;
@@ -17,6 +18,7 @@ mod file_tools_view;
 mod menu_view;
 mod navigation_view;
 mod overlays;
+mod panel_footer;
 mod panel_view;
 mod quick_view;
 mod screensaver_view;
@@ -143,8 +145,12 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
             label
         };
         frame.render_widget(
-            Paragraph::new(profile.function(index as u8 + 1, label, enabled))
-                .style(profile.bar(enabled)),
+            Paragraph::new(profile.function(
+                index as u8 + 1,
+                app.config.language.text(label),
+                enabled,
+            ))
+            .style(profile.bar(enabled)),
             buttons[index],
         );
     }
@@ -165,5 +171,6 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
     utilities_view::draw(frame, app, area);
     colors_view::draw(frame, app, area);
     screensaver_view::draw_setup(frame, app, area);
+    command_history_view::draw(frame, app, area);
     draw_info_dialog(frame, app, prepared.message.as_ref());
 }

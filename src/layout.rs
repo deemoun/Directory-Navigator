@@ -63,7 +63,7 @@ pub fn prepare(app: &mut App, area: Rect) -> Prepared {
                 }
             }
             _ => {
-                app.page_rows = usize::from(panel_areas[0].height.saturating_sub(6));
+                app.page_rows = panels[app.active].rows();
                 for (p, g) in app.panels.iter_mut().zip(&panels) {
                     p.keep_visible_grid(g.rows(), g.columns.len());
                 }
@@ -119,15 +119,23 @@ pub fn prepare(app: &mut App, area: Rect) -> Prepared {
                 *offset = *cursor + 1 - *rows;
             }
         }
+        if let Some(d) = &mut app.command_line.dialog {
+            d.rows = crate::command_line::history::geometry(area).1;
+            d.keep_visible();
+        }
         if let Some(info) = &mut app.utilities.information {
             info.rows = usize::from(area.height.saturating_sub(4).min(24).saturating_sub(6));
             info.step(0);
         }
     }
     let message = if area.width >= 80 && area.height >= 25 {
-        app.dialogs
-            .last()
-            .map(|d| message_layout(area, d.title, &d.message))
+        app.dialogs.last().map(|d| {
+            message_layout(
+                area,
+                app.config.language.text(d.title),
+                &app.config.language.message(&d.message),
+            )
+        })
     } else {
         None
     };

@@ -303,7 +303,7 @@ Unsupported commands are not menu placeholders. Disk administration/recovery,
 DOS communications/country/printer setup and built-in printing are outside this
 app's scope. Save all and desktop window-management commands await a matching
 multi-document/window model. Future work is separate: safe archive extraction,
-command-history dialog, disk/free-space information and permission editing; later,
+disk/free-space information and permission editing; later,
 output recall, archive creation, custom associations and palette editing.
 Split/combine and line drawing remain low priority. No settings format changes.
 
@@ -321,3 +321,97 @@ Space/+/-/* retain selection actions when the prompt is empty. `cd`, `cd ~` and
 `cd "directory with spaces"` navigate the active panel; other shell commands use
 a child process, so environment changes do not persist. Long paths and commands
 scroll/clip to keep the insertion cursor visible. No command history is saved.
+
+## Language and regional formats
+
+Options → Configuration → Language / date & time offers English and Russian.
+Use Up/Down or Tab to choose a row; Left/Right or Space cycles its value. Clicking
+a row also cycles it. Enter/OK applies the draft; Esc/Cancel discards it. The
+preview shows the chosen format before applying. Language and formats are independent.
+English menu shortcuts still work alongside Russian mnemonics.
+
+Choose YMD/DMY/MDY, date separators `-`, `.` or `/`, 12/24-hour time and time
+separators `:` or `.`. Footer dates use a compact two-digit year; column dates
+use four digits. File information keeps the timezone offset. Archive dates retain
+their original timezone meaning. Machine timestamps, filenames, commands and file
+contents are unaffected. The 12-hour clock reserves extra header space for AM/PM.
+
+Preferences persist through the usual settings store and Save/Load desktop:
+`language=en|ru`, `date_order=ymd|dmy|mdy`, `date_separator`, `time_format=24|12`,
+and `time_separator`. Older configurations retain English/ISO date/24-hour defaults.
+Unknown language/format values use safe defaults.
+
+UTF-8 catalogs in `locales/en.lang` and `locales/ru.lang` are compiled into the
+binary. Each record is an English message ID, a tab, and its translation.
+Backslash/newline/tab use `\\`, `\n`, `\t` escapes; `~` marks a mnemonic.
+Keep corresponding IDs and unique menu mnemonics when editing translations, then
+rebuild. Catalogs are not loaded from the current directory. Missing resources
+fall back to English; some detailed diagnostics remain English and OS errors are
+shown unchanged. No system locale or timezone settings are changed.
+
+## Command history and copying names
+
+Utilities → Commands History (Alt+F8) lists the current session’s commands, most
+recent first, with up to 100 unique entries. Type or paste a filter to match any
+part of a command, ignoring case. Arrows, Home/End and page keys select entries;
+Tab moves between the filter, list and buttons. Enter/Use or double-click puts
+the exact command back in the prompt for editing. It never runs automatically.
+Esc/Cancel keeps the previous prompt and cursor. Ctrl+E/Ctrl+X recall still works.
+History is not written to disk.
+
+File → Copy names / paths → Names / Full paths copies visible marked entries,
+or the highlighted entry if no marks exist. The order matches the panel listing.
+Multiple entries are separated by newlines, without a final newline or shell
+quoting. Parent `..` is excluded; marks hidden by filtering do not cause fallback
+to the highlighted entry. Invalid Unicode, embedded CR/LF and text over 2 MiB
+are rejected without changing the clipboard.
+
+This uses DN’s internal text clipboard, shared with the editor and utilities,
+not the operating system clipboard. Shift+Insert pastes into the command prompt
+only when its existing single-line validation permits the text. Copying paths
+does not insert or execute a command.
+
+## Classic panel footer
+
+Below the listing, each panel shows the highlighted entry in cyan, a centered
+yellow selection summary with white numbers, then a gray volume-space line with
+white figures. With no marks it reads “No files selected”; marked files show
+their cached byte total and count. Selected folders are counted separately and
+never sized recursively. Unknown file lengths show `+ ?`. Only visible marks
+contribute; the filter separator continues to report hidden marks. Quick search
+temporarily uses the selection row.
+
+The last line shows space available to the current user and total capacity for
+the filesystem containing that panel’s directory. Exact byte counts are used
+when they fit, otherwise rounded binary units (KiB/MiB/GiB/TiB) are shown. This
+is volume capacity, not the size of the directory. On APFS it may represent a
+shared container; operating-system storage tools can account for purgeable space
+differently. Snapshots refresh in the background about every five seconds, on
+directory changes and after Refresh. Rendering and clock ticks perform no volume
+queries or directory scans. Failed queries display “Volume space unavailable”.
+No drive selector or DOS drive-letter controls are added.
+
+## Tetris high scores
+
+Alt+F9 opens Tetris. A finished game shows the final score, line count and
+starting/ending levels. Enter/Esc continues: positive scores qualifying for the
+top ten ask for a player name; other scores show the leaderboard directly.
+Type or paste a Unicode name (up to 30 graphemes / 240 UTF-8 bytes). Enter/OK
+saves it; Esc/Skip name records Anonymous. Blank names also use Anonymous.
+The new entry is highlighted. F4 shows the top ten during play. Closing an
+unfinished game does not add a score.
+
+Names, scores, lines, start/end levels and the last player name are stored in
+`tetris.conf` beside `config.conf`, not in the program’s directory. This is a
+separate UTF-8 `key=value` file: `tetris_version=1`, `last_name=...`, then up to ten
+`score=points,lines,start,end,name` records. Names may contain commas; control
+characters are rejected. Old installations start with an empty table.
+
+Accepted scores save immediately, even if preference auto-save is disabled.
+Writes use a private staging file and lock, merging the latest disk scores before
+keeping the top ten; equal scores retain existing order. Read-only, malformed,
+unsupported and symlinked files are not silently replaced. A failure leaves the
+score in memory and shows an error with Retry save. Unsaved scores remain available
+when closing/reopening the game during the session; retry after fixing the error.
+An explicitly abandoned name prompt or exiting the app before acceptance does not
+commit that result. The old DOS binary `dn.tet` format is not imported.

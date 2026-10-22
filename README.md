@@ -16,7 +16,10 @@ computers. It runs directly in your terminal—no DOS emulator or graphical fron
 - Browse ZIP, TAR and TAR.GZ archives without extracting them.
 - Type shell commands directly into the bottom command prompt.
 - Customize the layout, colors, clock and screensaver; settings save on exit.
-- Use the calculator, character table and configurable user menus—or play Tetris.
+- Classic panel footers show selection totals and available/total volume space.
+- Choose English or Russian, with independent date order and 12/24-hour time.
+- Recall commands through a searchable session history; copy filenames or paths to the internal clipboard.
+- Use the calculator, character table and configurable user menus—or play Tetris with named, persistent high scores.
 
 ## Get started
 
@@ -85,6 +88,14 @@ saves immediately; **Options → Configuration → System Setup** controls savin
 
 - macOS/Linux: `~/.config/dn/config.conf`, or `$XDG_CONFIG_HOME/dn/config.conf`.
 - Windows: `%APPDATA%\DOSNavigator\config.conf`.
+
+**Options → Configuration → Language / date & time** changes the interface language,
+date order (year/month/day, day/month/year or month/day/year), date separator and
+12/24-hour time with a configurable time separator. Apply accepts changes; Cancel
+keeps the previous settings. The clock, panel dates and file information follow
+these preferences. Defaults remain English, year-month-day and 24-hour time.
+English and Russian catalogs are embedded, so the binary needs no companion files.
+Untranslated diagnostics fall back to English; system errors retain their original text.
 - Older `config.txt` files migrate on save; the old file is retained as a backup.
 
 File operations refuse existing destinations. Trash is the default deletion mode;

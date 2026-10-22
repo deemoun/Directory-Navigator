@@ -36,14 +36,14 @@ pub(super) fn draw_setup(frame: &mut Frame, app: &mut App, area: Rect) {
         rect,
         rect.width,
         rect.height,
-        " Screen savers ",
+        app.config.language.text(" Screen savers "),
     );
     frame.render_widget(
-        Paragraph::new("Selected saver: Star Sky").style(dos(0x70)),
+        Paragraph::new(app.config.language.text("Selected saver: Star Sky")).style(dos(0x70)),
         Rect::new(rect.x + 3, rect.y + 2, 52, 1),
     );
     frame.render_widget(
-        Paragraph::new("Time before screen rest").style(dos(0x70)),
+        Paragraph::new(app.config.language.text("Time before screen rest")).style(dos(0x70)),
         Rect::new(rect.x + 3, rect.y + 4, 52, 1),
     );
     app.mouse.regions.clear();
@@ -56,9 +56,14 @@ pub(super) fn draw_setup(frame: &mut Frame, app: &mut App, area: Rect) {
     );
     for (i, minutes) in DELAYS.iter().enumerate() {
         let label = if *minutes == 0 {
-            "Never".to_string()
+            app.config.language.text("Never").to_string()
         } else {
-            format!("{minutes} minute{}", if *minutes == 1 { "" } else { "s" })
+            format!(
+                "{minutes} {}",
+                app.config
+                    .language
+                    .text(if *minutes == 1 { "minute" } else { "minutes" })
+            )
         };
         let row = Rect::new(rect.x + 4, rect.y + 6 + i as u16, 48, 1);
         frame.render_widget(
@@ -72,7 +77,12 @@ pub(super) fn draw_setup(frame: &mut Frame, app: &mut App, area: Rect) {
         app.mouse.regions.push((row, Target::Screensaver(i)));
     }
     frame.render_widget(
-        Paragraph::new("Any key or mouse input returns to DN").style(dos(0x70)),
+        Paragraph::new(
+            app.config
+                .language
+                .text("Any key or mouse input returns to DN"),
+        )
+        .style(dos(0x70)),
         Rect::new(rect.x + 3, rect.y + 14, 52, 1),
     );
     for (i, x, label) in [
@@ -81,7 +91,13 @@ pub(super) fn draw_setup(frame: &mut Frame, app: &mut App, area: Rect) {
         (CANCEL, 39, "[ Cancel ]"),
     ] {
         let row = Rect::new(rect.x + x, rect.y + 17, 12, 1);
-        super::dialog_style::button(frame, app.config.palette, row, label, setup.cursor == i);
+        super::dialog_style::button(
+            frame,
+            app.config.palette,
+            row,
+            app.config.language.text(label),
+            setup.cursor == i,
+        );
         app.mouse.regions.push((row, Target::Screensaver(i)));
     }
 }

@@ -25,7 +25,14 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
         width,
         height,
     );
-    super::dialog_style::window(frame, profile, rect, rect.width, rect.height, title);
+    super::dialog_style::window(
+        frame,
+        profile,
+        rect,
+        rect.width,
+        rect.height,
+        app.config.language.text(title),
+    );
     app.mouse.regions.clear();
     if !matches!(modal, ToolDialog::Busy) {
         super::dialog_style::close_button(
@@ -52,7 +59,7 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
                     frame,
                     profile,
                     Rect::new(x, rect.y + 2, w, 1),
-                    "No history in this session.",
+                    app.config.language.text("No history in this session."),
                     false,
                 );
             }
@@ -101,7 +108,9 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
                 frame,
                 profile,
                 Rect::new(x, rect.y + 1, w, 1),
-                "Visible files only · No recursive or content reads",
+                app.config
+                    .language
+                    .text("Visible files only · No recursive or content reads"),
                 false,
             );
             let options = app.file_tools.comparison;
@@ -116,6 +125,7 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
                 ),
             ] {
                 let row = Rect::new(x + 2, rect.y + 3 + index as u16 * 2, w - 4, 1);
+                let label = app.config.language.text(label);
                 text(
                     frame,
                     profile,
@@ -150,7 +160,9 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
                 frame,
                 profile,
                 Rect::new(x, rect.bottom() - 3, w, 1),
-                "Tab moves · Space toggles · Enter compares · Esc cancels",
+                app.config
+                    .language
+                    .text("Tab moves · Space toggles · Enter compares · Esc cancels"),
                 false,
             );
         }
@@ -182,7 +194,7 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
                 frame,
                 profile,
                 Rect::new(x, rect.y + 4, w, 1),
-                "Destination:",
+                app.config.language.text("Destination:"),
                 false,
             );
             let input = Rect::new(x, rect.y + 5, w, 1);
@@ -203,6 +215,7 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
                 (1, "Full paths", app.file_tools.full_paths),
             ] {
                 let row = Rect::new(x + index as u16 * 25, rect.y + 7, 24, 1);
+                let label = app.config.language.text(label);
                 text(
                     frame,
                     profile,
@@ -216,7 +229,9 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
                 frame,
                 profile,
                 Rect::new(x, rect.y + 9, w, 1),
-                "UTF-8 · One entry per line · Tab moves · Esc cancels",
+                app.config
+                    .language
+                    .text("UTF-8 · One entry per line · Tab moves · Esc cancels"),
                 false,
             );
             controls.push((
@@ -247,14 +262,14 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
                 frame,
                 profile,
                 row,
-                " [ OK ] ",
+                app.config.language.text(" [ OK ] "),
                 focus.is_some_and(|(f, a, _)| f == a),
             ),
             ToolAction::Cancel => super::dialog_style::button(
                 frame,
                 profile,
                 row,
-                " [ Cancel ] ",
+                app.config.language.text(" [ Cancel ] "),
                 focus.is_some_and(|(f, _, c)| f == c),
             ),
             _ => {}

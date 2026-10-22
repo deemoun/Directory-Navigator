@@ -20,6 +20,7 @@ pub(super) fn label_spans(label: &str, normal: Style, hot: Style) -> Vec<Span<'_
 }
 
 pub(super) fn draw_bar(frame: &mut Frame, app: &mut App, area: Rect) -> Vec<Rect> {
+    let language = app.config.language;
     let profile = app.config.palette;
     let dos = profile.styles();
     frame.render_widget(Block::default().style(dos(0x70)), area);
@@ -27,6 +28,7 @@ pub(super) fn draw_bar(frame: &mut Frame, app: &mut App, area: Rect) -> Vec<Rect
     let mut x = area.x;
     let mut positions = Vec::new();
     for (index, label) in menu::LABELS.iter().enumerate() {
+        let label = language.text(label);
         let width = Line::from(menu::plain(label)).width() as u16 + 3;
         let rect = Rect::new(x, area.y, width, 1).intersection(header);
         let selected = app.menu.is_some_and(|(root, _)| root == index);
@@ -44,10 +46,10 @@ pub(super) fn draw_bar(frame: &mut Frame, app: &mut App, area: Rect) -> Vec<Rect
     positions
 }
 
-fn menu_width(entries: &[menu::Item]) -> u16 {
+fn menu_width(entries: &[menu::Item], language: crate::localization::Language) -> u16 {
     let names = entries
         .iter()
-        .map(|item| Line::from(menu::plain(item.label)).width())
+        .map(|item| Line::from(menu::plain(language.text(item.label))).width())
         .max()
         .unwrap_or(0);
     let keys = entries
@@ -59,6 +61,7 @@ fn menu_width(entries: &[menu::Item]) -> u16 {
 }
 
 pub(super) fn draw_dropdowns(frame: &mut Frame, app: &mut App, bar: &[Rect], area: Rect) {
+    let language = app.config.language;
     let profile = app.config.palette;
     let dos = profile.styles();
     let Some((root, _)) = app.menu else {
@@ -67,7 +70,7 @@ pub(super) fn draw_dropdowns(frame: &mut Frame, app: &mut App, bar: &[Rect], are
     let mut parent: Option<Rect> = None;
     for depth in 0..=app.submenus.len() {
         let entries = menu::level_items(app, depth);
-        let width = menu_width(&entries).min(area.width);
+        let width = menu_width(&entries, language).min(area.width);
         let height = (entries.len() as u16 + 2).min(area.height - 1);
         let (x, y) = if let Some(parent) = parent {
             let right = parent.right() - 1;
@@ -130,11 +133,11 @@ pub(super) fn draw_dropdowns(frame: &mut Frame, app: &mut App, bar: &[Rect], are
                 Action::QuickView => app.quick_view.is_some(),
                 _ => false,
             };
-            let label_width = Line::from(menu::plain(item.label)).width();
+            let label_width = Line::from(menu::plain(language.text(item.label))).width();
             let padding =
                 (width as usize - 2).saturating_sub(2 + label_width + item.shortcut.len() + 2);
             let mut spans = vec![Span::styled(if checked { "• " } else { "  " }, normal)];
-            spans.extend(label_spans(item.label, normal, hot));
+            spans.extend(label_spans(language.text(item.label), normal, hot));
             spans.push(Span::styled(" ".repeat(padding), normal));
             spans.push(Span::styled(item.shortcut, normal));
             spans.push(Span::styled(

@@ -1,19 +1,25 @@
 use crate::{app::App, columns::ColumnPreset, filesystem::display_name, mouse::Target};
 use ratatui::{layout::Rect, text::Line, widgets::Paragraph, Frame};
 
-fn popup(
-    frame: &mut Frame,
-    profile: crate::palette::PaletteProfile,
-    area: Rect,
-    width: u16,
-    height: u16,
-    title: &str,
-) -> Rect {
-    super::dialog_style::window(frame, profile, area, width, height, title)
+fn popup(frame: &mut Frame, app: &App, area: Rect, width: u16, height: u16, title: &str) -> Rect {
+    super::dialog_style::window(
+        frame,
+        app.config.palette,
+        area,
+        width,
+        height,
+        app.config.language.text(title),
+    )
 }
 
 fn button(frame: &mut Frame, app: &mut App, rect: Rect, text: &str, target: Target, focused: bool) {
-    super::dialog_style::button(frame, app.config.palette, rect, text, focused);
+    super::dialog_style::button(
+        frame,
+        app.config.palette,
+        rect,
+        app.config.language.text(text),
+        focused,
+    );
     app.mouse.regions.push((rect, target));
 }
 
@@ -21,9 +27,9 @@ pub(super) fn draw_tools(frame: &mut Frame, app: &mut App, area: Rect) {
     let profile = app.config.palette;
     let dos = profile.styles();
     if let Some(pattern) = &app.pattern {
-        let rect = popup(frame, profile, area, 58, 8, pattern.title());
+        let rect = popup(frame, app, area, 58, 8, pattern.title());
         frame.render_widget(
-            Paragraph::new("Name pattern").style(dos(0x7f)),
+            Paragraph::new(app.config.language.text("Name pattern")).style(dos(0x7f)),
             Rect::new(rect.x + 2, rect.y + 1, rect.width - 4, 1),
         );
         let input = Rect::new(rect.x + 2, rect.y + 2, rect.width - 4, 1);
@@ -41,9 +47,9 @@ pub(super) fn draw_tools(frame: &mut Frame, app: &mut App, area: Rect) {
         );
         frame.set_cursor_position((input.x + (cursor - scroll) as u16, input.y));
         frame.render_widget(
-            Paragraph::new(
+            Paragraph::new(app.config.language.text(
                 "* any sequence · ? one character\nVisible files and folders only · case-sensitive",
-            )
+            ))
             .style(dos(0x70)),
             Rect::new(rect.x + 2, rect.y + 3, rect.width - 4, 2),
         );
@@ -73,7 +79,7 @@ pub(super) fn draw_tools(frame: &mut Frame, app: &mut App, area: Rect) {
         );
     }
     if let Some(dialog) = &app.columns_dialog {
-        let rect = popup(frame, profile, area, 74, 13, " Setup columns ");
+        let rect = popup(frame, app, area, 74, 13, " Setup columns ");
         let cursor = dialog.cursor;
         app.mouse.regions.clear();
         super::dialog_style::close_button(
@@ -86,11 +92,11 @@ pub(super) fn draw_tools(frame: &mut Frame, app: &mut App, area: Rect) {
         for panel in 0..2 {
             let x = rect.x + 3 + panel as u16 * 35;
             frame.render_widget(
-                Paragraph::new(if panel == 0 {
+                Paragraph::new(app.config.language.text(if panel == 0 {
                     "Left panel"
                 } else {
                     "Right panel"
-                })
+                }))
                 .style(dos(0x71)),
                 Rect::new(x, rect.y + 2, 31, 1),
             );
@@ -101,7 +107,7 @@ pub(super) fn draw_tools(frame: &mut Frame, app: &mut App, area: Rect) {
                     Paragraph::new(format!(
                         "({}) {}",
                         if checked { 'x' } else { ' ' },
-                        preset.label()
+                        app.config.language.text(preset.label())
                     ))
                     .style(dos(if cursor == panel && checked {
                         0x30
@@ -116,7 +122,12 @@ pub(super) fn draw_tools(frame: &mut Frame, app: &mut App, area: Rect) {
             }
         }
         frame.render_widget(
-            Paragraph::new("Tab chooses panel · Arrows change · Esc restores").style(dos(0x70)),
+            Paragraph::new(
+                app.config
+                    .language
+                    .text("Tab chooses panel · Arrows change · Esc restores"),
+            )
+            .style(dos(0x70)),
             Rect::new(rect.x + 3, rect.y + 9, rect.width - 6, 1),
         );
         button(
@@ -139,7 +150,7 @@ pub(super) fn draw_tools(frame: &mut Frame, app: &mut App, area: Rect) {
     if let Some(info) = &app.file_info {
         let rect = popup(
             frame,
-            profile,
+            app,
             area,
             area.width.min(76),
             area.height.min(21),
@@ -158,7 +169,7 @@ pub(super) fn draw_tools(frame: &mut Frame, app: &mut App, area: Rect) {
             .iter()
             .skip(info.offset)
             .take(rect.height.saturating_sub(4) as usize)
-            .map(|line| Line::from(line.as_str()))
+            .map(|line| Line::from(app.config.language.field(line, app.config.datetime)))
             .collect();
         frame.render_widget(
             Paragraph::new(visible)
@@ -167,7 +178,12 @@ pub(super) fn draw_tools(frame: &mut Frame, app: &mut App, area: Rect) {
             Rect::new(rect.x + 2, rect.y + 1, rect.width - 4, rect.height - 4),
         );
         frame.render_widget(
-            Paragraph::new("↑↓ / PgUp/PgDn scroll · ←→ long lines · Home resets").style(dos(0x70)),
+            Paragraph::new(
+                app.config
+                    .language
+                    .text("↑↓ / PgUp/PgDn scroll · ←→ long lines · Home resets"),
+            )
+            .style(dos(0x70)),
             Rect::new(rect.x + 2, rect.bottom() - 3, rect.width - 4, 1),
         );
         app.mouse.regions.clear();

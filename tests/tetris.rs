@@ -83,15 +83,19 @@ fn game_over_records_restart_and_ceiling_collision() {
     piece(&mut game, 2, 4, HEIGHT as i32 - 4);
     game.drop(now);
     assert!(game.over);
-    assert_eq!(game.records.len(), 1);
+    assert_eq!(game.screen, Screen::GameOver);
+    assert!(game.records.is_empty());
     let board = game.board;
     game.drop(now);
     game.rotate();
     assert!(!game.translate(1, 0));
     assert_eq!(game.board, board);
-    assert_eq!(game.records.len(), 1);
-    for score in 0..20 {
+    assert_eq!(game.screen, Screen::GameOver);
+    assert!(game.records.is_empty());
+    for score in (1..=10).rev() {
         game.records.push(Record {
+            name: "Anonymous".into(),
+            start_level: 1,
             score,
             lines: 0,
             level: 1,
@@ -106,10 +110,6 @@ fn game_over_records_restart_and_ceiling_collision() {
     game.fall(now);
     assert!(game.over);
     assert_eq!(game.records.len(), 10);
-    assert!(game
-        .records
-        .windows(2)
-        .all(|records| records[0].score >= records[1].score));
 }
 
 #[test]
@@ -183,6 +183,7 @@ impl Temp {
     }
     fn app(&self) -> io::Result<App> {
         let mut app = App::new(self.0.clone())?;
+        app.config_store = dn::config::Store::new(Some(self.0.join("config.conf")));
         let deadline = Instant::now() + Duration::from_secs(5);
         while app.panels.iter().any(|panel| panel.loading) {
             app.poll();
@@ -286,7 +287,25 @@ fn game_dialog_mouse_setup_cancel_apply_scores_and_resize() -> io::Result<()> {
     let mut app = temp.app()?;
     tetris::open(&mut app);
     for (width, height) in [(80, 25), (120, 40), (161, 30), (40, 10), (80, 25)] {
-        render(&mut app, width, height)?;
+        let terminal = render(&mut app, width, height)?;
+        if width == 80 {
+            let bar: String = (0..80)
+                .map(|x| terminal.backend().buffer()[(x, height - 1)].symbol())
+                .collect();
+            let expected = [
+                "F1 Help",
+                "F2 New",
+                "F3 Pause",
+                "F4 Scores",
+                "F5 Setup",
+                "+ Level",
+                "* Preview",
+                "Esc Close",
+            ]
+            .map(|s| format!("{s:<10}"))
+            .concat();
+            assert_eq!(bar, expected);
+        }
         assert_eq!(
             app.tetris.as_ref().unwrap().running(),
             width >= 80 && height >= 25
@@ -331,16 +350,221 @@ fn game_dialog_mouse_setup_cancel_apply_scores_and_resize() -> io::Result<()> {
     render(&mut app, 80, 25)?;
     assert_eq!(app.tetris.as_ref().unwrap().screen, Screen::Scores);
     key(&mut app, KeyCode::Enter);
-    app.tetris.as_mut().unwrap().records.push(Record {
+    app.game_scores.add(Record {
+        name: "Anonymous".into(),
+        start_level: 1,
         score: 123,
         lines: 4,
         level: 2,
-    });
+    })?;
     render(&mut app, 80, 25)?;
     click(&mut app, GameAction::Close);
     tetris::open(&mut app);
     assert_eq!(app.tetris.as_ref().unwrap().records[0].score, 123);
     key(&mut app, KeyCode::F(10));
     assert!(app.quit);
+    Ok(())
+}
+
+fn ended(app: &mut App, score: u64) {
+    let g = app.tetris.as_mut().unwrap();
+    g.score = score;
+    g.lines = 4;
+    g.start_level = 2;
+    g.level = 3;
+    g.over = true;
+    g.screen = Screen::GameOver;
+    g.submitted = false;
+}
+#[test]
+fn final_score_name_entry_saved_immediately_and_reloaded() -> io::Result<()> {
+    let t = Temp::new()?;
+    let mut app = t.app()?;
+    app.config.save_on_exit = false;
+    tetris::open(&mut app);
+    ended(&mut app, 1234);
+    let terminal = render(&mut app, 80, 25)?;
+    let screen: String = terminal
+        .backend()
+        .buffer()
+        .content
+        .iter()
+        .map(|c| c.symbol())
+        .collect();
+    assert!(screen.contains("Final score: 1234"));
+    key(&mut app, KeyCode::Enter);
+    assert_eq!(app.tetris.as_ref().unwrap().screen, Screen::Name);
+    key(&mut app, KeyCode::F(2));
+    assert_eq!(app.tetris.as_ref().unwrap().screen, Screen::Name);
+    input::paste(&mut app, "Дмитрий, 世界 👩‍💻");
+    render(&mut app, 80, 25)?;
+    click(&mut app, GameAction::SubmitName);
+    let g = app.tetris.as_ref().unwrap();
+    assert_eq!(g.screen, Screen::Scores);
+    assert_eq!(g.highlighted, Some(0));
+    assert_eq!(g.records[0].name, "Дмитрий, 世界 👩‍💻");
+    assert_eq!(g.records[0].start_level, 2);
+    let path = t.0.join("tetris.conf");
+    assert!(fs::read_to_string(&path)?.contains("Дмитрий, 世界 👩‍💻"));
+    assert!(!t.0.join("config.conf").exists());
+    tetris::action(&mut app, GameAction::SubmitName);
+    assert_eq!(app.game_scores.board.records.len(), 1);
+    let mut other = t.app()?;
+    tetris::open(&mut other);
+    assert_eq!(
+        other.tetris.as_ref().unwrap().records,
+        app.game_scores.board.records
+    );
+    key(&mut other, KeyCode::F(4));
+    for (w, h) in [(80, 25), (120, 40), (40, 10), (80, 25)] {
+        render(&mut other, w, h)?;
+    }
+    Ok(())
+}
+#[test]
+fn score_qualification_ties_anonymous_and_grapheme_name_limits() -> io::Result<()> {
+    let t = Temp::new()?;
+    let mut app = t.app()?;
+    tetris::open(&mut app);
+    ended(&mut app, 0);
+    key(&mut app, KeyCode::Enter);
+    assert_eq!(app.tetris.as_ref().unwrap().screen, Screen::Scores);
+    assert!(!t.0.join("tetris.conf").exists());
+    ended(&mut app, 100);
+    key(&mut app, KeyCode::Enter);
+    input::paste(&mut app, "é👩‍💻");
+    key(&mut app, KeyCode::Backspace);
+    assert_eq!(app.tetris.as_ref().unwrap().name, "é");
+    input::paste(&mut app, "\n");
+    assert_eq!(app.tetris.as_ref().unwrap().name, "é");
+    input::paste(&mut app, &"x".repeat(31));
+    assert_eq!(app.tetris.as_ref().unwrap().name, "é");
+    key(&mut app, KeyCode::Esc);
+    assert_eq!(app.game_scores.board.records[0].name, "Anonymous");
+    for score in 1..=10 {
+        app.tetris.as_mut().unwrap().records.push(Record {
+            name: "other".into(),
+            start_level: 1,
+            score: score * 100,
+            lines: 0,
+            level: 1,
+        });
+    }
+    app.tetris
+        .as_mut()
+        .unwrap()
+        .records
+        .sort_by_key(|r| std::cmp::Reverse(r.score));
+    app.tetris.as_mut().unwrap().records.truncate(10);
+    let threshold = app.tetris.as_ref().unwrap().records.last().unwrap().score;
+    ended(&mut app, threshold);
+    key(&mut app, KeyCode::Enter);
+    assert_eq!(app.tetris.as_ref().unwrap().screen, Screen::Scores);
+    ended(&mut app, threshold + 1);
+    key(&mut app, KeyCode::Enter);
+    assert_eq!(app.tetris.as_ref().unwrap().screen, Screen::Name);
+    Ok(())
+}
+#[test]
+fn score_files_merge_instances_and_refuse_corruption_symlinks_and_readonly() -> io::Result<()> {
+    use dn::tetris::scores::{Board, Store};
+    let t = Temp::new()?;
+    let path = t.0.join("tetris.conf");
+    let mut a = Store::default();
+    let mut b = Store::default();
+    a.load(Some(path.clone()))?;
+    b.load(Some(path.clone()))?;
+    for (store, score) in [(&mut a, 20), (&mut b, 30)] {
+        store.add(Record {
+            name: format!("name,{score}"),
+            score,
+            lines: 1,
+            start_level: 1,
+            level: 2,
+        })?;
+        store.save()?;
+    }
+    let contents = fs::read(&path)?;
+    assert_eq!(Board::parse(&contents)?.records.len(), 2);
+    b.save()?;
+    assert_eq!(Board::parse(&fs::read(&path)?)?.records.len(), 2);
+    for invalid in [
+        b"tetris_version=2\n".as_slice(),
+        b"tetris_version=1\nscore=1,0,11,1,bad\n",
+        b"tetris_version=1\nscore=18446744073709551616,0,1,1,bad\n",
+        b"tetris_version=1\nlast_name=bad\tname\n",
+    ] {
+        assert!(Board::parse(invalid).is_err());
+    }
+    fs::write(&path, "broken file")?;
+    assert!(b.save().is_err());
+    b.add(Record {
+        name: "pending".into(),
+        score: 100,
+        lines: 0,
+        start_level: 1,
+        level: 1,
+    })?;
+    assert!(b.save().is_err());
+    assert!(b.has_pending());
+    assert_eq!(fs::read_to_string(&path)?, "broken file");
+    fs::write(&path, &contents)?;
+    b.save()?;
+    assert!(!b.has_pending());
+    assert_eq!(Board::parse(&fs::read(&path)?)?.records.len(), 3);
+    let before = fs::read(&path)?;
+    b.add(Record {
+        name: "readonly pending".into(),
+        score: 200,
+        lines: 0,
+        start_level: 1,
+        level: 1,
+    })?;
+    let mut permissions = fs::metadata(&path)?.permissions();
+    let original = permissions.clone();
+    permissions.set_readonly(true);
+    fs::set_permissions(&path, permissions)?;
+    assert!(b.save().is_err());
+    assert_eq!(fs::read(&path)?, before);
+    fs::set_permissions(&path, original)?;
+    fs::write(path.with_file_name("tetris.conf.lock"), "busy")?;
+    assert!(b.save().is_err());
+    assert_eq!(fs::read(&path)?, before);
+    #[cfg(unix)]
+    {
+        let link = t.0.join("link.conf");
+        std::os::unix::fs::symlink(&path, &link)?;
+        let mut linked = Store::default();
+        assert!(linked.load(Some(link)).is_err());
+        assert_eq!(fs::read(&path)?, before);
+    }
+    Ok(())
+}
+#[test]
+fn failed_score_save_is_visible_retryable_and_survives_game_close() -> io::Result<()> {
+    let t = Temp::new()?;
+    let mut app = t.app()?;
+    let path = t.0.join("tetris.conf");
+    fs::write(&path, "invalid")?;
+    tetris::open(&mut app);
+    ended(&mut app, 999);
+    key(&mut app, KeyCode::Enter);
+    input::paste(&mut app, "Winner");
+    key(&mut app, KeyCode::Enter);
+    assert!(app.game_scores.has_pending());
+    assert!(app.tetris.as_ref().unwrap().notice.contains("not saved"));
+    assert_eq!(fs::read_to_string(&path)?, "invalid");
+    tetris::action(&mut app, GameAction::Close);
+    tetris::open(&mut app);
+    assert_eq!(app.tetris.as_ref().unwrap().records[0].name, "Winner");
+    fs::write(&path, "tetris_version=1\nlast_name=Anonymous\n")?;
+    tetris::action(&mut app, GameAction::Scores);
+    render(&mut app, 80, 25)?;
+    click(&mut app, GameAction::RetrySave);
+    assert!(!app.game_scores.has_pending());
+    assert_eq!(
+        dn::tetris::scores::Board::parse(&fs::read(&path)?)?.records[0].name,
+        "Winner"
+    );
     Ok(())
 }

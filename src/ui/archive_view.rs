@@ -23,7 +23,7 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
         area,
         area.width.saturating_sub(4).min(110),
         area.height.saturating_sub(4).min(30),
-        " Archive browser — read-only ",
+        app.config.language.text(" Archive browser — read-only "),
     );
     app.mouse.regions.clear();
     super::dialog_style::close_button(
@@ -146,7 +146,9 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
             format!(
                 "{} B · {}",
                 n.size,
-                n.modified.as_deref().unwrap_or("Modified: unavailable")
+                app.config
+                    .datetime
+                    .archive(n.modified.as_deref().unwrap_or("Modified: unavailable"))
             )
         })
         .unwrap_or_else(|| "Enter opens · Backspace parent · Esc closes".into());
@@ -159,7 +161,12 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
         Rect::new(x, rect.bottom() - 4, w, 1),
     );
     frame.render_widget(
-        Paragraph::new("Read-only · No extraction · Links are not followed").style(dos(0x78)),
+        Paragraph::new(
+            app.config
+                .language
+                .text("Read-only · No extraction · Links are not followed"),
+        )
+        .style(dos(0x78)),
         Rect::new(x, rect.bottom() - 3, w, 1),
     );
     let bw = (rect.width - 4) / 6;
@@ -178,7 +185,13 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
             _ => true,
         };
         if enabled {
-            super::dialog_style::button(frame, profile, r, label, b.focus == i);
+            super::dialog_style::button(
+                frame,
+                profile,
+                r,
+                app.config.language.text(label),
+                b.focus == i,
+            );
             app.mouse.regions.push((r, Target::Archive(a)));
         } else {
             frame.render_widget(Paragraph::new(label).style(dos(0x78)), r);

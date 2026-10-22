@@ -552,13 +552,13 @@ fn panel_footer_sizes_totals_paths_and_resized_mouse_rows() -> io::Result<()> {
         let terminal = render(&mut app, width, height)?;
         let buffer = terminal.backend().buffer();
         let line = |y: u16| -> String { (0..width / 2).map(|x| buffer[(x, y)].symbol()).collect() };
-        assert!(line(height - 5).contains("12,345"));
-        assert!(line(height - 4).contains("1 file, 12,345 bytes"));
+        assert!(line(height - 6).contains("12,345"));
+        assert!(line(height - 5).contains("No files selected"));
         for y in 2..height - 6 {
             assert!(!line(y).contains("12,345"));
             assert!(!line(y).contains("12345"));
         }
-        assert_eq!(app.page_rows, usize::from(height - 9));
+        assert_eq!(app.page_rows, usize::from(height - 10));
         assert!(app
             .mouse
             .regions
@@ -573,7 +573,7 @@ fn panel_footer_sizes_totals_paths_and_resized_mouse_rows() -> io::Result<()> {
     focus(&mut app, "folder");
     let terminal = render(&mut app, 80, 25)?;
     let footer: String = (0..40)
-        .map(|x| terminal.backend().buffer()[(x, 20)].symbol())
+        .map(|x| terminal.backend().buffer()[(x, 19)].symbol())
         .collect();
     assert!(footer.contains("<SUB-DIR>"));
     app.panels[0].path = PathBuf::from(format!("/{}終点", "long/".repeat(30)));

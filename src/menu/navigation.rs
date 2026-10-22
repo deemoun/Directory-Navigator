@@ -21,7 +21,7 @@ pub fn open(app: &mut App, root: usize) {
 pub fn open_mnemonic(app: &mut App, character: char) -> bool {
     if let Some(index) = super::LABELS
         .iter()
-        .position(|label| super::mnemonic(label) == Some(character.to_ascii_lowercase()))
+        .position(|label| app.config.language.matches(label, character))
     {
         open(app, index);
         true
@@ -105,9 +105,10 @@ pub fn key(app: &mut App, code: KeyCode) {
             }
         }
         KeyCode::Char(c) => {
-            if let Some(index) = entries.iter().position(|item| {
-                item.selectable() && super::mnemonic(item.label) == Some(c.to_ascii_lowercase())
-            }) {
+            if let Some(index) = entries
+                .iter()
+                .position(|item| item.selectable() && app.config.language.matches(item.label, c))
+            {
                 activate(app, depth, index);
             }
         }

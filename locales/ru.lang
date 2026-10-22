@@ -1,0 +1,417 @@
+# UTF-8 catalog: English message ID<TAB>translation; escapes: \n \t \\
+ Name	 Имя
+ · No match	 · Нет совпадений
+12 hour	12 часов
+24 hour	24 часа
+ASCII / DOS CP437 Table	ASCII / DOS CP437
+ASCII Ta~b~le	~Т~аблица символов
+About Directory Navigator	О Directory Navigator
+Active directory	Текущая папка
+All	Все
+Any key or mouse input returns to DN	Любая клавиша или мышь — возврат в DN
+Application	Приложение
+Architecture	Архитектура
+Archive member information	Свойства элемента архива
+As He~x~	~Ш~естнадцатеричный
+As ~T~ext	Как ~т~екст
+Author	Автор
+Auto~i~ndent	~А~втоотступ
+Available memory	Доступная память
+BS - go to ~u~pper directory	BS — ~р~одительская папка
+Backward	Назад
+Behavior	Поведение
+Browse archive	Открыть архив
+Calculate directory si~z~es...	Ра~з~меры папок...
+Calculator	Калькулятор
+Cancel	Отмена
+Cannot read file information.	Не удалось прочитать свойства файла.
+Case sensitive	С учётом регистра
+Change all	Заменить всё
+Change direc~t~ory...	П~е~рейти в папку...
+Classic DN — fixed 256 colors	Классика DN — 256 цветов
+Clear	Очистить
+Clear all marks	Снять все отметки
+Close	Закрыть
+Colors	Цвета
+Compare directories	Сравнить папки
+Confirm permanent deletion	Подтвердите удаление навсегда
+Confirm replacement	Подтвердить замену
+Confirmation policy — read-only	Подтверждения — только чтение
+Copy	Копия
+Copy to	Копировать в
+Cu~t~	Вы~р~езать
+C~o~lors...	~Ц~вета...
+DN resident memory	Память процесса DN
+Date order	Порядок даты
+Date separator	Разделитель даты
+Day–month–year	День–месяц–год
+Del	Удал.
+Delete	Удалить
+Destination	Назначение
+De~l~ete selection	~У~далить выделенное
+Directory	Папка
+Directory Navigator — Help	Directory Navigator — Помощь
+Directory Navigator — error	Directory Navigator — ошибка
+Directory name	Имя папки
+Directory sizes — snapshot	Размеры папок — снимок
+Directory tree	Дерево папок
+Discard	Отбросить
+Display	Отображение
+Document	Документ
+Dupe	Дубль
+Edit	Ред.
+Editor	Редактор
+Editor help	Помощь редактора
+Enter / Esc: close	Enter / Esc: закрыть
+Enter applies · Esc cancels	Enter — применить · Esc — отменить
+Entire scope	Вся область
+Entry type	Тип объекта
+Error	Ошибка
+Exact size	Точный размер
+Existing destinations are always refused.\nTrash and permanent deletion require confirmation.	Существующие назначения не перезаписываются.\nУдаление и корзина требуют подтверждения.
+E~x~it	В~ы~ход
+E~x~it DN	В~ы~ход из DN
+F1: keyboard help	F1: помощь по клавишам
+F3 View	F3 Просм.
+F9 Info	F9 Инфо
+File Attributes / Info (read-only)	Свойства файла (только чтение)
+File Edit History	История редактора
+File Manager Setup	Файловый менеджер
+File View History	История просмотра
+File operation	Файловая операция
+File ~A~ttributes / Info...	С~в~ойства файла...
+File ~E~dit History	История ~р~едактора
+File ~V~iew History	~И~стория просмотра
+Filename filter	Фильтр имён
+Filter	Фильтр
+Find	Найти
+Find files	Найти файлы
+Find results	Результаты поиска
+Forward	Вперёд
+Free memory	Свободная память
+From cursor	От курсора
+Full path	Полный путь
+Go To	Перейти
+Go to directory	Перейти в папку
+Go to line	Перейти к строке
+Help	Пом.
+Highlight Groups	Цвета типов файлов
+History of directories	История папок
+History of ~d~irectories...	Ис~т~ория папок...
+Hostname	Имя компьютера
+Interface Setup	Интерфейс
+In~v~ert selection	Ин~в~ертировать отметки
+Language	Язык
+Language / date & time	Язык, дата и время
+Left panel	Левая панель
+Link target	Цель ссылки
+Link target (not followed)	Цель ссылки (без перехода)
+Local ~m~enu definition...	~Л~окальное меню...
+Logical CPUs	Логические процессоры
+Make directory	Создать папку
+Make list file	Создать список файлов
+Memory Information	Память
+Menu	Меню
+MkDir	Папка
+Modified	Изменён
+Month–day–year	Месяц–день–год
+Move	Перем
+Move / rename to	Переместить / переименовать
+Move deleted files to T~r~ash	Удалять в ~к~орзину
+Move to Trash	Переместить в корзину
+Name	Имя
+Name + Size	Имя + Размер
+Name + Size + Modified	Имя + Размер + Дата
+Name only	Только имя
+Name pattern	Маска имени
+Native Rust terminal file manager	Терминальный файловый менеджер на Rust
+Never	Никогда
+New name	Новое имя
+Next	Далее
+No	Нет
+OK	OK
+OS version	Версия ОС
+Open	Откр.
+Open file	Открыть файл
+Operating system	Операционная система
+Options	Настройки
+PID	PID
+Parent directory	Родительская папка
+Path	Путь
+Permissions	Права доступа
+Physical RAM	Физическая память
+Preview	Пример
+Prompt on replace	Подтверждать замены
+Quick directories	Быстрые папки
+Quick s~e~arch...	Быстрый ~п~оиск...
+Quit	Вых.
+Read-only	Только чтение
+Read-only information · no attributes are changed.	Только просмотр · атрибуты не изменяются.
+Reading directory…	Чтение папки…
+Reading file…	Чтение файла…
+Reading metadata…	Чтение свойств…
+Reading…	Чтение…
+Refresh	Обновить
+Regular file	Обычный файл
+Replace	Заменить
+Replacement	Замена
+Reverse	Назад
+Re~v~ersed search	~О~братный поиск
+Right panel	Правая панель
+Run	Выполнить
+Save	Сохр.
+Save As — new destination	Сохранить как — новый файл
+Save settings on e~x~it	~А~втосохранение настроек
+Save ~a~s...	Сохранить ~к~ак...
+Screen savers	Заставки
+Screen sa~v~ers...	~З~аставки...
+Search in viewer	Поиск в просмотре
+Search text	Искомый текст
+Select all	Отметить всё
+Select group	Отметить группу
+Select grou~p~...	Отметить ~г~руппу...
+Select ~a~ll	В~ы~брать всё
+Selected saver: Star Sky	Заставка: Звёздное небо
+Selected text	Выделенный текст
+Set Current	Назначить
+Setup columns	Колонки
+Setup c~o~lumns...	~К~олонки...
+Shell	Оболочка
+Show ~c~lock	Показывать ~ч~асы
+Show ~h~idden files	Показывать ~с~крытые файлы
+Size	Размер
+Sort ~b~y...	~С~ортировка...
+Special file	Специальный файл
+Stop	Стоп
+Swap total	Всего подкачки
+Swap used	Использовано подкачки
+Symbolic link	Символическая ссылка
+Syntax ~h~ighlight	Подсветка с~и~нтаксиса
+System Information	Система
+System Setup	Система
+S~y~stem Information	~С~истема
+S~y~stem Setup...	~С~истема...
+Tab / ↑↓ choose · Space toggle · Enter OK · Esc Cancel	Tab / ↑↓ — выбор · Пробел — смена · Enter OK · Esc отмена
+Tab panels · Arrows/PgUp/PgDn/Home/End navigate\nAlt+F/U/P/M/O menus · Alt+X exits\nEnter app/dir/archive · Ctrl+Enter OS app · F3 view · F4 edit · BS parent\nIns / Space marks · Ctrl+A all · Ctrl+U clear\n+ / - group · Alt+E info · Alt+K columns\nAlt+F7 quick search · Ctrl+F7 recursive Find\nCtrl+Q quick view · Ctrl+T tree · Alt+F9 Tetris\nCtrl+1–9 bookmarks set · Alt+1–9 go · Alt+Del filter\nCtrl+K calculator · Ctrl+B ASCII · Alt+Y memory\nCtrl+C compare · Alt+L list file\nAlt+BS directories · Alt+PgUp edits / PgDn views\nF2 user menu · Shift+F2 sort · Ctrl+F3 name / F4 ext / F5 date / F6 size\nF5 copy · F6 move · Shift+F6 rename here\nF7 mkdir · F8 Trash/delete · F9 menu · F10 exit\nCtrl+H hidden · Ctrl+L go to · Ctrl+R refresh\nClick row · Ctrl+click mark · Double-click open\nWheel scrolls · Esc cancels dialogs/operations\nType commands · Enter runs · Esc clears · Ctrl+E/X history · Alt+F8 list\nFile menu: Copy names / paths uses internal clipboard\nColors: white dirs · green exec · cyan source\nMagenta archives · blue links · yellow marks\nTrash by default; File Manager Setup changes mode.\nExisting destinations are refused; no overwrites.	Tab — сменить панель · Стрелки/PgUp/PgDn/Home/End — навигация\nAlt+F/U/P/M/O — меню · Alt+X — выход\nEnter — открыть · Ctrl+Enter — приложение ОС · F3 просмотр · F4 редактор\nIns / Пробел — отметить · Ctrl+A все · Ctrl+U снять отметки\n+ / - — группа · Alt+E свойства · Alt+K колонки\nAlt+F7 — быстрый поиск · Ctrl+F7 — поиск по папкам\nCtrl+Q — быстрый просмотр · Ctrl+T — дерево · Alt+F9 — Тетрис\nCtrl+1–9 — назначить закладку · Alt+1–9 — перейти · Alt+Del фильтр\nCtrl+K калькулятор · Ctrl+B символы · Alt+Y память\nCtrl+C сравнить · Alt+L список файлов\nAlt+BS история папок · Alt+PgUp редактор / PgDn просмотр\nF2 меню пользователя · Shift+F2 сортировка\nF5 копировать · F6 переместить · Shift+F6 переименовать\nF7 создать папку · F8 корзина/удаление · F9 меню · F10 выход\nCtrl+H скрытые · Ctrl+L перейти · Ctrl+R обновить\nЩелчок — выбрать · Ctrl+щелчок — отметить · Двойной — открыть\nКолесо — прокрутка · Esc — отмена\nКоманды: Enter выполнить · Esc очистить · Ctrl+E/X история · Alt+F8 список\nФайл: копирование имён/путей во внутренний буфер\nБелый — папки · Зелёный — программы · Бирюзовый — исходники\nПурпурный — архивы · Синий — ссылки · Жёлтый — отметки\nПо умолчанию файлы перемещаются в корзину.\nСуществующие назначения не перезаписываются.
+Tab width	Ширина табуляции
+Terminal	Терминал
+Terminal size	Размер терминала
+Terminal — ANSI/theme colors	Терминал — цвета ANSI
+Time before screen rest	Время до заставки
+Time format	Формат времени
+Time separator	Разделитель времени
+Unsaved changes	Несохранённые изменения
+Unselect group	Снять отметки группы
+User	Польз.
+User menu	Меню пользователя
+Version	Версия
+View	Просм
+Viewer	Просмотр
+Whole words	Слова целиком
+Wrap	Перенос
+Year–month–day	Год–месяц–день
+Yes	Да
+[ Apply ]	[ Применить ]
+[ Cancel ]	[ Отмена ]
+[ Close ]	[ Закрыть ]
+[ Help ]	[ Помощь ]
+[ OK ]	[ OK ]
+[ Preview ]	[ Просмотр ]
+bytes	байт
+filtered marks	скрытых отметок
+marked	отмечено
+~A~bout...	~О~ программе...
+~A~s is	~А~втоматически
+~B~lock	~Б~лок
+~B~rief	~К~раткий
+~B~rowse archive...	~А~рхив...
+~C~alculator	~К~алькулятор
+~C~lose editor	~З~акрыть редактор
+~C~olumn defaults...	~К~олонки по умолчанию...
+~C~ompare directories...	С~р~авнить папки...
+~C~onfiguration	~К~онфигурация
+~C~onfirmation policy...	~П~одтверждения...
+~C~opy	~К~опировать
+~C~opy...	~К~опировать...
+~D~EL erases file(s)	~D~EL удаляет файлы
+~D~ate	~Д~ата
+~D~elete	~У~далить
+~D~etails	~П~одробный
+~D~irectory tree	~Д~ерево папок
+~D~uplicate line	~Д~ублировать строку
+~E~dit	П~р~авка
+~E~xpand typed tabs to spaces	Табуляция ~п~робелами
+~E~xtension	~Р~асширение
+~F~ile	~Ф~айл
+~F~ile Manager	~Ф~айловый менеджер
+~F~ilename filter...	~Ф~ильтр имён...
+~F~ind...	~Н~айти...
+~G~ame	~И~гра
+~G~lobal menu definition...	~Г~лобальное меню...
+~G~o to line...	~С~трока...
+~H~ighlight file types	~Ц~вета типов файлов
+~H~ighlight groups...	~Ц~вета типов файлов...
+~I~nterface...	~И~нтерфейс...
+~L~anguage / date & time...	~Я~зык, дата и время...
+~L~ayout	Вид пане~л~и
+~L~oad desktop	~З~агрузить настройки
+~M~ake directory	~С~оздать папку
+~M~ake list file...	Создать сп~и~сок...
+~M~anager	~М~енеджер
+~M~emory Information	~П~амять
+~M~isc	Ра~з~ное
+~N~ame	~И~мя
+~O~pen with default app	~О~ткрыть в приложении
+~O~pen...	~О~ткрыть...
+~O~ptions	~Н~астройки
+~P~anel	~П~анель
+~P~aragraph	~А~бзац
+~P~aste	~В~ставить
+~Q~uick directories...	~Б~ыстрые папки...
+~Q~uick view	Б~ы~стрый просмотр
+~R~e-read	~О~бновить
+~R~edo	~П~овторить
+~R~efresh	Об~н~овить
+~R~ename/Move...	П~е~реместить...
+~R~eplace...	~З~аменить...
+~S~PACE toggles selection	~П~РОБЕЛ отмечает файл
+~S~ave	~С~охранить
+~S~ave desktop	~С~охранить настройки
+~S~creensaver	~З~аставка
+~S~earch	~П~оиск
+~S~earch again	~П~овторить поиск
+~S~etup Panel...	~Н~астройка панели...
+~S~etup...	~Н~астройки...
+~S~ize	Ра~з~мер
+~S~wap panels	По~м~енять панели
+~T~ab width...	Ширина ~т~абуляции...
+~T~ag character	~С~имвол отметки
+~U~ndo	~О~тменить
+~U~nselect group...	Снять от~м~етки группы...
+~U~ser menu	~М~еню пользователя
+~U~tilities	~У~тилиты
+~V~iew	~П~росмотр
+←/→ or Space changes · Tab/↑↓ chooses	←/→ или Пробел — изменить · Tab/↑↓ — выбрать
+↑↓ / PgUp/PgDn scroll	↑↓ / PgUp/PgDn — прокрутка
+↑↓ / PgUp/PgDn scroll · ←→ long lines · Home resets	↑↓ / PgUp/PgDn — прокрутка · ←→ — сдвиг · Home — сброс
+minute	минута
+minutes	минут
+Move to Trash · items:	В корзину · элементов:
+Permanently delete · items:	Удалить навсегда · элементов:
+Restore using your desktop file manager.	Восстановление — через файловый менеджер системы.
+This cannot be undone.	Это действие нельзя отменить.
+Expression · + - * / % ^ · sqrt() abs() · 0x / 0b / 0o	Выражение · + - * / % ^ · sqrt() abs() · 0x / 0b / 0o
+Up/Down history · Enter evaluates · Tab moves · Esc closes	↑↓ история · Enter вычислить · Tab выбор · Esc закрыть
+Loading native information…	Загрузка системных сведений…
+Snapshot · R/F5 Refresh · ↑↓ PgUp/PgDn scroll · ←→ pan	Снимок · R/F5 обновить · ↑↓ PgUp/PgDn прокрутка · ←→ сдвиг
+ASCII controls are shown as dots and cannot be copied	Управляющие коды ASCII показаны точками; копирование выключено
+DOS font glyphs at 01–1F / 7F; not control-code decoding	01–1F / 7F — графические символы DOS, а не управляющие коды
+ Copy disabled 	Копирование выключено
+Archive browser — read-only	Архив — только просмотр
+Viewer search — loaded text	Поиск в загруженном тексте
+C/T or Space chooses · Enter applies · Esc restores	C/T или Пробел — выбор · Enter принять · Esc вернуть
+Copy uses DN's internal clipboard · Ctrl+C copies	Копирование во внутренний буфер DN · Ctrl+C копировать
+Existing destinations are refused.	Существующие файлы не перезаписываются.
+Filename pattern	Маска имени
+Preview off	Просмотр выключен
+Read-only · No extraction · Links are not followed	Только просмотр · Без извлечения и перехода по ссылкам
+Tab chooses field/option · Space toggles · Enter OK\nAlt+C/W: options · Alt+B/D: direction · Esc Cancel	Tab — поле/параметр · Пробел — переключить · Enter OK\nAlt+C/W — параметры · Alt+B/D — направление · Esc отмена
+Tab chooses panel · Arrows change · Esc restores	Tab — панель · Стрелки — изменить · Esc вернуть
+This document has unsaved changes.\n\nSave before closing or switching files?\n\nS: Save    D: Discard    C / Esc / Enter: Cancel	В документе есть несохранённые изменения.\n\nСохранить перед закрытием или сменой файла?\n\nS: Сохранить    D: Отбросить    C / Esc / Enter: Отмена
+Visible cached filenames · case-sensitive * and ?\nEmpty or * clears · Parent stays visible\nFiltered marks are preserved; operations use visible marks	Имена в текущем списке · * и ? с учётом регистра\nПусто или * — снять фильтр · .. остаётся\nСкрытые отметки сохраняются; действия — с видимыми
+[New file]	[Новый файл]
+<empty>	<пусто>
+← → Move   ↑ Rotate\n↓ / Space Drop\nEsc returns to files	← → — двигать   ↑ — поворот\n↓ / Пробел — сбросить\nEsc — вернуться к файлам
+↑↓ / 1–9 choose · Tab moves · Ctrl+1–9 set · Alt+1–9 go	↑↓ / 1–9 выбор · Tab переход · Ctrl+1–9 назначить · Alt+1–9 открыть
+Text to find:	Найти:
+New text:	Новый текст:
+Whole words only	Только слова
+Direction	Направление
+Scope	Область
+Origin	Начало
+Global	Весь текст
+Terminal palette — legacy ANSI colors	Палитра терминала — цвета ANSI
+ Name      marked	 Имя      отмечено
+ folder	 папка
+ ordinary file	 обычный файл
+ source.rs	 исходник.rs
+ selected file	 текущий файл
+Include subdirectories	Включая подпапки
+Show hidden	Скрытые файлы
+No history in this session.	История сеанса пуста.
+Visible files only · No recursive or content reads	Только видимые файлы · Без подпапок и чтения содержимого
+Compare size	Сравнить размер
+Compare time	Сравнить время
+Select differences (replace marks)	Отметить различия (заменить отметки)
+Unselect equivalent (retain differences)	Снять отметки с совпадающих
+Tab moves · Space toggles · Enter compares · Esc cancels	Tab переход · Пробел выбор · Enter сравнить · Esc отмена
+Destination:	Назначение:
+Names	Имена
+Full paths	Полные пути
+F2 / Ctrl+S Save · Shift+F2 Save As · F3 Open\nF6 Duplicate line · F7 / Ctrl+F Find\nShift+F7 Search again · Alt+F7 Reverse search\nCtrl+F7 Replace · Alt+G / Ctrl+G Go to line\nCtrl+←/→ words · Ctrl+Shift+←/→ select words\nShift+arrows select · Ctrl+A select all\nAlt+Backspace / Ctrl+Z Undo · Ctrl+Y Redo\nCtrl+Ins/C Copy · Shift+Del / Ctrl+X Cut\nShift+Ins / Ctrl+V Paste · terminal paste supported\nAlt+B Block: selection/clipboard · Options: indent/colors/tabs\nF10 Menu · Ctrl+F4 / Esc Close · Alt+X Quit DN\nOpen/Close/Quit protect unsaved changes.\nUTF-8, 2 MiB / 100k lines. Line endings preserved.\nSave As never overwrites an existing destination.	F2 / Ctrl+S сохранить · Shift+F2 сохранить как · F3 открыть\nF6 повторить строку · F7 / Ctrl+F найти\nShift+F7 искать далее · Alt+F7 обратный поиск\nCtrl+F7 заменить · Alt+G / Ctrl+G перейти к строке\nCtrl+←/→ по словам · Ctrl+Shift+←/→ выделить слова\nShift+стрелки выделение · Ctrl+A выделить всё\nAlt+Backspace / Ctrl+Z отменить · Ctrl+Y повторить\nCtrl+Ins/C копировать · Shift+Del / Ctrl+X вырезать\nShift+Ins / Ctrl+V вставить · Вставка терминала поддерживается\nAlt+B блок: выделение/буфер · Настройки: отступ/цвет/табуляция\nF10 меню · Ctrl+F4 / Esc закрыть · Alt+X выход\nОткрытие/закрытие/выход защищают несохранённые изменения.\nUTF-8, 2 МиБ / 100 тыс. строк. Концы строк сохраняются.\nСохранить как не перезаписывает существующие файлы.
+Modified (local)	Изменён (местное)
+Read-only attribute	Только чтение
+Permissions describe the link, not its target.	Права самой ссылки, а не её цели.
+* any sequence · ? one character\nVisible files and folders only · case-sensitive	* любая строка · ? один символ\nТолько видимые файлы и папки · с учётом регистра
+Ln	Стр
+Col	Стл
+Quick view	Быстрый просмотр
+New UTF-8 document	Новый документ UTF-8
+Reading next file…	Чтение следующего файла…
+Editor Help	Помощь редактора
+Move {} item(s) to Trash?	Переместить в корзину: {} элементов?
+Permanently delete {} item(s)?	Удалить навсегда: {} элементов?
+Commands ~H~istory	~Ж~урнал команд
+Commands History	Журнал команд
+Copy ~n~ames / paths	Копировать и~м~ена / пути
+~N~ames	~И~мена
+~F~ull paths	~П~олные пути
+Filter commands	Фильтр команд
+No commands in this session.	В этом сеансе ещё нет команд.
+No matching commands.	Нет подходящих команд.
+[ Use ]	[ Выбрать ]
+Enter recalls without running · Tab moves · Esc cancels	Enter — выбрать без запуска · Tab — переход · Esc — отмена
+Copied entries to internal clipboard:	Скопировано элементов во внутренний буфер:
+Directory is still loading.	Папка ещё загружается.
+Marked entries are outside the current filter.	Отмеченные элементы скрыты текущим фильтром.
+No eligible entries to copy.	Нет подходящих элементов для копирования.
+Cannot copy a name/path containing a newline.	Нельзя скопировать имя/путь с переводом строки.
+Copied names/paths exceed 2 MiB.	Имена/пути превышают 2 МиБ.
+Copy requires Unicode names/paths; an entry cannot be represented without loss.	Требуются имена/пути Unicode; элемент нельзя представить без потерь.
+No files selected	Нет выбранных файлов
+No visible entries selected	Нет видимых выбранных элементов
+ bytes in 	 байт в 
+ in 	 в 
+selected file	выбранном файле
+selected files	выбранных файлах
+selected folder	выбранная папка
+selected folders	выбранных папок
+folder	папка
+folders	папок
+free	свободно
+total	всего
+free bytes	байт свободно
+total bytes	байт всего
+Volume space unavailable	Место на томе недоступно
+Reading volume space…	Чтение места на томе…
+Game over	Игра окончена
+New high score	Новый рекорд
+Tetris Top Ten	Тетрис: лучшие десять
+Tetris Help	Помощь Тетриса
+Tetris Setup	Настройки Тетриса
+Score	Очки
+Final score	Итоговый счёт
+Lines	Линии
+Level	Уровень
+Start/End	Нач/Кон
+Your name (30 characters)	Ваше имя (30 символов)
+Enter saves · Esc uses Anonymous	Enter — сохранить · Esc — Anonymous
+Enter / Esc continues to high scores	Enter / Esc — перейти к рекордам
+Skip name	Без имени
+Continue	Далее
+Retry save	Повторить запись
+Back	Назад
+Scores saved	Рекорды сохранены
+No finished games yet.	Завершённых игр пока нет.
+Scores not saved. Retry save.	Рекорды не сохранены. Повторите запись.
+Name must fit 30 characters / 240 bytes, without controls	Имя: до 30 символов / 240 байт, без управляющих кодов

@@ -29,6 +29,7 @@ pub struct PanelGeometry {
     pub separator: Rect,
     pub detail: Rect,
     pub totals: Rect,
+    pub space: Rect,
     pub columns: Vec<Rect>,
     pub dividers: Vec<Rect>,
 }
@@ -37,6 +38,7 @@ impl PanelGeometry {
         let chunks = Layout::vertical([
             Constraint::Length(1),
             Constraint::Min(0),
+            Constraint::Length(1),
             Constraint::Length(1),
             Constraint::Length(1),
             Constraint::Length(1),
@@ -85,6 +87,7 @@ impl PanelGeometry {
             separator: chunks[2],
             detail: chunks[3],
             totals: chunks[4],
+            space: chunks[5],
             columns,
             dividers,
         }

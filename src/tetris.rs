@@ -2,7 +2,8 @@
 //! Retains the 12×19 well, seven figures, rotation sizes, delays and scoring.
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 mod controls;
-pub use controls::{action, key, open, GameAction};
+pub mod scores;
+pub use controls::{action, key, open, paste, GameAction};
 
 pub const WIDTH: usize = 12;
 pub const HEIGHT: usize = 19;
@@ -22,6 +23,8 @@ const DELAYS_MS: [u64; 10] = [800, 600, 500, 300, 250, 200, 150, 100, 50, 40];
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Screen {
     Play,
+    GameOver,
+    Name,
     Help,
     Scores,
     Setup { level: u8, preview: bool },
@@ -46,8 +49,10 @@ impl Piece {
         self.cells.iter().map(|(x, y)| (x + self.x, y + self.y))
     }
 }
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Record {
+    pub name: String,
+    pub start_level: u8,
     pub score: u64,
     pub lines: u32,
     pub level: u8,
@@ -66,6 +71,12 @@ pub struct Game {
     pub over: bool,
     pub screen: Screen,
     pub records: Vec<Record>,
+    pub name: String,
+    pub name_cursor: usize,
+    pub replace_name: bool,
+    pub highlighted: Option<usize>,
+    pub notice: String,
+    pub submitted: bool,
     obscured: bool,
     random: u64,
     last_tick: Instant,
@@ -95,6 +106,12 @@ impl Game {
             over: false,
             screen: Screen::Play,
             records: Vec::new(),
+            name: scores::ANONYMOUS.into(),
+            name_cursor: scores::ANONYMOUS.len(),
+            replace_name: true,
+            highlighted: None,
+            notice: String::new(),
+            submitted: false,
             obscured: false,
             random: if seed == 0 { 1 } else { seed },
             last_tick: now,
@@ -119,6 +136,8 @@ impl Game {
         self.level = self.start_level;
         self.paused = false;
         self.over = false;
+        self.submitted = false;
+        self.highlighted = None;
         self.screen = Screen::Play;
         self.last_tick = now;
     }
@@ -163,14 +182,7 @@ impl Game {
     }
     fn finish(&mut self) {
         self.over = true;
-        self.records.push(Record {
-            score: self.score,
-            lines: self.lines,
-            level: self.level,
-        });
-        self.records
-            .sort_by_key(|record| std::cmp::Reverse(record.score));
-        self.records.truncate(10);
+        self.screen = Screen::GameOver;
     }
     fn lock(&mut self) {
         if self.piece.positions().any(|(_, y)| y < 0) {

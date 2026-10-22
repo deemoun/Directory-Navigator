@@ -34,7 +34,13 @@ fn button(
     focused: bool,
 ) {
     let profile = app.config.palette;
-    super::dialog_style::button(frame, profile, rect, label, focused);
+    super::dialog_style::button(
+        frame,
+        profile,
+        rect,
+        app.config.language.text(label),
+        focused,
+    );
     app.mouse.regions.push((rect, Target::Utility(action)));
 }
 pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
@@ -61,7 +67,14 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
         Kind::System => " System Information ",
         Kind::Memory => " Memory Information ",
     };
-    super::dialog_style::window(frame, profile, rect, rect.width, rect.height, title);
+    super::dialog_style::window(
+        frame,
+        profile,
+        rect,
+        rect.width,
+        rect.height,
+        app.config.language.text(title),
+    );
     app.mouse.regions.clear();
     super::dialog_style::close_button(
         frame,
@@ -80,7 +93,9 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
                 frame,
                 profile,
                 Rect::new(x, rect.y + 1, w, 1),
-                "Expression · + - * / % ^ · sqrt() abs() · 0x / 0b / 0o",
+                app.config
+                    .language
+                    .text("Expression · + - * / % ^ · sqrt() abs() · 0x / 0b / 0o"),
                 false,
             );
             let input = Rect::new(x, rect.y + 2, w, 1);
@@ -102,7 +117,9 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
                 frame,
                 profile,
                 Rect::new(x, rect.y + 3, w, 1),
-                "Up/Down history · Enter evaluates · Tab moves · Esc closes",
+                app.config
+                    .language
+                    .text("Up/Down history · Enter evaluates · Tab moves · Esc closes"),
                 false,
             );
             let result = calc.result.map(|v| v.representations());
@@ -156,7 +173,9 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
                 frame,
                 profile,
                 Rect::new(x, rect.y + 18, w, 1),
-                "Copy uses DN's internal clipboard · Ctrl+C copies",
+                app.config
+                    .language
+                    .text("Copy uses DN's internal clipboard · Ctrl+C copies"),
                 false,
             );
             button(
@@ -267,7 +286,7 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
                     frame,
                     profile,
                     Rect::new(x + 10, rect.bottom() - 2, 16, 1),
-                    " Copy disabled ",
+                    app.config.language.text(" Copy disabled "),
                     false,
                 );
             }
@@ -287,7 +306,7 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
                         frame,
                         profile,
                         Rect::new(x, rect.y + 2, w, 1),
-                        "Loading native information…",
+                        app.config.language.text("Loading native information…"),
                         false,
                     );
                 }
@@ -299,9 +318,13 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
                     .take(info.rows)
                 {
                     frame.render_widget(
-                        Paragraph::new(format!("{name}: {}", display_name(value)))
-                            .scroll((0, info.horizontal))
-                            .style(dos(0x70)),
+                        Paragraph::new(format!(
+                            "{}: {}",
+                            app.config.language.text(name),
+                            display_name(value)
+                        ))
+                        .scroll((0, info.horizontal))
+                        .style(dos(0x70)),
                         Rect::new(x, rect.y + 1 + (index - info.offset) as u16, w, 1),
                     );
                 }
@@ -310,7 +333,9 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
                 frame,
                 profile,
                 Rect::new(x, rect.bottom() - 4, w, 1),
-                "Snapshot · R/F5 Refresh · ↑↓ PgUp/PgDn scroll · ←→ pan",
+                app.config
+                    .language
+                    .text("Snapshot · R/F5 Refresh · ↑↓ PgUp/PgDn scroll · ←→ pan"),
                 false,
             );
             let focus = app.utilities.focus;

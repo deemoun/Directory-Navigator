@@ -121,7 +121,7 @@ fn brief_column_navigation_pages_resize_and_mouse_geometry() -> io::Result<()> {
     let mut app = temp.app()?;
     render(&mut app, 80, 25)?;
     let rows = app.panels[0].viewport_rows;
-    assert_eq!(rows, 16);
+    assert_eq!(rows, 15);
     assert_eq!(app.panels[0].viewport_columns, 3);
     key(&mut app, KeyCode::Right);
     assert_eq!(app.panels[0].cursor, rows);
@@ -139,7 +139,7 @@ fn brief_column_navigation_pages_resize_and_mouse_geometry() -> io::Result<()> {
     assert_eq!(app.panels[0].cursor, rows - 1);
     key(&mut app, KeyCode::Home);
     key(&mut app, KeyCode::PageDown);
-    assert_eq!(app.panels[0].cursor, 48);
+    assert_eq!(app.panels[0].cursor, rows * 3);
     render(&mut app, 80, 25)?;
     assert_eq!(app.panels[0].offset, rows);
     key(&mut app, KeyCode::PageUp);
@@ -267,7 +267,7 @@ fn quick_search_unicode_edit_cycle_cancel_and_no_match() -> io::Result<()> {
     assert_eq!(highlighted(&app), "alphabet");
     let terminal = render(&mut app, 80, 25)?;
     let footer: String = (0..40)
-        .map(|x| terminal.backend().buffer()[(x, 21)].symbol())
+        .map(|x| terminal.backend().buffer()[(x, 20)].symbol())
         .collect();
     assert!(footer.contains("No match"));
     key(&mut app, KeyCode::Backspace);

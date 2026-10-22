@@ -121,8 +121,7 @@ pub fn key(app: &mut App, code: KeyCode) {
         KeyCode::Enter => activate(app, row),
         KeyCode::Char(c) => {
             if let Some(index) = items(root).iter().position(|item| {
-                item.action.is_some()
-                    && crate::menu::mnemonic(item.label) == Some(c.to_ascii_lowercase())
+                item.action.is_some() && app.config.language.matches(item.label, c)
             }) {
                 activate(app, index);
             }

@@ -15,7 +15,8 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
         area,
     );
     let title = format!(
-        " Quick view · {}",
+        " {} · {}",
+        app.config.language.text("Quick view"),
         tail(
             &q.path()
                 .map(|p| display_name(&p.to_string_lossy()))
@@ -40,7 +41,7 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
     );
     app.mouse.regions.push((body, Target::QuickPreview));
     if let Some(viewer) = &q.viewer {
-        super::viewer_view::draw_text(frame, viewer, body, profile);
+        super::viewer_view::draw_text(frame, viewer, body, profile, app.config.language);
         let status = viewer
             .contents
             .as_ref()
@@ -66,7 +67,11 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
             Paragraph::new(
                 q.lines
                     .iter()
-                    .map(|l| display_name(l))
+                    .map(|l| {
+                        app.config
+                            .language
+                            .field(&display_name(l), app.config.datetime)
+                    })
                     .collect::<Vec<_>>()
                     .join("\n"),
             )

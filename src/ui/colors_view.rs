@@ -13,7 +13,14 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
         72,
         18,
     );
-    super::dialog_style::window(frame, profile, rect, rect.width, rect.height, " Colors ");
+    super::dialog_style::window(
+        frame,
+        profile,
+        rect,
+        rect.width,
+        rect.height,
+        app.config.language.text(" Colors "),
+    );
     app.mouse.regions.clear();
     super::dialog_style::close_button(
         frame,
@@ -35,6 +42,7 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
         ),
     ] {
         let row = Rect::new(rect.x + 3, rect.y + 2 + i as u16 * 2, 66, 1);
+        let label = app.config.language.text(label);
         frame.render_widget(
             Paragraph::new(format!(
                 "({}) {label}",
@@ -46,7 +54,7 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
         app.mouse.regions.push((row, Target::ColorChoice(value)));
     }
     frame.render_widget(
-        Paragraph::new("Preview").style(dos(0x70)),
+        Paragraph::new(app.config.language.text("Preview")).style(dos(0x70)),
         Rect::new(rect.x + 3, rect.y + 6, 65, 1),
     );
     for (i, attr, label) in [
@@ -57,7 +65,7 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
         (4, 0x30, " selected file"),
     ] {
         frame.render_widget(
-            Paragraph::new(label).style(dos(attr)),
+            Paragraph::new(app.config.language.text(label)).style(dos(attr)),
             Rect::new(rect.x + 4, rect.y + 7 + i, 38, 1),
         );
     }
@@ -70,7 +78,12 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
         Rect::new(rect.x + 4, rect.y + 12, 62, 1),
     );
     frame.render_widget(
-        Paragraph::new("C/T or Space chooses · Enter applies · Esc restores").style(dos(0x70)),
+        Paragraph::new(
+            app.config
+                .language
+                .text("C/T or Space chooses · Enter applies · Esc restores"),
+        )
+        .style(dos(0x70)),
         Rect::new(rect.x + 3, rect.y + 14, 66, 1),
     );
     for (label, target, selected, x) in [
@@ -83,7 +96,13 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
         ),
     ] {
         let row = Rect::new(x, rect.bottom() - 2, 16, 1);
-        super::dialog_style::button(frame, profile, row, label, selected);
+        super::dialog_style::button(
+            frame,
+            profile,
+            row,
+            app.config.language.text(label),
+            selected,
+        );
         app.mouse.regions.push((row, target));
     }
 }

@@ -1,3 +1,4 @@
+pub mod clipboard;
 pub mod compare;
 pub mod export;
 pub mod history;

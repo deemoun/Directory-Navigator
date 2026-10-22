@@ -25,7 +25,8 @@ pub(super) fn draw_viewer(frame: &mut Frame, app: &mut App, area: Rect) {
     ])
     .split(area);
     let title = format!(
-        " F3 Viewer │ {}",
+        " F3 {} │ {}",
+        app.config.language.text("Viewer"),
         tail(
             &display_name(&viewer.path.to_string_lossy()),
             header.width.saturating_sub(27)
@@ -42,11 +43,16 @@ pub(super) fn draw_viewer(frame: &mut Frame, app: &mut App, area: Rect) {
     if let Some(text) = clock_text {
         frame.render_widget(
             Paragraph::new(text).style(dos(0x71)),
-            Rect::new(area.right() - 10, area.y, 10, 1),
+            Rect::new(
+                area.right() - app.config.datetime.clock_width(),
+                area.y,
+                app.config.datetime.clock_width(),
+                1,
+            ),
         );
     }
     if let Some(contents) = &viewer.contents {
-        draw_text(frame, viewer, regions[1], profile);
+        draw_text(frame, viewer, regions[1], profile, app.config.language);
         let line = viewer.anchor().0 + 1;
         frame.render_widget(
             Paragraph::new(format!(
@@ -70,7 +76,10 @@ pub(super) fn draw_viewer(frame: &mut Frame, app: &mut App, area: Rect) {
             regions[2],
         );
     } else {
-        frame.render_widget(Paragraph::new("Reading file…").style(dos(0x1f)), regions[1]);
+        frame.render_widget(
+            Paragraph::new(app.config.language.text("Reading file…")).style(dos(0x1f)),
+            regions[1],
+        );
     }
     frame.render_widget(Block::default().style(profile.bar(true)), regions[3]);
     let cells = Layout::horizontal([
@@ -91,10 +100,13 @@ pub(super) fn draw_viewer(frame: &mut Frame, app: &mut App, area: Rect) {
             let (key, description) = label.split_once(' ').unwrap_or((label, ""));
             Line::from(vec![
                 Span::styled(format!("{key} "), dos(if enabled { 0x74 } else { 0x78 })),
-                Span::styled(description, profile.bar(enabled)),
+                Span::styled(app.config.language.text(description), profile.bar(enabled)),
             ])
         } else {
-            Line::from(Span::styled(label, profile.bar(enabled)))
+            Line::from(Span::styled(
+                app.config.language.text(label),
+                profile.bar(enabled),
+            ))
         };
         frame.render_widget(Paragraph::new(line).style(profile.bar(enabled)), cells[i]);
         if enabled {
@@ -109,7 +121,7 @@ pub(super) fn draw_viewer(frame: &mut Frame, app: &mut App, area: Rect) {
             area,
             width,
             10,
-            " Viewer search — loaded text ",
+            app.config.language.text(" Viewer search — loaded text "),
         );
         app.mouse.regions.clear();
         super::dialog_style::close_button(
@@ -159,7 +171,13 @@ pub(super) fn draw_viewer(frame: &mut Frame, app: &mut App, area: Rect) {
             ("[ Cancel ]", Action::Cancel, 3, rect.right() - 24),
         ] {
             let row = Rect::new(x, rect.bottom() - 2, 16, 1);
-            super::dialog_style::button(frame, profile, row, label, dialog.focus == focus);
+            super::dialog_style::button(
+                frame,
+                profile,
+                row,
+                app.config.language.text(label),
+                dialog.focus == focus,
+            );
             app.mouse.regions.push((row, Target::Viewer(action)));
         }
     }
@@ -170,6 +188,7 @@ pub(super) fn draw_text(
     viewer: &crate::viewer::Viewer,
     area: Rect,
     profile: crate::palette::PaletteProfile,
+    language: crate::localization::Language,
 ) {
     let dos = profile.styles();
     if let Some(contents) = &viewer.contents {
@@ -204,6 +223,9 @@ pub(super) fn draw_text(
             area,
         );
     } else {
-        frame.render_widget(Paragraph::new("Reading file…").style(dos(0x1f)), area);
+        frame.render_widget(
+            Paragraph::new(language.text("Reading file…")).style(dos(0x1f)),
+            area,
+        );
     }
 }

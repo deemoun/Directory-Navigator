@@ -72,7 +72,7 @@ pub fn key(app: &mut App, key: KeyEvent) {
         if let KeyCode::Char(c) = key.code {
             if let Some(root) = menus::LABELS
                 .iter()
-                .position(|label| crate::menu::mnemonic(label) == Some(c.to_ascii_lowercase()))
+                .position(|label| app.config.language.matches(label, c))
             {
                 menus::open(app, root);
             }

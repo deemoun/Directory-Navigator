@@ -12,6 +12,7 @@ use std::{
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Target {
+    CommandHistory(crate::command_line::history::Action),
     Archive(crate::archive::Action),
     UserMenu(crate::user_menu::Action),
     Tree(crate::directory_tree::Action),
@@ -43,6 +44,7 @@ pub enum Target {
     CancelJob,
     CloseViewer,
     Setting(usize),
+    RegionalChoice(usize),
     AcceptSettings,
     CancelSettings,
     AcceptPattern,
@@ -95,6 +97,10 @@ fn handle_mouse(app: &mut App, event: MouseEvent) {
         .rev()
         .find(|(rect, _)| rect.contains(Position::new(event.column, event.row)))
         .map(|(_, target)| *target);
+    if focus == Focus::CommandHistory {
+        crate::command_line::history::mouse(app, event, target);
+        return;
+    }
     if focus == Focus::Archive {
         crate::archive::mouse(app, event, target);
         return;
@@ -244,6 +250,11 @@ fn handle_mouse(app: &mut App, event: MouseEvent) {
     if focus == Focus::Settings {
         if event.kind == MouseEventKind::Down(MouseButton::Left) {
             match target {
+                Some(Target::RegionalChoice(index)) => {
+                    if let Some(settings) = &mut app.settings {
+                        settings.regional_choice(index, false);
+                    }
+                }
                 Some(Target::Setting(index)) => {
                     if let Some(settings) = &mut app.settings {
                         settings.toggle(index);

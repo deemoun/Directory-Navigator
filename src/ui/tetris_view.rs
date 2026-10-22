@@ -12,7 +12,11 @@ use ratatui::{
 fn button(frame: &mut Frame, app: &mut App, rect: Rect, label: &str, action: GameAction) {
     let profile = app.config.palette;
     let dos = profile.styles();
-    frame.render_widget(Paragraph::new(label).style(dos(0x30)), rect);
+    frame.render_widget(Clear, rect);
+    frame.render_widget(
+        Paragraph::new(app.config.language.text(label)).style(dos(0x30)),
+        rect,
+    );
     app.mouse.regions.push((rect, Target::Game(action)));
 }
 
@@ -98,13 +102,17 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
         }
     } else {
         frame.render_widget(
-            Paragraph::new("Preview off").style(dos(0x71)),
+            Paragraph::new(app.config.language.text("Preview off")).style(dos(0x71)),
             Rect::new(info_x + 3, rect.y + 9, 16, 1),
         );
     }
     frame.render_widget(
-        Paragraph::new("← → Move   ↑ Rotate\n↓ / Space Drop\nEsc returns to files")
-            .style(dos(0x70)),
+        Paragraph::new(
+            app.config
+                .language
+                .text("← → Move   ↑ Rotate\n↓ / Space Drop\nEsc returns to files"),
+        )
+        .style(dos(0x70)),
         Rect::new(info_x, rect.y + 14, 23, 3),
     );
     if game.paused || game.over {
@@ -170,38 +178,175 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
 }
 
 fn draw_page(frame: &mut Frame, app: &mut App, game_rect: Rect, screen: Screen) {
+    let language = app.config.language;
     let profile = app.config.palette;
     let dos = profile.styles();
-    // A subwindow consumes all underlying board and function-bar mouse targets.
     app.mouse.regions.clear();
-    let rect = Rect::new(game_rect.x + 2, game_rect.y + 3, 50, 17);
-    let title = match screen {
-        Screen::Help => " Tetris Help ",
-        Screen::Scores => " Session Top Ten ",
-        _ => " Tetris Setup ",
-    };
-    frame.render_widget(Clear, rect);
-    frame.render_widget(
-        Block::default()
-            .borders(Borders::ALL)
-            .title(title)
-            .style(dos(0x70)),
-        rect,
+    let width = if screen == Screen::Scores { 72 } else { 50 };
+    let height = if screen == Screen::Scores { 20 } else { 17 };
+    let area = frame.area();
+    let rect = Rect::new(
+        area.x + (area.width - width) / 2,
+        game_rect.y + 2,
+        width,
+        height,
     );
-    let text = match screen {
-        Screen::Help => "Based on TETRIS.PAS by RIT Research Labs.\n\n←/Home left · →/PgUp right · ↑ rotate\n↓/Space drop · F2 new game · F3 pause\nF4 session scores · F5 setup\n+ increase level · * toggle next preview\n\nAlt+N new · Alt+P pause · Alt+T scores\nAlt+S setup · Esc returns to files\n\nSmall terminals automatically suspend play.\nScores are kept for this app session only.".into(),
-        Screen::Scores => {
-            let mut text = "Rank       Score       Lines    Level\n".to_owned();
-            if let Some(game) = &app.tetris {
-                if game.records.is_empty() { text.push_str("\nNo finished games yet."); }
-                for (i, record) in game.records.iter().enumerate() {
-                    text.push_str(&format!("\n{:>4} {:>11} {:>11} {:>8}", i + 1, record.score, record.lines, record.level));
-                }
-            }
-            text
+    let title = match screen {
+        Screen::Help => "Tetris Help",
+        Screen::Scores => "Tetris Top Ten",
+        Screen::Name => "New high score",
+        Screen::GameOver => "Game over",
+        _ => "Tetris Setup",
+    };
+    super::dialog_style::window(frame, profile, rect, width, height, language.text(title));
+    let Some(game) = &app.tetris else {
+        return;
+    };
+    if screen == Screen::Scores {
+        use ratatui::widgets::{Row, Table};
+        let rows = game.records.iter().enumerate().map(|(i, r)| {
+            Row::new(vec![
+                (i + 1).to_string(),
+                crate::formatting::tail(&crate::filesystem::display_name(&r.name), 20),
+                r.score.to_string(),
+                r.lines.to_string(),
+                format!("{} / {}", r.start_level, r.level),
+            ])
+            .style(dos(if game.highlighted == Some(i) {
+                0x30
+            } else {
+                0x70
+            }))
+        });
+        let header = Row::new([
+            "#",
+            language.text("Name"),
+            language.text("Score"),
+            language.text("Lines"),
+            language.text("Start/End"),
+        ])
+        .style(dos(0x71));
+        frame.render_widget(
+            Table::new(
+                rows,
+                [
+                    Constraint::Length(2),
+                    Constraint::Length(20),
+                    Constraint::Length(20),
+                    Constraint::Length(10),
+                    Constraint::Min(6),
+                ],
+            )
+            .header(header)
+            .column_spacing(1),
+            Rect::new(rect.x + 2, rect.y + 2, width - 4, 11),
+        );
+        if game.records.is_empty() {
+            frame.render_widget(
+                Paragraph::new(language.text("No finished games yet.")).style(dos(0x70)),
+                Rect::new(rect.x + 2, rect.y + 4, width - 4, 1),
+            );
         }
+        frame.render_widget(
+            Paragraph::new(crate::filesystem::display_name(language.text(&game.notice)))
+                .style(dos(0x74))
+                .wrap(ratatui::widgets::Wrap { trim: false }),
+            Rect::new(rect.x + 2, rect.bottom() - 5, width - 4, 2),
+        );
+        button(
+            frame,
+            app,
+            Rect::new(rect.x + 10, rect.bottom() - 2, 18, 1),
+            "Retry save",
+            GameAction::RetrySave,
+        );
+        button(
+            frame,
+            app,
+            Rect::new(rect.right() - 28, rect.bottom() - 2, 18, 1),
+            "Back",
+            GameAction::Back,
+        );
+        return;
+    }
+    if matches!(screen, Screen::GameOver | Screen::Name) {
+        let text = format!(
+            "{}: {}\n{}: {}    {}: {} → {}",
+            language.text("Final score"),
+            game.score,
+            language.text("Lines"),
+            game.lines,
+            language.text("Level"),
+            game.start_level,
+            game.level
+        );
+        frame.render_widget(
+            Paragraph::new(text).style(dos(0x71)),
+            Rect::new(rect.x + 3, rect.y + 2, 44, 3),
+        );
+        if screen == Screen::Name {
+            frame.render_widget(
+                Paragraph::new(language.text("Your name (30 characters)")).style(dos(0x70)),
+                Rect::new(rect.x + 3, rect.y + 6, 44, 1),
+            );
+            let field = Rect::new(rect.x + 3, rect.y + 7, 44, 1);
+            let col = ratatui::text::Line::from(&game.name[..game.name_cursor]).width();
+            let scroll = col.saturating_sub(43);
+            frame.render_widget(
+                Paragraph::new(game.name.as_str())
+                    .scroll((0, scroll as u16))
+                    .style(if game.replace_name {
+                        dos(0x30)
+                    } else {
+                        super::dialog_style::input_style(profile, true)
+                    }),
+                field,
+            );
+            frame.set_cursor_position((field.x + (col - scroll) as u16, field.y));
+            frame.render_widget(
+                Paragraph::new(language.text("Enter saves · Esc uses Anonymous")).style(dos(0x70)),
+                Rect::new(rect.x + 3, rect.y + 9, 44, 1),
+            );
+            frame.render_widget(
+                Paragraph::new(crate::filesystem::display_name(language.text(&game.notice)))
+                    .style(dos(0x74))
+                    .wrap(ratatui::widgets::Wrap { trim: false }),
+                Rect::new(rect.x + 3, rect.y + 10, 44, 3),
+            );
+            button(
+                frame,
+                app,
+                Rect::new(rect.x + 5, rect.bottom() - 2, 16, 1),
+                "OK",
+                GameAction::SubmitName,
+            );
+            button(
+                frame,
+                app,
+                Rect::new(rect.x + 27, rect.bottom() - 2, 18, 1),
+                "Skip name",
+                GameAction::SkipName,
+            );
+        } else {
+            frame.render_widget(
+                Paragraph::new(language.text("Enter / Esc continues to high scores"))
+                    .style(dos(0x70)),
+                Rect::new(rect.x + 3, rect.y + 7, 44, 2),
+            );
+            button(
+                frame,
+                app,
+                Rect::new(rect.x + 16, rect.bottom() - 2, 18, 1),
+                "Continue",
+                GameAction::Continue,
+            );
+        }
+        return;
+    }
+    let text = match screen {
+        Screen::Help => language.text("←/Home left · →/PgUp right · ↑ rotate\n↓/Space drop · F2 new game · F3 pause\nF4 high scores · F5 setup\n+ increase level · * toggle next preview\n\nAlt+N new · Alt+P pause · Alt+T scores\nAlt+S setup · Esc returns to files\n\nHigh scores save in tetris.conf.").to_owned(),
         Screen::Setup { level, preview } => format!("Classic Tetris · 12 × 19\n\nStarting level: {level}\nNext-piece preview: {}\n\n←/→ or +/− change level (1–10)\nSpace or * toggles preview\n\nEnter starts a new game\nEsc cancels without changing the game", if preview { "on" } else { "off" }),
-        Screen::Play => String::new(),
+        _=>String::new(),
     };
     frame.render_widget(
         Paragraph::new(text).style(dos(0x70)),
@@ -225,14 +370,14 @@ fn draw_page(frame: &mut Frame, app: &mut App, game_rect: Rect, screen: Screen) 
         button(
             frame,
             app,
-            Rect::new(rect.x + 34, rect.y + 4, 12, 1),
-            " Toggle ",
+            Rect::new(rect.x + 23, rect.y + 4, 12, 1),
+            " [ Toggle ] ",
             GameAction::Preview,
         );
         button(
             frame,
             app,
-            Rect::new(rect.x + 5, rect.bottom() - 2, 18, 1),
+            Rect::new(rect.x + 3, rect.bottom() - 2, 21, 1),
             " Start new game ",
             GameAction::Apply,
         );

@@ -7,7 +7,13 @@ use crate::{
 };
 use ratatui::{layout::Rect, text::Span, widgets::Paragraph, Frame};
 fn button(frame: &mut Frame, app: &mut App, rect: Rect, label: &str, command: A, focused: bool) {
-    super::dialog_style::button(frame, app.config.palette, rect, label, focused);
+    super::dialog_style::button(
+        frame,
+        app.config.palette,
+        rect,
+        app.config.language.text(label),
+        focused,
+    );
     app.mouse.regions.push((rect, Target::Editor(command)));
 }
 fn input(
@@ -62,7 +68,14 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
         Modal::Replace(_) => (72, 15),
         _ => (72, 20),
     };
-    let rect = super::dialog_style::window(frame, profile, area, width, height, title);
+    let rect = super::dialog_style::window(
+        frame,
+        profile,
+        area,
+        width,
+        height,
+        app.config.language.text(title),
+    );
     app.mouse.regions.clear();
     super::dialog_style::close_button(
         frame,
@@ -85,7 +98,7 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
                     continue;
                 }
                 frame.render_widget(
-                    Paragraph::new(label).style(dos(0x70)),
+                    Paragraph::new(app.config.language.text(label)).style(dos(0x70)),
                     Rect::new(rect.x + 3, rect.y + row, 14, 1),
                 );
                 let field_rect = Rect::new(rect.x + 18, rect.y + row, 50, 1);
@@ -107,8 +120,9 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
                     7,
                     3,
                     format!(
-                        "[{}] Case sensitive",
-                        if opts.case_sensitive { 'x' } else { ' ' }
+                        "[{}] {}",
+                        if opts.case_sensitive { 'x' } else { ' ' },
+                        app.config.language.text("Case sensitive")
                     ),
                     true,
                 ),
@@ -117,8 +131,9 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
                     8,
                     3,
                     format!(
-                        "[{}] Whole words only",
-                        if opts.whole_words { 'x' } else { ' ' }
+                        "[{}] {}",
+                        if opts.whole_words { 'x' } else { ' ' },
+                        app.config.language.text("Whole words only")
                     ),
                     true,
                 ),
@@ -127,8 +142,9 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
                     9,
                     3,
                     format!(
-                        "[{}] Prompt on replace",
-                        if opts.prompt { 'x' } else { ' ' }
+                        "[{}] {}",
+                        if opts.prompt { 'x' } else { ' ' },
+                        app.config.language.text("Prompt on replace")
                     ),
                     replacing,
                 ),
@@ -137,8 +153,13 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
                     7,
                     38,
                     format!(
-                        "Direction: {}",
-                        if opts.backward { "Backward" } else { "Forward" }
+                        "{}: {}",
+                        app.config.language.text("Direction"),
+                        app.config.language.text(if opts.backward {
+                            "Backward"
+                        } else {
+                            "Forward"
+                        })
                     ),
                     true,
                 ),
@@ -147,12 +168,13 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
                     10,
                     38,
                     format!(
-                        "Scope: {}",
-                        if opts.selected_scope {
+                        "{}: {}",
+                        app.config.language.text("Scope"),
+                        app.config.language.text(if opts.selected_scope {
                             "Selected text"
                         } else {
                             "Global"
-                        }
+                        })
                     ),
                     selection,
                 ),
@@ -161,12 +183,13 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
                     12,
                     38,
                     format!(
-                        "Origin: {}",
-                        if opts.entire_scope {
+                        "{}: {}",
+                        app.config.language.text("Origin"),
+                        app.config.language.text(if opts.entire_scope {
                             "Entire scope"
                         } else {
                             "From cursor"
-                        }
+                        })
                     ),
                     true,
                 ),
@@ -192,7 +215,7 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
                         .push((row, Target::Editor(A::SearchChoice(choice))));
                 }
             }
-            frame.render_widget(Paragraph::new("Tab chooses field/option · Space toggles · Enter OK\nAlt+C/W: options · Alt+B/D: direction · Esc Cancel").style(dos(0x70)), Rect::new(rect.x + 3, rect.y + 14, 66, 2));
+            frame.render_widget(Paragraph::new(app.config.language.text("Tab chooses field/option · Space toggles · Enter OK\nAlt+C/W: options · Alt+B/D: direction · Esc Cancel")).style(dos(0x70)), Rect::new(rect.x + 3, rect.y + 14, 66, 2));
             button(
                 frame,
                 app,
@@ -251,7 +274,7 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
             }
         }
         Modal::Help => {
-            frame.render_widget(Paragraph::new("F2 / Ctrl+S Save · Shift+F2 Save As · F3 Open\nF6 Duplicate line · F7 / Ctrl+F Find\nShift+F7 Search again · Alt+F7 Reverse search\nCtrl+F7 Replace · Alt+G / Ctrl+G Go to line\nCtrl+←/→ words · Ctrl+Shift+←/→ select words\nShift+arrows select · Ctrl+A select all\nAlt+Backspace / Ctrl+Z Undo · Ctrl+Y Redo\nCtrl+Ins/C Copy · Shift+Del / Ctrl+X Cut\nShift+Ins / Ctrl+V Paste · terminal paste supported\nAlt+B Block: selection/clipboard · Options: indent/colors/tabs\nF10 Menu · Ctrl+F4 / Esc Close · Alt+X Quit DN\nOpen/Close/Quit protect unsaved changes.\nUTF-8, 2 MiB / 100k lines. Line endings preserved.\nSave As never overwrites an existing destination.")
+            frame.render_widget(Paragraph::new(app.config.language.text("F2 / Ctrl+S Save · Shift+F2 Save As · F3 Open\nF6 Duplicate line · F7 / Ctrl+F Find\nShift+F7 Search again · Alt+F7 Reverse search\nCtrl+F7 Replace · Alt+G / Ctrl+G Go to line\nCtrl+←/→ words · Ctrl+Shift+←/→ select words\nShift+arrows select · Ctrl+A select all\nAlt+Backspace / Ctrl+Z Undo · Ctrl+Y Redo\nCtrl+Ins/C Copy · Shift+Del / Ctrl+X Cut\nShift+Ins / Ctrl+V Paste · terminal paste supported\nAlt+B Block: selection/clipboard · Options: indent/colors/tabs\nF10 Menu · Ctrl+F4 / Esc Close · Alt+X Quit DN\nOpen/Close/Quit protect unsaved changes.\nUTF-8, 2 MiB / 100k lines. Line endings preserved.\nSave As never overwrites an existing destination."))
                 .style(dos(0x70)), Rect::new(rect.x + 2, rect.y + 2, 68, 15));
             button(
                 frame,
@@ -263,7 +286,7 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
             );
         }
         Modal::ConfirmClose => {
-            frame.render_widget(Paragraph::new("This document has unsaved changes.\n\nSave before closing or switching files?\n\nS: Save    D: Discard    C / Esc / Enter: Cancel")
+            frame.render_widget(Paragraph::new(app.config.language.text("This document has unsaved changes.\n\nSave before closing or switching files?\n\nS: Save    D: Discard    C / Esc / Enter: Cancel"))
                 .style(dos(0x70)), Rect::new(rect.x + 3, rect.y + 2, rect.width-6, 5));
             for (i, (label, command)) in [
                 (" [ Save ] ", A::Save),
@@ -295,7 +318,7 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
                 PromptKind::TabWidth => "Tab columns (1–16); Ctrl+A clears",
             };
             frame.render_widget(
-                Paragraph::new(label).style(dos(0x70)),
+                Paragraph::new(app.config.language.text(label)).style(dos(0x70)),
                 Rect::new(rect.x + 2, rect.y + 1, rect.width - 4, 1),
             );
             input(

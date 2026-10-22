@@ -62,14 +62,20 @@ pub fn local_timestamp(time: SystemTime) -> Option<DateTime<Local>> {
 }
 
 pub fn modified(time: Option<SystemTime>, with_time: bool) -> String {
+    modified_with(time, with_time, crate::regional::DateTimeFormat::default())
+}
+pub fn modified_with(
+    time: Option<SystemTime>,
+    with_time: bool,
+    format: crate::regional::DateTimeFormat,
+) -> String {
     time.and_then(local_timestamp)
         .map(|time| {
-            time.format(if with_time {
-                "%Y-%m-%d %H:%M"
+            if with_time {
+                format.stamp(&time, false, false)
             } else {
-                "%Y-%m-%d"
-            })
-            .to_string()
+                format.date(&time, false)
+            }
         })
         .unwrap_or_else(|| "—".into())
 }

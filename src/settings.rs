@@ -3,6 +3,7 @@ use crossterm::event::KeyCode;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SettingsKind {
+    Regional,
     System,
     Interface,
     FileManager,
@@ -51,6 +52,7 @@ impl Settings {
     }
     pub fn title(&self) -> &'static str {
         match self.kind {
+            SettingsKind::Regional => " Language / date & time ",
             SettingsKind::System => " System Setup ",
             SettingsKind::Interface => " Interface Setup ",
             SettingsKind::FileManager => " File Manager Setup ",
@@ -59,6 +61,7 @@ impl Settings {
     }
     pub fn rows(&self) -> &'static [Setting] {
         match self.kind {
+            SettingsKind::Regional => &[],
             SettingsKind::System => &[Setting::Hidden, Setting::SaveOnExit],
             SettingsKind::Interface => &[Setting::Highlight, Setting::Tags, Setting::Clock],
             SettingsKind::FileManager => &[
@@ -70,6 +73,52 @@ impl Settings {
                 Setting::Trash,
             ],
             SettingsKind::Highlight => &[Setting::Highlight],
+        }
+    }
+    pub fn control_count(&self) -> usize {
+        if self.kind == SettingsKind::Regional {
+            5
+        } else {
+            self.rows().len()
+        }
+    }
+    pub fn regional_choice(&mut self, index: usize, reverse: bool) {
+        if self.kind != SettingsKind::Regional || index >= 5 {
+            return;
+        }
+        self.cursor = index;
+        match index {
+            0 => {
+                self.draft.language =
+                    if self.draft.language == crate::localization::Language::English {
+                        crate::localization::Language::Russian
+                    } else {
+                        crate::localization::Language::English
+                    }
+            }
+            1 => {
+                self.draft.datetime.date_order = self.draft.datetime.date_order.next();
+                if reverse {
+                    self.draft.datetime.date_order = self.draft.datetime.date_order.next();
+                }
+            }
+            2 => {
+                let choices = ['-', '.', '/'];
+                let i = choices
+                    .iter()
+                    .position(|c| *c == self.draft.datetime.date_separator)
+                    .unwrap_or(0);
+                self.draft.datetime.date_separator = choices[(i + if reverse { 2 } else { 1 }) % 3];
+            }
+            3 => self.draft.datetime.twelve_hour = !self.draft.datetime.twelve_hour,
+            4 => {
+                self.draft.datetime.time_separator = if self.draft.datetime.time_separator == ':' {
+                    '.'
+                } else {
+                    ':'
+                }
+            }
+            _ => {}
         }
     }
     pub fn value(&self, setting: Setting) -> bool {
@@ -115,7 +164,16 @@ pub fn key(app: &mut App, code: KeyCode) {
     let Some(settings) = &mut app.settings else {
         return;
     };
-    let count = settings.rows().len();
+    let count = settings.control_count();
+    if settings.kind == SettingsKind::Regional {
+        match code {
+            KeyCode::Left | KeyCode::Right | KeyCode::Char(' ') if settings.cursor < count => {
+                settings.regional_choice(settings.cursor, code == KeyCode::Left);
+                return;
+            }
+            _ => {}
+        }
+    }
     match code {
         KeyCode::Esc => app.settings = None,
         KeyCode::Enter if settings.cursor == count + 1 => app.settings = None,
@@ -128,9 +186,11 @@ pub fn key(app: &mut App, code: KeyCode) {
         KeyCode::Char(' ') if settings.cursor == count => accept(app),
         KeyCode::Char(' ') => app.settings = None,
         KeyCode::Char(c) => {
-            if let Some(index) = settings.rows().iter().position(|setting| {
-                crate::menu::mnemonic(setting.label()) == Some(c.to_ascii_lowercase())
-            }) {
+            if let Some(index) = settings
+                .rows()
+                .iter()
+                .position(|setting| app.config.language.matches(setting.label(), c))
+            {
                 settings.toggle(index);
             }
         }

@@ -28,7 +28,14 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
         Kind::FindResults => " Find results ",
         Kind::Sizes => " Directory sizes — snapshot ",
     };
-    let rect = super::dialog_style::window(frame, profile, area, width, height, title);
+    let rect = super::dialog_style::window(
+        frame,
+        profile,
+        area,
+        width,
+        height,
+        app.config.language.text(title),
+    );
     app.mouse.regions.clear();
     super::dialog_style::close_button(
         frame,
@@ -45,7 +52,7 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
     );
     if form {
         frame.render_widget(
-            Paragraph::new("Filename pattern").style(dos(0x70)),
+            Paragraph::new(app.config.language.text("Filename pattern")).style(dos(0x70)),
             Rect::new(x, rect.y + 3, w, 1),
         );
         let input = Rect::new(x, rect.y + 4, w, 1);
@@ -68,6 +75,7 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
             (2, "Show hidden", m.prefs.hidden),
         ] {
             let row = Rect::new(x, rect.y + 5 + i as u16, w, 1);
+            let label = app.config.language.text(label);
             frame.render_widget(
                 Paragraph::new(format!("[{}] {label}", if on { 'x' } else { ' ' }))
                     .style(dos(if m.focus == i { 0x30 } else { 0x70 })),
@@ -79,7 +87,13 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
         }
         for (i, label, command) in [(3, "Find", Action::Start), (4, "Cancel", Action::Close)] {
             let button = Rect::new(x + 12 + (i as u16 - 3) * 22, rect.bottom() - 3, 18, 1);
-            super::dialog_style::button(frame, profile, button, label, m.focus == i);
+            super::dialog_style::button(
+                frame,
+                profile,
+                button,
+                app.config.language.text(label),
+                m.focus == i,
+            );
             app.mouse.regions.push((button, Target::Discovery(command)));
         }
     } else {
@@ -169,7 +183,13 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
                 _ => true,
             };
             if enabled {
-                super::dialog_style::button(frame, profile, r, label, m.focus == index);
+                super::dialog_style::button(
+                    frame,
+                    profile,
+                    r,
+                    app.config.language.text(label),
+                    m.focus == index,
+                );
                 app.mouse.regions.push((r, Target::Discovery(*command)));
             } else {
                 frame.render_widget(Paragraph::new(*label).style(dos(0x78)), r);

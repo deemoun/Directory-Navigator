@@ -245,7 +245,7 @@ pub fn action(app: &mut App, action: Action) {
                 return;
             }
             if action == Action::Info || node.kind != Kind::File || node.locked {
-                app.dialogs.push(crate::dialog::Dialog{title:" Archive member information ",message:format!("{}\nType: {:?}{}\nSize: {} bytes\nModified: {}\nRead-only. Links and special entries are never followed.\nEncrypted members cannot be previewed.",crate::filesystem::display_name(&String::from_utf8_lossy(&node.path)),node.kind,if node.locked{" (encrypted)"}else{""},node.size,node.modified.as_deref().unwrap_or("Unavailable"))});
+                app.dialogs.push(crate::dialog::Dialog{title:" Archive member information ",message:format!("{}\nType: {:?}{}\nSize: {} bytes\nModified: {}\nRead-only. Links and special entries are never followed.\nEncrypted members cannot be previewed.",crate::filesystem::display_name(&String::from_utf8_lossy(&node.path)),node.kind,if node.locked{" (encrypted)"}else{""},node.size,app.config.datetime.archive(node.modified.as_deref().unwrap_or("Unavailable")))});
                 return;
             }
             let catalog = Arc::clone(catalog);

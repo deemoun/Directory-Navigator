@@ -362,6 +362,9 @@ fn clock_editor_viewer_dialog_and_game_precedence() -> io::Result<()> {
 fn clock_poll_changes_no_directory_scans_and_disabled_clock_does_not_tick() -> io::Result<()> {
     let t = Temp::new()?;
     let mut app = t.app()?;
+    wait(&mut app, |a| {
+        a.panels.iter().all(|p| p.space.result.is_some())
+    });
     app.config.show_clock = false;
     app.clock = Clock::default();
     assert!(!app.poll());

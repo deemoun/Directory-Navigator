@@ -8,7 +8,11 @@ pub(super) fn visible(app: &App) -> bool {
 }
 pub(super) fn header(app: &App, area: Rect) -> Rect {
     Rect {
-        width: area.width.saturating_sub(if visible(app) { 10 } else { 0 }),
+        width: area.width.saturating_sub(if visible(app) {
+            app.config.datetime.clock_width()
+        } else {
+            0
+        }),
         ..area
     }
 }
@@ -16,7 +20,12 @@ pub(super) fn draw(frame: &mut Frame, app: &App, area: Rect) {
     if visible(app) {
         frame.render_widget(
             Paragraph::new(app.clock.text.as_str()).style(app.config.palette.dos(0x71)),
-            Rect::new(area.right() - 10, area.y, 10, 1),
+            Rect::new(
+                area.right() - app.config.datetime.clock_width(),
+                area.y,
+                app.config.datetime.clock_width(),
+                1,
+            ),
         );
     }
 }

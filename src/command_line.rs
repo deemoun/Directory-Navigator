@@ -7,12 +7,14 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{layout::Rect, text::Span, widgets::Paragraph, Frame};
 use std::{ffi::OsString, io};
 use unicode_segmentation::UnicodeSegmentation;
+pub mod history;
 const MAX_BYTES: usize = 16 * 1024;
 #[derive(Default)]
 pub struct CommandLine {
     pub text: String,
     pub cursor: usize,
     pub pending: Option<Plan>,
+    pub dialog: Option<history::HistoryDialog>,
     history: Vec<String>,
     recalled: Option<usize>,
     draft: String,
@@ -20,6 +22,9 @@ pub struct CommandLine {
     input_x: u16,
 }
 impl CommandLine {
+    pub fn history(&self) -> &[String] {
+        &self.history
+    }
     pub fn insert(&mut self, text: &str) -> io::Result<()> {
         if text.chars().any(char::is_control) {
             return Err(io::Error::other(

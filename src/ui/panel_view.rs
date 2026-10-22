@@ -62,15 +62,19 @@ pub(super) fn draw_panel(
     };
     for (column_index, column) in geometry.columns.iter().enumerate() {
         let date_time = inner.width >= 50;
-        let mut headers = vec![" Name"];
+        let mut headers = vec![config.language.text(" Name")];
         let mut constraints = vec![Constraint::Min(1)];
         if preset != ColumnPreset::Name {
-            headers.push("Size");
+            headers.push(config.language.text("Size"));
             constraints.push(Constraint::Length(9));
         }
         if preset == ColumnPreset::NameSizeModified {
-            headers.push("Modified");
-            constraints.push(Constraint::Length(if date_time { 16 } else { 10 }));
+            headers.push(config.language.text("Modified"));
+            constraints.push(Constraint::Length(if date_time {
+                config.datetime.detail_width()
+            } else {
+                10
+            }));
         }
         frame.render_widget(
             Table::new([Row::new(headers)], constraints.clone())
@@ -146,7 +150,11 @@ pub(super) fn draw_panel(
                     cells.push(Cell::from(size));
                 }
                 if preset == ColumnPreset::NameSizeModified {
-                    cells.push(Cell::from(formatting::modified(entry.modified, date_time)));
+                    cells.push(Cell::from(formatting::modified_with(
+                        entry.modified,
+                        date_time,
+                        config.datetime,
+                    )));
                 }
                 Row::new(cells).style(dos(color))
             });
@@ -196,12 +204,19 @@ pub(super) fn draw_panel(
         geometry.separator,
     );
     if !panel.filter.is_empty() {
-        let suffix = format!(" · {} filtered marks ", panel.filtered_marks());
+        let suffix = format!(
+            " · {} {} ",
+            panel.filtered_marks(),
+            config.language.text("filtered marks")
+        );
         let label = format!(
-            " Filter:{}{suffix}",
+            " {}:{}{suffix}",
+            config.language.text("Filter"),
             formatting::tail(
                 &display_name(&panel.filter),
-                inner.width.saturating_sub(suffix.len() as u16 + 8)
+                inner
+                    .width
+                    .saturating_sub(Span::raw(&suffix).width() as u16 + 8)
             )
         );
         frame.render_widget(Paragraph::new(label).style(dos(0x8b)), geometry.separator);
@@ -220,7 +235,7 @@ pub(super) fn draw_panel(
         let modified = entry
             .modified
             .and_then(formatting::local_timestamp)
-            .map(|time| time.format("%d.%m.%y %H:%M").to_string())
+            .map(|time| config.datetime.stamp(&time, true, false))
             .unwrap_or_default();
         let size_width = (size.len() as u16)
             .min(inner.width.saturating_sub(22))
@@ -230,7 +245,9 @@ pub(super) fn draw_panel(
         } else {
             size
         };
-        let name_width = inner.width.saturating_sub(size_width + 17);
+        let name_width = inner
+            .width
+            .saturating_sub(size_width + config.datetime.footer_width() + 3);
         let name = formatting::tail(&display_name(&entry.name.to_string_lossy()), name_width);
         frame.render_widget(
             Table::new(
@@ -238,7 +255,7 @@ pub(super) fn draw_panel(
                 [
                     Constraint::Min(1),
                     Constraint::Length(size_width),
-                    Constraint::Length(14),
+                    Constraint::Length(config.datetime.footer_width()),
                 ],
             )
             .column_spacing(1)
@@ -247,39 +264,48 @@ pub(super) fn draw_panel(
         );
     }
     let info = if let Some(search) = search {
-        let suffix = if search.no_match { " · No match" } else { "" };
+        let suffix = if search.no_match {
+            config.language.text(" · No match")
+        } else {
+            ""
+        };
         format!(
-            " Find: {}▌{suffix}",
+            " {}: {}▌{suffix}",
+            config.language.text("Find"),
             formatting::tail(
                 &search.query,
-                inner.width.saturating_sub(8 + suffix.len() as u16)
+                inner
+                    .width
+                    .saturating_sub(8 + Span::raw(suffix).width() as u16)
             )
         )
     } else if panel.loading {
-        " Reading directory…".into()
+        config.language.text(" Reading directory…").into()
     } else {
-        let marked = if panel.selected.is_empty() {
-            String::new()
-        } else {
-            format!(
-                "{} marked · ",
-                panel.selected.len() - panel.filtered_marks()
-            )
-        };
-        format!(
-            " {marked}{} {}, {}{} bytes",
-            panel.total_files,
-            if panel.total_files == 1 {
-                "file"
-            } else {
-                "files"
-            },
-            formatting::grouped_bytes(panel.total_bytes),
-            if panel.unknown_sizes { " + ?" } else { "" }
-        )
+        frame.render_widget(
+            Paragraph::new(super::panel_footer::selection(
+                panel,
+                config,
+                geometry.totals.width,
+            ))
+            .alignment(ratatui::layout::Alignment::Center),
+            geometry.totals,
+        );
+        String::new()
     };
+    if search.is_some() || panel.loading {
+        frame.render_widget(
+            Paragraph::new(info).style(dos(if search.is_some() { 0x30 } else { 0x8b })),
+            geometry.totals,
+        );
+    }
     frame.render_widget(
-        Paragraph::new(info).style(dos(if search.is_some() { 0x30 } else { 0x8b })),
-        geometry.totals,
+        Paragraph::new(super::panel_footer::space(
+            panel,
+            config,
+            geometry.space.width,
+        ))
+        .alignment(ratatui::layout::Alignment::Center),
+        geometry.space,
     );
 }

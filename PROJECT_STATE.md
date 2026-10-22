@@ -12,6 +12,29 @@
   state owns session dialogs/options/results; quick view owns debounced reads.
 
 ## Implemented
+- Tetris final-score → qualifying Unicode name → highlighted top-ten flow.
+  Named records include lines and start/end levels; Enter accepts, Esc records
+  Anonymous. Immediate separate tetris.conf beside settings, independent of
+  preference auto-save. Bounded UTF-8 validation, locked merging/atomic writes,
+  malformed/read-only/link refusal and retryable session-retained failures.
+- Classic three-row footer: cyan entry details, centered yellow selection with
+  white figures, gray available/total volume space with white figures. Visible
+  marks only; folders counted separately without recursion; unknown sizes marked.
+  Width-aware exact bytes/binary units, English/Russian, shared list/mouse geometry.
+  Native statvfs/GetDiskFreeSpaceExW snapshots in cancellable tasks; path-bound
+  replies, five-second polling and explicit unavailable states. No new deps/keys.
+- Alt+F8 / Utilities Commands History: session-only searchable list over the
+  existing 100-entry MRU history. Unicode substring filter, navigation/mouse,
+  Use recalls without execution; Cancel preserves prompt/cursor.
+- File Copy names / paths: listing-order visible marks/highlighted entry to the
+  internal clipboard, lossless conversion, CR/LF/2 MiB limits and atomic clipboard
+  replacement. No dependencies/configuration keys added.
+- English/Russian UTF-8 UI catalogs with English fallback; translated menu
+  mnemonics retain English aliases. Configurable independent date order/separators,
+  12/24-hour time/separator, preview and Apply/Cancel. Persisted in config.conf;
+  legacy defaults unchanged. Clock reserves 13 cells in 12-hour mode. Panel,
+  metadata and archive dates use regional formatting; machine timestamps and
+  native paths/content stay unchanged. Some detailed diagnostics remain English.
 - Release preparation: legacy Pascal files/resources moved intact to ignored
   original-dn/; Rust src/, tests/ and root Cargo commands remain unchanged.
   MIT license credits Dmitry Yarygin; original notices are confined to the local,
@@ -113,6 +136,25 @@
   entries. Keyboard/mouse navigation uses the reduced menu set.
 
 ## Validation
+- Tetris: final-score/name/leaderboard flow, Unicode editing/limits, positive-score
+  qualification/ties, immediate saves independent of preference auto-save,
+  corruption/read-only/link/lock failures, retry and concurrent-instance merging.
+  macOS release PTY verified natural game over, Unicode name, top-ten display,
+  immediate save/restart persistence, resizing, mouse Back and terminal restoration.
+- Footer: selected bytes/counts, folders without recursion, filtered marks,
+  unknown lengths, color roles, exact/compact capacity, unavailable states,
+  native capacity errors, stale replies/throttling, 80×25/resize/mouse geometry.
+  macOS release PTY verified no marks/two files/folder, free/total capacity,
+  search handoff, directory changes, mouse selection and terminal restoration.
+- Command tools: history bounds/dedup/filter/cancel, non-executing recall, mouse
+  selection, modal precedence, Unicode/native clipboard failures and size limits.
+  Release macOS PTY passed history menu/Alt+F8, recall without execution, copying
+  names/paths, mouse Use/Cancel, resizing and terminal restoration.
+- Localization: catalog parity/validation, Cyrillic mnemonics, regional settings
+  round trips/defaults/Cancel, midnight/noon/offsets, native content preservation
+  and manager/editor/viewer geometry at 80×25 and 120×40. macOS release PTY
+  verified language preview/apply/cancel, clock ticks, prompts, editor replacement,
+  resize, restart persistence and terminal restoration. Linux/Windows untested.
 - Simplified-menu release PTY check passes remaining Alt menus, Refresh, immediate
   Screensaver, Manager tree, keyboard exit and terminal restoration at 80×25.
 - PTY regression verifies fragmented/delayed SGR mouse releases cannot leak into
@@ -126,7 +168,7 @@
   concurrent changes, Apply/Cancel and exit recovery. Release macOS PTY passed
   two-run persistence, clock/sort reload, conflict recovery, mouse opt-out,
   80×25→120×40 resizing and terminal restoration.
-- macOS ARM64: fmt check, Clippy with denied warnings, 241 passing tests
+- macOS ARM64: fmt check, Clippy with denied warnings, 260 passing tests
   (one opt-in real-Trash success test ignored), release build.
 - Menu tests enforce working entries, unique mnemonics, normalized separators,
   unchanged headings, Block selection/clipboard/undo, Paragraph styling and clock
@@ -187,7 +229,7 @@
 - Linux Trash supports the home volume only. macOS Trash refuses undecodable
   names; Finder Put Back is not guaranteed. Restore through the desktop manager.
   Linux external opening needs xdg-utils and a desktop session.
-- Feature priorities: safe archive extraction, history dialog/output recall, then disk
+- Feature priorities: safe archive extraction, output recall, then disk
   information/permission editing. Platform validation, traversal/recovery hardening
   and streaming viewing remain important.
   Tree mutations/persistent cache, archive extraction/modification, persistent command history, OS clipboard,

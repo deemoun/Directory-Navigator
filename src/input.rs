@@ -29,6 +29,10 @@ fn handle_key(app: &mut App, key: KeyEvent) {
         crate::dialog::message_key(app, key.code);
         return;
     }
+    if focus == Focus::CommandHistory {
+        crate::command_line::history::key(app, key);
+        return;
+    }
     if focus == Focus::SaverSetup {
         crate::screensaver::key(app, key.code);
         return;
@@ -202,6 +206,7 @@ fn handle_key(app: &mut App, key: KeyEvent) {
             KeyCode::PageDown => {
                 crate::file_tools::open_history(app, crate::file_tools::history::HistoryKind::View)
             }
+            KeyCode::F(8) => crate::command_line::history::open(app),
             KeyCode::Char('l') => crate::file_tools::open_export(app),
             KeyCode::F(9) => crate::tetris::open(app),
             KeyCode::F(7) => crate::quick_search::open(app),
@@ -285,7 +290,7 @@ fn handle_key(app: &mut App, key: KeyEvent) {
         KeyCode::Delete if app.config.delete_key => app.prompt_operation(Kind::Delete, false),
         KeyCode::F(9) => crate::menu::open(app, 1),
         KeyCode::F(1) => app.dialogs.push(Dialog { title: " Directory Navigator — Help ",
-            message: "Tab panels · Arrows/PgUp/PgDn/Home/End navigate\nAlt+F/U/P/M/O menus · Alt+X exits\nEnter app/dir/archive · Ctrl+Enter OS app · F3 view · F4 edit · BS parent\nIns / Space marks · Ctrl+A all · Ctrl+U clear\n+ / - group · Alt+E info · Alt+K columns\nAlt+F7 quick search · Ctrl+F7 recursive Find\nCtrl+Q quick view · Ctrl+T tree · Alt+F9 Tetris\nCtrl+1–9 bookmarks set · Alt+1–9 go · Alt+Del filter\nCtrl+K calculator · Ctrl+B ASCII · Alt+Y memory\nCtrl+C compare · Alt+L list file\nAlt+BS directories · Alt+PgUp edits / PgDn views\nF2 user menu · Shift+F2 sort · Ctrl+F3 name / F4 ext / F5 date / F6 size\nF5 copy · F6 move · Shift+F6 rename here\nF7 mkdir · F8 Trash/delete · F9 menu · F10 exit\nCtrl+H hidden · Ctrl+L go to · Ctrl+R refresh\nClick row · Ctrl+click mark · Double-click open\nWheel scrolls · Esc cancels dialogs/operations\nType commands · Enter runs · Esc clears · Ctrl+E/X history\nColors: white dirs · green exec · cyan source\nMagenta archives · blue links · yellow marks\nTrash by default; File Manager Setup changes mode.\nExisting destinations are refused; no overwrites.".into() }),
+            message: "Tab panels · Arrows/PgUp/PgDn/Home/End navigate\nAlt+F/U/P/M/O menus · Alt+X exits\nEnter app/dir/archive · Ctrl+Enter OS app · F3 view · F4 edit · BS parent\nIns / Space marks · Ctrl+A all · Ctrl+U clear\n+ / - group · Alt+E info · Alt+K columns\nAlt+F7 quick search · Ctrl+F7 recursive Find\nCtrl+Q quick view · Ctrl+T tree · Alt+F9 Tetris\nCtrl+1–9 bookmarks set · Alt+1–9 go · Alt+Del filter\nCtrl+K calculator · Ctrl+B ASCII · Alt+Y memory\nCtrl+C compare · Alt+L list file\nAlt+BS directories · Alt+PgUp edits / PgDn views\nF2 user menu · Shift+F2 sort · Ctrl+F3 name / F4 ext / F5 date / F6 size\nF5 copy · F6 move · Shift+F6 rename here\nF7 mkdir · F8 Trash/delete · F9 menu · F10 exit\nCtrl+H hidden · Ctrl+L go to · Ctrl+R refresh\nClick row · Ctrl+click mark · Double-click open\nWheel scrolls · Esc cancels dialogs/operations\nType commands · Enter runs · Esc clears · Ctrl+E/X history · Alt+F8 list\nFile menu: Copy names / paths uses internal clipboard\nColors: white dirs · green exec · cyan source\nMagenta archives · blue links · yellow marks\nTrash by default; File Manager Setup changes mode.\nExisting destinations are refused; no overwrites.".into() }),
         _ => {}
     }
 }
@@ -303,10 +308,12 @@ fn paste_text(app: &mut App, text: &str) {
     match focus::current(app) {
         Focus::Editor | Focus::EditorModal => crate::editor::paste(app, text),
         Focus::Viewer | Focus::ViewerSearch => crate::viewer::paste(app, text),
+        Focus::Game => crate::tetris::paste(app, text),
         Focus::Manager => crate::command_line::paste(app, text),
         Focus::Navigation => crate::navigation_tools::paste(app, text),
         Focus::Utility => app.utilities.paste(text),
         Focus::FileTools => app.file_tools.paste(text),
+        Focus::CommandHistory => crate::command_line::history::paste(app, text),
         Focus::Discovery => crate::discovery::paste(app, text),
         Focus::QuickSearch => {
             if let Some(s) = &mut app.quick_search {

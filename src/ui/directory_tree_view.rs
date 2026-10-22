@@ -18,8 +18,14 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
         return;
     };
     let g = geometry(area);
-    let rect =
-        super::dialog_style::window(frame, profile, area, g.width, g.height, " Directory tree ");
+    let rect = super::dialog_style::window(
+        frame,
+        profile,
+        area,
+        g.width,
+        g.height,
+        app.config.language.text(" Directory tree "),
+    );
     app.mouse.regions.clear();
     super::dialog_style::close_button(
         frame,
@@ -137,7 +143,13 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
         (4, "Close".to_string(), Action::Close),
     ] {
         let r = Rect::new(x + (index as u16 - 1) * bw, rect.bottom() - 2, bw - 1, 1);
-        super::dialog_style::button(frame, profile, r, &label, tree.focus == index);
+        super::dialog_style::button(
+            frame,
+            profile,
+            r,
+            app.config.language.text(&label),
+            tree.focus == index,
+        );
         app.mouse.regions.push((r, Target::Tree(command)));
     }
 }

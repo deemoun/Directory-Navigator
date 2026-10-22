@@ -29,7 +29,14 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
     } else {
         " Filename filter "
     };
-    super::dialog_style::window(frame, profile, rect, rect.width, rect.height, title);
+    super::dialog_style::window(
+        frame,
+        profile,
+        rect,
+        rect.width,
+        rect.height,
+        app.config.language.text(title),
+    );
     app.mouse.regions.clear();
     super::dialog_style::close_button(
         frame,
@@ -47,7 +54,7 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
                 let value = app.config.bookmarks[i]
                     .as_ref()
                     .map(|p| display_name(&p.to_string_lossy()))
-                    .unwrap_or_else(|| "<empty>".into());
+                    .unwrap_or_else(|| app.config.language.text("<empty>").into());
                 let row = Rect::new(x, rect.y + 1 + i as u16, w, 1);
                 frame.render_widget(
                     Paragraph::new(format!("{}  {}", i + 1, tail(&value, w - 3)))
@@ -59,8 +66,12 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
                     .push((row, Target::Navigation(Action::Slot(i))));
             }
             frame.render_widget(
-                Paragraph::new("↑↓ / 1–9 choose · Tab moves · Ctrl+1–9 set · Alt+1–9 go")
-                    .style(dos(0x70)),
+                Paragraph::new(
+                    app.config
+                        .language
+                        .text("↑↓ / 1–9 choose · Tab moves · Ctrl+1–9 set · Alt+1–9 go"),
+                )
+                .style(dos(0x70)),
                 Rect::new(x, rect.y + 11, w, 2),
             );
             for (i, label, action) in [
@@ -82,7 +93,7 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
             cursor,
             focus,
         } => {
-            frame.render_widget(Paragraph::new("Visible cached filenames · case-sensitive * and ?\nEmpty or * clears · Parent stays visible\nFiltered marks are preserved; operations use visible marks").style(dos(0x70)),Rect::new(x,rect.y+1,w,3));
+            frame.render_widget(Paragraph::new(app.config.language.text("Visible cached filenames · case-sensitive * and ?\nEmpty or * clears · Parent stays visible\nFiltered marks are preserved; operations use visible marks")).style(dos(0x70)),Rect::new(x,rect.y+1,w,3));
             let input = Rect::new(x, rect.y + 5, w, 1);
             let column = Line::from(&field[..*cursor]).width();
             let scroll = column.saturating_sub(w.saturating_sub(1) as usize);
@@ -113,7 +124,7 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
         }
     }
     for (rect, label, action, focus) in buttons {
-        super::dialog_style::button(frame, profile, rect, label, focus);
+        super::dialog_style::button(frame, profile, rect, app.config.language.text(label), focus);
         app.mouse.regions.push((rect, Target::Navigation(action)));
     }
 }

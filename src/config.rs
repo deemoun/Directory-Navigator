@@ -1,4 +1,4 @@
-mod store;
+pub(crate) mod store;
 use crate::columns::ColumnPreset;
 use crate::panel::SortMode;
 use crate::panel_layout::PanelLayout;
@@ -11,6 +11,8 @@ pub use store::Store;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Config {
+    pub language: crate::localization::Language,
+    pub datetime: crate::regional::DateTimeFormat,
     pub save_on_exit: bool,
     pub palette: crate::palette::PaletteProfile,
     pub show_clock: bool,
@@ -32,6 +34,8 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
+            language: Default::default(),
+            datetime: Default::default(),
             save_on_exit: true,
             palette: Default::default(),
             show_clock: true,
@@ -103,6 +107,24 @@ impl Config {
             }
             if let Some((key, value)) = line.split_once('=') {
                 match key.trim() {
+                    "language" => {
+                        config.language = crate::localization::Language::parse(value.trim())
+                    }
+                    "date_order" => {
+                        config.datetime.date_order = crate::regional::DateOrder::parse(value.trim())
+                    }
+                    "date_separator" => {
+                        config.datetime.date_separator = value
+                            .trim()
+                            .chars()
+                            .next()
+                            .filter(|c| matches!(c, '-' | '.' | '/'))
+                            .unwrap_or('-')
+                    }
+                    "time_format" => config.datetime.twelve_hour = value.trim() == "12",
+                    "time_separator" => {
+                        config.datetime.time_separator = if value.trim() == "." { '.' } else { ':' }
+                    }
                     "config_version" if value.trim() != "1" => {
                         return Err(io::Error::new(
                             io::ErrorKind::InvalidData,
@@ -186,7 +208,21 @@ impl Config {
             SortMode::Date => "date",
         };
         let mut output = Vec::new();
+
         writeln!(output, "# Directory Navigator preferences\n# Saved automatically on normal exit; Options > Save desktop saves now.\nconfig_version=1\nsave_on_exit={}", self.save_on_exit)?;
+        writeln!(
+            output,
+            "language={}\ndate_order={}\ndate_separator={}\ntime_format={}\ntime_separator={}",
+            self.language.key(),
+            self.datetime.date_order.key(),
+            self.datetime.date_separator,
+            if self.datetime.twelve_hour {
+                "12"
+            } else {
+                "24"
+            },
+            self.datetime.time_separator
+        )?;
         write!(
             output,
             "hidden={}\nleft_sort={}\nright_sort={}\n",

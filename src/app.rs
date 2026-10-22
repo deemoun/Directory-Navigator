@@ -24,7 +24,7 @@ pub struct App {
     pub editor_search: crate::editor::search::SearchMemory,
     pub editor: Option<crate::editor::Editor>,
     pub tetris: Option<crate::tetris::Game>,
-    pub game_records: Vec<crate::tetris::Record>,
+    pub game_scores: crate::tetris::scores::Store,
     pub panels: [Panel; 2],
     pub active: usize,
     pub command_line: crate::command_line::CommandLine,
@@ -72,7 +72,7 @@ impl App {
             editor_search: crate::editor::search::SearchMemory::default(),
             editor: None,
             tetris: None,
-            game_records: Vec::new(),
+            game_scores: Default::default(),
             panels: [
                 Panel::new(path.clone(), config.show_hidden)?,
                 Panel::new(path, config.show_hidden)?,
@@ -141,7 +141,7 @@ impl App {
             | user_menu_changed
             | archive_changed;
         if self.config.show_clock {
-            let tick = self.clock.tick();
+            let tick = self.clock.tick_with(self.config.datetime);
             changed |= tick && self.tetris.is_none();
         }
         if let Some(info) = &mut self.file_info {
@@ -197,6 +197,7 @@ impl App {
                 });
             }
             changed |= loading != panel.loading || revision != panel.revision;
+            changed |= panel.space.poll(&panel.path, std::time::Instant::now());
             if refresh_allowed {
                 panel.refresh_if_due(self.config.show_hidden, std::time::Instant::now());
             }
@@ -319,6 +320,7 @@ impl App {
     pub fn refresh(&mut self) {
         for panel in &mut self.panels {
             panel.refresh(self.config.show_hidden);
+            panel.space.refresh();
         }
     }
 
@@ -514,6 +516,7 @@ impl App {
     pub fn apply_config(&mut self, config: Config) {
         let hidden_changed = self.config.show_hidden != config.show_hidden;
         self.config = config;
+        self.clock.tick_with(self.config.datetime);
         if let Some(editor) = &mut self.editor {
             editor.apply_preferences(self.config.editor);
         }

@@ -37,11 +37,11 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
         area,
         width,
         height,
-        if review {
+        app.config.language.text(if review {
             " Run user command "
         } else {
             " User menu "
-        },
+        }),
     );
     app.mouse.regions.clear();
     super::dialog_style::close_button(
@@ -152,7 +152,13 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
     let bw = w / buttons.len() as u16;
     for (i, (label, action)) in buttons.into_iter().enumerate() {
         let r = Rect::new(x + i as u16 * bw, rect.bottom() - 2, bw - 1, 1);
-        super::dialog_style::button(frame, profile, r, label, m.focus == i + 1);
+        super::dialog_style::button(
+            frame,
+            profile,
+            r,
+            app.config.language.text(label),
+            m.focus == i + 1,
+        );
         app.mouse.regions.push((r, Target::UserMenu(action)));
     }
 }

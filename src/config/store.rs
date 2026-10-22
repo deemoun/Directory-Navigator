@@ -5,7 +5,7 @@ use std::{
 };
 
 const MAX_CONFIG_BYTES: u64 = 1024 * 1024;
-pub(super) fn read_bytes(path: &Path) -> io::Result<Option<Vec<u8>>> {
+pub(crate) fn read_bytes(path: &Path) -> io::Result<Option<Vec<u8>>> {
     use std::io::Read;
     let file = match crate::filesystem::open_regular(path) {
         Ok(file) => file,
@@ -98,12 +98,12 @@ impl Store {
         Ok(true)
     }
 }
-struct SaveLock {
+pub(crate) struct SaveLock {
     file: fs::File,
     path: PathBuf,
 }
 impl SaveLock {
-    fn acquire(path: &Path) -> io::Result<Self> {
+    pub(crate) fn acquire(path: &Path) -> io::Result<Self> {
         let mut lock_path = path.as_os_str().to_os_string();
         lock_path.push(".lock");
         let path = PathBuf::from(lock_path);

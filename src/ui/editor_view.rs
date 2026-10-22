@@ -20,9 +20,10 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
         .path
         .as_ref()
         .map(|path| display_name(&path.to_string_lossy()))
-        .unwrap_or_else(|| "[New file]".into());
+        .unwrap_or_else(|| app.config.language.text("[New file]").into());
     let title = format!(
-        " F4 Editor {} │ {}",
+        " F4 {} {} │ {}",
+        app.config.language.text("Editor"),
         if editor.dirty() { "*" } else { " " },
         formatting::tail(&path, area.width.saturating_sub(29))
     );
@@ -117,17 +118,28 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
             ));
         }
     } else {
-        frame.render_widget(Paragraph::new("Reading file…").style(dos(0x1f)), content);
+        frame.render_widget(
+            Paragraph::new(app.config.language.text("Reading file…")).style(dos(0x1f)),
+            content,
+        );
     }
     let position = editor
         .buffer
         .as_ref()
-        .map(|buffer| format!("Ln {} Col {}", buffer.row() + 1, buffer.column() + 1))
+        .map(|buffer| {
+            format!(
+                "{} {} {} {}",
+                app.config.language.text("Ln"),
+                buffer.row() + 1,
+                app.config.language.text("Col"),
+                buffer.column() + 1
+            )
+        })
         .unwrap_or_default();
     let status = format!(
         " {position} │ {} │ {}",
         editor.highlight.language.label(),
-        editor.notice
+        app.config.language.text(&editor.notice)
     );
     frame.render_widget(
         Paragraph::new(status).style(dos(0x70)),
@@ -155,8 +167,12 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
     .enumerate()
     {
         frame.render_widget(
-            Paragraph::new(profile.function(index as u8 + 1, name, command.is_some()))
-                .style(profile.bar(command.is_some())),
+            Paragraph::new(profile.function(
+                index as u8 + 1,
+                app.config.language.text(name),
+                command.is_some(),
+            ))
+            .style(profile.bar(command.is_some())),
             cells[index],
         );
         if let Some(command) = command {

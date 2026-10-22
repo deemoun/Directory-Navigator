@@ -9,6 +9,7 @@ pub enum Screen {
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Focus {
+    CommandHistory,
     Message,
     SaverSetup,
     Colors,
@@ -64,6 +65,9 @@ pub fn current(app: &App) -> Focus {
         };
     }
     if screen == Screen::Manager {
+        if app.command_line.dialog.is_some() {
+            return Focus::CommandHistory;
+        }
         if app.screensaver.setup.is_some() {
             return Focus::SaverSetup;
         }

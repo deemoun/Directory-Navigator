@@ -6,6 +6,7 @@ pub use navigation::{activate, close, key, open, open_mnemonic};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MenuId {
+    CopyNames,
     View,
     Sort,
     Layout,
@@ -15,6 +16,8 @@ pub enum MenuId {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Action {
+    CommandHistory,
+    CopyNames(bool),
     Colors,
     ScreensaverSetup,
     ScreenRest,
@@ -99,7 +102,7 @@ pub fn mnemonic(label: &str) -> Option<char> {
         .1
         .chars()
         .next()
-        .map(|c| c.to_ascii_lowercase())
+        .and_then(|c| c.to_lowercase().next())
 }
 
 pub fn items(menu: usize) -> Vec<Item> {
@@ -119,6 +122,7 @@ pub fn items(menu: usize) -> Vec<Item> {
             item("~O~pen with default app", "Ctrl+Enter", OpenExternal),
             item("~F~ind...", "Ctrl+F7", Find),
             item("~C~opy...", "F5", Key(5)),
+            item("Copy ~n~ames / paths", "", Submenu(MenuId::CopyNames)),
             item("~R~ename/Move...", "F6", Key(6)),
             item("~M~ake directory", "F7", Key(7)),
             item("~D~elete", "F8", Key(8)),
@@ -150,6 +154,7 @@ pub fn items(menu: usize) -> Vec<Item> {
                 Utility(crate::utilities::Kind::Characters),
             ),
             line(),
+            item("Commands ~H~istory", "Alt+F8", CommandHistory),
             item(
                 "File ~E~dit History",
                 "Alt+PgUp",
@@ -218,6 +223,10 @@ pub fn items(menu: usize) -> Vec<Item> {
 pub fn submenu_items(menu: MenuId) -> Vec<Item> {
     use Action::*;
     match menu {
+        MenuId::CopyNames => vec![
+            item("~N~ames", "", CopyNames(false)),
+            item("~F~ull paths", "", CopyNames(true)),
+        ],
         MenuId::View => vec![
             item("~A~s is", "F3", View(ViewMode::Auto)),
             item("As ~T~ext", "", View(ViewMode::Text)),
@@ -244,6 +253,11 @@ pub fn submenu_items(menu: MenuId) -> Vec<Item> {
         MenuId::Configuration => vec![
             item("S~y~stem Setup...", "", Settings(SettingsKind::System)),
             item("~I~nterface...", "", Settings(SettingsKind::Interface)),
+            item(
+                "~L~anguage / date & time...",
+                "",
+                Settings(SettingsKind::Regional),
+            ),
             item("~C~onfirmation policy...", "", Confirmations),
             line(),
             item("Screen sa~v~ers...", "", ScreensaverSetup),
@@ -292,6 +306,8 @@ pub fn execute(app: &mut App, action: Action) {
     close(app);
     app.quick_search = None;
     match action {
+        Action::CommandHistory => crate::command_line::history::open(app),
+        Action::CopyNames(full) => crate::file_tools::clipboard::copy(app,full),
         Action::ScreensaverSetup => crate::screensaver::open(app),
         Action::ScreenRest => app.screensaver.start(std::time::Instant::now()),
         Action::Colors => crate::palette::open(app),
@@ -332,7 +348,7 @@ pub fn execute(app: &mut App, action: Action) {
         Action::Game => crate::tetris::open(app),
         Action::About => app.dialogs.push(crate::dialog::Dialog {
             title: " About Directory Navigator ",
-            message: format!("{}\nVersion {}\nNative Rust terminal file manager\n\nAuthor: Dmitry Yarygin\n\nF1: keyboard help\nEnter / Esc: close", crate::APPLICATION_NAME, crate::DISPLAY_VERSION),
+            message: format!("{}\n{} {}\n{}\n\n{}: Dmitry Yarygin\n\n{}\n{}", crate::APPLICATION_NAME, app.config.language.text("Version"), crate::DISPLAY_VERSION, app.config.language.text("Native Rust terminal file manager"), app.config.language.text("Author"), app.config.language.text("F1: keyboard help"), app.config.language.text("Enter / Esc: close")),
         }),
         Action::SelectAll => app.panels[app.active].select_visible(),
         Action::ClearSelection => app.panels[app.active].selected.clear(),

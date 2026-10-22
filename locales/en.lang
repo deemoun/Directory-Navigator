@@ -1,0 +1,417 @@
+# UTF-8 catalog: English message ID<TAB>translation; escapes: \n \t \\
+ Name	 Name
+ · No match	 · No match
+12 hour	12 hour
+24 hour	24 hour
+ASCII / DOS CP437 Table	ASCII / DOS CP437 Table
+ASCII Ta~b~le	ASCII Ta~b~le
+About Directory Navigator	About Directory Navigator
+Active directory	Active directory
+All	All
+Any key or mouse input returns to DN	Any key or mouse input returns to DN
+Application	Application
+Architecture	Architecture
+Archive member information	Archive member information
+As He~x~	As He~x~
+As ~T~ext	As ~T~ext
+Author	Author
+Auto~i~ndent	Auto~i~ndent
+Available memory	Available memory
+BS - go to ~u~pper directory	BS - go to ~u~pper directory
+Backward	Backward
+Behavior	Behavior
+Browse archive	Browse archive
+Calculate directory si~z~es...	Calculate directory si~z~es...
+Calculator	Calculator
+Cancel	Cancel
+Cannot read file information.	Cannot read file information.
+Case sensitive	Case sensitive
+Change all	Change all
+Change direc~t~ory...	Change direc~t~ory...
+Classic DN — fixed 256 colors	Classic DN — fixed 256 colors
+Clear	Clear
+Clear all marks	Clear all marks
+Close	Close
+Colors	Colors
+Compare directories	Compare directories
+Confirm permanent deletion	Confirm permanent deletion
+Confirm replacement	Confirm replacement
+Confirmation policy — read-only	Confirmation policy — read-only
+Copy	Copy
+Copy to	Copy to
+Cu~t~	Cu~t~
+C~o~lors...	C~o~lors...
+DN resident memory	DN resident memory
+Date order	Date order
+Date separator	Date separator
+Day–month–year	Day–month–year
+Del	Del
+Delete	Delete
+Destination	Destination
+De~l~ete selection	De~l~ete selection
+Directory	Directory
+Directory Navigator — Help	Directory Navigator — Help
+Directory Navigator — error	Directory Navigator — error
+Directory name	Directory name
+Directory sizes — snapshot	Directory sizes — snapshot
+Directory tree	Directory tree
+Discard	Discard
+Display	Display
+Document	Document
+Dupe	Dupe
+Edit	Edit
+Editor	Editor
+Editor help	Editor help
+Enter / Esc: close	Enter / Esc: close
+Enter applies · Esc cancels	Enter applies · Esc cancels
+Entire scope	Entire scope
+Entry type	Entry type
+Error	Error
+Exact size	Exact size
+Existing destinations are always refused.\nTrash and permanent deletion require confirmation.	Existing destinations are always refused.\nTrash and permanent deletion require confirmation.
+E~x~it	E~x~it
+E~x~it DN	E~x~it DN
+F1: keyboard help	F1: keyboard help
+F3 View	F3 View
+F9 Info	F9 Info
+File Attributes / Info (read-only)	File Attributes / Info (read-only)
+File Edit History	File Edit History
+File Manager Setup	File Manager Setup
+File View History	File View History
+File operation	File operation
+File ~A~ttributes / Info...	File ~A~ttributes / Info...
+File ~E~dit History	File ~E~dit History
+File ~V~iew History	File ~V~iew History
+Filename filter	Filename filter
+Filter	Filter
+Find	Find
+Find files	Find files
+Find results	Find results
+Forward	Forward
+Free memory	Free memory
+From cursor	From cursor
+Full path	Full path
+Go To	Go To
+Go to directory	Go to directory
+Go to line	Go to line
+Help	Help
+Highlight Groups	Highlight Groups
+History of directories	History of directories
+History of ~d~irectories...	History of ~d~irectories...
+Hostname	Hostname
+Interface Setup	Interface Setup
+In~v~ert selection	In~v~ert selection
+Language	Language
+Language / date & time	Language / date & time
+Left panel	Left panel
+Link target	Link target
+Link target (not followed)	Link target (not followed)
+Local ~m~enu definition...	Local ~m~enu definition...
+Logical CPUs	Logical CPUs
+Make directory	Make directory
+Make list file	Make list file
+Memory Information	Memory Information
+Menu	Menu
+MkDir	MkDir
+Modified	Modified
+Month–day–year	Month–day–year
+Move	Move
+Move / rename to	Move / rename to
+Move deleted files to T~r~ash	Move deleted files to T~r~ash
+Move to Trash	Move to Trash
+Name	Name
+Name + Size	Name + Size
+Name + Size + Modified	Name + Size + Modified
+Name only	Name only
+Name pattern	Name pattern
+Native Rust terminal file manager	Native Rust terminal file manager
+Never	Never
+New name	New name
+Next	Next
+No	No
+OK	OK
+OS version	OS version
+Open	Open
+Open file	Open file
+Operating system	Operating system
+Options	Options
+PID	PID
+Parent directory	Parent directory
+Path	Path
+Permissions	Permissions
+Physical RAM	Physical RAM
+Preview	Preview
+Prompt on replace	Prompt on replace
+Quick directories	Quick directories
+Quick s~e~arch...	Quick s~e~arch...
+Quit	Quit
+Read-only	Read-only
+Read-only information · no attributes are changed.	Read-only information · no attributes are changed.
+Reading directory…	Reading directory…
+Reading file…	Reading file…
+Reading metadata…	Reading metadata…
+Reading…	Reading…
+Refresh	Refresh
+Regular file	Regular file
+Replace	Replace
+Replacement	Replacement
+Reverse	Reverse
+Re~v~ersed search	Re~v~ersed search
+Right panel	Right panel
+Run	Run
+Save	Save
+Save As — new destination	Save As — new destination
+Save settings on e~x~it	Save settings on e~x~it
+Save ~a~s...	Save ~a~s...
+Screen savers	Screen savers
+Screen sa~v~ers...	Screen sa~v~ers...
+Search in viewer	Search in viewer
+Search text	Search text
+Select all	Select all
+Select group	Select group
+Select grou~p~...	Select grou~p~...
+Select ~a~ll	Select ~a~ll
+Selected saver: Star Sky	Selected saver: Star Sky
+Selected text	Selected text
+Set Current	Set Current
+Setup columns	Setup columns
+Setup c~o~lumns...	Setup c~o~lumns...
+Shell	Shell
+Show ~c~lock	Show ~c~lock
+Show ~h~idden files	Show ~h~idden files
+Size	Size
+Sort ~b~y...	Sort ~b~y...
+Special file	Special file
+Stop	Stop
+Swap total	Swap total
+Swap used	Swap used
+Symbolic link	Symbolic link
+Syntax ~h~ighlight	Syntax ~h~ighlight
+System Information	System Information
+System Setup	System Setup
+S~y~stem Information	S~y~stem Information
+S~y~stem Setup...	S~y~stem Setup...
+Tab / ↑↓ choose · Space toggle · Enter OK · Esc Cancel	Tab / ↑↓ choose · Space toggle · Enter OK · Esc Cancel
+Tab panels · Arrows/PgUp/PgDn/Home/End navigate\nAlt+F/U/P/M/O menus · Alt+X exits\nEnter app/dir/archive · Ctrl+Enter OS app · F3 view · F4 edit · BS parent\nIns / Space marks · Ctrl+A all · Ctrl+U clear\n+ / - group · Alt+E info · Alt+K columns\nAlt+F7 quick search · Ctrl+F7 recursive Find\nCtrl+Q quick view · Ctrl+T tree · Alt+F9 Tetris\nCtrl+1–9 bookmarks set · Alt+1–9 go · Alt+Del filter\nCtrl+K calculator · Ctrl+B ASCII · Alt+Y memory\nCtrl+C compare · Alt+L list file\nAlt+BS directories · Alt+PgUp edits / PgDn views\nF2 user menu · Shift+F2 sort · Ctrl+F3 name / F4 ext / F5 date / F6 size\nF5 copy · F6 move · Shift+F6 rename here\nF7 mkdir · F8 Trash/delete · F9 menu · F10 exit\nCtrl+H hidden · Ctrl+L go to · Ctrl+R refresh\nClick row · Ctrl+click mark · Double-click open\nWheel scrolls · Esc cancels dialogs/operations\nType commands · Enter runs · Esc clears · Ctrl+E/X history · Alt+F8 list\nFile menu: Copy names / paths uses internal clipboard\nColors: white dirs · green exec · cyan source\nMagenta archives · blue links · yellow marks\nTrash by default; File Manager Setup changes mode.\nExisting destinations are refused; no overwrites.	Tab panels · Arrows/PgUp/PgDn/Home/End navigate\nAlt+F/U/P/M/O menus · Alt+X exits\nEnter app/dir/archive · Ctrl+Enter OS app · F3 view · F4 edit · BS parent\nIns / Space marks · Ctrl+A all · Ctrl+U clear\n+ / - group · Alt+E info · Alt+K columns\nAlt+F7 quick search · Ctrl+F7 recursive Find\nCtrl+Q quick view · Ctrl+T tree · Alt+F9 Tetris\nCtrl+1–9 bookmarks set · Alt+1–9 go · Alt+Del filter\nCtrl+K calculator · Ctrl+B ASCII · Alt+Y memory\nCtrl+C compare · Alt+L list file\nAlt+BS directories · Alt+PgUp edits / PgDn views\nF2 user menu · Shift+F2 sort · Ctrl+F3 name / F4 ext / F5 date / F6 size\nF5 copy · F6 move · Shift+F6 rename here\nF7 mkdir · F8 Trash/delete · F9 menu · F10 exit\nCtrl+H hidden · Ctrl+L go to · Ctrl+R refresh\nClick row · Ctrl+click mark · Double-click open\nWheel scrolls · Esc cancels dialogs/operations\nType commands · Enter runs · Esc clears · Ctrl+E/X history · Alt+F8 list\nFile menu: Copy names / paths uses internal clipboard\nColors: white dirs · green exec · cyan source\nMagenta archives · blue links · yellow marks\nTrash by default; File Manager Setup changes mode.\nExisting destinations are refused; no overwrites.
+Tab width	Tab width
+Terminal	Terminal
+Terminal size	Terminal size
+Terminal — ANSI/theme colors	Terminal — ANSI/theme colors
+Time before screen rest	Time before screen rest
+Time format	Time format
+Time separator	Time separator
+Unsaved changes	Unsaved changes
+Unselect group	Unselect group
+User	User
+User menu	User menu
+Version	Version
+View	View
+Viewer	Viewer
+Whole words	Whole words
+Wrap	Wrap
+Year–month–day	Year–month–day
+Yes	Yes
+[ Apply ]	[ Apply ]
+[ Cancel ]	[ Cancel ]
+[ Close ]	[ Close ]
+[ Help ]	[ Help ]
+[ OK ]	[ OK ]
+[ Preview ]	[ Preview ]
+bytes	bytes
+filtered marks	filtered marks
+marked	marked
+~A~bout...	~A~bout...
+~A~s is	~A~s is
+~B~lock	~B~lock
+~B~rief	~B~rief
+~B~rowse archive...	~B~rowse archive...
+~C~alculator	~C~alculator
+~C~lose editor	~C~lose editor
+~C~olumn defaults...	~C~olumn defaults...
+~C~ompare directories...	~C~ompare directories...
+~C~onfiguration	~C~onfiguration
+~C~onfirmation policy...	~C~onfirmation policy...
+~C~opy	~C~opy
+~C~opy...	~C~opy...
+~D~EL erases file(s)	~D~EL erases file(s)
+~D~ate	~D~ate
+~D~elete	~D~elete
+~D~etails	~D~etails
+~D~irectory tree	~D~irectory tree
+~D~uplicate line	~D~uplicate line
+~E~dit	~E~dit
+~E~xpand typed tabs to spaces	~E~xpand typed tabs to spaces
+~E~xtension	~E~xtension
+~F~ile	~F~ile
+~F~ile Manager	~F~ile Manager
+~F~ilename filter...	~F~ilename filter...
+~F~ind...	~F~ind...
+~G~ame	~G~ame
+~G~lobal menu definition...	~G~lobal menu definition...
+~G~o to line...	~G~o to line...
+~H~ighlight file types	~H~ighlight file types
+~H~ighlight groups...	~H~ighlight groups...
+~I~nterface...	~I~nterface...
+~L~anguage / date & time...	~L~anguage / date & time...
+~L~ayout	~L~ayout
+~L~oad desktop	~L~oad desktop
+~M~ake directory	~M~ake directory
+~M~ake list file...	~M~ake list file...
+~M~anager	~M~anager
+~M~emory Information	~M~emory Information
+~M~isc	~M~isc
+~N~ame	~N~ame
+~O~pen with default app	~O~pen with default app
+~O~pen...	~O~pen...
+~O~ptions	~O~ptions
+~P~anel	~P~anel
+~P~aragraph	~P~aragraph
+~P~aste	~P~aste
+~Q~uick directories...	~Q~uick directories...
+~Q~uick view	~Q~uick view
+~R~e-read	~R~e-read
+~R~edo	~R~edo
+~R~efresh	~R~efresh
+~R~ename/Move...	~R~ename/Move...
+~R~eplace...	~R~eplace...
+~S~PACE toggles selection	~S~PACE toggles selection
+~S~ave	~S~ave
+~S~ave desktop	~S~ave desktop
+~S~creensaver	~S~creensaver
+~S~earch	~S~earch
+~S~earch again	~S~earch again
+~S~etup Panel...	~S~etup Panel...
+~S~etup...	~S~etup...
+~S~ize	~S~ize
+~S~wap panels	~S~wap panels
+~T~ab width...	~T~ab width...
+~T~ag character	~T~ag character
+~U~ndo	~U~ndo
+~U~nselect group...	~U~nselect group...
+~U~ser menu	~U~ser menu
+~U~tilities	~U~tilities
+~V~iew	~V~iew
+←/→ or Space changes · Tab/↑↓ chooses	←/→ or Space changes · Tab/↑↓ chooses
+↑↓ / PgUp/PgDn scroll	↑↓ / PgUp/PgDn scroll
+↑↓ / PgUp/PgDn scroll · ←→ long lines · Home resets	↑↓ / PgUp/PgDn scroll · ←→ long lines · Home resets
+minute	minute
+minutes	minutes
+Move to Trash · items:	Move to Trash · items:
+Permanently delete · items:	Permanently delete · items:
+Restore using your desktop file manager.	Restore using your desktop file manager.
+This cannot be undone.	This cannot be undone.
+Expression · + - * / % ^ · sqrt() abs() · 0x / 0b / 0o	Expression · + - * / % ^ · sqrt() abs() · 0x / 0b / 0o
+Up/Down history · Enter evaluates · Tab moves · Esc closes	Up/Down history · Enter evaluates · Tab moves · Esc closes
+Loading native information…	Loading native information…
+Snapshot · R/F5 Refresh · ↑↓ PgUp/PgDn scroll · ←→ pan	Snapshot · R/F5 Refresh · ↑↓ PgUp/PgDn scroll · ←→ pan
+ASCII controls are shown as dots and cannot be copied	ASCII controls are shown as dots and cannot be copied
+DOS font glyphs at 01–1F / 7F; not control-code decoding	DOS font glyphs at 01–1F / 7F; not control-code decoding
+ Copy disabled 	 Copy disabled 
+Archive browser — read-only	Archive browser — read-only
+Viewer search — loaded text	Viewer search — loaded text
+C/T or Space chooses · Enter applies · Esc restores	C/T or Space chooses · Enter applies · Esc restores
+Copy uses DN's internal clipboard · Ctrl+C copies	Copy uses DN's internal clipboard · Ctrl+C copies
+Existing destinations are refused.	Existing destinations are refused.
+Filename pattern	Filename pattern
+Preview off	Preview off
+Read-only · No extraction · Links are not followed	Read-only · No extraction · Links are not followed
+Tab chooses field/option · Space toggles · Enter OK\nAlt+C/W: options · Alt+B/D: direction · Esc Cancel	Tab chooses field/option · Space toggles · Enter OK\nAlt+C/W: options · Alt+B/D: direction · Esc Cancel
+Tab chooses panel · Arrows change · Esc restores	Tab chooses panel · Arrows change · Esc restores
+This document has unsaved changes.\n\nSave before closing or switching files?\n\nS: Save    D: Discard    C / Esc / Enter: Cancel	This document has unsaved changes.\n\nSave before closing or switching files?\n\nS: Save    D: Discard    C / Esc / Enter: Cancel
+Visible cached filenames · case-sensitive * and ?\nEmpty or * clears · Parent stays visible\nFiltered marks are preserved; operations use visible marks	Visible cached filenames · case-sensitive * and ?\nEmpty or * clears · Parent stays visible\nFiltered marks are preserved; operations use visible marks
+[New file]	[New file]
+<empty>	<empty>
+← → Move   ↑ Rotate\n↓ / Space Drop\nEsc returns to files	← → Move   ↑ Rotate\n↓ / Space Drop\nEsc returns to files
+↑↓ / 1–9 choose · Tab moves · Ctrl+1–9 set · Alt+1–9 go	↑↓ / 1–9 choose · Tab moves · Ctrl+1–9 set · Alt+1–9 go
+Text to find:	Text to find:
+New text:	New text:
+Whole words only	Whole words only
+Direction	Direction
+Scope	Scope
+Origin	Origin
+Global	Global
+Terminal palette — legacy ANSI colors	Terminal palette — legacy ANSI colors
+ Name      marked	 Name      marked
+ folder	 folder
+ ordinary file	 ordinary file
+ source.rs	 source.rs
+ selected file	 selected file
+Include subdirectories	Include subdirectories
+Show hidden	Show hidden
+No history in this session.	No history in this session.
+Visible files only · No recursive or content reads	Visible files only · No recursive or content reads
+Compare size	Compare size
+Compare time	Compare time
+Select differences (replace marks)	Select differences (replace marks)
+Unselect equivalent (retain differences)	Unselect equivalent (retain differences)
+Tab moves · Space toggles · Enter compares · Esc cancels	Tab moves · Space toggles · Enter compares · Esc cancels
+Destination:	Destination:
+Names	Names
+Full paths	Full paths
+F2 / Ctrl+S Save · Shift+F2 Save As · F3 Open\nF6 Duplicate line · F7 / Ctrl+F Find\nShift+F7 Search again · Alt+F7 Reverse search\nCtrl+F7 Replace · Alt+G / Ctrl+G Go to line\nCtrl+←/→ words · Ctrl+Shift+←/→ select words\nShift+arrows select · Ctrl+A select all\nAlt+Backspace / Ctrl+Z Undo · Ctrl+Y Redo\nCtrl+Ins/C Copy · Shift+Del / Ctrl+X Cut\nShift+Ins / Ctrl+V Paste · terminal paste supported\nAlt+B Block: selection/clipboard · Options: indent/colors/tabs\nF10 Menu · Ctrl+F4 / Esc Close · Alt+X Quit DN\nOpen/Close/Quit protect unsaved changes.\nUTF-8, 2 MiB / 100k lines. Line endings preserved.\nSave As never overwrites an existing destination.	F2 / Ctrl+S Save · Shift+F2 Save As · F3 Open\nF6 Duplicate line · F7 / Ctrl+F Find\nShift+F7 Search again · Alt+F7 Reverse search\nCtrl+F7 Replace · Alt+G / Ctrl+G Go to line\nCtrl+←/→ words · Ctrl+Shift+←/→ select words\nShift+arrows select · Ctrl+A select all\nAlt+Backspace / Ctrl+Z Undo · Ctrl+Y Redo\nCtrl+Ins/C Copy · Shift+Del / Ctrl+X Cut\nShift+Ins / Ctrl+V Paste · terminal paste supported\nAlt+B Block: selection/clipboard · Options: indent/colors/tabs\nF10 Menu · Ctrl+F4 / Esc Close · Alt+X Quit DN\nOpen/Close/Quit protect unsaved changes.\nUTF-8, 2 MiB / 100k lines. Line endings preserved.\nSave As never overwrites an existing destination.
+Modified (local)	Modified (local)
+Read-only attribute	Read-only attribute
+Permissions describe the link, not its target.	Permissions describe the link, not its target.
+* any sequence · ? one character\nVisible files and folders only · case-sensitive	* any sequence · ? one character\nVisible files and folders only · case-sensitive
+Ln	Ln
+Col	Col
+Quick view	Quick view
+New UTF-8 document	New UTF-8 document
+Reading next file…	Reading next file…
+Editor Help	Editor Help
+Move {} item(s) to Trash?	Move {} item(s) to Trash?
+Permanently delete {} item(s)?	Permanently delete {} item(s)?
+Commands ~H~istory	Commands ~H~istory
+Commands History	Commands History
+Copy ~n~ames / paths	Copy ~n~ames / paths
+~N~ames	~N~ames
+~F~ull paths	~F~ull paths
+Filter commands	Filter commands
+No commands in this session.	No commands in this session.
+No matching commands.	No matching commands.
+[ Use ]	[ Use ]
+Enter recalls without running · Tab moves · Esc cancels	Enter recalls without running · Tab moves · Esc cancels
+Copied entries to internal clipboard:	Copied entries to internal clipboard:
+Directory is still loading.	Directory is still loading.
+Marked entries are outside the current filter.	Marked entries are outside the current filter.
+No eligible entries to copy.	No eligible entries to copy.
+Cannot copy a name/path containing a newline.	Cannot copy a name/path containing a newline.
+Copied names/paths exceed 2 MiB.	Copied names/paths exceed 2 MiB.
+Copy requires Unicode names/paths; an entry cannot be represented without loss.	Copy requires Unicode names/paths; an entry cannot be represented without loss.
+No files selected	No files selected
+No visible entries selected	No visible entries selected
+ bytes in 	 bytes in 
+ in 	 in 
+selected file	selected file
+selected files	selected files
+selected folder	selected folder
+selected folders	selected folders
+folder	folder
+folders	folders
+free	free
+total	total
+free bytes	free bytes
+total bytes	total bytes
+Volume space unavailable	Volume space unavailable
+Reading volume space…	Reading volume space…
+Game over	Game over
+New high score	New high score
+Tetris Top Ten	Tetris Top Ten
+Tetris Help	Tetris Help
+Tetris Setup	Tetris Setup
+Score	Score
+Final score	Final score
+Lines	Lines
+Level	Level
+Start/End	Start/End
+Your name (30 characters)	Your name (30 characters)
+Enter saves · Esc uses Anonymous	Enter saves · Esc uses Anonymous
+Enter / Esc continues to high scores	Enter / Esc continues to high scores
+Skip name	Skip name
+Continue	Continue
+Retry save	Retry save
+Back	Back
+Scores saved	Scores saved
+No finished games yet.	No finished games yet.
+Scores not saved. Retry save.	Scores not saved. Retry save.
+Name must fit 30 characters / 240 bytes, without controls	Name must fit 30 characters / 240 bytes, without controls

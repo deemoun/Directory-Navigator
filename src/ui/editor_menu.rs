@@ -12,6 +12,7 @@ use ratatui::{
     Frame,
 };
 pub(super) fn draw_bar(frame: &mut Frame, app: &mut App, area: Rect) {
+    let language = app.config.language;
     let profile = app.config.palette;
     let dos = profile.styles();
     frame.render_widget(Block::default().style(dos(0x70)), area);
@@ -19,7 +20,14 @@ pub(super) fn draw_bar(frame: &mut Frame, app: &mut App, area: Rect) {
     let current = app.editor.as_ref().and_then(|e| e.menu);
     let mut x = area.x;
     for (root, label) in menus::LABELS.iter().enumerate() {
-        let rect = Rect::new(x, area.y, plain(label).len() as u16 + 3, 1).intersection(header);
+        let label = language.text(label);
+        let rect = Rect::new(
+            x,
+            area.y,
+            Line::from(plain(language.text(label))).width() as u16 + 3,
+            1,
+        )
+        .intersection(header);
         let normal = dos(if !menus::enabled(root) {
             0x78
         } else if current.is_some_and(|(r, _)| r == root) {
@@ -50,6 +58,7 @@ pub(super) fn draw_bar(frame: &mut Frame, app: &mut App, area: Rect) {
     super::clock::draw(frame, app, area);
 }
 pub(super) fn draw_dropdown(frame: &mut Frame, app: &mut App, area: Rect) {
+    let language = app.config.language;
     let profile = app.config.palette;
     let dos = profile.styles();
     let Some(editor) = &app.editor else {
@@ -61,13 +70,13 @@ pub(super) fn draw_dropdown(frame: &mut Frame, app: &mut App, area: Rect) {
     let entries = menus::items(root);
     let width = entries
         .iter()
-        .map(|item| plain(item.label).len() + item.shortcut.len() + 8)
+        .map(|item| Line::from(plain(language.text(item.label))).width() + item.shortcut.len() + 8)
         .max()
         .unwrap_or(20)
         .min(area.width as usize) as u16;
     let x = menus::LABELS[..root]
         .iter()
-        .map(|label| plain(label).len() as u16 + 3)
+        .map(|label| Line::from(plain(language.text(label))).width() as u16 + 3)
         .sum::<u16>()
         .min(area.width - width);
     let rect = Rect::new(area.x + x, area.y + 1, width, entries.len() as u16 + 2);
@@ -99,7 +108,13 @@ pub(super) fn draw_dropdown(frame: &mut Frame, app: &mut App, area: Rect) {
         let row_rect = Rect::new(rect.x + 1, rect.y + 1 + row as u16, width - 2, 1);
         if item.label.is_empty() {
             frame.render_widget(
-                Paragraph::new("─".repeat(row_rect.width as usize)).style(dos(0x70)),
+                Paragraph::new(
+                    app.config
+                        .language
+                        .text("─")
+                        .repeat(row_rect.width as usize),
+                )
+                .style(dos(0x70)),
                 row_rect,
             );
             continue;
@@ -117,9 +132,10 @@ pub(super) fn draw_dropdown(frame: &mut Frame, app: &mut App, area: Rect) {
             normal
         };
         let mut spans = vec![Span::styled(if states[row] { "• " } else { "  " }, normal)];
-        spans.extend(label_spans(item.label, normal, hot));
-        let padding = usize::from(width - 2)
-            .saturating_sub(2 + plain(item.label).len() + item.shortcut.len() + 1);
+        spans.extend(label_spans(language.text(item.label), normal, hot));
+        let padding = usize::from(width - 2).saturating_sub(
+            2 + Line::from(plain(language.text(item.label))).width() + item.shortcut.len() + 1,
+        );
         spans.push(Span::styled(" ".repeat(padding), normal));
         spans.push(Span::styled(item.shortcut, normal));
         frame.render_widget(Paragraph::new(Line::from(spans)).style(normal), row_rect);
