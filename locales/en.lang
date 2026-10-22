@@ -432,3 +432,20 @@ Mac-friendly: press Ctrl+O, release, then choose\n2 Wrap · 3 Close · 7 Find ·
 ^O means Ctrl+O, release, then the next key.\n1 Help · 2 User · 3 View · 4 Edit · 5 Copy\n6 Move · 7 MkDir · 8 Trash · 9 Menu · 0 Quit\ns Quick search · f Find · i Info · z Sort\nb Bookmarks · l Filter · h Commands · k Keyboard\nEditor: a Save As · w Close · r Replace · x Quit\nViewer: 2 Wrap · n Next · p Reverse · w Close\nThe prefix displays a guide for the current screen.\nClassic DN shortcuts remain available.	^O means Ctrl+O, release, then the next key.\n1 Help · 2 User · 3 View · 4 Edit · 5 Copy\n6 Move · 7 MkDir · 8 Trash · 9 Menu · 0 Quit\ns Quick search · f Find · i Info · z Sort\nb Bookmarks · l Filter · h Commands · k Keyboard\nEditor: a Save As · w Close · r Replace · x Quit\nViewer: 2 Wrap · n Next · p Reverse · w Close\nThe prefix displays a guide for the current screen.\nClassic DN shortcuts remain available.
 Classic DN uses F1–F10 and Alt/Ctrl combinations.\nTab switches panels; Insert or Space marks entries.\nF3 View · F4 Edit · F5 Copy · F6 Move\nF7 MkDir · F8 Trash/delete · F9 Menu · F10 Quit\nEditor: F2 Save · F7 Find · F10 Menu\nMac-friendly adds Ctrl+O sequences without Fn/Option.\nAutomatic selects Mac-friendly on macOS, Classic elsewhere.	Classic DN uses F1–F10 and Alt/Ctrl combinations.\nTab switches panels; Insert or Space marks entries.\nF3 View · F4 Edit · F5 Copy · F6 Move\nF7 MkDir · F8 Trash/delete · F9 Menu · F10 Quit\nEditor: F2 Save · F7 Find · F10 Menu\nMac-friendly adds Ctrl+O sequences without Fn/Option.\nAutomatic selects Mac-friendly on macOS, Classic elsewhere.
 Ctrl+O: choose a user-menu command\n1 Help · 2 Global/Local · 4 Edit · other digits: F-keys\nr Reload · w Back/Cancel · Up/Down Page\nLeft/Right First/last item\nEsc or click cancels the prefix.\nCommands still require explicit Run confirmation.	Ctrl+O: choose a user-menu command\n1 Help · 2 Global/Local · 4 Edit · other digits: F-keys\nr Reload · w Back/Cancel · Up/Down Page\nLeft/Right First/last item\nEsc or click cancels the prefix.\nCommands still require explicit Run confirmation.
+ Welcome to Directory Navigator 	 Welcome to Directory Navigator 
+~W~elcome...	~W~elcome...
+~S~tart	~S~tart
+~K~eyboard settings	~K~eyboard settings
+~H~elp	~H~elp
+Arrows navigate; Tab switches panels.	Arrows navigate; Tab switches panels.
+Enter opens folders, archives or associated applications.	Enter opens folders, archives or associated applications.
+Space / Insert marks entries.	Space / Insert marks entries.
+Insert marks entries; Space marking is disabled.	Insert marks entries; Space marking is disabled.
+Deletion mode: Trash	Deletion mode: Trash
+Deletion mode: permanent deletion	Deletion mode: permanent deletion
+Destinations and deletion require confirmation.	Destinations and deletion require confirmation.
+Mac: press Ctrl+O, release, then another key.	Mac: press Ctrl+O, release, then another key.
+Ctrl+O displays a guide; Esc cancels the prefix.	Ctrl+O displays a guide; Esc cancels the prefix.
+Classic keys: F1–F10 and Alt/Ctrl combinations.	Classic keys: F1–F10 and Alt/Ctrl combinations.
+F1 opens help; keyboard settings offer a Mac-friendly profile.	F1 opens help; keyboard settings offer a Mac-friendly profile.
+Trash	Trash

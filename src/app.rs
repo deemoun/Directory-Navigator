@@ -7,6 +7,7 @@ use crate::{
 use std::{io, path::PathBuf};
 
 pub struct App {
+    pub welcome: crate::welcome::State,
     pub shortcuts: crate::shortcuts::State,
     pub associations: crate::associations::State,
     pub archive: Option<crate::archive::Browser>,
@@ -57,6 +58,7 @@ impl App {
     pub fn new(path: PathBuf) -> io::Result<Self> {
         let config = Config::default();
         Ok(Self {
+            welcome: Default::default(),
             shortcuts: Default::default(),
             associations: Default::default(),
             archive: None,
@@ -554,13 +556,30 @@ impl App {
     }
 
     pub fn load_config(&mut self) {
+        self.read_config();
+    }
+
+    pub fn load_initial_config(&mut self) {
+        if std::mem::replace(&mut self.welcome.startup_checked, true) {
+            return;
+        }
+        if self.read_config() && self.config_store.is_new_installation() {
+            crate::welcome::open(self);
+        }
+    }
+
+    fn read_config(&mut self) -> bool {
         crate::associations::reload(self);
         match self.config_store.load() {
             Ok(config) => {
                 self.apply_config(config);
                 self.notice = "Desktop preferences loaded".into();
+                true
             }
-            Err(error) => self.error(format!("Cannot load settings: {error}")),
+            Err(error) => {
+                self.error(format!("Cannot load settings: {error}"));
+                false
+            }
         }
     }
 

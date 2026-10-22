@@ -432,3 +432,20 @@ Mac-friendly: press Ctrl+O, release, then choose\n2 Wrap · 3 Close · 7 Find ·
 ^O means Ctrl+O, release, then the next key.\n1 Help · 2 User · 3 View · 4 Edit · 5 Copy\n6 Move · 7 MkDir · 8 Trash · 9 Menu · 0 Quit\ns Quick search · f Find · i Info · z Sort\nb Bookmarks · l Filter · h Commands · k Keyboard\nEditor: a Save As · w Close · r Replace · x Quit\nViewer: 2 Wrap · n Next · p Reverse · w Close\nThe prefix displays a guide for the current screen.\nClassic DN shortcuts remain available.	^O: нажмите Ctrl+O, отпустите, затем другую клавишу.\n1 Помощь · 2 Пользователь · 3 Просмотр · 4 Редактор · 5 Копия\n6 Перенос · 7 Папка · 8 Корзина · 9 Меню · 0 Выход\ns Быстрый поиск · f Поиск файлов · i Свойства · z Сортировка\nb Закладки · l Фильтр · h Команды · k Клавиши\nРедактор: a Сохранить как · w Закрыть · r Замена · x Выход\nПросмотр: 2 Перенос строк · n Далее · p Назад · w Закрыть\nПосле Ctrl+O видна подсказка для текущего экрана.\nКлассические клавиши DN также работают.
 Classic DN uses F1–F10 and Alt/Ctrl combinations.\nTab switches panels; Insert or Space marks entries.\nF3 View · F4 Edit · F5 Copy · F6 Move\nF7 MkDir · F8 Trash/delete · F9 Menu · F10 Quit\nEditor: F2 Save · F7 Find · F10 Menu\nMac-friendly adds Ctrl+O sequences without Fn/Option.\nAutomatic selects Mac-friendly on macOS, Classic elsewhere.	Классические DN: F1–F10 и сочетания с Alt/Ctrl.\nTab переключает панели; Insert или Пробел отмечает.\nF3 Просмотр · F4 Редактор · F5 Копия · F6 Перенос\nF7 Папка · F8 Корзина/удаление · F9 Меню · F10 Выход\nРедактор: F2 Сохранить · F7 Поиск · F10 Меню\nПрофиль Mac добавляет Ctrl+O без Fn/Option.\nАвто выбирает профиль Mac на macOS, иначе классический.
 Ctrl+O: choose a user-menu command\n1 Help · 2 Global/Local · 4 Edit · other digits: F-keys\nr Reload · w Back/Cancel · Up/Down Page\nLeft/Right First/last item\nEsc or click cancels the prefix.\nCommands still require explicit Run confirmation.	Ctrl+O: команды меню пользователя\n1 Справка · 2 Общее/Локальное · 4 Правка\nОстальные цифры: соответствующие F-клавиши\nr Перечитать · w Назад/Отмена · ↑↓ Страница\n←/→ Первый/последний пункт\nEsc или щелчок отменяет префикс.\nЗапуск команды требует явного подтверждения.
+ Welcome to Directory Navigator 	 Добро пожаловать в Directory Navigator 
+~W~elcome...	~П~риветствие...
+~S~tart	~Н~ачать
+~K~eyboard settings	~К~лавиши
+~H~elp	~С~правка
+Arrows navigate; Tab switches panels.	Стрелки — навигация; Tab — переключение панелей.
+Enter opens folders, archives or associated applications.	Enter открывает папки, архивы или связанное приложение.
+Space / Insert marks entries.	Пробел / Insert отмечает элементы.
+Insert marks entries; Space marking is disabled.	Insert отмечает элементы; отметка Пробелом отключена.
+Deletion mode: Trash	Удаление: в корзину
+Deletion mode: permanent deletion	Удаление: безвозвратно
+Destinations and deletion require confirmation.	Копирование, перенос и удаление требуют подтверждения.
+Mac: press Ctrl+O, release, then another key.	Mac: нажмите Ctrl+O, отпустите, затем другую клавишу.
+Ctrl+O displays a guide; Esc cancels the prefix.	Ctrl+O показывает подсказку; Esc отменяет префикс.
+Classic keys: F1–F10 and Alt/Ctrl combinations.	Классические клавиши: F1–F10 и сочетания Alt/Ctrl.
+F1 opens help; keyboard settings offer a Mac-friendly profile.	F1 — справка; в настройках клавиш доступен профиль Mac.
+Trash	Корзина

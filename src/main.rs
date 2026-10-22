@@ -22,7 +22,7 @@ fn run() -> io::Result<()> {
         ));
     }
     let mut app = App::new(std::env::current_dir()?)?;
-    app.load_config();
+    app.load_initial_config();
     let (session, mut terminal) = Session::start()?;
     let mut dirty = true;
     loop {

@@ -9,6 +9,7 @@ pub enum Screen {
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Focus {
+    Welcome,
     CommandHistory,
     Message,
     SaverSetup,
@@ -118,6 +119,8 @@ pub fn current(app: &App) -> Focus {
     }
     if app.settings.is_some() {
         Focus::Settings
+    } else if app.welcome.dialog.is_some() {
+        Focus::Welcome
     } else if app.job.is_some() {
         Focus::Job
     } else if app.prompt.is_some() {

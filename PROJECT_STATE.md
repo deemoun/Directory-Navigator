@@ -12,6 +12,11 @@
   state owns session dialogs/options/results; quick view owns debounced reads.
 
 ## Implemented
+- New-installation welcome uses Directory Navigator/Cargo version, profile-aware
+  controls, deletion mode, Start/Keyboard settings/Help, and ≡ → Welcome reopening.
+  Dedicated modal focus blocks background input/screensavers and survives resizing.
+  Only successful initial loads with neither modern nor legacy settings show it;
+  dismissal uses normal settings persistence, with no onboarding key or dependency.
 - Keyboard profiles Auto/Classic DN/Mac-friendly persist via config.conf/desktop.
   Auto uses Mac-friendly on macOS, Classic elsewhere. Ctrl+O prefix supplies
   function/letter/navigation alternatives with a context guide; text modals retain
@@ -200,13 +205,18 @@
   concurrent changes, Apply/Cancel and exit recovery. Release macOS PTY passed
   two-run persistence, clock/sort reload, conflict recovery, mouse opt-out,
   80×25→120×40 resizing and terminal restoration.
+- Welcome tests cover missing/existing/legacy/invalid/inaccessible settings, CLI
+  bypass, session-only dismissal, save-on-exit/restart behavior, modal isolation,
+  locale/profile updates, mouse controls, screensaver suppression and small sizes.
+  Release macOS PTY passes first/subsequent launches, Help/settings return,
+  persistence, title close, manual reopening, resizing and terminal restoration.
 - Keyboard-profile tests cover legacy/unknown configuration, Apply/Cancel and
   desktop persistence, original confirmations and unsaved guards, prefix input
   isolation, paste/mouse/focus changes, editor word movement and user-menu review.
   English/Russian labels and targets fit 80×25/120×40. Release macOS PTY passes
   Auto→Classic→Mac, saved/reloaded preferences, editor save/close, viewer wrap/search,
   copy cancellation, resize and terminal restoration.
-- macOS ARM64: fmt check, Clippy (including all test targets) with denied warnings, 316 passing tests
+- macOS ARM64: fmt check, Clippy (including all test targets) with denied warnings, 324 passing tests
   (one opt-in real-Trash success test ignored), release build.
 - Menu tests enforce working entries, unique mnemonics, normalized separators,
   unchanged headings, Block selection/clipboard/undo, Paragraph styling and clock

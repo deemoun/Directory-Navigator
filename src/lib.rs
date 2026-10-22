@@ -25,6 +25,7 @@ pub mod terminal;
 pub mod tetris;
 pub mod ui;
 pub mod viewer;
+pub mod welcome;
 
 pub mod utilities;
 

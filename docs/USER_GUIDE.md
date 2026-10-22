@@ -13,6 +13,20 @@ Starts in the current directory. Minimum terminal: 80×25. Unicode names, native
 paths, mouse menus, panel clicks, double-click opening and wheel scrolling work.
 Ctrl+click marks files. F4 opens the native UTF-8 editor.
 
+## First start
+
+Directory Navigator shows a compact welcome when neither `config.conf` nor legacy
+`config.txt` exists. It lists the active profile’s controls, opening behavior and
+current deletion mode. **Start**, Esc or the title close control dismisses it;
+**Keyboard settings** and **Help** return to the welcome when closed. **≡ → Welcome…**
+opens it again without changing panel state.
+
+Dismissing the welcome writes no files. Normal settings saving on exit prevents
+it appearing on later launches. If saving is disabled and no configuration exists,
+it appears next time. Existing, invalid or inaccessible configurations do not
+trigger it; settings errors are reported separately. Load desktop never triggers it.
+There is no startup delay or splash timer. CLI help/version bypass the interface.
+
 ## Keyboard profiles
 
 **Options → Configuration → Keyboard shortcuts** selects **Automatic**, **Classic

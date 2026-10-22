@@ -58,6 +58,9 @@ On Windows, the executable is `target\release\dn.exe`.
 
 ## Everyday controls
 
+New installations open a short welcome with keyboard guidance, Help and keyboard
+settings. Reopen it any time through **≡ → Welcome…**. Existing settings skip it.
+
 On macOS, **Automatic** shortcuts use the Mac-friendly profile: press **Ctrl+O**,
 release, then a digit or letter. A guide appears; for example, **5** copies,
 **4** edits and **0** quits the file manager. **Ctrl+O, K** opens keyboard settings.

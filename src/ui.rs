@@ -30,6 +30,7 @@ mod tools_view;
 mod user_menu_view;
 mod utilities_view;
 mod viewer_view;
+mod welcome_view;
 use overlays::{draw_info_dialog, draw_operation_overlays};
 use panel_view::draw_panel;
 
@@ -163,6 +164,12 @@ fn draw_content(frame: &mut Frame, app: &mut App) {
     }
     if app.tetris.is_some() {
         tetris_view::draw(frame, app, area);
+        return;
+    }
+    if app.welcome.dialog.is_some() {
+        welcome_view::draw(frame, app, area);
+        settings_view::draw_settings(frame, app, area);
+        draw_info_dialog(frame, app, prepared.message.as_ref());
         return;
     }
     menu_view::draw_dropdowns(frame, app, &menu_positions, area);

@@ -60,6 +60,7 @@ pub enum Action {
     SaveSettings,
     LoadSettings,
     About,
+    Welcome,
     Game,
     Settings(SettingsKind),
     Confirmations,
@@ -112,6 +113,7 @@ pub fn items(menu: usize) -> Vec<Item> {
     use Action::*;
     match menu {
         0 => vec![
+            item("~W~elcome...", "", Welcome),
             item("~A~bout...", "", About),
             item("~R~efresh", "", Refresh),
             line(),
@@ -365,6 +367,7 @@ pub fn execute(app: &mut App, action: Action) {
             title: " About Directory Navigator ",
             message: format!("{}\n{} {}\n{}\n\n{}: Dmitry Yarygin\n\n{}\n{}", crate::APPLICATION_NAME, app.config.language.text("Version"), crate::DISPLAY_VERSION, app.config.language.text("Native Rust terminal file manager"), app.config.language.text("Author"), app.config.language.text("F1: keyboard help"), app.config.language.text("Enter / Esc: close")),
         }),
+        Action::Welcome => crate::welcome::open(app),
         Action::SelectAll => app.panels[app.active].select_visible(),
         Action::ClearSelection => app.panels[app.active].selected.clear(),
         Action::InvertSelection => app.panels[app.active].invert_visible(),

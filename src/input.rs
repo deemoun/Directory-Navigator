@@ -1,5 +1,5 @@
 use crate::focus::{self, Focus};
-use crate::{app::App, dialog::Dialog, operations::Kind, panel::SortMode};
+use crate::{app::App, operations::Kind, panel::SortMode};
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 
 pub fn handle(app: &mut App, key: KeyEvent) {
@@ -30,6 +30,10 @@ fn handle_key(app: &mut App, key: KeyEvent) {
     }
     if focus == Focus::Message {
         crate::dialog::message_key(app, key.code);
+        return;
+    }
+    if focus == Focus::Welcome {
+        crate::welcome::key(app, key);
         return;
     }
     if focus == Focus::CommandHistory {
@@ -263,7 +267,10 @@ fn handle_key(app: &mut App, key: KeyEvent) {
     let panel = &mut app.panels[app.active];
     let capacity = panel.viewport_rows * if brief { 3 } else { 1 };
     match key.code {
-        KeyCode::Tab | KeyCode::BackTab => {app.quick_view=None;app.active ^= 1;},
+        KeyCode::Tab | KeyCode::BackTab => {
+            app.quick_view = None;
+            app.active ^= 1;
+        }
         KeyCode::Char('+') => app.open_pattern(true),
         KeyCode::Char('-') => app.open_pattern(false),
         KeyCode::Up => panel.step(-1),
@@ -276,24 +283,36 @@ fn handle_key(app: &mut App, key: KeyEvent) {
         KeyCode::End => panel.cursor = panel.entries.len().saturating_sub(1),
         KeyCode::Enter => app.open_current(),
         KeyCode::Backspace if app.config.backspace_parent => panel.parent(app.config.show_hidden),
-        KeyCode::Insert => { panel.toggle_selection(); panel.step(1); }
-        KeyCode::Char(' ') if app.config.space_select => { panel.toggle_selection(); panel.step(1); }
+        KeyCode::Insert => {
+            panel.toggle_selection();
+            panel.step(1);
+        }
+        KeyCode::Char(' ') if app.config.space_select => {
+            panel.toggle_selection();
+            panel.step(1);
+        }
         KeyCode::Char('*') => crate::menu::execute(app, crate::menu::Action::InvertSelection),
         KeyCode::F(2) if key.modifiers.contains(KeyModifiers::SHIFT) => {
-            let next = match panel.sort { SortMode::Name => SortMode::Extension, SortMode::Extension => SortMode::Size, SortMode::Size => SortMode::Date, SortMode::Date => SortMode::Name };
+            let next = match panel.sort {
+                SortMode::Name => SortMode::Extension,
+                SortMode::Extension => SortMode::Size,
+                SortMode::Size => SortMode::Date,
+                SortMode::Date => SortMode::Name,
+            };
             panel.set_sort(next);
         }
-        KeyCode::F(2) => crate::user_menu::open(app,crate::user_menu::Source::Auto),
+        KeyCode::F(2) => crate::user_menu::open(app, crate::user_menu::Source::Auto),
         KeyCode::F(4) => crate::editor::open(app, key.modifiers.contains(KeyModifiers::SHIFT)),
         KeyCode::F(5) => app.prompt_operation(Kind::Copy, false),
         KeyCode::F(3) => app.open_viewer(),
-        KeyCode::F(6) => app.prompt_operation(Kind::Move, key.modifiers.contains(KeyModifiers::SHIFT)),
+        KeyCode::F(6) => {
+            app.prompt_operation(Kind::Move, key.modifiers.contains(KeyModifiers::SHIFT))
+        }
         KeyCode::F(7) => app.prompt_operation(Kind::Mkdir, false),
         KeyCode::F(8) => app.prompt_operation(Kind::Delete, false),
         KeyCode::Delete if app.config.delete_key => app.prompt_operation(Kind::Delete, false),
         KeyCode::F(9) => crate::menu::open(app, 1),
-        KeyCode::F(1) => app.dialogs.push(Dialog { title: " Directory Navigator — Help ",
-            message: if app.config.shortcuts.is_mac() { crate::shortcuts::MANAGER_HELP.into() } else { "Tab panels · Arrows/PgUp/PgDn/Home/End navigate\nAlt+F/U/P/M/O menus · Alt+X exits\nEnter app/dir/archive · Ctrl+Enter OS app · F3 view · F4 edit · BS parent\nIns / Space marks · Ctrl+A all · Ctrl+U clear\n+ / - group · Alt+E info · Alt+K columns\nAlt+F7 quick search · Ctrl+F7 recursive Find\nCtrl+Q quick view · Ctrl+T tree · Alt+F9 Tetris\nCtrl+1–9 bookmarks set · Alt+1–9 go · Alt+Del filter\nCtrl+K calculator · Ctrl+B ASCII · Alt+Y memory\nCtrl+C compare · Alt+L list file\nAlt+BS directories · Alt+PgUp edits / PgDn views\nF2 user menu · Shift+F2 sort · Ctrl+F3 name / F4 ext / F5 date / F6 size\nF5 copy · F6 move · Shift+F6 rename here\nF7 mkdir · F8 Trash/delete · F9 menu · F10 exit\nCtrl+H hidden · Ctrl+L go to · Ctrl+R refresh\nClick row · Ctrl+click mark · Double-click open\nWheel scrolls · Esc cancels dialogs/operations\nType commands · Enter runs · Esc clears · Ctrl+E/X history · Alt+F8 list\nFile menu: Copy names / paths uses internal clipboard\nOptions: File associations configures Enter actions\nColors: white dirs · green exec · cyan source\nMagenta archives · blue links · yellow marks\nTrash by default; File Manager Setup changes mode.\nExisting destinations are refused; no overwrites.".into() } }),
+        KeyCode::F(1) => crate::dialog::keyboard_help(app),
         _ => {}
     }
 }

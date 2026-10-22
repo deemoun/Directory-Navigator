@@ -45,6 +45,10 @@ impl Store {
             .as_deref()
             .ok_or_else(|| io::Error::other("Cannot determine the configuration directory"))
     }
+    /// True only after a successful load that found neither modern nor legacy settings.
+    pub fn is_new_installation(&self) -> bool {
+        self.loaded.is_some() && self.disk.is_none() && self.legacy.is_none()
+    }
     pub fn load(&mut self) -> io::Result<Config> {
         let disk = read_bytes(self.path()?)?;
         let legacy = if disk.is_none()
