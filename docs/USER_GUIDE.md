@@ -13,9 +13,52 @@ Starts in the current directory. Minimum terminal: 80×25. Unicode names, native
 paths, mouse menus, panel clicks, double-click opening and wheel scrolling work.
 Ctrl+click marks files. F4 opens the native UTF-8 editor.
 
+## Keyboard profiles
+
+**Options → Configuration → Keyboard shortcuts** selects **Automatic**, **Classic
+DN** or **Mac-friendly**. Apply changes the profile immediately; Cancel preserves
+it. Save/Load desktop and normal settings persistence include `shortcuts=auto`,
+`shortcuts=classic_dn` or `shortcuts=mac` in `config.conf`. Missing or unknown values
+use Automatic: Mac-friendly on macOS, Classic DN on Linux/Windows. When using a
+Mac keyboard over SSH to another OS, select Mac-friendly explicitly if preferred.
+
+The Mac profile uses **Ctrl+O, release, then another key**. `^O` in menus and
+function bars means this prefix. A context guide appears while waiting; Esc,
+Ctrl+O again, or a mouse click dismisses it without editing text. Text prompts
+retain their normal input behavior. Existing DN and modern Ctrl aliases remain
+available; Command stays with the terminal, and no terminal settings are modified.
+
+| After Ctrl+O | File manager |
+| --- | --- |
+| 1 … 9, 0 | F1 … F9, F10: Help, User menu, View, Edit, Copy, Move, MkDir, Trash/delete, Menu, Quit |
+| S / F | Quick filename search / recursive Find |
+| I / Z | File information / Sort menu |
+| B / L / E | Bookmarks / filename filter / columns |
+| H / J / A / V | Command / directory / edit / view histories |
+| O / P / Y | OS default application / list export / Tetris |
+| K / M / R | Keyboard settings / menu / refresh |
+| Space | Mark highlighted entry, even when ordinary Space selection is disabled |
+| Up / Down / Left / Right | Page up / page down / first entry / last entry (also `[` / `]` / `,` / `.`) |
+
+The editor retains the same numeric function-key meanings: **2 Save**, **3 Open**,
+**6 Duplicate**, **7 Find**, **0 Menu**. Letter alternatives: **A Save As**, **W Close**,
+**X Quit DN**, **N Next match**, **P Reverse**, **R Replace**, **G Go to line**, and
+**C Clear selection**. Ctrl+S/F/G/Z/Y/C/X/V keep their existing editor meanings.
+After Ctrl+O, Left/Right moves by words; add Shift to the arrow to select.
+Up/Down (or `[`/`]`) page, `,`/`.` move to line start/end, and H/E (or `<`/`>`) to document start/end.
+Open, Close and Quit retain unsaved-change guards.
+
+In the viewer, **2 Wrap**, **3 Close**, **7 Find**, **0 Quit DN** follow the existing
+function keys; **N/P** continue/reverse search and **W** closes. The prefix does
+not change controls in games or text-entry dialogs. In the user menu, Ctrl+O then 2 switches global/local, 4 edits its definition, R reloads and W returns/cancels; commands still require Run confirmation. Use ordinary arrows, Tab,
+Enter, Esc and the existing clickable controls there.
+
+The control tables below describe the Classic DN keys, also retained as aliases.
+
 Enter or double-click browses ZIP/TAR/TAR.GZ/TGZ archives inside DN; other files
-open in the operating system's default application. Ctrl+Enter or File → Open
-with default app opens an archive externally.
+use a configured custom association, or open in the operating system's default
+application. Custom associations can also override archive opening. Ctrl+Enter
+or File → Open with default app always bypasses custom rules and archive browsing.
 F3 explicitly opens DN's viewer; F4 explicitly opens DN's editor. Ordinary
 directories stay inside DN. Links to files open externally, links to directories
 navigate normally, and broken links report an error. On macOS, `.app` bundles
@@ -24,9 +67,41 @@ launch instead of being browsed as directories.
 Opening uses macOS `/usr/bin/open`, Linux `xdg-open` (requires xdg-utils and a
 desktop session), or Windows ShellExecute. Native paths are passed directly,
 without shell command substitution. Launching is asynchronous; opener errors
-are reported in DN without falling back to the viewer/editor. File associations
-are managed by the OS. User menus have a separate explicit command runner;
-there is no association editor.
+are reported in DN without falling back to the viewer/editor.
+
+### Custom file associations
+
+Use **Options → File associations → Edit associations…** to edit
+`associations.conf` beside `config.conf`. Only this global file supplies rules;
+files inside browsed directories cannot change launching behavior. The first Edit
+creates a commented template without enabling any rules. Save and close the editor
+to reload automatically, or use **Reload associations** after an external edit.
+Rules also load at startup and with Load desktop.
+
+```conf
+.txt = @editor
+.log = @viewer
+.bin = @hex
+.zip = @default
+.md = code --wait %f
+```
+
+Match the final extension, case-insensitively; `<none>` matches extensionless names.
+`@viewer`, `@hex`, `@editor` use the built-in tools; `@default` uses the OS opener.
+Directories, symlinks and macOS application bundles retain their normal behavior.
+F3/F4 always use DN's viewer/editor, independently of these rules.
+
+External targets use an executable followed by arguments. Quotes group arguments;
+`%f` is the full native file path, `%d` its directory and `%n` its filename stem.
+Each placeholder must occupy a whole argument, for example `tool --file %f`.
+Unlike RDN's textual command substitution, these values remain separate native
+arguments. No shell, wildcard or environment-variable expansion is implicit.
+Use an explicit shell for scripts or pipelines. Commands run with your permissions
+in the active directory using the existing terminal handoff; Enter returns to DN.
+
+Limits: UTF-8 configuration, 64 KiB, 128 unique rules, 256 arguments per rule.
+Duplicate extensions and invalid rules report errors; Ctrl+Enter remains available
+for the OS default. Failed custom commands do not silently launch another tool.
 
 Directory names appear without a leading slash. While browsing, both panels
 refresh quietly in the background roughly every two seconds. Surviving marks,
@@ -304,7 +379,7 @@ DOS communications/country/printer setup and built-in printing are outside this
 app's scope. Save all and desktop window-management commands await a matching
 multi-document/window model. Future work is separate: safe archive extraction,
 disk/free-space information and permission editing; later,
-output recall, archive creation, custom associations and palette editing.
+output recall, archive creation and palette editing.
 Split/combine and line drawing remain low priority. No settings format changes.
 
 The bottom row is a command prompt with a blinking cursor, not a status line.

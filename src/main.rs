@@ -43,6 +43,7 @@ fn run() -> io::Result<()> {
             .user_menu
             .pending
             .take()
+            .or_else(|| app.associations.pending.take())
             .or_else(|| app.command_line.pending.take())
         {
             session.suspend();
@@ -78,6 +79,7 @@ fn run() -> io::Result<()> {
                     dirty = true;
                 }
                 Event::Resize(_, _) => {
+                    app.shortcuts.clear();
                     app.mouse.scrollbar_drag = None;
                     dirty = true;
                 }

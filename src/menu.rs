@@ -6,6 +6,7 @@ pub use navigation::{activate, close, key, open, open_mnemonic};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MenuId {
+    Associations,
     CopyNames,
     View,
     Sort,
@@ -16,6 +17,8 @@ pub enum MenuId {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Action {
+    EditAssociations,
+    ReloadAssociations,
     CommandHistory,
     CopyNames(bool),
     Colors,
@@ -210,6 +213,7 @@ pub fn items(menu: usize) -> Vec<Item> {
             line(),
             item("~G~lobal menu definition...", "", EditUserMenu(false)),
             item("Local ~m~enu definition...", "", EditUserMenu(true)),
+            item("File ~a~ssociations", "", Submenu(MenuId::Associations)),
             line(),
             item("~S~ave desktop", "", SaveSettings),
             item("~L~oad desktop", "", LoadSettings),
@@ -223,6 +227,10 @@ pub fn items(menu: usize) -> Vec<Item> {
 pub fn submenu_items(menu: MenuId) -> Vec<Item> {
     use Action::*;
     match menu {
+        MenuId::Associations => vec![
+            item("~E~dit associations...", "", EditAssociations),
+            item("~R~eload associations", "", ReloadAssociations),
+        ],
         MenuId::CopyNames => vec![
             item("~N~ames", "", CopyNames(false)),
             item("~F~ull paths", "", CopyNames(true)),
@@ -251,6 +259,11 @@ pub fn submenu_items(menu: MenuId) -> Vec<Item> {
             ),
         ],
         MenuId::Configuration => vec![
+            item(
+                "~K~eyboard shortcuts...",
+                "",
+                Settings(SettingsKind::Keyboard),
+            ),
             item("S~y~stem Setup...", "", Settings(SettingsKind::System)),
             item("~I~nterface...", "", Settings(SettingsKind::Interface)),
             item(
@@ -324,6 +337,8 @@ pub fn execute(app: &mut App, action: Action) {
         Action::QuickSearch => crate::quick_search::open(app),
         Action::Find => crate::discovery::open_find(app),
         Action::UserMenu => crate::user_menu::open(app,crate::user_menu::Source::Auto),
+        Action::EditAssociations => crate::associations::edit(app),
+        Action::ReloadAssociations => crate::associations::reload(app),
         Action::EditUserMenu(local) => crate::user_menu::edit_definition(app,local),
         Action::OpenExternal => app.open_external_current(),
         Action::BrowseArchive => crate::archive::open_current(app),

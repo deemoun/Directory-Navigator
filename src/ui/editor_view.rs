@@ -10,6 +10,7 @@ use ratatui::{
 use unicode_segmentation::UnicodeSegmentation;
 
 pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
+    let prefix_armed = crate::shortcuts::armed(app);
     let profile = app.config.palette;
     let dos = profile.styles();
     super::editor_menu::draw_bar(frame, app, Rect::new(area.x, area.y, area.width, 1));
@@ -22,10 +23,21 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
         .map(|path| display_name(&path.to_string_lossy()))
         .unwrap_or_else(|| app.config.language.text("[New file]").into());
     let title = format!(
-        " F4 {} {} │ {}",
+        " {} {} {} │ {}",
+        crate::shortcuts::label(app.config.shortcuts, crate::focus::Screen::Editor, "F4"),
         app.config.language.text("Editor"),
         if editor.dirty() { "*" } else { " " },
-        formatting::tail(&path, area.width.saturating_sub(29))
+        formatting::tail(
+            &path,
+            area.width.saturating_sub(
+                27 + crate::shortcuts::label(
+                    app.config.shortcuts,
+                    crate::focus::Screen::Editor,
+                    "F4"
+                )
+                .len() as u16
+            )
+        )
     );
     super::dialog_style::document_header(
         frame,
@@ -111,6 +123,7 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
             && editor.modal.is_none()
             && editor.menu.is_none()
             && app.dialogs.is_empty()
+            && !prefix_armed
         {
             frame.set_cursor_position((
                 content.x + gutter + (buffer.column() - editor.scroll_column) as u16,
@@ -167,7 +180,9 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
     .enumerate()
     {
         frame.render_widget(
-            Paragraph::new(profile.function(
+            Paragraph::new(crate::shortcuts::function(
+                app.config.shortcuts,
+                profile,
                 index as u8 + 1,
                 app.config.language.text(name),
                 command.is_some(),

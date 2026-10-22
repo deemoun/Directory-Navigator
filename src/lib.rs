@@ -2,6 +2,7 @@ pub const APPLICATION_NAME: &str = "Directory Navigator";
 pub const DISPLAY_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub mod app;
+pub mod associations;
 pub mod columns;
 pub mod config;
 pub mod dialog;
@@ -19,6 +20,7 @@ pub mod panel_layout;
 pub mod pattern;
 pub mod quick_search;
 pub mod settings;
+pub mod shortcuts;
 pub mod terminal;
 pub mod tetris;
 pub mod ui;

@@ -12,6 +12,17 @@
   state owns session dialogs/options/results; quick view owns debounced reads.
 
 ## Implemented
+- Keyboard profiles Auto/Classic DN/Mac-friendly persist via config.conf/desktop.
+  Auto uses Mac-friendly on macOS, Classic elsewhere. Ctrl+O prefix supplies
+  function/letter/navigation alternatives with a context guide; text modals retain
+  normal input, Esc/click cancels, menus/bars/help reflect the profile. Keyboard
+  settings have draft Apply/Cancel and mouse controls; legacy aliases/guards remain.
+- Global associations.conf beside config.conf: case-insensitive final extensions,
+  extensionless names, internal viewer/hex/editor/default targets and explicit argv
+  commands with native whole-argument %f/%d/%n expansion. Enter/double-click override
+  archives; Ctrl+Enter/F3/F4 retain explicit behavior. Options Edit/Reload, automatic
+  reload after editor close/startup/Load desktop, bounded background reads, inactive
+  starter template, validation errors and stale-launch suppression. No new deps.
 - Tetris final-score → qualifying Unicode name → highlighted top-ten flow.
   Named records include lines and start/end levels; Enter accepts, Esc records
   Anonymous. Immediate separate tetris.conf beside settings, independent of
@@ -141,6 +152,12 @@
   entries. Keyboard/mouse navigation uses the reduced menu set.
 
 ## Validation
+- Associations: 13 regressions cover parsing/limits/native argv, literal command
+  execution/spawn errors, internal tools, directory/Ctrl+Enter precedence, stale
+  replies, invalid-config recovery, safe definition editing/reload, archive
+  override and English/Russian menu/mouse geometry at 80×25 and 120×40.
+  macOS release PTY passed editor/viewer associations, literal external command
+  handoff, definition Edit/Save/Reload, 80×25→120×40 resize and terminal restoration.
 - Ten file-operation regressions cover queued/ancestor replacements, restored-mtime
   rewrites before and after move preflight, growing/shrinking inputs, batch retention,
   cancellation boundaries, overlapping selections and hard-linked native/fallback moves.
@@ -183,7 +200,13 @@
   concurrent changes, Apply/Cancel and exit recovery. Release macOS PTY passed
   two-run persistence, clock/sort reload, conflict recovery, mouse opt-out,
   80×25→120×40 resizing and terminal restoration.
-- macOS ARM64: fmt check, Clippy (including all test targets) with denied warnings, 292 passing tests
+- Keyboard-profile tests cover legacy/unknown configuration, Apply/Cancel and
+  desktop persistence, original confirmations and unsaved guards, prefix input
+  isolation, paste/mouse/focus changes, editor word movement and user-menu review.
+  English/Russian labels and targets fit 80×25/120×40. Release macOS PTY passes
+  Auto→Classic→Mac, saved/reloaded preferences, editor save/close, viewer wrap/search,
+  copy cancellation, resize and terminal restoration.
+- macOS ARM64: fmt check, Clippy (including all test targets) with denied warnings, 316 passing tests
   (one opt-in real-Trash success test ignored), release build.
 - Menu tests enforce working entries, unique mnemonics, normalized separators,
   unchanged headings, Block selection/clipboard/undo, Paragraph styling and clock

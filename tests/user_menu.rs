@@ -251,7 +251,11 @@ fn f2_local_discovery_editor_precedence_stale_close_and_menu_targets() -> io::Re
     );
     let text = draw(&mut a, 80, 25)?;
     assert!(text.contains("User menu"));
-    assert!(text.contains("F2 User"));
+    assert!(text.contains(if a.config.shortcuts.is_mac() {
+        "^O2 User"
+    } else {
+        "F2 User"
+    }));
     key(&mut a, KeyCode::Esc);
     assert!(a.user_menu.modal.is_none());
     user_menu::open_file(&mut a, t.0.join("dn.mnu"), true);

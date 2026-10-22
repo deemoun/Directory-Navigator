@@ -12,6 +12,7 @@ use std::{
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Target {
+    ShortcutProfile,
     CommandHistory(crate::command_line::history::Action),
     Archive(crate::archive::Action),
     UserMenu(crate::user_menu::Action),
@@ -75,6 +76,15 @@ pub fn handle(app: &mut App, event: MouseEvent) {
     crate::layout::update(app);
 }
 fn handle_mouse(app: &mut App, event: MouseEvent) {
+    if crate::shortcuts::armed(app)
+        && matches!(
+            event.kind,
+            MouseEventKind::Down(_) | MouseEventKind::ScrollUp | MouseEventKind::ScrollDown
+        )
+    {
+        app.shortcuts.clear();
+        return;
+    }
     if event.kind == MouseEventKind::Up(MouseButton::Left) {
         app.mouse.scrollbar_drag = None;
         return;
@@ -250,6 +260,11 @@ fn handle_mouse(app: &mut App, event: MouseEvent) {
     if focus == Focus::Settings {
         if event.kind == MouseEventKind::Down(MouseButton::Left) {
             match target {
+                Some(Target::ShortcutProfile) => {
+                    if let Some(settings) = &mut app.settings {
+                        settings.keyboard_choice(false);
+                    }
+                }
                 Some(Target::RegionalChoice(index)) => {
                     if let Some(settings) = &mut app.settings {
                         settings.regional_choice(index, false);

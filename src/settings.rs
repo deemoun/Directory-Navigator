@@ -3,6 +3,7 @@ use crossterm::event::KeyCode;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SettingsKind {
+    Keyboard,
     Regional,
     System,
     Interface,
@@ -52,6 +53,7 @@ impl Settings {
     }
     pub fn title(&self) -> &'static str {
         match self.kind {
+            SettingsKind::Keyboard => " Keyboard shortcuts ",
             SettingsKind::Regional => " Language / date & time ",
             SettingsKind::System => " System Setup ",
             SettingsKind::Interface => " Interface Setup ",
@@ -61,6 +63,7 @@ impl Settings {
     }
     pub fn rows(&self) -> &'static [Setting] {
         match self.kind {
+            SettingsKind::Keyboard => &[],
             SettingsKind::Regional => &[],
             SettingsKind::System => &[Setting::Hidden, Setting::SaveOnExit],
             SettingsKind::Interface => &[Setting::Highlight, Setting::Tags, Setting::Clock],
@@ -76,10 +79,18 @@ impl Settings {
         }
     }
     pub fn control_count(&self) -> usize {
-        if self.kind == SettingsKind::Regional {
+        if self.kind == SettingsKind::Keyboard {
+            1
+        } else if self.kind == SettingsKind::Regional {
             5
         } else {
             self.rows().len()
+        }
+    }
+    pub fn keyboard_choice(&mut self, reverse: bool) {
+        if self.kind == SettingsKind::Keyboard {
+            self.cursor = 0;
+            self.draft.shortcuts = self.draft.shortcuts.next(reverse);
         }
     }
     pub fn regional_choice(&mut self, index: usize, reverse: bool) {
@@ -165,6 +176,16 @@ pub fn key(app: &mut App, code: KeyCode) {
         return;
     };
     let count = settings.control_count();
+    if settings.kind == SettingsKind::Keyboard
+        && settings.cursor == 0
+        && matches!(
+            code,
+            KeyCode::Left | KeyCode::Right | KeyCode::Char(' ' | 'p' | 'P')
+        )
+    {
+        settings.keyboard_choice(code == KeyCode::Left);
+        return;
+    }
     if settings.kind == SettingsKind::Regional {
         match code {
             KeyCode::Left | KeyCode::Right | KeyCode::Char(' ') if settings.cursor < count => {

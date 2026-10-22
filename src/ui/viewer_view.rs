@@ -25,11 +25,19 @@ pub(super) fn draw_viewer(frame: &mut Frame, app: &mut App, area: Rect) {
     ])
     .split(area);
     let title = format!(
-        " F3 {} │ {}",
+        " {} {} │ {}",
+        crate::shortcuts::label(app.config.shortcuts, crate::focus::Screen::Viewer, "F3"),
         app.config.language.text("Viewer"),
         tail(
             &display_name(&viewer.path.to_string_lossy()),
-            header.width.saturating_sub(27)
+            header.width.saturating_sub(
+                25 + crate::shortcuts::label(
+                    app.config.shortcuts,
+                    crate::focus::Screen::Viewer,
+                    "F3"
+                )
+                .len() as u16
+            )
         )
     );
     super::dialog_style::document_header(
@@ -96,10 +104,22 @@ pub(super) fn draw_viewer(frame: &mut Frame, app: &mut App, area: Rect) {
         (3, "C-F7 Reverse", Action::Reverse),
     ] {
         let enabled = viewer.text_ready();
-        let line = if profile == crate::palette::PaletteProfile::ClassicDn {
+        let line = if profile == crate::palette::PaletteProfile::ClassicDn
+            || app.config.shortcuts.is_mac()
+        {
             let (key, description) = label.split_once(' ').unwrap_or((label, ""));
             Line::from(vec![
-                Span::styled(format!("{key} "), dos(if enabled { 0x74 } else { 0x78 })),
+                Span::styled(
+                    format!(
+                        "{} ",
+                        crate::shortcuts::label(
+                            app.config.shortcuts,
+                            crate::focus::Screen::Viewer,
+                            key
+                        )
+                    ),
+                    dos(if enabled { 0x74 } else { 0x78 }),
+                ),
                 Span::styled(app.config.language.text(description), profile.bar(enabled)),
             ])
         } else {

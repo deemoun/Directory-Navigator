@@ -11,6 +11,7 @@ pub use store::Store;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Config {
+    pub shortcuts: crate::shortcuts::Profile,
     pub language: crate::localization::Language,
     pub datetime: crate::regional::DateTimeFormat,
     pub save_on_exit: bool,
@@ -34,6 +35,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
+            shortcuts: Default::default(),
             language: Default::default(),
             datetime: Default::default(),
             save_on_exit: true,
@@ -107,6 +109,9 @@ impl Config {
             }
             if let Some((key, value)) = line.split_once('=') {
                 match key.trim() {
+                    "shortcuts" => {
+                        config.shortcuts = crate::shortcuts::Profile::parse(value.trim())
+                    }
                     "language" => {
                         config.language = crate::localization::Language::parse(value.trim())
                     }
@@ -210,6 +215,7 @@ impl Config {
         let mut output = Vec::new();
 
         writeln!(output, "# Directory Navigator preferences\n# Saved automatically on normal exit; Options > Save desktop saves now.\nconfig_version=1\nsave_on_exit={}", self.save_on_exit)?;
+        writeln!(output, "shortcuts={}", self.shortcuts.key())?;
         writeln!(
             output,
             "language={}\ndate_order={}\ndate_separator={}\ntime_format={}\ntime_separator={}",

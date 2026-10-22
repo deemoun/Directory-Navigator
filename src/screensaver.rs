@@ -160,6 +160,7 @@ pub fn event(app: &mut App, event: &Event, now: Instant) -> bool {
         _ => false,
     };
     if input && app.screensaver.activity(now) {
+        app.shortcuts.clear();
         app.mouse.reset_click();
         true
     } else {
@@ -173,6 +174,8 @@ pub fn poll(app: &mut App, now: Instant) -> bool {
     ) && !app.quit
         && !app.exit_pending
         && !app.file_tools.busy()
+        && !app.associations.busy()
+        && app.associations.pending.is_none()
         && app.panels.iter().all(|p| !p.loading)
         && app.editor.as_ref().is_none_or(|e| !e.busy())
         && app.viewer.as_ref().is_none_or(|v| v.contents.is_some());

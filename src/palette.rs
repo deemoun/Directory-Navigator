@@ -56,13 +56,16 @@ impl PaletteProfile {
         } else {
             number.to_string()
         };
+        self.function_key(key, label, enabled)
+    }
+    pub fn function_key(self, key: impl Into<String>, label: &str, enabled: bool) -> Line<'static> {
         let style = if self == Self::ClassicDn {
             self.dos(if enabled { 0x74 } else { 0x78 })
         } else {
             self.dos(0x07)
         };
         Line::from(vec![
-            Span::styled(key, style),
+            Span::styled(key.into(), style),
             Span::styled(label.to_string(), self.bar(enabled)),
         ])
     }

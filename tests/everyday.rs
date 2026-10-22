@@ -518,6 +518,7 @@ fn function_bar_has_continuous_label_background_after_resize() -> io::Result<()>
     use ratatui::style::Color;
     let temp = Temp::new()?;
     let mut app = temp.app()?;
+    app.config.shortcuts = dn::shortcuts::Profile::ClassicDn;
     app.config.palette = dn::palette::PaletteProfile::Terminal;
     let mut terminal = Terminal::new(TestBackend::new(80, 25))?;
     for (width, height) in [(80, 25), (120, 40), (161, 30), (80, 25)] {

@@ -46,7 +46,11 @@ pub(super) fn draw_bar(frame: &mut Frame, app: &mut App, area: Rect) -> Vec<Rect
     positions
 }
 
-fn menu_width(entries: &[menu::Item], language: crate::localization::Language) -> u16 {
+fn menu_width(
+    entries: &[menu::Item],
+    language: crate::localization::Language,
+    shortcuts: crate::shortcuts::Profile,
+) -> u16 {
     let names = entries
         .iter()
         .map(|item| Line::from(menu::plain(language.text(item.label))).width())
@@ -54,7 +58,9 @@ fn menu_width(entries: &[menu::Item], language: crate::localization::Language) -
         .unwrap_or(0);
     let keys = entries
         .iter()
-        .map(|item| item.shortcut.len())
+        .map(|item| {
+            crate::shortcuts::label(shortcuts, crate::focus::Screen::Manager, item.shortcut).len()
+        })
         .max()
         .unwrap_or(0);
     (names + keys + 8).max(18) as u16
@@ -70,7 +76,7 @@ pub(super) fn draw_dropdowns(frame: &mut Frame, app: &mut App, bar: &[Rect], are
     let mut parent: Option<Rect> = None;
     for depth in 0..=app.submenus.len() {
         let entries = menu::level_items(app, depth);
-        let width = menu_width(&entries, language).min(area.width);
+        let width = menu_width(&entries, language, app.config.shortcuts).min(area.width);
         let height = (entries.len() as u16 + 2).min(area.height - 1);
         let (x, y) = if let Some(parent) = parent {
             let right = parent.right() - 1;
@@ -133,13 +139,17 @@ pub(super) fn draw_dropdowns(frame: &mut Frame, app: &mut App, bar: &[Rect], are
                 Action::QuickView => app.quick_view.is_some(),
                 _ => false,
             };
+            let shortcut = crate::shortcuts::label(
+                app.config.shortcuts,
+                crate::focus::Screen::Manager,
+                item.shortcut,
+            );
             let label_width = Line::from(menu::plain(language.text(item.label))).width();
-            let padding =
-                (width as usize - 2).saturating_sub(2 + label_width + item.shortcut.len() + 2);
+            let padding = (width as usize - 2).saturating_sub(2 + label_width + shortcut.len() + 2);
             let mut spans = vec![Span::styled(if checked { "• " } else { "  " }, normal)];
             spans.extend(label_spans(language.text(item.label), normal, hot));
             spans.push(Span::styled(" ".repeat(padding), normal));
-            spans.push(Span::styled(item.shortcut, normal));
+            spans.push(Span::styled(shortcut.into_owned(), normal));
             spans.push(Span::styled(
                 if matches!(item.action, Action::Submenu(_)) {
                     " ▶"

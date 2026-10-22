@@ -13,6 +13,10 @@ pub(super) fn draw_settings(frame: &mut Frame, app: &mut App, area: Rect) {
     let Some(settings) = &app.settings else {
         return;
     };
+    if settings.kind == SettingsKind::Keyboard {
+        super::shortcuts_view::draw_settings(frame, app, area);
+        return;
+    }
     if settings.kind == SettingsKind::Regional {
         draw_regional(frame, app, area);
         return;
@@ -23,6 +27,7 @@ pub(super) fn draw_settings(frame: &mut Frame, app: &mut App, area: Rect) {
         60
     };
     let height = match settings.kind {
+        SettingsKind::Keyboard => 20,
         SettingsKind::Regional => 17,
         SettingsKind::System => 14,
         SettingsKind::Interface => 12,

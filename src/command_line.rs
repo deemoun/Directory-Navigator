@@ -222,6 +222,7 @@ pub fn key(app: &mut App, key: KeyEvent) -> bool {
     true
 }
 pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
+    let prefix_armed = crate::shortcuts::armed(app);
     let focused = crate::focus::current(app) == crate::focus::Focus::Manager;
     let line = &mut app.command_line;
     let path = format!(
@@ -263,7 +264,7 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
     app.mouse
         .regions
         .push((area, crate::mouse::Target::CommandLine));
-    if focused {
+    if focused && !prefix_armed {
         frame.set_cursor_position((line.input_x + used as u16, area.y));
     }
 }

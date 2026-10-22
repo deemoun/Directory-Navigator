@@ -23,6 +23,7 @@ mod panel_view;
 mod quick_view;
 mod screensaver_view;
 mod settings_view;
+mod shortcuts_view;
 mod tetris_view;
 mod theme;
 mod tools_view;
@@ -36,6 +37,10 @@ pub use theme::entry_color;
 use viewer_view::draw_viewer;
 
 pub fn draw(frame: &mut Frame, app: &mut App) {
+    draw_content(frame, app);
+    shortcuts_view::draw_prefix(frame, app);
+}
+fn draw_content(frame: &mut Frame, app: &mut App) {
     let profile = app.config.palette;
     let dos = profile.styles();
     let area = frame.area();
@@ -145,7 +150,9 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
             label
         };
         frame.render_widget(
-            Paragraph::new(profile.function(
+            Paragraph::new(crate::shortcuts::function(
+                app.config.shortcuts,
+                profile,
                 index as u8 + 1,
                 app.config.language.text(label),
                 enabled,

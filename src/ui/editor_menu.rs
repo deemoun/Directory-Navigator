@@ -70,7 +70,16 @@ pub(super) fn draw_dropdown(frame: &mut Frame, app: &mut App, area: Rect) {
     let entries = menus::items(root);
     let width = entries
         .iter()
-        .map(|item| Line::from(plain(language.text(item.label))).width() + item.shortcut.len() + 8)
+        .map(|item| {
+            Line::from(plain(language.text(item.label))).width()
+                + crate::shortcuts::label(
+                    app.config.shortcuts,
+                    crate::focus::Screen::Editor,
+                    item.shortcut,
+                )
+                .len()
+                + 8
+        })
         .max()
         .unwrap_or(20)
         .min(area.width as usize) as u16;
@@ -134,10 +143,25 @@ pub(super) fn draw_dropdown(frame: &mut Frame, app: &mut App, area: Rect) {
         let mut spans = vec![Span::styled(if states[row] { "• " } else { "  " }, normal)];
         spans.extend(label_spans(language.text(item.label), normal, hot));
         let padding = usize::from(width - 2).saturating_sub(
-            2 + Line::from(plain(language.text(item.label))).width() + item.shortcut.len() + 1,
+            2 + Line::from(plain(language.text(item.label))).width()
+                + crate::shortcuts::label(
+                    app.config.shortcuts,
+                    crate::focus::Screen::Editor,
+                    item.shortcut,
+                )
+                .len()
+                + 1,
         );
         spans.push(Span::styled(" ".repeat(padding), normal));
-        spans.push(Span::styled(item.shortcut, normal));
+        spans.push(Span::styled(
+            crate::shortcuts::label(
+                app.config.shortcuts,
+                crate::focus::Screen::Editor,
+                item.shortcut,
+            )
+            .into_owned(),
+            normal,
+        ));
         frame.render_widget(Paragraph::new(Line::from(spans)).style(normal), row_rect);
         if item.action.is_some() {
             app.mouse

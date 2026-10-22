@@ -16,6 +16,7 @@ computers. It runs directly in your terminal—no DOS emulator or graphical fron
 - Browse ZIP, TAR and TAR.GZ archives without extracting them.
 - Type shell commands directly into the bottom command prompt.
 - Customize the layout, colors, clock and screensaver; settings save on exit.
+- Configure file extensions to use DN's viewer/editor or your preferred commands.
 - Classic panel footers show selection totals and available/total volume space.
 - Choose English or Russian, with independent date order and 12/24-hour time.
 - Recall commands through a searchable session history; copy filenames or paths to the internal clipboard.
@@ -56,6 +57,13 @@ On Windows, the executable is `target\release\dn.exe`.
 | Windows 10/11 | Best effort; runtime validation still pending |
 
 ## Everyday controls
+
+On macOS, **Automatic** shortcuts use the Mac-friendly profile: press **Ctrl+O**,
+release, then a digit or letter. A guide appears; for example, **5** copies,
+**4** edits and **0** quits the file manager. **Ctrl+O, K** opens keyboard settings.
+Choose Automatic, Classic DN or Mac-friendly under **Options → Configuration →
+Keyboard shortcuts**. Linux and Windows default to Classic DN. Classic keys stay
+available in the Mac profile; `^O5` in a function bar means Ctrl+O, then 5.
 
 | Key | Action |
 | --- | --- |

@@ -152,13 +152,16 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
     let bw = w / buttons.len() as u16;
     for (i, (label, action)) in buttons.into_iter().enumerate() {
         let r = Rect::new(x + i as u16 * bw, rect.bottom() - 2, bw - 1, 1);
-        super::dialog_style::button(
-            frame,
-            profile,
-            r,
-            app.config.language.text(label),
-            m.focus == i + 1,
-        );
+        let translated = app.config.language.text(label);
+        let caption = if let Some((key, rest)) = translated.split_once(' ') {
+            format!(
+                "{} {rest}",
+                crate::shortcuts::label(app.config.shortcuts, crate::focus::Screen::Manager, key)
+            )
+        } else {
+            translated.to_owned()
+        };
+        super::dialog_style::button(frame, profile, r, &caption, m.focus == i + 1);
         app.mouse.regions.push((r, Target::UserMenu(action)));
     }
 }

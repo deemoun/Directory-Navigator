@@ -241,6 +241,7 @@ fn clock_header_reservation_styles_resize_and_no_hit_targets() -> io::Result<()>
 fn function_bars_profiles_mouse_and_disabled_editor_actions() -> io::Result<()> {
     let t = Temp::new()?;
     let mut app = t.app()?;
+    app.config.shortcuts = dn::shortcuts::Profile::ClassicDn;
     for profile in [PaletteProfile::ClassicDn, PaletteProfile::Terminal] {
         app.config.palette = profile;
         let mut terminal = Terminal::new(TestBackend::new(80, 25))?;
@@ -530,7 +531,19 @@ fn document_headers_use_cyan_close_icons_with_reserved_titles_and_clock() -> io:
                 assert_eq!(b[(3, r.y)].fg, profile.color(11));
                 assert_eq!(b[(3, r.y)].bg, profile.color(7));
                 let title = (0..w).map(|x| b[(x, r.y)].symbol()).collect::<String>();
-                assert!(title.contains(if editor { "F4 Editor" } else { "F3 Viewer" }));
+                let key = dn::shortcuts::label(
+                    app.config.shortcuts,
+                    if editor {
+                        dn::focus::Screen::Editor
+                    } else {
+                        dn::focus::Screen::Viewer
+                    },
+                    if editor { "F4" } else { "F3" },
+                );
+                assert!(title.contains(&format!(
+                    "{key} {}",
+                    if editor { "Editor" } else { "Viewer" }
+                )));
                 assert!(title.contains(".txt"));
                 assert!(!b
                     .content

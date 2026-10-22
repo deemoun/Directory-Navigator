@@ -7,6 +7,8 @@ use crate::{
 use std::{io, path::PathBuf};
 
 pub struct App {
+    pub shortcuts: crate::shortcuts::State,
+    pub associations: crate::associations::State,
     pub archive: Option<crate::archive::Browser>,
     pub user_menu: crate::user_menu::State,
     pub directory_tree: Option<crate::directory_tree::Tree>,
@@ -55,6 +57,8 @@ impl App {
     pub fn new(path: PathBuf) -> io::Result<Self> {
         let config = Config::default();
         Ok(Self {
+            shortcuts: Default::default(),
+            associations: Default::default(),
             archive: None,
             user_menu: Default::default(),
             directory_tree: None,
@@ -103,6 +107,7 @@ impl App {
     }
 
     pub fn poll(&mut self) -> bool {
+        let associations_changed = crate::associations::poll(self);
         let archive_changed = crate::archive::poll(self);
         let user_menu_changed = crate::user_menu::poll(self);
         let tree_changed = self.directory_tree.as_mut().is_some_and(|t| t.poll());
@@ -132,6 +137,7 @@ impl App {
             .as_mut()
             .is_some_and(|game| game.tick(std::time::Instant::now()));
         changed |= saver_changed
+            | associations_changed
             | editor_changed
             | tools_changed
             | utilities_changed
@@ -281,6 +287,7 @@ impl App {
             ) && self.quick_view.as_ref().is_some_and(|q| q.pending()))
             || self.directory_tree.as_ref().is_some_and(|t| t.loading())
             || crate::user_menu::pending(&self.user_menu)
+            || self.associations.busy()
             || self.archive.as_ref().is_some_and(|a| a.loading())
             || self.launcher.loading()
             || self.job.is_some()
@@ -499,6 +506,16 @@ impl App {
                 self.panels[self.active].enter(self.config.show_hidden);
                 return;
             }
+            if browse && !entry.directory && !entry.symlink {
+                let path = entry.path.clone();
+                if crate::associations::open(self, path) {
+                    return;
+                }
+            }
+            let panel = &self.panels[self.active];
+            let Some(entry) = panel.entries.get(panel.cursor) else {
+                return;
+            };
             if browse
                 && !entry.symlink
                 && crate::archive::reader::Format::detect(&entry.path).is_some()
@@ -514,6 +531,7 @@ impl App {
     }
 
     pub fn apply_config(&mut self, config: Config) {
+        self.shortcuts.clear();
         let hidden_changed = self.config.show_hidden != config.show_hidden;
         self.config = config;
         self.clock.tick_with(self.config.datetime);
@@ -536,6 +554,7 @@ impl App {
     }
 
     pub fn load_config(&mut self) {
+        crate::associations::reload(self);
         match self.config_store.load() {
             Ok(config) => {
                 self.apply_config(config);

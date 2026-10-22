@@ -634,7 +634,14 @@ fn original_menu_hierarchy_cascades_alignment_and_keyboard_navigation() -> io::R
             .unwrap()
             .0;
         for (row, item) in menu::items(1).iter().enumerate() {
-            if let Some(last) = item.shortcut.chars().last() {
+            if let Some(last) = dn::shortcuts::label(
+                app.config.shortcuts,
+                dn::focus::Screen::Manager,
+                item.shortcut,
+            )
+            .chars()
+            .last()
+            {
                 assert_eq!(
                     terminal.backend().buffer()[(rect.right() - 4, rect.y + 1 + row as u16)]
                         .symbol(),
