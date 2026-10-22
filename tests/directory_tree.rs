@@ -426,7 +426,8 @@ fn menu_access_and_cancel_keep_marks_filter_layout_and_cursor() -> io::Result<()
     let selected = a.panels[0].selected.clone();
     let cursor = a.panels[0].cursor;
     let layouts = a.config.layouts;
-    for root in [4] {
+    {
+        let root = 4;
         let item = dn::menu::items(root)
             .into_iter()
             .find(|i| i.action == dn::menu::Action::DirectoryTree)
@@ -456,7 +457,7 @@ fn unreadable_branch_reports_error_and_can_refresh() -> io::Result<()> {
         }
     }
     let _restore = Restore(locked.clone());
-    fs::set_permissions(&locked, fs::Permissions::from_mode(0))?;
+    fs::set_permissions(&locked, fs::Permissions::from_mode(0o000))?;
     if fs::read_dir(&locked).is_ok() {
         return Ok(());
     }

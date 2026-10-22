@@ -48,6 +48,11 @@
   preservation of surviving marks/cursor and removed-folder recovery.
 - Safe copy/move/mkdir/delete: exclusive destinations, native same-volume moves,
   staging, metadata preservation where supported, no recursive symlink following.
+  Queued-entry/ancestor checks stop detected replacements; duplicate/overlapping
+  batches are refused. Copy reads are bounded by initial size; Unix change times
+  detect restored-mtime rewrites. Fallback moves preflight all copied items before
+  source cleanup, recheck each removal and sync source parents. UI unchanged.
+  Cancellation is rechecked immediately before entry changes/Trash submission.
   Confirmed Trash is the default; File Manager Setup changes deletion mode and
   Save/Load desktop persists it. Trash failure never causes permanent deletion.
 - Enter/double-click browse supported regular archives; other files use OS default
@@ -136,6 +141,16 @@
   entries. Keyboard/mouse navigation uses the reduced menu set.
 
 ## Validation
+- Ten file-operation regressions cover queued/ancestor replacements, restored-mtime
+  rewrites before and after move preflight, growing/shrinking inputs, batch retention,
+  cancellation boundaries, overlapping selections and hard-linked native/fallback moves.
+  Trash cancellation at entry notification never reaches the backend. macOS release
+  PTY passed copy/collision refusal, move, permanent-delete Cancel/confirm, Unicode
+  mkdir, 80×25→120×40 resize and return to the shell with terminal modes restored.
+- Additional deterministic unit regressions: wildcard matcher versus an independent
+  DP oracle, Unicode/history editing and bounds, panel/scroll geometry across small
+  and resized viewports, score parser/ranking invariants, and owned staging cleanup,
+  replacement races/no-overwrite publication. No new test dependencies.
 - Tetris: final-score/name/leaderboard flow, Unicode editing/limits, positive-score
   qualification/ties, immediate saves independent of preference auto-save,
   corruption/read-only/link/lock failures, retry and concurrent-instance merging.
@@ -168,7 +183,7 @@
   concurrent changes, Apply/Cancel and exit recovery. Release macOS PTY passed
   two-run persistence, clock/sort reload, conflict recovery, mouse opt-out,
   80×25→120×40 resizing and terminal restoration.
-- macOS ARM64: fmt check, Clippy with denied warnings, 260 passing tests
+- macOS ARM64: fmt check, Clippy (including all test targets) with denied warnings, 292 passing tests
   (one opt-in real-Trash success test ignored), release build.
 - Menu tests enforce working entries, unique mnemonics, normalized separators,
   unchanged headings, Block selection/clipboard/undo, Paragraph styling and clock
@@ -203,8 +218,9 @@
 - Real default-app opening verified on macOS. Successful real macOS Trash transfer
   remains unverified: sandbox failure; outside-sandbox test permission declined.
   Isolated Trash tests and settings/confirmation PTY workflow pass.
-- GitHub push/PR/manual checks plus manual Build all platforms workflow configured,
-  not executed remotely. Build matrix: macOS ARM64/Intel, Linux x86_64/ARM64,
+- GitHub Rust checks and Build all platforms are workflow_dispatch-only; no push,
+  pull-request or scheduled triggers. A local regression test guards every workflow.
+  Neither workflow was executed remotely. Build matrix: macOS ARM64/Intel, Linux x86_64/ARM64,
   Windows x86_64. YAML/matrix and exact Unix packaging step validated locally
   (clean archive, executable permissions and SHA-256). Windows packaging untested.
   Locked tests/builds, version smoke check and 30-day archives/
@@ -212,8 +228,9 @@
   Linux/Windows remain untested locally.
 
 ## Limitations and next steps
-- Path-based recursion retains intermediate-directory substitution races; full
-  descriptor-relative traversal remains future hardening. Nesting beyond 512 is
+- Ancestor/entry snapshots detect replacements between operation stages, but
+  path-based recursion still has check-to-use races; full descriptor-relative
+  traversal remains future hardening. Nesting beyond 512 in discovery is
   reported as skipped. Kernel I/O cannot be force-cancelled.
 - No restart-resume journal or atomic directory-tree publication. Crashes can
   leave identifiable staging files or completed portions of operations.

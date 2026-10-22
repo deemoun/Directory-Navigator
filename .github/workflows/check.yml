@@ -1,7 +1,5 @@
 name: Rust checks
 on:
-  push:
-  pull_request:
   workflow_dispatch:
 permissions:
   contents: read
@@ -20,6 +18,6 @@ jobs:
         with:
           components: rustfmt, clippy
       - run: cargo fmt --check
-      - run: cargo clippy --locked -- -D warnings
+      - run: cargo clippy --locked --all-targets -- -D warnings
       - run: cargo test --locked
       - run: cargo build --release --locked

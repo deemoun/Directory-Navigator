@@ -76,3 +76,96 @@ impl Drop for StagedFile {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+    struct Temp(PathBuf);
+    impl Temp {
+        fn new() -> io::Result<Self> {
+            static NEXT: AtomicU64 = AtomicU64::new(0);
+            let p = std::env::temp_dir().join(format!(
+                "dn-publication-{}-{}",
+                std::process::id(),
+                NEXT.fetch_add(1, Ordering::Relaxed)
+            ));
+            fs::create_dir(&p)?;
+            Ok(Self(p))
+        }
+    }
+    impl Drop for Temp {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+    #[test]
+    fn abandoned_staging_removes_only_its_own_partial_output() -> io::Result<()> {
+        let t = Temp::new()?;
+        let target = t.0.join("target");
+        fs::write(&target, "existing")?;
+        let staging = {
+            let mut stage = StagedFile::create(&target)?;
+            stage.file.write_all(b"partial")?;
+            stage.path().to_owned()
+        };
+        assert!(!staging.exists());
+        assert_eq!(fs::read_to_string(&target)?, "existing");
+        assert_eq!(fs::read_dir(&t.0)?.count(), 1);
+        Ok(())
+    }
+    #[test]
+    fn publication_refuses_a_destination_created_after_staging() -> io::Result<()> {
+        let t = Temp::new()?;
+        let target = t.0.join("target");
+        let mut stage = StagedFile::create(&target)?;
+        stage.file.write_all(b"new")?;
+        fs::write(&target, "winner")?;
+        assert!(stage.publish(&target).is_err());
+        drop(stage);
+        assert_eq!(fs::read_to_string(&target)?, "winner");
+        assert_eq!(fs::read_dir(&t.0)?.count(), 1);
+        Ok(())
+    }
+    #[test]
+    fn successful_publication_survives_staging_drop() -> io::Result<()> {
+        let t = Temp::new()?;
+        let target = t.0.join("target");
+        let mut stage = StagedFile::create(&target)?;
+        stage.file.write_all(b"complete")?;
+        stage.publish(&target)?;
+        drop(stage);
+        assert_eq!(fs::read(&target)?, b"complete");
+        assert_eq!(fs::read_dir(&t.0)?.count(), 1);
+        Ok(())
+    }
+    #[cfg(unix)]
+    #[test]
+    fn replaced_staging_cannot_be_published_or_deleted_by_the_old_owner() -> io::Result<()> {
+        let t = Temp::new()?;
+        let target = t.0.join("target");
+        let stage = StagedFile::create(&target)?;
+        let path = stage.path().to_owned();
+        fs::rename(&path, t.0.join("held-original"))?;
+        fs::write(&path, "replacement")?;
+        assert!(stage.publish(&target).is_err());
+        drop(stage);
+        assert_eq!(fs::read_to_string(&path)?, "replacement");
+        assert!(!target.exists());
+        Ok(())
+    }
+    #[cfg(unix)]
+    #[test]
+    fn dangling_symlink_destination_is_never_overwritten() -> io::Result<()> {
+        let t = Temp::new()?;
+        let target = t.0.join("link");
+        std::os::unix::fs::symlink("missing", &target)?;
+        let mut stage = StagedFile::create(&target)?;
+        stage.file.write_all(b"new")?;
+        assert!(stage.publish(&target).is_err());
+        drop(stage);
+        assert_eq!(fs::read_link(&target)?, PathBuf::from("missing"));
+        assert!(!t.0.join("missing").exists());
+        Ok(())
+    }
+}

@@ -74,8 +74,10 @@ fn deletion_defaults_legacy_settings_roundtrip_and_cancel() -> io::Result<()> {
     assert!(Config::read(&path)?.use_trash);
     fs::write(&path, "use_trash=unknown\n")?;
     assert!(Config::read(&path)?.use_trash);
-    let mut config = Config::default();
-    config.use_trash = false;
+    let config = Config {
+        use_trash: false,
+        ..Default::default()
+    };
     config.save(&path)?;
     assert!(!Config::read(&path)?.use_trash);
     let mut app = temp.app()?;
@@ -165,6 +167,17 @@ fn trash_failure_partial_progress_cancellation_and_native_paths_are_safe() -> io
     .unwrap_err();
     assert_eq!(error.kind(), io::ErrorKind::Interrupted);
     assert!(two.exists());
+    cancel.store(false, Ordering::Relaxed);
+    let error = trash_support::move_items(
+        std::slice::from_ref(&two),
+        &cancel,
+        &mut progress,
+        |_| cancel.store(true, Ordering::Relaxed),
+        |_| panic!("cancellation at entry notification must not reach Trash backend"),
+    )
+    .unwrap_err();
+    assert_eq!(error.kind(), io::ErrorKind::Interrupted);
+    assert_eq!(fs::read(&two)?, b"two");
     Ok(())
 }
 

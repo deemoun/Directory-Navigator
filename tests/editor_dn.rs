@@ -259,7 +259,7 @@ fn replacement_snapshot_wrap_skip_growth_empty_and_atomic_all_undo() {
     let mut session = ReplaceSession::new(vec![0..1, 2..3], "x".repeat(MAX_BYTES));
     assert!(session.all(&mut b).is_err());
     assert_eq!(b.text, "a a a");
-    let mut session = ReplaceSession::new(vec![0..1], "\n".repeat(MAX_LINES));
+    let mut session = ReplaceSession::new(std::iter::once(0..1).collect(), "\n".repeat(MAX_LINES));
     assert!(session.all(&mut b).is_err());
     assert_eq!(b.text, "a a a");
 }
@@ -504,10 +504,8 @@ fn all_editor_menu_roots_mnemonics_mouse_targets_and_clipboard_modern_aliases() 
             .all(|(_, t)| matches!(t, Target::Editor(_))));
         key(&mut app, KeyCode::Esc);
     }
-    for root in [3] {
-        menus::open(&mut app, root);
-        assert!(app.editor.as_ref().unwrap().menu.is_none());
-    }
+    menus::open(&mut app, 3);
+    assert!(app.editor.as_ref().unwrap().menu.is_none());
     modified(&mut app, KeyCode::Char('a'), KeyModifiers::CONTROL);
     modified(&mut app, KeyCode::Char('x'), KeyModifiers::CONTROL);
     assert!(buffer(&app).text.is_empty());

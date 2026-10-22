@@ -13,13 +13,18 @@ pub fn move_items(
     mut notify: impl FnMut(&Progress),
     mut backend: impl FnMut(&Path) -> io::Result<()>,
 ) -> io::Result<()> {
-    for path in paths {
+    let check_cancel = || {
         if cancel.load(Ordering::Relaxed) {
-            return Err(io::Error::new(
+            Err(io::Error::new(
                 io::ErrorKind::Interrupted,
                 "Trash operation cancelled; completed items remain in Trash",
-            ));
+            ))
+        } else {
+            Ok(())
         }
+    };
+    for path in paths {
+        check_cancel()?;
         progress.path = path.clone();
         notify(progress);
         if path.file_name().is_none()
@@ -43,6 +48,7 @@ pub fn move_items(
                 .ok_or_else(|| io::Error::other("Missing filename"))?,
         );
         fs::symlink_metadata(&source)?;
+        check_cancel()?;
         backend(&source).map_err(|e| {
             io::Error::new(
                 e.kind(),

@@ -558,7 +558,7 @@ fn inaccessible_subtrees_report_errors_without_aborting_other_results() -> io::R
         }
     }
     let _restore = Restore(locked.clone());
-    fs::set_permissions(&locked, fs::Permissions::from_mode(0))?;
+    fs::set_permissions(&locked, fs::Permissions::from_mode(0o000))?;
     let results = events(Request::Find {
         root: t.0.clone(),
         pattern: "*".into(),

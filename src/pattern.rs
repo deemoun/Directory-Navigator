@@ -156,3 +156,79 @@ pub fn key(app: &mut App, key: KeyEvent) {
         _ => {}
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    /// Independent, non-greedy dynamic-programming oracle for exhaustive small inputs.
+    fn reference(pattern: &str, name: &str) -> bool {
+        let name = name.chars().collect::<Vec<_>>();
+        let mut previous = vec![false; name.len() + 1];
+        previous[0] = true;
+        for token in pattern.chars() {
+            let mut next = vec![false; name.len() + 1];
+            next[0] = token == '*' && previous[0];
+            for j in 1..=name.len() {
+                next[j] = if token == '*' {
+                    previous[j] || next[j - 1]
+                } else {
+                    previous[j - 1] && (token == '?' || token == name[j - 1])
+                };
+            }
+            previous = next;
+        }
+        previous[name.len()]
+    }
+    fn words(alphabet: &[char], depth: usize) -> Vec<String> {
+        let mut all = vec![String::new()];
+        let mut level = all.clone();
+        for _ in 0..depth {
+            level = level
+                .iter()
+                .flat_map(|prefix| alphabet.iter().map(move |c| format!("{prefix}{c}")))
+                .collect();
+            all.extend(level.iter().cloned());
+        }
+        all
+    }
+    #[test]
+    fn greedy_matching_agrees_with_independent_oracle() {
+        let names = words(&['a', '界'], 5);
+        for pattern in words(&['a', '界', '*', '?'], 5) {
+            let matcher = Wildcard::new(&pattern);
+            for name in &names {
+                assert_eq!(
+                    matcher.matches(OsStr::new(name)),
+                    reference(&pattern, name),
+                    "pattern={pattern:?}, name={name:?}"
+                );
+            }
+        }
+    }
+    #[test]
+    fn matching_is_scalar_based_case_sensitive_and_not_normalized() {
+        for (pattern, name, expected) in [
+            ("?", "界", true),
+            ("?", "é", false),
+            ("??", "é", true),
+            ("é", "é", false),
+            ("*.RS", "main.rs", false),
+            ("**a*b?", "aaab界", true),
+            ("*a*a*b", "aaaaac", false),
+        ] {
+            assert_eq!(Wildcard::new(pattern).matches(OsStr::new(name)), expected);
+        }
+    }
+    #[cfg(unix)]
+    #[test]
+    fn undecodable_names_match_only_universal_star() {
+        use std::os::unix::ffi::OsStrExt;
+        let name = OsStr::from_bytes(b"a\xff");
+        for pattern in ["*", "**", "***"] {
+            assert!(Wildcard::new(pattern).matches(name));
+        }
+        for pattern in ["?*", "a*", "??", ""] {
+            assert!(!Wildcard::new(pattern).matches(name));
+        }
+    }
+}

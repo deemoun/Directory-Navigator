@@ -101,6 +101,8 @@ Untranslated diagnostics fall back to English; system errors retain their origin
 File operations refuse existing destinations. Trash is the default deletion mode;
 a Trash failure never falls back to permanent deletion. Permanent deletion can be
 selected in File Manager Setup and still requires confirmation.
+Detected changes to queued entries or their parent directories stop the operation.
+Cancellation or failure retains completed work; multi-file operations have no automatic rollback.
 
 This is a **beta**. Archive browsing is read-only; the viewer is a bounded preview,
 and the editor handles UTF-8 files up to 2 MiB / 100,000 lines. Test important
@@ -123,7 +125,8 @@ macOS (Apple Silicon and Intel), Linux (x86_64 and ARM64), and Windows (x86_64).
 Each successful job uploads an archive containing the executable, README and MIT
 license, plus a SHA-256 checksum. Downloads are under that run's **Artifacts** and
 are retained for 30 days. These are unsigned builds; this workflow does not publish
-a GitHub Release. **Rust checks** also runs on pushes/PRs and can be started manually.
+a GitHub Release. **Rust checks** is also manual-only: open it in Actions and choose
+**Run workflow**. Neither workflow runs on pushes, pull requests or a schedule.
 
 The Rust application lives in `src/`, with tests in `tests/`.
 

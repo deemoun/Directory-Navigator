@@ -177,11 +177,17 @@ fn viewed_and_edited_histories_record_only_success_and_guard_open() -> io::Resul
     wait(&mut app, |a| {
         a.viewer.as_ref().is_some_and(|v| v.contents.is_some())
     });
-    assert_eq!(app.file_tools.histories.get(HistoryKind::View), [a.clone()]);
+    assert_eq!(
+        app.file_tools.histories.get(HistoryKind::View),
+        std::slice::from_ref(&a)
+    );
     app.viewer = None;
     editor::open_path(&mut app, a.clone());
     wait(&mut app, |a| a.editor.as_ref().is_some_and(|e| !e.busy()));
-    assert_eq!(app.file_tools.histories.get(HistoryKind::Edit), [a.clone()]);
+    assert_eq!(
+        app.file_tools.histories.get(HistoryKind::Edit),
+        std::slice::from_ref(&a)
+    );
     editor::paste(&mut app, "changed");
     editor::open_path(&mut app, b.clone());
     assert!(matches!(
@@ -194,7 +200,10 @@ fn viewed_and_edited_histories_record_only_success_and_guard_open() -> io::Resul
     editor::action(&mut app, EditorAction::Discard);
     wait(&mut app, |a| a.editor.as_ref().is_some_and(|e| !e.busy()));
     assert!(app.editor.as_ref().unwrap().dirty());
-    assert_eq!(app.file_tools.histories.get(HistoryKind::Edit), [a.clone()]);
+    assert_eq!(
+        app.file_tools.histories.get(HistoryKind::Edit),
+        std::slice::from_ref(&a)
+    );
     app.dialogs.clear();
     editor::open_path(&mut app, b.clone());
     editor::action(&mut app, EditorAction::Discard);

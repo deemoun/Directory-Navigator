@@ -179,3 +179,105 @@ fn read(path: &Path) -> io::Result<Board> {
     crate::config::store::read_bytes(path)?
         .map_or_else(|| Ok(Board::default()), |b| Board::parse(&b))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn record(score: u64, name: &str) -> Record {
+        Record {
+            score,
+            name: name.into(),
+            lines: u32::MAX,
+            start_level: 1,
+            level: 10,
+        }
+    }
+    #[test]
+    fn readable_configuration_roundtrips_unicode_delimiters_and_integer_limits() {
+        let board = Board {
+            records: vec![record(u64::MAX, "Дмитрий,世界=#"), record(1, "é 👩‍💻")],
+            last_name: "Дмитрий,世界=#".into(),
+        };
+        assert_eq!(Board::parse(&board.encode()).unwrap(), board);
+    }
+    #[test]
+    fn parser_rejects_versions_overflow_missing_fields_and_controls() {
+        for text in [
+            "",
+            "tetris_version=1\ntetris_version=1\n",
+            "tetris_version=2\n",
+            "tetris_version=1\nfuture=1\n",
+            "tetris_version=1\nscore=1,2,3,4\n",
+            "tetris_version=1\nscore=0,0,1,1,zero\n",
+            "tetris_version=1\nscore=1,4294967296,1,1,overflow\n",
+            "tetris_version=1\nscore=1,0,5,4,reversed\n",
+            "tetris_version=1\nlast_name=bad\x1bname\n",
+        ] {
+            assert!(Board::parse(text.as_bytes()).is_err(), "{text:?}");
+        }
+        assert!(Board::parse(&[0xff, 0xfe]).is_err());
+        assert!(Board::parse(&vec![b' '; 16 * 1024 + 1]).is_err());
+    }
+    #[test]
+    fn name_limits_count_graphemes_and_utf8_bytes_independently() {
+        assert!(validate_name(&"界".repeat(30)));
+        assert!(!validate_name(&"界".repeat(31)));
+        assert!(validate_name(&"é".repeat(30)));
+        assert!(!validate_name(&"a".repeat(240)));
+        // One grapheme can exceed the byte bound through many combining marks.
+        assert!(!validate_name(&format!("a{}", "\u{301}".repeat(121))));
+        for bad in ["", "a\nb", "a\rb", "a\tb", "a\0b"] {
+            assert!(!validate_name(bad));
+        }
+    }
+    #[test]
+    fn top_ten_retains_stable_ties_and_legitimate_duplicate_results() {
+        let mut store = Store::default();
+        for score in 1..=20 {
+            store.add(record(score, &format!("player{score}"))).unwrap();
+        }
+        assert_eq!(
+            store
+                .board
+                .records
+                .iter()
+                .map(|r| r.score)
+                .collect::<Vec<_>>(),
+            (11..=20).rev().collect::<Vec<_>>()
+        );
+        store.add(record(20, "new tie")).unwrap();
+        assert_eq!(store.board.records[0].name, "player20");
+        assert_eq!(store.board.records[1].name, "new tie");
+        store.add(record(20, "new tie")).unwrap();
+        assert_eq!(
+            store
+                .board
+                .records
+                .iter()
+                .filter(|r| r.name == "new tie")
+                .count(),
+            2
+        );
+        assert_eq!(store.pending.len(), 10);
+    }
+    #[test]
+    fn rejected_records_leave_all_pending_and_display_state_unchanged() {
+        let mut store = Store::default();
+        store.add(record(10, "keep")).unwrap();
+        let before = (store.board.clone(), store.pending.clone());
+        let mut bad = record(11, "bad");
+        bad.start_level = 0;
+        for r in [record(0, "zero"), record(10, ""), bad] {
+            assert!(store.add(r).is_err());
+            assert_eq!((&store.board, &store.pending), (&before.0, &before.1));
+        }
+    }
+    #[test]
+    fn parser_refuses_an_eleventh_record_instead_of_silently_discarding_it() {
+        let mut text = "tetris_version=1\n".to_owned();
+        for i in 1..=11 {
+            text.push_str(&format!("score={i},0,1,1,name\n"));
+        }
+        assert!(Board::parse(text.as_bytes()).is_err());
+    }
+}

@@ -151,3 +151,71 @@ pub fn scroll_position(track: Rect, y: u16, count: usize) -> usize {
     let span = u128::from(track.height - 1);
     ((row * count.saturating_sub(1) as u128 + span / 2) / span) as usize
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn all_small_and_normal_viewports_keep_entries_inside_listing() {
+        for layout in [PanelLayout::Brief, PanelLayout::Details] {
+            for width in 0..85 {
+                for height in 0..32 {
+                    let inner = Rect::new(3, 2, width, height);
+                    let g = PanelGeometry::new(inner, layout);
+                    for offset in [0_usize, 1, 39, 1000] {
+                        assert!(
+                            g.entry_rect(offset.saturating_sub(1), offset).is_none() || offset == 0
+                        );
+                        assert!(g.entry_rect(offset + g.capacity(), offset).is_none());
+                        for index in offset..offset + g.capacity() {
+                            let r = g.entry_rect(index, offset).expect("visible entry");
+                            assert!(r.y >= g.list.y && r.bottom() <= g.list.bottom());
+                            assert!(r.x >= g.list.x && r.right() <= g.list.right());
+                            assert!(
+                                r.bottom() <= g.separator.y,
+                                "Entry overlaps footer: {width}x{height}"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+    #[test]
+    fn scroll_mapping_is_monotonic_clamped_and_reaches_both_ends() {
+        for height in [0, 1, 2, 3, 19, 100] {
+            let track = Rect::new(5, 7, 1, height);
+            for count in [0, 1, 2, 7, 10000, usize::MAX] {
+                let mut previous = 0;
+                for y in 0..120 {
+                    let current = scroll_position(track, y, count);
+                    assert!(current >= previous);
+                    assert!(current <= count.saturating_sub(1));
+                    previous = current;
+                }
+                assert_eq!(scroll_position(track, 0, count), 0);
+                if height > 1 && count > 1 {
+                    assert_eq!(scroll_position(track, u16::MAX, count), count - 1);
+                }
+            }
+        }
+    }
+    #[test]
+    fn thumb_stays_in_track_for_large_counts_and_out_of_range_cursors() {
+        for layout in [PanelLayout::Brief, PanelLayout::Details] {
+            let g = PanelGeometry::new(Rect::new(1, 1, 38, 20), layout);
+            let track = g.scroll_track();
+            for count in [2, 17, 100_000, usize::MAX] {
+                for cursor in [0, 1, count / 2, count - 1, usize::MAX] {
+                    let r = g.scroll_thumb(cursor, count).unwrap();
+                    assert!(r.y >= track.y && r.bottom() <= track.bottom());
+                }
+                assert_eq!(g.scroll_thumb(0, count).unwrap().y, track.y);
+                assert_eq!(
+                    g.scroll_thumb(count - 1, count).unwrap().bottom(),
+                    track.bottom()
+                );
+            }
+        }
+    }
+}

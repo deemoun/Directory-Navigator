@@ -401,7 +401,7 @@ fn source_symlinks_special_files_and_permission_errors_are_not_followed() -> io:
     tar(&p, false)?;
     symlink(&p, t.0.join("link.tar"))?;
     assert!(reader::list(t.0.join("link.tar"), &Cancellation::default()).is_err());
-    fs::set_permissions(&p, fs::Permissions::from_mode(0))?;
+    fs::set_permissions(&p, fs::Permissions::from_mode(0o000))?;
     let denied = fs::File::open(&p).is_err();
     let result = reader::list(p.clone(), &Cancellation::default());
     fs::set_permissions(&p, fs::Permissions::from_mode(0o600))?;

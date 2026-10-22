@@ -319,7 +319,7 @@ fn info_inspects_links_themselves_and_permission_errors() -> io::Result<()> {
     }
     fs::create_dir(temp.0.join("blocked"))?;
     fs::write(temp.0.join("blocked/child"), b"x")?;
-    fs::set_permissions(temp.0.join("blocked"), fs::Permissions::from_mode(0))?;
+    fs::set_permissions(temp.0.join("blocked"), fs::Permissions::from_mode(0o000))?;
     let enforced = fs::read_dir(temp.0.join("blocked")).is_err();
     let result = file_info::inspect(&temp.0.join("blocked/child"));
     fs::set_permissions(temp.0.join("blocked"), fs::Permissions::from_mode(0o700))?;

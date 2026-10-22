@@ -256,3 +256,86 @@ pub fn mouse(app: &mut App, event: MouseEvent, target: Option<Target>) {
         _ => {}
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn filtering_keeps_unicode_mapping_and_original_history_unchanged() {
+        let history = vec![
+            "echo İSTANBUL".into(),
+            "echo ПрИвЕт".into(),
+            "printf 世界".into(),
+        ];
+        let original = history.clone();
+        let mut dialog = HistoryDialog::new(&history);
+        for (query, expected) in [
+            ("i̇stan", vec![0]),
+            ("ПРИВЕТ", vec![1]),
+            ("世界", vec![2]),
+            ("absent", vec![]),
+            ("", vec![0, 1, 2]),
+        ] {
+            dialog.query = query.into();
+            dialog.cursor = 99;
+            dialog.offset = 99;
+            dialog.refilter(&history);
+            assert_eq!(dialog.matches, expected);
+            assert_eq!(dialog.cursor, 0);
+            assert_eq!(dialog.offset, 0);
+        }
+        assert_eq!(history, original);
+    }
+    #[test]
+    fn invalid_paste_is_atomic_even_with_an_existing_query() {
+        let history = vec!["echo one".into()];
+        let mut d = HistoryDialog::new(&history);
+        d.edit(KeyCode::Null, Some("echo"), &history).unwrap();
+        for bad in [
+            "\n",
+            "\r",
+            "\t",
+            "\x1b[31m",
+            &"x".repeat(super::super::MAX_BYTES),
+        ] {
+            let before = (d.query.clone(), d.input_cursor, d.matches.clone());
+            assert!(d.edit(KeyCode::Null, Some(bad), &history).is_err());
+            assert_eq!((d.query.clone(), d.input_cursor, d.matches.clone()), before);
+        }
+    }
+    #[test]
+    fn grapheme_editing_deletes_whole_clusters_at_both_ends() {
+        let history = vec![];
+        let mut d = HistoryDialog::new(&history);
+        d.edit(KeyCode::Null, Some("a👩‍💻é"), &history).unwrap();
+        d.edit(KeyCode::Left, None, &history).unwrap();
+        assert_eq!(d.input_cursor, "a👩‍💻".len());
+        d.edit(KeyCode::Backspace, None, &history).unwrap();
+        assert_eq!(d.query, "aé");
+        assert_eq!(d.input_cursor, 1);
+        d.edit(KeyCode::Delete, None, &history).unwrap();
+        assert_eq!(d.query, "a");
+        d.edit(KeyCode::Backspace, None, &history).unwrap();
+        d.edit(KeyCode::Backspace, None, &history).unwrap();
+        d.edit(KeyCode::Delete, None, &history).unwrap();
+        assert_eq!(d.query, "");
+        assert_eq!(d.input_cursor, 0);
+    }
+    #[test]
+    fn selection_remains_visible_after_resizing_and_saturating_navigation() {
+        for count in 0..=100 {
+            let history = vec!["command".into(); count];
+            let mut d = HistoryDialog::new(&history);
+            for rows in [1, 17, 3, 200, 0, 5] {
+                d.rows = rows;
+                for delta in [isize::MAX, isize::MIN, 9, -3] {
+                    d.step(delta);
+                    assert!(d.rows > 0);
+                    assert!(d.cursor <= count.saturating_sub(1));
+                    assert!(d.offset <= d.cursor);
+                    assert!(d.cursor < d.offset + d.rows);
+                }
+            }
+        }
+    }
+}

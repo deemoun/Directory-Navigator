@@ -1,5 +1,7 @@
 //! No-replace file operations. Existing destinations are always refused.
+mod guards;
 use crate::filesystem::open_regular;
+use guards::DirectoryGuards;
 use std::{
     fs::{self, Metadata},
     io::{self, Read, Write},
@@ -155,7 +157,70 @@ fn same_file(a: &Metadata, b: &Metadata) -> bool {
             return false;
         }
     }
-    a.file_type() == b.file_type() && a.len() == b.len() && a.modified().ok() == b.modified().ok()
+    a.file_type() == b.file_type()
+        && a.len() == b.len()
+        && a.permissions() == b.permissions()
+        && a.modified().ok() == b.modified().ok()
+}
+
+fn unchanged_file(a: &Metadata, b: &Metadata) -> bool {
+    // ctime also detects same-length rewrites whose mtime was restored.
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        if a.ctime() != b.ctime() || a.ctime_nsec() != b.ctime_nsec() {
+            return false;
+        }
+    }
+    same_file(a, b)
+}
+
+struct Source {
+    path: PathBuf,
+    metadata: Metadata,
+}
+
+fn sources(plan: &Plan, guards: &mut DirectoryGuards) -> io::Result<Vec<Source>> {
+    let mut sources = Vec::new();
+    let mut selected = std::collections::HashMap::new();
+    for path in &plan.sources {
+        // Pin ancestor symlinks once; the final component is never followed.
+        let path = destination_path(path)?;
+        guards.capture_parent(&path)?;
+        let metadata = fs::symlink_metadata(&path)?;
+        if selected.insert(path.clone(), metadata.is_dir()).is_some() {
+            return Err(io::Error::other(
+                "The same source was selected more than once",
+            ));
+        }
+        sources.push(Source { path, metadata });
+    }
+    for source in &sources {
+        if source
+            .path
+            .ancestors()
+            .skip(1)
+            .any(|p| selected.get(p) == Some(&true))
+        {
+            return Err(io::Error::other(
+                "Cannot operate on a directory and its contents in the same batch",
+            ));
+        }
+    }
+    Ok(sources)
+}
+
+fn verify_entry(path: &Path, original: &Metadata) -> io::Result<Metadata> {
+    let current = fs::symlink_metadata(path)?;
+    let unchanged = if original.is_dir() {
+        crate::platform_fs::same_identity(original, &current)
+    } else {
+        unchanged_file(original, &current)
+    };
+    if !unchanged {
+        return Err(io::Error::other("Entry changed during operation; retained"));
+    }
+    Ok(current)
 }
 
 /// Resolve the destination's parent before checking containment or creating it.
@@ -170,36 +235,43 @@ fn destination_path(path: &Path) -> io::Result<PathBuf> {
     Ok(fs::canonicalize(parent)?.join(name))
 }
 
-fn mappings(plan: &Plan) -> io::Result<Vec<(PathBuf, PathBuf)>> {
+fn mappings(plan: &Plan, sources: Vec<Source>) -> io::Result<Vec<(Source, PathBuf)>> {
     let container = fs::metadata(&plan.destination).is_ok_and(|m| m.is_dir());
+    let container_path = if container {
+        Some(fs::canonicalize(&plan.destination)?)
+    } else {
+        None
+    };
     if plan.sources.len() > 1 && !container {
         return Err(io::Error::other(
             "Multiple items require an existing destination directory",
         ));
     }
     let mut pairs = Vec::new();
-    for source in &plan.sources {
-        let metadata = fs::symlink_metadata(source)?;
-        let target = if container {
+    let mut targets = std::collections::HashSet::new();
+    for source in sources {
+        let metadata = &source.metadata;
+        let target = if let Some(container_path) = &container_path {
             let name = source
+                .path
                 .file_name()
                 .ok_or_else(|| io::Error::other("Cannot operate on a filesystem root"))?;
-            fs::canonicalize(&plan.destination)?.join(name)
+            container_path.join(name)
         } else {
             destination_path(&plan.destination)?
         };
         absent(&target)?;
-        if metadata.is_dir() && target.starts_with(fs::canonicalize(source)?) {
+        if metadata.is_dir() && target.starts_with(&source.path) {
             return Err(io::Error::other(
                 "Cannot copy or move a directory into itself",
             ));
         }
-        if pairs.iter().any(|(_, previous)| previous == &target) {
+        if !targets.insert(target.clone()) {
             return Err(io::Error::other(
                 "Two sources have the same destination name",
             ));
         }
-        pairs.push((source.clone(), target));
+        pairs.push((source, target));
     }
     Ok(pairs)
 }
@@ -241,8 +313,8 @@ fn remove_leaf(path: &Path, metadata: &Metadata) -> io::Result<()> {
 }
 
 enum Work {
-    Visit(PathBuf, PathBuf),
-    Permissions(fs::File, fs::File, Metadata),
+    Visit(Source, PathBuf),
+    Permissions(PathBuf, PathBuf, fs::File, fs::File, Metadata),
 }
 
 pub fn run(
@@ -286,7 +358,9 @@ pub fn run_with_strategy(
     let mut progress = Progress::default();
     check(cancel)?;
     if plan.kind == Kind::Mkdir {
-        fs::create_dir(destination_path(&plan.destination)?)?;
+        let destination = destination_path(&plan.destination)?;
+        fs::create_dir(&destination)?;
+        crate::platform_fs::sync_parent(&destination)?;
         progress.files = 1;
         return Ok(progress);
     }
@@ -312,23 +386,59 @@ pub fn run_with_strategy(
         )?;
         return Ok(progress);
     }
+    let mut guards = DirectoryGuards::default();
+    let sources = sources(plan, &mut guards)?;
+    let display_roots: std::collections::HashMap<_, _> = sources
+        .iter()
+        .zip(&plan.sources)
+        .map(|(source, display)| (source.path.clone(), display))
+        .collect();
+    let display_path = |path: &Path| {
+        path.ancestors()
+            .find_map(|root| {
+                display_roots.get(root).and_then(|display| {
+                    path.strip_prefix(root).ok().map(|suffix| {
+                        if suffix.as_os_str().is_empty() {
+                            (**display).clone()
+                        } else {
+                            display.join(suffix)
+                        }
+                    })
+                })
+            })
+            .unwrap_or_else(|| path.to_owned())
+    };
     if plan.kind == Kind::Delete {
-        for source in &plan.sources {
-            let mut stack = vec![(source.clone(), false)];
-            while let Some((path, leave)) = stack.pop() {
+        for source in sources {
+            let root = source.path.clone();
+            let mut stack = vec![(source, false)];
+            while let Some((source, leave)) = stack.pop() {
                 check(cancel)?;
-                progress.path = path.clone();
+                let path = source.path;
+                progress.path = display_path(&path);
                 notify(&progress);
-                let metadata = fs::symlink_metadata(&path)?;
+                check(cancel)?;
+                guards.verify_parent(&path)?;
+                let metadata = verify_entry(&path, &source.metadata)?;
                 if metadata.is_dir() {
                     if leave {
                         fs::remove_dir(&path)?;
                         progress.files += 1;
                     } else {
-                        stack.push((path.clone(), true));
+                        guards.capture(&path)?;
+                        stack.push((
+                            Source {
+                                path: path.clone(),
+                                metadata,
+                            },
+                            true,
+                        ));
                         for child in fs::read_dir(&path)? {
                             check(cancel)?;
-                            stack.push((child?.path(), false));
+                            guards.verify_directory(&path)?;
+                            let path = child?.path();
+                            let metadata = fs::symlink_metadata(&path)?;
+                            stack.push((Source { path, metadata }, false));
                         }
                     }
                 } else {
@@ -336,23 +446,31 @@ pub fn run_with_strategy(
                     progress.files += 1;
                 }
             }
+            crate::platform_fs::sync_parent(&root)?;
         }
         return Ok(progress);
     }
-    let pairs = mappings(plan)?; // Check all top-level collisions before writing.
+    let pairs = mappings(plan, sources)?; // Check all top-level collisions before writing.
+    for (_, target) in &pairs {
+        guards.capture_parent(target)?;
+    }
     let mut copied = Vec::new();
     let mut buffer = vec![0_u8; 128 * 1024];
     for (source, target) in pairs {
         if plan.kind == Kind::Move && strategy == MoveStrategy::PreferRename {
             check(cancel)?;
-            let original = fs::symlink_metadata(&source)?;
-            progress.path = source.clone();
+            let original = &source.metadata;
+            progress.path = display_path(&source.path);
             notify(&progress);
             check(cancel)?;
-            if !same_file(&original, &fs::symlink_metadata(&source)?) {
-                return Err(io::Error::other("Source changed before move"));
+            guards.verify_parent(&source.path)?;
+            guards.verify_parent(&target)?;
+            // Rename transfers the current inode itself. Renaming a previous
+            // hard link can legitimately change this inode's ctime.
+            if !same_file(original, &fs::symlink_metadata(&source.path)?) {
+                return Err(io::Error::other("Source changed before move; retained"));
             }
-            match crate::platform_fs::rename_no_replace(&source, &target) {
+            match crate::platform_fs::rename_no_replace(&source.path, &target) {
                 Ok(()) => {
                     progress.files += 1;
                     if original.is_file() {
@@ -360,7 +478,7 @@ pub fn run_with_strategy(
                     }
                     notify(&progress);
                     crate::platform_fs::sync_parent(&target)?;
-                    crate::platform_fs::sync_parent(&source)?;
+                    crate::platform_fs::sync_parent(&source.path)?;
                     continue;
                 }
                 Err(e) if crate::platform_fs::can_copy_fallback(&e) => {}
@@ -371,7 +489,15 @@ pub fn run_with_strategy(
         while let Some(work) = stack.pop() {
             check(cancel)?;
             let (source, target) = match work {
-                Work::Permissions(input, output, metadata) => {
+                Work::Permissions(source, target, input, output, metadata) => {
+                    guards.verify_parent(&source)?;
+                    guards.verify_parent(&target)?;
+                    verify_entry(&source, &metadata)?;
+                    if !crate::platform_fs::owns(&target, &output.metadata()?) {
+                        return Err(io::Error::other(
+                            "Destination directory changed during copy",
+                        ));
+                    }
                     crate::platform_fs::copy_extended_metadata(&input, &output)?;
                     #[cfg(unix)]
                     {
@@ -385,53 +511,88 @@ pub fn run_with_strategy(
                     {
                         let _ = metadata;
                     }
+                    crate::platform_fs::sync_parent(&target)?;
                     continue;
                 }
                 Work::Visit(source, target) => (source, target),
             };
-            progress.path = source.clone();
+            let Source {
+                path: source,
+                metadata: original,
+            } = source;
+            progress.path = display_path(&source);
             notify(&progress);
-            let metadata = fs::symlink_metadata(&source)?;
+            check(cancel)?;
+            guards.verify_parent(&source)?;
+            guards.verify_parent(&target)?;
+            let metadata = verify_entry(&source, &original)?;
             if metadata.is_symlink() {
                 copy_link(&source, &target)?;
+                guards.verify_parent(&source)?;
+                verify_entry(&source, &metadata)?;
+                crate::platform_fs::sync_parent(&target)?;
             } else if metadata.is_dir() {
-                fs::create_dir(&target)?;
                 let source_directory = crate::platform_fs::open_directory(&source)?;
                 if !crate::platform_fs::same_identity(&metadata, &source_directory.metadata()?) {
                     return Err(io::Error::other("Source directory changed before copy"));
                 }
+                fs::create_dir(&target)?;
                 let target_directory = crate::platform_fs::open_directory(&target)?;
+                guards.capture(&source)?;
+                guards.capture(&target)?;
                 stack.push(Work::Permissions(
+                    source.clone(),
+                    target.clone(),
                     source_directory,
                     target_directory,
                     metadata.clone(),
                 ));
                 for child in fs::read_dir(&source)? {
                     check(cancel)?;
+                    guards.verify_directory(&source)?;
                     let child = child?;
-                    stack.push(Work::Visit(child.path(), target.join(child.file_name())));
+                    let path = child.path();
+                    let metadata = fs::symlink_metadata(&path)?;
+                    stack.push(Work::Visit(
+                        Source { path, metadata },
+                        target.join(child.file_name()),
+                    ));
                 }
             } else if metadata.is_file() {
                 let mut input = open_regular(&source)?;
-                if !same_file(&metadata, &input.metadata()?) {
+                if !unchanged_file(&metadata, &input.metadata()?) {
                     return Err(io::Error::other("Source changed before copy"));
                 }
                 absent(&target)?;
                 let mut staged = crate::publication::StagedFile::create(&target)?;
                 let output = &mut staged.file;
-                loop {
+                let mut remaining = metadata.len();
+                while remaining > 0 {
                     check(cancel)?;
-                    let count = input.read(&mut buffer)?;
+                    let limit = remaining.min(buffer.len() as u64) as usize;
+                    let count = input.read(&mut buffer[..limit])?;
                     if count == 0 {
-                        break;
+                        return Err(io::Error::other(
+                            "Source shrank during copy; original retained",
+                        ));
                     }
                     output.write_all(&buffer[..count])?;
+                    remaining -= count as u64;
                     progress.bytes = progress.bytes.saturating_add(count as u64);
                     notify(&progress);
                 }
+                check(cancel)?;
+                if input.read(&mut buffer[..1])? != 0 {
+                    return Err(io::Error::other(
+                        "Source grew during copy; original retained",
+                    ));
+                }
                 output.sync_all()?;
-                if !same_file(&metadata, &input.metadata()?)
-                    || !same_file(&metadata, &fs::symlink_metadata(&source)?)
+                check(cancel)?;
+                guards.verify_parent(&source)?;
+                guards.verify_parent(&target)?;
+                if !unchanged_file(&metadata, &input.metadata()?)
+                    || !unchanged_file(&metadata, &fs::symlink_metadata(&source)?)
                 {
                     return Err(io::Error::other(
                         "Source changed during copy; original retained",
@@ -443,6 +604,10 @@ pub fn run_with_strategy(
                     output.set_times(fs::FileTimes::new().set_modified(modified))?;
                 }
                 output.sync_all()?;
+                check(cancel)?;
+                guards.verify_parent(&source)?;
+                guards.verify_parent(&target)?;
+                verify_entry(&source, &metadata)?;
                 staged.publish(&target)?;
             } else {
                 return Err(io::Error::other(format!(
@@ -455,20 +620,37 @@ pub fn run_with_strategy(
                 let destination_metadata = fs::symlink_metadata(&target)?;
                 copied.push((source, target, metadata, destination_metadata));
             }
+            notify(&progress);
         }
     }
     if plan.kind == Kind::Move {
+        // Validate the whole copied batch before removing its first source.
+        // Later unlinks can change ctime on other source hard links, so cleanup
+        // below rechecks identity/content metadata without comparing that field.
+        for (source, target, original, destination_metadata) in &copied {
+            check(cancel)?;
+            guards.verify_parent(source)?;
+            guards.verify_parent(target)?;
+            verify_entry(source, original)?;
+            verify_entry(target, destination_metadata)?;
+        }
         // Copy everything successfully before removing any source. Never recursively
         // delete a moved directory: new children must survive, causing remove_dir to fail.
+        #[cfg(unix)]
+        let mut unlinked = std::collections::HashMap::<(u64, u64), u64>::new();
         for (source, target, original, destination_metadata) in copied.into_iter().rev() {
             check(cancel)?;
-            progress.path = source.clone();
+            progress.path = display_path(&source);
             notify(&progress);
+            check(cancel)?;
+            guards.verify_parent(&source)?;
+            guards.verify_parent(&target)?;
             let current = fs::symlink_metadata(&source)?;
             let destination_current = fs::symlink_metadata(&target)?;
             if (original.is_dir()
                 && !crate::platform_fs::same_identity(&destination_metadata, &destination_current))
-                || (!original.is_dir() && !same_file(&destination_metadata, &destination_current))
+                || (!original.is_dir()
+                    && !unchanged_file(&destination_metadata, &destination_current))
             {
                 return Err(io::Error::other(
                     "Destination changed after copy; original retained",
@@ -480,11 +662,36 @@ pub fn run_with_strategy(
                 }
                 fs::remove_dir(&source)?;
             } else {
-                if !same_file(&original, &current) {
+                #[cfg(unix)]
+                let unchanged = {
+                    use std::os::unix::fs::MetadataExt;
+                    let removals = unlinked
+                        .get(&(original.dev(), original.ino()))
+                        .copied()
+                        .unwrap_or(0);
+                    if removals == 0 {
+                        unchanged_file(&original, &current)
+                    } else {
+                        // Our previous unlink changes ctime on remaining hard links.
+                        same_file(&original, &current)
+                            && original.nlink().checked_sub(removals) == Some(current.nlink())
+                    }
+                };
+                #[cfg(not(unix))]
+                let unchanged = unchanged_file(&original, &current);
+                if !unchanged {
                     return Err(io::Error::other("Source changed after copy; retained"));
                 }
                 remove_leaf(&source, &current)?;
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::MetadataExt;
+                    *unlinked
+                        .entry((original.dev(), original.ino()))
+                        .or_default() += 1;
+                }
             }
+            crate::platform_fs::sync_parent(&source)?;
         }
     }
     Ok(progress)
