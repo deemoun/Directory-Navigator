@@ -1,4 +1,6 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+#[cfg(unix)]
+use dn::panel;
 use dn::{
     app::App,
     columns::ColumnPreset,
@@ -6,7 +8,7 @@ use dn::{
     input,
     menu::{self, Action, MenuId},
     mouse::{self, Target},
-    panel::{self, SortMode},
+    panel::SortMode,
     panel_layout::{PanelGeometry, PanelLayout},
     ui,
 };

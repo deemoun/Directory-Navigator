@@ -1,4 +1,6 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+#[cfg(unix)]
+use dn::pattern;
 use dn::{
     app::App,
     columns::ColumnPreset,
@@ -6,7 +8,7 @@ use dn::{
     file_info, formatting, input,
     menu::{self, Action, MenuId},
     mouse::{self, Target},
-    pattern::{self, Wildcard},
+    pattern::Wildcard,
     ui,
 };
 use ratatui::{backend::TestBackend, Terminal};

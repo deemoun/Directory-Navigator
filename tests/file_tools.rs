@@ -385,12 +385,14 @@ fn comparison_native_names_and_directory_exclusion() {
     dir.directory = true;
     let mut parent = entry("..", Some(0));
     parent.parent = true;
-    let mut native = entry("unicode子", Some(1));
+    let native = entry("unicode子", Some(1));
     #[cfg(unix)]
-    {
+    let native = {
         use std::os::unix::ffi::OsStringExt;
+        let mut native = native;
         native.name = OsString::from_vec(vec![255]);
-    }
+        native
+    };
     let result = compare::compare(&[dir, parent, native], &[], CompareOptions::default());
     assert_eq!(result.left_only, 1);
     assert_eq!(result.differences[0].len(), 1);

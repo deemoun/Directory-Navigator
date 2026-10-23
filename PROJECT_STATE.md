@@ -26,6 +26,11 @@
   Read-only permissions; no tags/releases or dependency on Mac/Linux workflows.
   Workflow YAML/policy checks, ten helper tests and all four local Cargo checks
   pass; Windows/Linux native builds still require manual GitHub validation.
+- Windows-target all-target Clippy now passes with denied warnings on the Mac
+  cross-check: narrowly documented Windows-only read-only staging cleanup lint
+  exception; Unix-only test imports/mutability are correctly gated. Added a
+  Windows regression test for abandoned read-only staging and untouched targets.
+  Native Windows execution remains pending; no CI checks disabled or runs started.
 - New-installation welcome uses Directory Navigator/Cargo version, profile-aware
   controls, deletion mode, Start/Keyboard settings/Help, and ≡ → Welcome reopening.
   Dedicated modal focus blocks background input/screensavers and survives resizing.

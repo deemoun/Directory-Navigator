@@ -1,8 +1,11 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+#[cfg(not(windows))]
+use dn::launcher;
+#[cfg(unix)]
+use dn::launcher::{Launched, Launcher};
 use dn::{
     app::App,
     input,
-    launcher::{self, Launched, Launcher},
     mouse::{self, Target},
     ui,
 };

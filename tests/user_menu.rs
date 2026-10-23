@@ -1,4 +1,6 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+#[cfg(unix)]
+use dn::user_menu::runner;
 use dn::{
     app::App,
     focus::{self, Focus},
@@ -8,7 +10,7 @@ use dn::{
     user_menu::{
         self,
         format::{self, parse, words},
-        runner, Action,
+        Action,
     },
 };
 use ratatui::{backend::TestBackend, Terminal};

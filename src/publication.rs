@@ -69,6 +69,10 @@ impl Drop for StagedFile {
             #[cfg(windows)]
             if let Ok(metadata) = self.file.metadata() {
                 let mut permissions = metadata.permissions();
+                // Windows needs the read-only attribute cleared to delete our
+                // abandoned staging file. This code cannot run on Unix, where
+                // set_readonly(false) would broaden filesystem permissions.
+                #[allow(clippy::permissions_set_readonly_false)]
                 permissions.set_readonly(false);
                 let _ = self.file.set_permissions(permissions);
             }
@@ -136,6 +140,25 @@ mod tests {
         stage.publish(&target)?;
         drop(stage);
         assert_eq!(fs::read(&target)?, b"complete");
+        assert_eq!(fs::read_dir(&t.0)?.count(), 1);
+        Ok(())
+    }
+    #[cfg(windows)]
+    #[test]
+    fn abandoned_readonly_staging_is_removed_without_touching_destination() -> io::Result<()> {
+        let t = Temp::new()?;
+        let target = t.0.join("target");
+        fs::write(&target, b"existing")?;
+        let mut stage = StagedFile::create(&target)?;
+        stage.file.write_all(b"partial")?;
+        let path = stage.path().to_owned();
+        let mut permissions = stage.file.metadata()?.permissions();
+        permissions.set_readonly(true);
+        stage.file.set_permissions(permissions)?;
+        drop(stage);
+        assert!(!path.exists());
+        assert_eq!(fs::read(&target)?, b"existing");
+        assert!(!fs::metadata(&target)?.permissions().readonly());
         assert_eq!(fs::read_dir(&t.0)?.count(), 1);
         Ok(())
     }
