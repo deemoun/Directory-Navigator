@@ -154,23 +154,22 @@ are retained for 30 days. These are unsigned builds; this workflow does not publ
 a GitHub Release. **Rust checks** is also manual-only: open it in Actions and choose
 **Run workflow**. Neither workflow runs on pushes, pull requests or a schedule.
 
-### Draft releases (macOS and Linux)
+### Draft releases (macOS)
 
 After pushing the workflow to the default branch, open **Actions → Build draft
 release → Run workflow**, choose the source branch and enter a version **without
 `v`**, for example `1.0.0` or `1.1.0-beta.1`.
 
-The manual workflow checks, tests and builds macOS Apple Silicon/Intel and Linux
-ARM64/x86_64. It embeds your version in the app, About and CLI; uploads versioned
+The manual workflow checks, tests and builds macOS Apple Silicon and Intel. It embeds your version in the app, About and CLI; uploads versioned
 archives with the README, user guide and MIT license; and attaches checksums to an
 **unpublished draft release** tagged `v<version>`. Prerelease versions are marked
-automatically. Windows is excluded from this release workflow.
+automatically. Linux and Windows are excluded from this release workflow.
 
 The tag points to the exact versioned source tree used for all builds. If needed,
 a release-only commit updates Cargo.toml/Cargo.lock; your development branch is
 not rewritten or bumped. Set the next branch version separately when appropriate.
 Only the final job has repository write access, and no tag or draft is created
-unless all four builds pass. Existing tags/releases are refused, never overwritten.
+unless both Mac builds pass. Existing tags/releases are refused, never overwritten.
 If publication fails after creating the tag or draft, inspect that version in GitHub;
 finish the draft manually or deliberately remove the partial draft/tag before a new
 run. The workflow does not delete or replace existing releases during recovery.
@@ -179,6 +178,15 @@ Review the draft, test the downloads, edit the release notes and publish it your
 macOS builds remain unsigned and unnotarized. The repository must permit Actions
 to write contents/create tags; restrictive tag rules can block the final job.
 All workflows remain manual-only; nothing runs on pushes or tags.
+
+### Separate Linux builds
+
+Open **Actions → Build Linux → Run workflow**, choose a branch and enter the
+version without `v`. This independent, manual-only workflow checks, tests and builds
+Linux x86_64 and ARM64. Download **linux-downloads** from the run's **Artifacts**
+for both versioned archives, individual checksums and `SHA256SUMS.txt` (30-day
+retention). It creates no tags or GitHub releases and cannot block the Mac draft.
+The selected version is embedded in these builds; the source branch is unchanged.
 
 Release helper tests (Python 3.12+, standard library only):
 

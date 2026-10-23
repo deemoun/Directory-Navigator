@@ -67,12 +67,19 @@ fn delayed_fragmented_mouse_release_does_not_leak_to_shell() -> io::Result<()> {
         )?;
         let mut master_fd = 0;
         let mut slave_fd = 0;
-        let mut size = libc::winsize {
+        let size = libc::winsize {
             ws_row: 54,
             ws_col: 170,
             ws_xpixel: 0,
             ws_ypixel: 0,
         };
+        // Linux takes a const winsize pointer; other Unix signatures take mutable.
+        #[cfg(not(target_os = "linux"))]
+        let mut size = size;
+        #[cfg(target_os = "linux")]
+        let size_ptr = &size;
+        #[cfg(not(target_os = "linux"))]
+        let size_ptr = &mut size;
         // SAFETY: openpty initializes two owned descriptors with the supplied size.
         if unsafe {
             libc::openpty(
@@ -80,7 +87,7 @@ fn delayed_fragmented_mouse_release_does_not_leak_to_shell() -> io::Result<()> {
                 &mut slave_fd,
                 std::ptr::null_mut(),
                 std::ptr::null_mut(),
-                &mut size,
+                size_ptr,
             )
         } != 0
         {

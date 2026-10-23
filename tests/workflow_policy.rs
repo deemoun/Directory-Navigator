@@ -55,20 +55,15 @@ fn every_workflow_is_dispatch_only() -> io::Result<()> {
 }
 
 #[test]
-fn draft_release_is_four_unix_targets_and_write_permission_is_isolated() -> io::Result<()> {
+fn draft_release_is_mac_only_and_write_permission_is_isolated() -> io::Result<()> {
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(".github/workflows/release.yml");
     let text = fs::read_to_string(path)?;
     let targets = text
         .lines()
         .filter_map(|line| line.trim().strip_prefix("target: "))
         .collect::<Vec<_>>();
-    assert_eq!(targets.len(), 4);
-    for target in [
-        "aarch64-apple-darwin",
-        "x86_64-apple-darwin",
-        "aarch64-unknown-linux-gnu",
-        "x86_64-unknown-linux-gnu",
-    ] {
+    assert_eq!(targets.len(), 2);
+    for target in ["aarch64-apple-darwin", "x86_64-apple-darwin"] {
         assert!(targets.contains(&target));
     }
     let (build_jobs, draft) = text.split_once("  draft:\n").expect("Dedicated draft job");
@@ -79,6 +74,7 @@ fn draft_release_is_four_unix_targets_and_write_permission_is_isolated() -> io::
     assert!(draft.contains("--verify-tag --draft"));
     assert!(draft.contains("--prerelease"));
     assert!(draft.contains("verify-assets"));
+    assert!(draft.contains("--platform macos"));
     assert!(draft.contains("check-unused"));
     assert!(!text.contains("--clobber"));
     assert!(!text.contains("--draft=false"));
@@ -86,5 +82,41 @@ fn draft_release_is_four_unix_targets_and_write_permission_is_isolated() -> io::
     assert!(text.contains("cancel-in-progress: false"));
     assert!(text.contains("type: string"));
     assert!(text.contains("git write-tree"));
+    Ok(())
+}
+
+#[test]
+fn linux_builds_are_independent_and_cannot_publish() -> io::Result<()> {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(".github/workflows/linux.yml");
+    let text = fs::read_to_string(path)?;
+    let targets = text
+        .lines()
+        .filter_map(|line| line.trim().strip_prefix("target: "))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        targets,
+        ["x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu"]
+    );
+    assert!(text.contains("contents: read"));
+    assert!(text.contains("--platform linux"));
+    assert!(text.contains("scripts/release.py prepare"));
+    assert!(text.contains("cargo clippy --locked --all-targets"));
+    assert!(text.contains("cargo test --locked"));
+    assert!(text.contains("cargo build --release --locked"));
+    assert!(text.contains("linux-downloads"));
+    for forbidden in [
+        "contents: write",
+        "persist-credentials: true",
+        "git push",
+        "git tag",
+        "gh release",
+        "needs: validate",
+        "apple-darwin",
+    ] {
+        assert!(
+            !text.contains(forbidden),
+            "Unexpected Linux workflow capability: {forbidden}"
+        );
+    }
     Ok(())
 }

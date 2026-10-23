@@ -68,10 +68,6 @@ jobs:
             target: aarch64-apple-darwin
           - os: macos-15-intel
             target: x86_64-apple-darwin
-          - os: ubuntu-24.04
-            target: x86_64-unknown-linux-gnu
-          - os: ubuntu-24.04-arm
-            target: aarch64-unknown-linux-gnu
     env:
       RELEASE_VERSION: ${{ needs.validate.outputs.version }}
       EXPECTED_TREE: ${{ needs.validate.outputs.source_tree }}
@@ -140,7 +136,7 @@ jobs:
           path: dist
           merge-multiple: true
       - name: Verify complete release assets
-        run: python3 scripts/release.py verify-assets "$RELEASE_VERSION"
+        run: python3 scripts/release.py verify-assets "$RELEASE_VERSION" --platform macos
       - name: Create tagged versioned source
         run: |
           set -euo pipefail
@@ -163,7 +159,8 @@ jobs:
 
           Native terminal file manager for macOS and Linux.
 
-          Packages: macOS Apple Silicon/Intel and Linux ARM64/x86_64.
+          Packages: macOS Apple Silicon and Intel.
+          Linux builds are available through the separate manual Build Linux workflow.
           Extract the archive, then run ./dn. See the included README and user guide.
           Verify downloads against SHA256SUMS.txt. macOS builds are unsigned and not notarized.
 

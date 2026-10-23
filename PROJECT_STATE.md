@@ -12,12 +12,15 @@
   state owns session dialogs/options/results; quick view owns debounced reads.
 
 ## Implemented
-- Manual Build draft release accepts a validated SemVer, builds/checks four native
-  macOS/Linux targets, verifies embedded versions and packages versioned assets.
+- Manual Build draft release accepts a validated SemVer, builds/checks two native
+  macOS Apple Silicon/Intel targets, verifies embedded versions and packages versioned assets.
   Final write-only job verifies complete checksums and tags the identical source
   tree (release-only Cargo version commit if needed), then creates an unpublished
   draft; branches stay unchanged. Existing tags/releases are refused; no Windows
   assets, signing, automatic dispatch or automatic publication.
+- Separate manual Build Linux checks/builds native ARM64/x86_64 with a version
+  input, verified archives/checksums and read-only permissions; no tags/releases.
+  Linux failures do not block Mac drafts. Fixed Linux openpty test Clippy warning.
 - New-installation welcome uses Directory Navigator/Cargo version, profile-aware
   controls, deletion mode, Start/Keyboard settings/Help, and ≡ → Welcome reopening.
   Dedicated modal focus blocks background input/screensavers and survives resizing.
@@ -217,14 +220,17 @@
   concurrent changes, Apply/Cancel and exit recovery. Release macOS PTY passed
   two-run persistence, clock/sort reload, conflict recovery, mouse opt-out,
   80×25→120×40 resizing and terminal restoration.
-- Draft-release workflow YAML/four-target matrix and all shell steps validated
-  locally. Nine stdlib Python tests cover versions/output metadata, collisions/API
+- Draft-release workflow YAML/Mac-only matrix and all shell steps validated
+  locally. Ten stdlib Python tests cover versions/output metadata, collisions/API
   failures, root-only lockfile edits, binary-version checks, archive contents/modes,
   checksums and incomplete/tampered bundles. Rust policy tests enforce manual-only
   triggers and isolated draft-job writes. Isolated macOS ARM64 source override to
   1.2.3-rc.1 built with --locked, packaged and extracted; binary version/checksum
-  verified without changing the development version. Remote release and other
-  release targets remain untested; no GitHub run/tag/release was created here.
+  verified without changing the development version. Updated Mac-only release
+  and separate Linux workflows pass YAML/shell/policy checks; all four local Cargo
+  checks and ten helper tests pass. No GitHub run/tag/release initiated here.
+  User-reported prior run passed both Mac builds; Linux failed Clippy (fixed in
+  terminal_exit). Updated remote workflows and Linux builds remain untested.
 - Conf-only tests verify ignored/unchanged config.txt files (including broken
   links), .conf defaults/welcome, save/reload/unknown-key preservation and conflict
   safeguards. DOS score fixtures verify both record layouts, XOR/endian fields,
@@ -247,7 +253,7 @@
   English/Russian labels and targets fit 80×25/120×40. Release macOS PTY passes
   Auto→Classic→Mac, saved/reloaded preferences, editor save/close, viewer wrap/search,
   copy cancellation, resize and terminal restoration.
-- macOS ARM64: fmt check, Clippy (including all test targets) with denied warnings, 334 passing tests
+- macOS ARM64: fmt check, Clippy (including all test targets) with denied warnings, 335 passing tests
   (one opt-in real-Trash success test ignored), release build.
 - Menu tests enforce working entries, unique mnemonics, normalized separators,
   unchanged headings, Block selection/clipboard/undo, Paragraph styling and clock

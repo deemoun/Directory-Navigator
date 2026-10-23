@@ -84,6 +84,32 @@ class ReleaseTests(unittest.TestCase):
         release.verify_assets(output, "1.2.3")
         self.assertEqual(len((output / "SHA256SUMS.txt").read_text().splitlines()), 4)
 
+    def test_platform_bundles_are_independent_and_require_exact_assets(self):
+        with self.package_fixture():
+            for platform in ("macos", "linux"):
+                with self.subTest(platform=platform):
+                    output = self.root / platform
+                    targets = release.PLATFORM_TARGETS[platform]
+                    release.package(self.root, "1.2.3", targets[0], output)
+                    with self.assertRaises(ValueError):
+                        release.verify_assets(output, "1.2.3", platform)
+                    self.assertFalse((output / "SHA256SUMS.txt").exists())
+                    release.package(self.root, "1.2.3", targets[1], output)
+                    extra = output / "unexpected.txt"
+                    extra.write_text("unexpected")
+                    with self.assertRaises(ValueError):
+                        release.verify_assets(output, "1.2.3", platform)
+                    extra.unlink()
+                    other = "linux" if platform == "macos" else "macos"
+                    with self.assertRaises(ValueError):
+                        release.verify_assets(output, "1.2.3", other)
+                    with patch("sys.argv", ["release.py", "verify-assets", "1.2.3", "--platform", platform, "--output", str(output)]):
+                        release.main()
+                    manifest = (output / "SHA256SUMS.txt").read_text().splitlines()
+                    self.assertEqual(len(manifest), 2)
+                    self.assertEqual([line.split("  ")[1] for line in manifest],
+                                     [release.archive_name("1.2.3", target) for target in targets])
+
     def test_incomplete_tampered_and_existing_outputs_are_refused(self):
         output = self.root / "dist"
         with self.package_fixture():

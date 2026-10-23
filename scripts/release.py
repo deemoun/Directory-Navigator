@@ -18,6 +18,7 @@ TARGETS = (
     "aarch64-unknown-linux-gnu",
     "x86_64-unknown-linux-gnu",
 )
+PLATFORM_TARGETS = {"all": TARGETS, "macos": TARGETS[:2], "linux": TARGETS[2:]}
 SEMVER = re.compile(
     r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)"
     r"(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?"
@@ -113,13 +114,14 @@ def package(root, version, target, output):
         stream.write(f"{digest(archive)}  {name}\n")
 
 
-def verify_assets(output, version):
-    expected = {archive_name(version, target) for target in TARGETS}
+def verify_assets(output, version, platform="all"):
+    targets = PLATFORM_TARGETS[platform]
+    expected = {archive_name(version, target) for target in targets}
     expected |= {name + ".sha256" for name in expected}
     if {p.name for p in output.iterdir()} != expected:
-        raise ValueError("Expected exactly four platform archives and their checksums")
+        raise ValueError(f"Expected exactly {len(targets)} {platform} platform archives and their checksums")
     lines = []
-    for target in TARGETS:
+    for target in targets:
         name = archive_name(version, target)
         archive, checksum = output / name, output / (name + ".sha256")
         if any(p.is_symlink() or not p.is_file() for p in (archive, checksum)):
@@ -162,6 +164,7 @@ def main():
     parser.add_argument("version")
     parser.add_argument("--root", type=Path, default=Path.cwd())
     parser.add_argument("--target", choices=TARGETS)
+    parser.add_argument("--platform", choices=PLATFORM_TARGETS, default="all")
     parser.add_argument("--output", type=Path, default=Path("dist"))
     parser.add_argument("--github-output", type=Path)
     args = parser.parse_args()
@@ -177,7 +180,7 @@ def main():
                 parser.error("package requires --target")
             package(args.root, args.version, args.target, args.output)
         elif args.command == "verify-assets":
-            verify_assets(args.output, args.version)
+            verify_assets(args.output, args.version, args.platform)
         else:
             check_unused(args.version)
     except (ValueError, OSError, subprocess.SubprocessError) as error:
