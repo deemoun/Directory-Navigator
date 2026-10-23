@@ -24,7 +24,8 @@
   Only successful initial loads with neither modern nor legacy settings show it;
   dismissal uses normal settings persistence, with no onboarding key or dependency.
 - Keyboard profiles Auto/Classic DN/Mac-friendly persist via config.conf/desktop.
-  Auto uses Mac-friendly on macOS, Classic elsewhere. Ctrl+O prefix supplies
+  Classic DN is the default for new/missing/unknown settings on every platform;
+  explicit Auto/Mac choices remain intact. Auto still follows the OS. Ctrl+O supplies
   function/letter/navigation alternatives with a context guide; text modals retain
   normal input, Esc/click cancels, menus/bars/help reflect the profile. Keyboard
   settings have draft Apply/Cancel and mouse controls; legacy aliases/guards remain.
@@ -224,6 +225,9 @@
   locale/profile updates, mouse controls, screensaver suppression and small sizes.
   Release macOS PTY passes first/subsequent launches, Help/settings return,
   persistence, title close, manual reopening, resizing and terminal restoration.
+- Classic DN defaults on all platforms and saved Mac/Auto choices round-trip.
+  Release macOS PTY verifies Classic first start, switching to Mac in Settings,
+  saved-profile restart, welcome/Help/mouse/resize and terminal restoration.
 - Keyboard-profile tests cover legacy/unknown configuration, Apply/Cancel and
   desktop persistence, original confirmations and unsaved guards, prefix input
   isolation, paste/mouse/focus changes, editor word movement and user-menu review.

@@ -82,7 +82,8 @@ fn draw(app: &mut App, w: u16, h: u16) -> io::Result<String> {
 }
 #[test]
 fn defaults_unknown_values_and_configuration_round_trip() -> io::Result<()> {
-    assert_eq!(Config::default().shortcuts, Profile::Auto);
+    assert_eq!(Config::default().shortcuts, Profile::ClassicDn);
+    assert!(!Profile::default().is_mac());
     assert_eq!(Profile::Auto.is_mac(), cfg!(target_os = "macos"));
     let temp = Temp::new()?;
     let path = temp.0.join("desktop");
@@ -96,7 +97,7 @@ fn defaults_unknown_values_and_configuration_round_trip() -> io::Result<()> {
     }
     for text in ["hidden=true\n", "shortcuts=unknown\n"] {
         fs::write(&path, text)?;
-        assert_eq!(Config::read(&path)?.shortcuts, Profile::Auto);
+        assert_eq!(Config::read(&path)?.shortcuts, Profile::ClassicDn);
     }
     Ok(())
 }

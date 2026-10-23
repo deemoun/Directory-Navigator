@@ -99,6 +99,7 @@ fn only_initial_missing_settings_show_welcome_and_normal_exit_establishes_instal
     assert!(!a.config_store.is_new_installation());
     a.load_initial_config();
     assert!(a.welcome.dialog.is_some());
+    assert_eq!(a.config.shortcuts, Profile::ClassicDn);
     draw(&mut a, 80, 25)?;
     key(&mut a, K::Enter);
     assert!(a.welcome.dialog.is_none());
@@ -232,9 +233,9 @@ fn welcome_blocks_background_input_and_screensaver_and_returns_from_help_setting
     assert_eq!(focus::current(&a), Focus::Settings);
     key(&mut a, K::Right);
     key(&mut a, K::Enter);
-    assert_eq!(a.config.shortcuts, Profile::ClassicDn);
+    assert_eq!(a.config.shortcuts, Profile::Mac);
     assert_eq!(focus::current(&a), Focus::Welcome);
-    assert!(draw(&mut a, 80, 25)?.contains("F5 Copy"));
+    assert!(draw(&mut a, 80, 25)?.contains("^O5 Copy"));
     key(&mut a, K::F(1));
     assert_eq!(focus::current(&a), Focus::Message);
     input::paste(&mut a, "ignored");

@@ -61,12 +61,14 @@ On Windows, the executable is `target\release\dn.exe`.
 New installations open a short welcome with keyboard guidance, Help and keyboard
 settings. Reopen it any time through **≡ → Welcome…**. Existing settings skip it.
 
-On macOS, **Automatic** shortcuts use the Mac-friendly profile: press **Ctrl+O**,
-release, then a digit or letter. A guide appears; for example, **5** copies,
-**4** edits and **0** quits the file manager. **Ctrl+O, K** opens keyboard settings.
-Choose Automatic, Classic DN or Mac-friendly under **Options → Configuration →
-Keyboard shortcuts**. Linux and Windows default to Classic DN. Classic keys stay
-available in the Mac profile; `^O5` in a function bar means Ctrl+O, then 5.
+**Classic DN shortcuts are the default on every platform**, including macOS.
+Choose Classic DN, Mac-friendly or Automatic under **Options → Configuration →
+Keyboard shortcuts**. Saved profile choices are preserved.
+
+For Mac-friendly controls, press **Ctrl+O**, release, then a digit or letter. A guide
+appears; **5** copies, **4** edits and **0** quits the file manager. **Ctrl+O, K** opens
+keyboard settings. Classic keys remain available; `^O5` means Ctrl+O, then 5.
+Automatic remains optional: it selects Mac-friendly on macOS and Classic DN elsewhere.
 
 | Key | Action |
 | --- | --- |

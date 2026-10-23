@@ -9,8 +9,8 @@ use std::borrow::Cow;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Profile {
-    #[default]
     Auto,
+    #[default]
     ClassicDn,
     Mac,
 }
@@ -27,9 +27,10 @@ impl Profile {
     }
     pub fn parse(value: &str) -> Self {
         match value {
+            "auto" => Self::Auto,
             "classic_dn" => Self::ClassicDn,
             "mac" => Self::Mac,
-            _ => Self::Auto,
+            _ => Self::default(),
         }
     }
     pub fn name(self) -> &'static str {

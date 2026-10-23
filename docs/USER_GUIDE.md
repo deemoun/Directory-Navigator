@@ -33,8 +33,9 @@ There is no startup delay or splash timer. CLI help/version bypass the interface
 DN** or **Mac-friendly**. Apply changes the profile immediately; Cancel preserves
 it. Save/Load desktop and normal settings persistence include `shortcuts=auto`,
 `shortcuts=classic_dn` or `shortcuts=mac` in `config.conf`. Missing or unknown values
-use Automatic: Mac-friendly on macOS, Classic DN on Linux/Windows. When using a
-Mac keyboard over SSH to another OS, select Mac-friendly explicitly if preferred.
+use Classic DN on every platform, including macOS. Explicitly saved choices are
+preserved. Automatic remains available and selects Mac-friendly on macOS, Classic
+DN elsewhere. Select Mac-friendly explicitly when preferred, including over SSH.
 
 The Mac profile uses **Ctrl+O, release, then another key**. `^O` in menus and
 function bars means this prefix. A context guide appears while waiting; Esc,
