@@ -179,7 +179,7 @@ dependencies = [
 
 [[package]]
 name = "dn"
-version = "1.0.0-beta"
+version = "1.0.6"
 dependencies = [
  "chrono",
  "crossterm",
