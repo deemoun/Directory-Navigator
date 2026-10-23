@@ -12,6 +12,12 @@
   state owns session dialogs/options/results; quick view owns debounced reads.
 
 ## Implemented
+- Manual Build draft release accepts a validated SemVer, builds/checks four native
+  macOS/Linux targets, verifies embedded versions and packages versioned assets.
+  Final write-only job verifies complete checksums and tags the identical source
+  tree (release-only Cargo version commit if needed), then creates an unpublished
+  draft; branches stay unchanged. Existing tags/releases are refused; no Windows
+  assets, signing, automatic dispatch or automatic publication.
 - New-installation welcome uses Directory Navigator/Cargo version, profile-aware
   controls, deletion mode, Start/Keyboard settings/Help, and ≡ → Welcome reopening.
   Dedicated modal focus blocks background input/screensavers and survives resizing.
@@ -205,6 +211,14 @@
   concurrent changes, Apply/Cancel and exit recovery. Release macOS PTY passed
   two-run persistence, clock/sort reload, conflict recovery, mouse opt-out,
   80×25→120×40 resizing and terminal restoration.
+- Draft-release workflow YAML/four-target matrix and all shell steps validated
+  locally. Nine stdlib Python tests cover versions/output metadata, collisions/API
+  failures, root-only lockfile edits, binary-version checks, archive contents/modes,
+  checksums and incomplete/tampered bundles. Rust policy tests enforce manual-only
+  triggers and isolated draft-job writes. Isolated macOS ARM64 source override to
+  1.2.3-rc.1 built with --locked, packaged and extracted; binary version/checksum
+  verified without changing the development version. Remote release and other
+  release targets remain untested; no GitHub run/tag/release was created here.
 - Welcome tests cover missing/existing/legacy/invalid/inaccessible settings, CLI
   bypass, session-only dismissal, save-on-exit/restart behavior, modal isolation,
   locale/profile updates, mouse controls, screensaver suppression and small sizes.
@@ -216,7 +230,7 @@
   English/Russian labels and targets fit 80×25/120×40. Release macOS PTY passes
   Auto→Classic→Mac, saved/reloaded preferences, editor save/close, viewer wrap/search,
   copy cancellation, resize and terminal restoration.
-- macOS ARM64: fmt check, Clippy (including all test targets) with denied warnings, 324 passing tests
+- macOS ARM64: fmt check, Clippy (including all test targets) with denied warnings, 325 passing tests
   (one opt-in real-Trash success test ignored), release build.
 - Menu tests enforce working entries, unique mnemonics, normalized separators,
   unchanged headings, Block selection/clipboard/undo, Paragraph styling and clock
@@ -253,11 +267,11 @@
   Isolated Trash tests and settings/confirmation PTY workflow pass.
 - GitHub Rust checks and Build all platforms are workflow_dispatch-only; no push,
   pull-request or scheduled triggers. A local regression test guards every workflow.
-  Neither workflow was executed remotely. Build matrix: macOS ARM64/Intel, Linux x86_64/ARM64,
+  No workflows have been executed remotely here. Build matrix: macOS ARM64/Intel, Linux x86_64/ARM64,
   Windows x86_64. YAML/matrix and exact Unix packaging step validated locally
   (clean archive, executable permissions and SHA-256). Windows packaging untested.
   Locked tests/builds, version smoke check and 30-day archives/
-  checksums; no release publishing or signing.
+  checksums; these two existing workflows do not create releases or sign builds.
   Linux/Windows remain untested locally.
 
 ## Limitations and next steps

@@ -53,3 +53,38 @@ fn every_workflow_is_dispatch_only() -> io::Result<()> {
     );
     Ok(())
 }
+
+#[test]
+fn draft_release_is_four_unix_targets_and_write_permission_is_isolated() -> io::Result<()> {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(".github/workflows/release.yml");
+    let text = fs::read_to_string(path)?;
+    let targets = text
+        .lines()
+        .filter_map(|line| line.trim().strip_prefix("target: "))
+        .collect::<Vec<_>>();
+    assert_eq!(targets.len(), 4);
+    for target in [
+        "aarch64-apple-darwin",
+        "x86_64-apple-darwin",
+        "aarch64-unknown-linux-gnu",
+        "x86_64-unknown-linux-gnu",
+    ] {
+        assert!(targets.contains(&target));
+    }
+    let (build_jobs, draft) = text.split_once("  draft:\n").expect("Dedicated draft job");
+    assert!(!build_jobs.contains("contents: write"));
+    assert!(!build_jobs.contains("git push"));
+    assert!(draft.contains("needs: [validate, build]"));
+    assert!(draft.contains("contents: write"));
+    assert!(draft.contains("--verify-tag --draft"));
+    assert!(draft.contains("--prerelease"));
+    assert!(draft.contains("verify-assets"));
+    assert!(draft.contains("check-unused"));
+    assert!(!text.contains("--clobber"));
+    assert!(!text.contains("--draft=false"));
+    assert!(!text.contains("git push --force"));
+    assert!(text.contains("cancel-in-progress: false"));
+    assert!(text.contains("type: string"));
+    assert!(text.contains("git write-tree"));
+    Ok(())
+}

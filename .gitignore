@@ -19,3 +19,7 @@ Desktop.ini
 *.swo
 *~
 
+
+# Local release-helper bytecode
+__pycache__/
+*.pyc

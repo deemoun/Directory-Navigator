@@ -1,0 +1,181 @@
+name: Build draft release
+run-name: Draft Directory Navigator ${{ inputs.version }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'App version without v (for example 1.0.0 or 1.1.0-beta.1)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: draft-release-${{ github.repository }}-${{ inputs.version }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  validate:
+    name: Validate release version
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+      source_tree: ${{ steps.tree.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Test release helpers
+        run: python3 -m unittest discover -s scripts -p 'test_*.py'
+      - name: Set release source version
+        id: version
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: python3 scripts/release.py prepare "$RELEASE_VERSION" --github-output "$GITHUB_OUTPUT"
+      - name: Refuse existing tags and releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: python3 scripts/release.py check-unused "$RELEASE_VERSION"
+      - name: Record versioned source tree
+        id: tree
+        run: |
+          git add Cargo.toml Cargo.lock
+          echo "sha=$(git write-tree)" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build ${{ matrix.target }}
+    needs: validate
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            target: aarch64-apple-darwin
+          - os: macos-15-intel
+            target: x86_64-apple-darwin
+          - os: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+          - os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+    env:
+      RELEASE_VERSION: ${{ needs.validate.outputs.version }}
+      EXPECTED_TREE: ${{ needs.validate.outputs.source_tree }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+          components: rustfmt, clippy
+      - name: Prepare identical versioned sources
+        run: |
+          set -euo pipefail
+          python3 scripts/release.py prepare "$RELEASE_VERSION"
+          git add Cargo.toml Cargo.lock
+          test "$(git write-tree)" = "$EXPECTED_TREE"
+      - name: Check formatting
+        run: cargo fmt --check
+      - name: Clippy
+        run: cargo clippy --locked --all-targets --target ${{ matrix.target }} -- -D warnings
+      - name: Test
+        run: cargo test --locked --target ${{ matrix.target }}
+      - name: Build release
+        run: cargo build --release --locked --target ${{ matrix.target }}
+      - name: Verify version and package
+        env:
+          BUILD_TARGET: ${{ matrix.target }}
+        run: python3 scripts/release.py package "$RELEASE_VERSION" --target "$BUILD_TARGET"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-${{ matrix.target }}
+          path: dist/dn-*
+          if-no-files-found: error
+          retention-days: 30
+
+  draft:
+    name: Create draft release
+    needs: [validate, build]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_VERSION: ${{ needs.validate.outputs.version }}
+      RELEASE_TAG: ${{ needs.validate.outputs.tag }}
+      PRERELEASE: ${{ needs.validate.outputs.prerelease }}
+      EXPECTED_TREE: ${{ needs.validate.outputs.source_tree }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          # Only this job may push the new release tag; no branch is pushed.
+          persist-credentials: true
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: release-*
+          path: dist
+          merge-multiple: true
+      - name: Verify complete release assets
+        run: python3 scripts/release.py verify-assets "$RELEASE_VERSION"
+      - name: Create tagged versioned source
+        run: |
+          set -euo pipefail
+          python3 scripts/release.py check-unused "$RELEASE_VERSION"
+          python3 scripts/release.py prepare "$RELEASE_VERSION"
+          git add Cargo.toml Cargo.lock
+          test "$(git write-tree)" = "$EXPECTED_TREE"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          if ! git diff --cached --quiet; then
+            git -c core.hooksPath=/dev/null commit -m "Release Directory Navigator $RELEASE_VERSION"
+          fi
+          git tag -a "$RELEASE_TAG" -m "Directory Navigator $RELEASE_VERSION"
+          git push origin "refs/tags/$RELEASE_TAG"
+      - name: Create unpublished draft and attach assets
+        run: |
+          set -euo pipefail
+          cat > release-notes.md <<EOF
+          Directory Navigator $RELEASE_VERSION
+
+          Native terminal file manager for macOS and Linux.
+
+          Packages: macOS Apple Silicon/Intel and Linux ARM64/x86_64.
+          Extract the archive, then run ./dn. See the included README and user guide.
+          Verify downloads against SHA256SUMS.txt. macOS builds are unsigned and not notarized.
+
+          Source revision: $(git rev-parse HEAD)
+          Build: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
+
+          Draft: review these notes and test the downloads before publishing.
+          EOF
+          flags=()
+          if [ "$PRERELEASE" = true ]; then
+            flags+=(--prerelease)
+          fi
+          gh release create "$RELEASE_TAG" dist/*.tar.gz dist/*.sha256 dist/SHA256SUMS.txt \
+            --repo "$GITHUB_REPOSITORY" --verify-tag --draft \
+            --title "Directory Navigator $RELEASE_VERSION" --notes-file release-notes.md "${flags[@]}"
