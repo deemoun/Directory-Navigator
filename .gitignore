@@ -23,3 +23,8 @@ Desktop.ini
 # Local release-helper bytecode
 __pycache__/
 *.pyc
+
+# Local environment secrets (keep the shareable example)
+.env
+.env.*
+!.env.example
