@@ -12,6 +12,15 @@
   state owns session dialogs/options/results; quick view owns debounced reads.
 
 ## Implemented
+- Intel CI mouse-exit leakage reproduced on ARM64 with a 250 ms delayed release:
+  the old 100 ms cleanup window returned the report to the shell. Shutdown now
+  retains capture/raw input until release (one-second lost-release bound), then
+  disables reports, flushes incomplete input and restores the terminal. UI unchanged.
+  PTY regression covers fast/delayed/partial releases and keyboard exit; all
+  restoration, clean shell input and process-status assertions remain enabled.
+  All four Mac Cargo checks pass (364 tests, one opt-in ignored), plus 20
+  consecutive ARM64 four-scenario PTY runs. Native Intel confirmation awaits
+  manual workflow; no GitHub run was started and no CI checks/retries changed.
 - config.conf uses typed TOML v2 sections only; no flat-format reader, conversion
   or migration backups. Invalid contents move to exclusive `_old_config.conf`
   (numbered on collision), then defaults load and normal saves work. Missing files
@@ -278,7 +287,7 @@
   Shell handoff checks DN's exit code and exact terminal-mode restoration before
   verifying unchanged input; fragmented mouse-release checks remain mandatory.
   Five focused wait tests and 20 consecutive ARM64 mouse/keyboard PTY runs pass.
-  No application/UI changes or CI bypass/retry; updated Intel run still required.
+  No UI changes or CI bypass/retry; updated Intel run still required.
 - Conf-only tests verify ignored/unchanged config.txt files (including broken
   links), .conf defaults/welcome, save/reload/unknown-key preservation and conflict
   safeguards. DOS score fixtures verify both record layouts, XOR/endian fields,

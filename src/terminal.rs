@@ -25,11 +25,12 @@ pub fn restore() {
     restore_input(false);
 }
 fn restore_input(mouse_down: bool) {
-    // Stop reports before re-enabling canonical input/echo. Otherwise an SGR
-    // mouse release can become literal characters in the parent shell.
-    let _ = execute!(io::stdout(), DisableMouseCapture, DisableBracketedPaste);
     if mouse_down {
-        let deadline = Instant::now() + Duration::from_millis(100);
+        // Keep capture and raw input active until the pending button is released.
+        // Disabling reports first can suppress that release, while a short deadline
+        // lets delayed/fragmented reports spill into the parent shell under load.
+        // Bound the wait in case the terminal loses the release entirely.
+        let deadline = Instant::now() + Duration::from_secs(1);
         while Instant::now() < deadline {
             match event::poll(deadline.saturating_duration_since(Instant::now())) {
                 Ok(true) => match event::read() {
@@ -44,6 +45,10 @@ fn restore_input(mouse_down: bool) {
                 _ => break,
             }
         }
+    }
+    // Stop new reports before restoring canonical input and shell echo.
+    let _ = execute!(io::stdout(), DisableMouseCapture, DisableBracketedPaste);
+    if mouse_down {
         // Also discard a fragmented in-flight report which the event parser
         // cannot yet decode. Only flush for a mouse-initiated handoff.
         #[cfg(unix)]

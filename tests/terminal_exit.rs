@@ -140,7 +140,12 @@ fn until(
 #[test]
 fn delayed_fragmented_mouse_release_does_not_leak_to_shell() -> io::Result<()> {
     static NEXT: AtomicU64 = AtomicU64::new(0);
-    for mouse in [true, false] {
+    for (mouse, release_delay) in [
+        (true, Some(Duration::from_millis(20))),
+        (true, Some(Duration::from_millis(250))),
+        (true, None),
+        (false, None),
+    ] {
         let directory = std::env::temp_dir().join(format!(
             "dn-exit-{}-{}",
             std::process::id(),
@@ -208,7 +213,11 @@ fn delayed_fragmented_mouse_release_does_not_leak_to_shell() -> io::Result<()> {
         let child = command.spawn()?;
         let mut fixture = Fixture { directory, child };
         let mut output = Vec::new();
-        let scenario = if mouse { "mouse exit" } else { "keyboard exit" };
+        let scenario = match release_delay {
+            Some(delay) => format!("mouse exit (release after {} ms)", delay.as_millis()),
+            None if mouse => "mouse exit (incomplete release)".to_owned(),
+            None => "keyboard exit".to_owned(),
+        };
         until(
             &mut master,
             &mut output,
@@ -218,10 +227,15 @@ fn delayed_fragmented_mouse_release_does_not_leak_to_shell() -> io::Result<()> {
         )?;
         if mouse {
             master.write_all(b"\x1b[<0;168;54M")?;
-            std::thread::sleep(Duration::from_millis(20));
-            master.write_all(b"\x1b[<")?;
-            std::thread::sleep(Duration::from_millis(10));
-            master.write_all(b"0;168;54m")?;
+            if let Some(delay) = release_delay {
+                std::thread::sleep(delay);
+                master.write_all(b"\x1b[<")?;
+                std::thread::sleep(Duration::from_millis(10));
+                master.write_all(b"0;168;54m")?;
+            } else {
+                // A lost/truncated release must not hang shutdown or pollute shell input.
+                master.write_all(b"\x1b[<")?;
+            }
         } else {
             master.write_all(b"\x1b[21~")?;
         }
@@ -243,7 +257,7 @@ fn delayed_fragmented_mouse_release_does_not_leak_to_shell() -> io::Result<()> {
             || original_mode.c_cc != restored_mode.c_cc
         {
             return Err(wait_error(
-                scenario,
+                &scenario,
                 "terminal mode was not restored",
                 None,
                 &output,
