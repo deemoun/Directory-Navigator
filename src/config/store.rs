@@ -111,10 +111,8 @@ impl SaveLock {
 }
 impl Drop for SaveLock {
     fn drop(&mut self) {
-        if let Ok(metadata) = self.file.metadata() {
-            if crate::platform_fs::owns(&self.path, &metadata) {
-                let _ = fs::remove_file(&self.path);
-            }
+        if crate::platform_fs::owns_file(&self.path, &self.file) {
+            let _ = fs::remove_file(&self.path);
         }
     }
 }

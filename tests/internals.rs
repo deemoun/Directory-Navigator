@@ -307,6 +307,87 @@ fn staging_cleanup_never_removes_a_replacement() -> io::Result<()> {
     Ok(())
 }
 #[test]
+fn staged_ownership_tracks_the_open_file_not_its_name() -> io::Result<()> {
+    let temp = Temp::new()?;
+    let target = temp.0.join("target");
+    let stage = StagedFile::create(&target)?;
+    let path = stage.path().to_owned();
+    assert!(dn::platform_fs::owns_file(&path, &stage.file));
+    let held = temp.0.join("held-stage");
+    fs::rename(&path, &held)?;
+    fs::write(&path, b"replacement")?;
+    assert!(dn::platform_fs::owns_file(&held, &stage.file));
+    assert!(!dn::platform_fs::owns_file(&path, &stage.file));
+    assert!(!dn::platform_fs::owns_file(
+        &temp.0.join("missing"),
+        &stage.file
+    ));
+    assert!(stage.publish(&target).is_err());
+    drop(stage);
+    assert_eq!(fs::read(&path)?, b"replacement");
+    assert!(held.exists());
+    assert!(!target.exists());
+    Ok(())
+}
+
+#[cfg(windows)]
+#[test]
+fn windows_staging_replacement_with_identical_creation_time_is_not_owned() -> io::Result<()> {
+    use std::os::windows::io::AsRawHandle;
+    use windows::Win32::{
+        Foundation::HANDLE,
+        Storage::FileSystem::{
+            GetFileInformationByHandle, SetFileTime, BY_HANDLE_FILE_INFORMATION,
+        },
+    };
+    let temp = Temp::new()?;
+    let target = temp.0.join("target");
+    let stage = StagedFile::create(&target)?;
+    let path = stage.path().to_owned();
+    let mut original = BY_HANDLE_FILE_INFORMATION::default();
+    // SAFETY: stage owns a live file handle; original is writable.
+    unsafe { GetFileInformationByHandle(HANDLE(stage.file.as_raw_handle()), &mut original) }
+        .map_err(io::Error::other)?;
+    fs::rename(&path, temp.0.join("held-stage"))?;
+    let replacement = fs::File::create(&path)?;
+    // SAFETY: replacement is live and the creation-time pointer remains valid.
+    // Force the timestamp collision rather than relying on NTFS time tunneling.
+    unsafe {
+        SetFileTime(
+            HANDLE(replacement.as_raw_handle()),
+            Some(&original.ftCreationTime),
+            None,
+            None,
+        )
+    }
+    .map_err(io::Error::other)?;
+    assert_eq!(
+        stage.file.metadata()?.created()?,
+        replacement.metadata()?.created()?
+    );
+    assert!(!dn::platform_fs::owns_file(&path, &stage.file));
+    assert!(stage.publish(&target).is_err());
+    drop(stage);
+    assert!(path.exists());
+    assert!(!target.exists());
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn staged_ownership_does_not_follow_a_replacement_symlink() -> io::Result<()> {
+    let temp = Temp::new()?;
+    let stage = StagedFile::create(&temp.0.join("target"))?;
+    let path = stage.path().to_owned();
+    let held = temp.0.join("held-stage");
+    fs::rename(&path, &held)?;
+    std::os::unix::fs::symlink(&held, &path)?;
+    assert!(!dn::platform_fs::owns_file(&path, &stage.file));
+    drop(stage);
+    assert_eq!(fs::read_link(&path)?, held);
+    Ok(())
+}
+#[test]
 fn crash_child_leaves_no_incomplete_final_file() -> io::Result<()> {
     let temp = Temp::new()?;
     let status = std::process::Command::new(std::env::current_exe()?)

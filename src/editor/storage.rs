@@ -136,7 +136,7 @@ pub fn save(
         let metadata = output.metadata()?;
         if let Some(original) = original {
             verify(path, original)?;
-            if !crate::platform_fs::owns(staged.path(), &metadata) {
+            if !crate::platform_fs::owns_file(staged.path(), &staged.file) {
                 return Err(io::Error::other("Temporary save was replaced"));
             }
             fs::rename(staged.path(), path)?;

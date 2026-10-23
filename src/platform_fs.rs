@@ -206,6 +206,50 @@ pub fn owns(path: &Path, identity: &Metadata) -> bool {
     fs::symlink_metadata(path).is_ok_and(|m| same_identity(identity, &m))
 }
 
+/// Compare a directory entry with a live file handle, without following links.
+/// Windows creation timestamps are not file identities (NTFS may reuse them).
+pub fn owns_file(path: &Path, file: &File) -> bool {
+    #[cfg(windows)]
+    {
+        use std::os::windows::{fs::OpenOptionsExt, io::AsRawHandle};
+        use windows::Win32::{
+            Foundation::HANDLE,
+            Storage::FileSystem::{
+                GetFileInformationByHandle, BY_HANDLE_FILE_INFORMATION, FILE_FLAG_BACKUP_SEMANTICS,
+                FILE_FLAG_OPEN_REPARSE_POINT, FILE_SHARE_DELETE, FILE_SHARE_READ, FILE_SHARE_WRITE,
+            },
+        };
+        fn identity(file: &File) -> io::Result<(u32, u32, u32)> {
+            let mut info = BY_HANDLE_FILE_INFORMATION::default();
+            // SAFETY: the borrowed handle remains open and info is writable.
+            unsafe { GetFileInformationByHandle(HANDLE(file.as_raw_handle()), &mut info) }
+                .map_err(io::Error::other)?;
+            Ok((
+                info.dwVolumeSerialNumber,
+                info.nFileIndexHigh,
+                info.nFileIndexLow,
+            ))
+        }
+        let entry = fs::OpenOptions::new()
+            .read(true)
+            .access_mode(0)
+            .share_mode(FILE_SHARE_READ.0 | FILE_SHARE_WRITE.0 | FILE_SHARE_DELETE.0)
+            .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT.0 | FILE_FLAG_BACKUP_SEMANTICS.0)
+            .open(path);
+        let Ok(entry) = entry else { return false };
+        matches!((identity(file), identity(&entry)), (Ok(a), Ok(b)) if a == b)
+    }
+    #[cfg(unix)]
+    {
+        file.metadata().is_ok_and(|metadata| owns(path, &metadata))
+    }
+    #[cfg(not(any(unix, windows)))]
+    {
+        let _ = (path, file);
+        false
+    }
+}
+
 pub fn open_directory(path: &Path) -> io::Result<File> {
     let mut options = fs::OpenOptions::new();
     options.read(true);

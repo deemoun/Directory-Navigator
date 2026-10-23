@@ -1,6 +1,6 @@
 //! A newly created sibling owns its cleanup; final names appear only when complete.
 use std::{
-    fs::{self, File, Metadata, OpenOptions},
+    fs::{self, File, OpenOptions},
     io,
     path::{Path, PathBuf},
     sync::atomic::{AtomicU64, Ordering},
@@ -8,7 +8,6 @@ use std::{
 pub struct StagedFile {
     pub file: File,
     path: PathBuf,
-    identity: Metadata,
 }
 impl StagedFile {
     pub fn create(destination: &Path) -> io::Result<Self> {
@@ -32,12 +31,7 @@ impl StagedFile {
             }
             match options.open(&path) {
                 Ok(file) => {
-                    let identity = file.metadata()?;
-                    return Ok(Self {
-                        file,
-                        path,
-                        identity,
-                    });
+                    return Ok(Self { file, path });
                 }
                 Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {}
                 Err(e) => return Err(e),
@@ -50,7 +44,7 @@ impl StagedFile {
     }
     pub fn publish(&self, destination: &Path) -> io::Result<()> {
         self.file.sync_all()?;
-        if !crate::platform_fs::owns(&self.path, &self.identity) {
+        if !crate::platform_fs::owns_file(&self.path, &self.file) {
             return Err(io::Error::other("Temporary output was replaced"));
         }
         match crate::platform_fs::rename_no_replace(&self.path, destination) {
@@ -65,7 +59,7 @@ impl StagedFile {
 }
 impl Drop for StagedFile {
     fn drop(&mut self) {
-        if crate::platform_fs::owns(&self.path, &self.identity) {
+        if crate::platform_fs::owns_file(&self.path, &self.file) {
             #[cfg(windows)]
             if let Ok(metadata) = self.file.metadata() {
                 let mut permissions = metadata.permissions();

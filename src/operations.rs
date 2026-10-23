@@ -493,7 +493,7 @@ pub fn run_with_strategy(
                     guards.verify_parent(&source)?;
                     guards.verify_parent(&target)?;
                     verify_entry(&source, &metadata)?;
-                    if !crate::platform_fs::owns(&target, &output.metadata()?) {
+                    if !crate::platform_fs::owns_file(&target, &output) {
                         return Err(io::Error::other(
                             "Destination directory changed during copy",
                         ));

@@ -31,6 +31,14 @@
   exception; Unix-only test imports/mutability are correctly gated. Added a
   Windows regression test for abandoned read-only staging and untouched targets.
   Native Windows execution remains pending; no CI checks disabled or runs started.
+- Live-handle ownership checks use Windows volume/file IDs through native API
+  calls; path opens do not follow reparse points and failed queries reject ownership.
+  Staging publish/cleanup, editor staging, config-lock cleanup and copied directory
+  checks use this guard, avoiding creation-time collisions and replacement deletion.
+  Regression tests retain moved/replaced stages and symlinks; a Windows-specific
+  test forces identical creation times. Windows all-target Clippy cross-check
+  passes; Mac fmt/Clippy, 343 tests and release build pass. Native Windows
+  execution still requires the manual workflow.
 - New-installation welcome uses Directory Navigator/Cargo version, profile-aware
   controls, deletion mode, Start/Keyboard settings/Help, and ≡ → Welcome reopening.
   Dedicated modal focus blocks background input/screensavers and survives resizing.
@@ -269,7 +277,7 @@
   English/Russian labels and targets fit 80×25/120×40. Release macOS PTY passes
   Auto→Classic→Mac, saved/reloaded preferences, editor save/close, viewer wrap/search,
   copy cancellation, resize and terminal restoration.
-- macOS ARM64: fmt check, Clippy (including all test targets) with denied warnings, 341 passing tests
+- macOS ARM64: fmt check, Clippy (including all test targets) with denied warnings, 343 passing tests
   (one opt-in real-Trash success test ignored), release build.
 - Menu tests enforce working entries, unique mnemonics, normalized separators,
   unchanged headings, Block selection/clipboard/undo, Paragraph styling and clock
