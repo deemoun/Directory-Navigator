@@ -7,6 +7,16 @@ Directory Navigator is a DOS Navigator–inspired clone: familiar two-panel brow
 classic colors, keyboard shortcuts and mouse controls, rebuilt in Rust for modern
 computers. It runs directly in your terminal—no DOS emulator or graphical frontend.
 
+<table>
+  <tr>
+    <td>
+      <a href="docs/images/directory-navigator.png">
+        <img src="docs/images/directory-navigator.png" alt="Directory Navigator with classic dual panels, file selection and volume-space information" width="1000">
+      </a>
+    </td>
+  </tr>
+</table>
+
 ## What you can do
 
 - Browse two folders side by side, mark files, and copy, move or rename them.
