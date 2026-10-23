@@ -1,7 +1,5 @@
 # Directory Navigator
 
-**By Dmitry Yarygin**
-
 A modern, native terminal file manager inspired by **DOS Navigator**.
 Directory Navigator is a DOS Navigator–inspired clone: familiar two-panel browsing,
 classic colors, keyboard shortcuts and mouse controls, rebuilt in Rust for modern
