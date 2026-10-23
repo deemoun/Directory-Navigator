@@ -32,6 +32,39 @@ computers. It runs directly in your terminal—no DOS emulator or graphical fron
 - Recall commands through a searchable session history; copy filenames or paths to the internal clipboard.
 - Use the calculator, character table and configurable user menus—or play Tetris with named, persistent high scores.
 
+## In action
+
+<table>
+  <tr>
+    <td align="center" width="50%" valign="top">
+      <a href="docs/images/tetris.png">
+        <img src="docs/images/tetris.png" alt="Directory Navigator Tetris with score, next piece and game controls" width="500">
+      </a>
+      <br><strong>Tetris</strong><br>A classic break, with saved high scores.
+    </td>
+    <td align="center" width="50%" valign="top">
+      <a href="docs/images/options.png">
+        <img src="docs/images/options.png" alt="Options menu and Configuration submenu showing keyboard, interface and regional settings" width="500">
+      </a>
+      <br><strong>Make it yours</strong><br>Configure shortcuts, appearance and regional formats.
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="50%" valign="top">
+      <a href="docs/images/editor.png">
+        <img src="docs/images/editor.png" alt="Built-in editor displaying a UTF-8 Markdown file with line numbers and editor menus" width="500">
+      </a>
+      <br><strong>Built-in editor</strong><br>Edit UTF-8 text without leaving the terminal.
+    </td>
+    <td align="center" width="50%" valign="top">
+      <a href="docs/images/make-directory.png">
+        <img src="docs/images/make-directory.png" alt="Make directory dialog with a folder name and OK, Cancel and Help buttons" width="500">
+      </a>
+      <br><strong>Everyday file tasks</strong><br>Create folders through compact, familiar dialogs.
+    </td>
+  </tr>
+</table>
+
 ## Get started
 
 ### Run a supplied binary
