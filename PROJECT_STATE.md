@@ -231,6 +231,12 @@
   checks and ten helper tests pass. No GitHub run/tag/release initiated here.
   User-reported prior run passed both Mac builds; Linux failed Clippy (fixed in
   terminal_exit). Updated remote workflows and Linux builds remain untested.
+- Terminal-exit PTY waits tolerate transient empty reads while the shell lives,
+  drain buffered output after exit, and fail with stage/status/escaped output.
+  Shell handoff checks DN's exit code and exact terminal-mode restoration before
+  verifying unchanged input; fragmented mouse-release checks remain mandatory.
+  Five focused wait tests and 20 consecutive ARM64 mouse/keyboard PTY runs pass.
+  No application/UI changes or CI bypass/retry; updated Intel run still required.
 - Conf-only tests verify ignored/unchanged config.txt files (including broken
   links), .conf defaults/welcome, save/reload/unknown-key preservation and conflict
   safeguards. DOS score fixtures verify both record layouts, XOR/endian fields,
@@ -253,7 +259,7 @@
   English/Russian labels and targets fit 80×25/120×40. Release macOS PTY passes
   Auto→Classic→Mac, saved/reloaded preferences, editor save/close, viewer wrap/search,
   copy cancellation, resize and terminal restoration.
-- macOS ARM64: fmt check, Clippy (including all test targets) with denied warnings, 335 passing tests
+- macOS ARM64: fmt check, Clippy (including all test targets) with denied warnings, 340 passing tests
   (one opt-in real-Trash success test ignored), release build.
 - Menu tests enforce working entries, unique mnemonics, normalized separators,
   unchanged headings, Block selection/clipboard/undo, Paragraph styling and clock
