@@ -11,14 +11,16 @@ import tomllib
 import urllib.error
 import urllib.parse
 import urllib.request
+import zipfile
 
 TARGETS = (
     "aarch64-apple-darwin",
     "x86_64-apple-darwin",
     "aarch64-unknown-linux-gnu",
     "x86_64-unknown-linux-gnu",
+    "x86_64-pc-windows-msvc",
 )
-PLATFORM_TARGETS = {"all": TARGETS, "macos": TARGETS[:2], "linux": TARGETS[2:]}
+PLATFORM_TARGETS = {"all": TARGETS, "macos": TARGETS[:2], "linux": TARGETS[2:4], "windows": TARGETS[4:]}
 SEMVER = re.compile(
     r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)"
     r"(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?"
@@ -78,7 +80,8 @@ def archive_name(version, target):
     validate_version(version)
     if target not in TARGETS:
         raise ValueError("Unsupported release target")
-    return f"dn-{version}-{target}.tar.gz"
+    extension = "zip" if target.endswith("windows-msvc") else "tar.gz"
+    return f"dn-{version}-{target}.{extension}"
 
 
 def digest(path):
@@ -88,8 +91,9 @@ def digest(path):
 
 def package(root, version, target, output):
     name = archive_name(version, target)
-    binary = root / "target" / target / "release" / "dn"
-    files = [(binary, "dn"), (root / "LICENSE", "LICENSE"), (root / "README.md", "README.md"),
+    binary_name = "dn.exe" if target.endswith("windows-msvc") else "dn"
+    binary = root / "target" / target / "release" / binary_name
+    files = [(binary, binary_name), (root / "LICENSE", "LICENSE"), (root / "README.md", "README.md"),
              (root / "docs/USER_GUIDE.md", "docs/USER_GUIDE.md")]
     if any(p.is_symlink() or not p.is_file() for p, _ in files):
         raise ValueError("Missing or non-regular release input")
@@ -103,13 +107,18 @@ def package(root, version, target, output):
     checksum = output / (name + ".sha256")
     if archive.exists() or archive.is_symlink() or checksum.exists() or checksum.is_symlink():
         raise ValueError("Release output already exists")
-    with tarfile.open(archive, "x:gz") as bundle:
-        for path, member in files:
-            info = bundle.gettarinfo(str(path), arcname=member)
-            info.uid = info.gid = 0
-            info.uname = info.gname = ""
-            with path.open("rb") as stream:
-                bundle.addfile(info, stream)
+    if binary_name == "dn.exe":
+        with zipfile.ZipFile(archive, "x", compression=zipfile.ZIP_DEFLATED) as bundle:
+            for path, member in files:
+                bundle.write(path, arcname=member)
+    else:
+        with tarfile.open(archive, "x:gz") as bundle:
+            for path, member in files:
+                info = bundle.gettarinfo(str(path), arcname=member)
+                info.uid = info.gid = 0
+                info.uname = info.gname = ""
+                with path.open("rb") as stream:
+                    bundle.addfile(info, stream)
     with checksum.open("x") as stream:
         stream.write(f"{digest(archive)}  {name}\n")
 

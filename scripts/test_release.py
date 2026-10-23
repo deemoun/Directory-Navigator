@@ -8,6 +8,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 import urllib.error
+import zipfile
 import release
 
 
@@ -61,7 +62,7 @@ class ReleaseTests(unittest.TestCase):
 
     def package_fixture(self, version="1.2.3"):
         for target in release.TARGETS:
-            binary = self.root / "target" / target / "release/dn"
+            binary = self.root / "target" / target / "release" / ("dn.exe" if target.endswith("windows-msvc") else "dn")
             binary.parent.mkdir(parents=True)
             binary.write_bytes(b"fake binary")
             binary.chmod(0o755)
@@ -77,12 +78,19 @@ class ReleaseTests(unittest.TestCase):
         with self.package_fixture():
             for target in release.TARGETS:
                 release.package(self.root, "1.2.3", target, output)
-                with tarfile.open(output / release.archive_name("1.2.3", target)) as archive:
-                    self.assertEqual(archive.getnames(), ["dn", "LICENSE", "README.md", "docs/USER_GUIDE.md"])
-                    self.assertTrue(archive.getmember("dn").mode & 0o111)
-                    self.assertTrue(all(member.isfile() for member in archive.getmembers()))
+                archive_path = output / release.archive_name("1.2.3", target)
+                if target.endswith("windows-msvc"):
+                    with zipfile.ZipFile(archive_path) as archive:
+                        self.assertEqual(archive.namelist(), ["dn.exe", "LICENSE", "README.md", "docs/USER_GUIDE.md"])
+                        self.assertEqual(archive.read("dn.exe"), b"fake binary")
+                        self.assertTrue(all(not member.is_dir() for member in archive.infolist()))
+                else:
+                    with tarfile.open(archive_path) as archive:
+                        self.assertEqual(archive.getnames(), ["dn", "LICENSE", "README.md", "docs/USER_GUIDE.md"])
+                        self.assertTrue(archive.getmember("dn").mode & 0o111)
+                        self.assertTrue(all(member.isfile() for member in archive.getmembers()))
         release.verify_assets(output, "1.2.3")
-        self.assertEqual(len((output / "SHA256SUMS.txt").read_text().splitlines()), 4)
+        self.assertEqual(len((output / "SHA256SUMS.txt").read_text().splitlines()), 5)
 
     def test_platform_bundles_are_independent_and_require_exact_assets(self):
         with self.package_fixture():
@@ -134,7 +142,20 @@ class ReleaseTests(unittest.TestCase):
                 release.package(self.root, "1.2.3", release.TARGETS[0], output)
         self.assertFalse(output.exists())
         with self.assertRaises(ValueError):
-            release.archive_name("1.2.3", "x86_64-pc-windows-msvc")
+            release.archive_name("1.2.3", "unsupported-target")
+
+    def test_windows_bundle_requires_its_zip_and_checksum(self):
+        output = self.root / "dist"
+        target = "x86_64-pc-windows-msvc"
+        with self.package_fixture():
+            release.package(self.root, "1.2.3", target, output)
+        name = "dn-1.2.3-x86_64-pc-windows-msvc.zip"
+        self.assertEqual(release.archive_name("1.2.3", target), name)
+        with self.assertRaises(ValueError):
+            release.verify_assets(output, "1.2.3", "all")
+        release.verify_assets(output, "1.2.3", "windows")
+        self.assertEqual((output / "SHA256SUMS.txt").read_text(),
+                         f"{release.digest(output / name)}  {name}\n")
 
     def test_remote_collision_auth_errors_and_unknown_network_failures_fail_closed(self):
         env = {"GH_TOKEN": "fake-test-token", "GITHUB_REPOSITORY": "example/dn", "GITHUB_API_URL": "https://api.github.com"}

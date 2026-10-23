@@ -1,4 +1,4 @@
-name: Build draft release
+name: Build unified draft release
 run-name: Draft Directory Navigator ${{ inputs.version }}
 
 on:
@@ -15,6 +15,10 @@ permissions:
 concurrency:
   group: draft-release-${{ github.repository }}-${{ inputs.version }}
   cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
 
 env:
   CARGO_TERM_COLOR: always
@@ -38,17 +42,17 @@ jobs:
         with:
           python-version: '3.12'
       - name: Test release helpers
-        run: python3 -m unittest discover -s scripts -p 'test_*.py'
+        run: python -m unittest discover -s scripts -p 'test_*.py'
       - name: Set release source version
         id: version
         env:
           RELEASE_VERSION: ${{ inputs.version }}
-        run: python3 scripts/release.py prepare "$RELEASE_VERSION" --github-output "$GITHUB_OUTPUT"
+        run: python scripts/release.py prepare "$RELEASE_VERSION" --github-output "$GITHUB_OUTPUT"
       - name: Refuse existing tags and releases
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_VERSION: ${{ steps.version.outputs.version }}
-        run: python3 scripts/release.py check-unused "$RELEASE_VERSION"
+        run: python scripts/release.py check-unused "$RELEASE_VERSION"
       - name: Record versioned source tree
         id: tree
         run: |
@@ -68,6 +72,12 @@ jobs:
             target: aarch64-apple-darwin
           - os: macos-15-intel
             target: x86_64-apple-darwin
+          - os: windows-2022
+            target: x86_64-pc-windows-msvc
+          - os: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+          - os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
     env:
       RELEASE_VERSION: ${{ needs.validate.outputs.version }}
       EXPECTED_TREE: ${{ needs.validate.outputs.source_tree }}
@@ -86,7 +96,7 @@ jobs:
       - name: Prepare identical versioned sources
         run: |
           set -euo pipefail
-          python3 scripts/release.py prepare "$RELEASE_VERSION"
+          python scripts/release.py prepare "$RELEASE_VERSION"
           git add Cargo.toml Cargo.lock
           test "$(git write-tree)" = "$EXPECTED_TREE"
       - name: Check formatting
@@ -100,7 +110,7 @@ jobs:
       - name: Verify version and package
         env:
           BUILD_TARGET: ${{ matrix.target }}
-        run: python3 scripts/release.py package "$RELEASE_VERSION" --target "$BUILD_TARGET"
+        run: python scripts/release.py package "$RELEASE_VERSION" --target "$BUILD_TARGET"
       - uses: actions/upload-artifact@v7
         with:
           name: release-${{ matrix.target }}
@@ -136,12 +146,12 @@ jobs:
           path: dist
           merge-multiple: true
       - name: Verify complete release assets
-        run: python3 scripts/release.py verify-assets "$RELEASE_VERSION" --platform macos
+        run: python scripts/release.py verify-assets "$RELEASE_VERSION" --platform all
       - name: Create tagged versioned source
         run: |
           set -euo pipefail
-          python3 scripts/release.py check-unused "$RELEASE_VERSION"
-          python3 scripts/release.py prepare "$RELEASE_VERSION"
+          python scripts/release.py check-unused "$RELEASE_VERSION"
+          python scripts/release.py prepare "$RELEASE_VERSION"
           git add Cargo.toml Cargo.lock
           test "$(git write-tree)" = "$EXPECTED_TREE"
           git config user.name 'github-actions[bot]'
@@ -157,12 +167,12 @@ jobs:
           cat > release-notes.md <<EOF
           Directory Navigator $RELEASE_VERSION
 
-          Native terminal file manager for macOS and Linux.
+          Native terminal file manager for macOS, Windows and Linux.
 
-          Packages: macOS Apple Silicon and Intel.
-          Linux builds are available through the separate manual Build Linux workflow.
-          Extract the archive, then run ./dn. See the included README and user guide.
-          Verify downloads against SHA256SUMS.txt. macOS builds are unsigned and not notarized.
+          Packages: macOS Apple Silicon and Intel, Windows x86-64, Linux x86-64 and ARM64.
+          Extract the archive, then run ./dn (dn.exe on Windows).
+          See the included README and user guide. macOS builds are unsigned and
+          not notarized; Windows builds are unsigned.
 
           Source revision: $(git rev-parse HEAD)
           Build: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
@@ -173,6 +183,6 @@ jobs:
           if [ "$PRERELEASE" = true ]; then
             flags+=(--prerelease)
           fi
-          gh release create "$RELEASE_TAG" dist/*.tar.gz dist/*.sha256 dist/SHA256SUMS.txt \
+          gh release create "$RELEASE_TAG" dist/*.tar.gz dist/*.zip \
             --repo "$GITHUB_REPOSITORY" --verify-tag --draft \
             --title "Directory Navigator $RELEASE_VERSION" --notes-file release-notes.md "${flags[@]}"

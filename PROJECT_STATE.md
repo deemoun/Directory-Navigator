@@ -23,20 +23,17 @@
   controls. No source writes or automatic imports; paths/commands/desktop objects,
   palettes, Trash and confirmation policy are excluded. Mapping is independently
   implemented from documented source layouts; real DOS files remain untested.
-- Manual Build draft release accepts a validated SemVer, builds/checks two native
-  macOS Apple Silicon/Intel targets, verifies embedded versions and packages versioned assets.
-  Final write-only job verifies complete checksums and tags the identical source
-  tree (release-only Cargo version commit if needed), then creates an unpublished
-  draft; branches stay unchanged. Existing tags/releases are refused; no Windows
-  assets, signing, automatic dispatch or automatic publication.
-- Separate manual Build Linux checks/builds native ARM64/x86_64 with a version
-  input, verified archives/checksums and read-only permissions; no tags/releases.
-  Linux failures do not block Mac drafts. Fixed Linux openpty test Clippy warning.
-- Separate manual Build Windows checks/builds x86_64 MSVC, verifies the requested
-  version, and uploads dn.exe/docs/license in a versioned ZIP with SHA-256 files.
-  Read-only permissions; no tags/releases or dependency on Mac/Linux workflows.
-  Workflow YAML/policy checks, ten helper tests and all four local Cargo checks
-  pass; Windows/Linux native builds still require manual GitHub validation.
+- Manual Build unified draft release validates one SemVer, checks/builds native
+  macOS ARM64/Intel, Windows x86_64 and Linux ARM64/x86_64 from an identical tree.
+  All five must pass before the write-only final job tags sources and creates an
+  unpublished draft. Downloads contain only five versioned binary archives;
+  checksums stay internal. Branches stay unchanged; existing tags/releases refused.
+  No signing, automatic dispatch or automatic publication. Separate Linux/Windows
+  manual build workflows remain available without release permissions.
+  Shared Python packager supports TAR.GZ and Windows ZIP; 11 helper tests,
+  5 workflow-policy tests, YAML/shell checks and all four Mac Cargo checks pass.
+  Local Windows cross-Clippy was blocked by Cargo's windows-implement cache error;
+  native five-platform validation awaits manual dispatch. No GitHub run started.
 - Windows-target all-target Clippy now passes with denied warnings on the Mac
   cross-check: narrowly documented Windows-only read-only staging cleanup lint
   exception; Unix-only test imports/mutability are correctly gated. Added a
@@ -265,15 +262,15 @@
   concurrent changes, Apply/Cancel and exit recovery. Release macOS PTY passed
   two-run persistence, clock/sort reload, conflict recovery, mouse opt-out,
   80×25→120×40 resizing and terminal restoration.
-- Draft-release workflow YAML/Mac-only matrix and all shell steps validated
+- Draft-release workflow YAML/five-platform matrix and all shell steps validated
   locally. Ten stdlib Python tests cover versions/output metadata, collisions/API
   failures, root-only lockfile edits, binary-version checks, archive contents/modes,
   checksums and incomplete/tampered bundles. Rust policy tests enforce manual-only
   triggers and isolated draft-job writes. Isolated macOS ARM64 source override to
   1.2.3-rc.1 built with --locked, packaged and extracted; binary version/checksum
-  verified without changing the development version. Updated Mac-only release
-  and separate Linux workflows pass YAML/shell/policy checks; all four local Cargo
-  checks and ten helper tests pass. No GitHub run/tag/release initiated here.
+  verified without changing the development version. Unified release and
+  separate build workflows pass YAML/shell/policy checks; all four local Cargo
+  checks and eleven helper tests pass. No GitHub run/tag/release initiated here.
   User-reported prior run passed both Mac builds; Linux failed Clippy (fixed in
   terminal_exit). Updated remote workflows and Linux builds remain untested.
 - Terminal-exit PTY waits tolerate transient empty reads while the shell lives,

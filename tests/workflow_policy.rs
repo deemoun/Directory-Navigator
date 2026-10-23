@@ -55,7 +55,7 @@ fn every_workflow_is_dispatch_only() -> io::Result<()> {
 }
 
 #[test]
-fn draft_release_is_mac_only_and_write_permission_is_isolated() -> io::Result<()> {
+fn draft_release_includes_all_platforms_and_write_permission_is_isolated() -> io::Result<()> {
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(".github/workflows/release.yml");
     let text = fs::read_to_string(path)?;
     assert_draft_release_policy(&text);
@@ -69,8 +69,14 @@ fn assert_draft_release_policy(text: &str) {
         .lines()
         .filter_map(|line| line.trim().strip_prefix("target: "))
         .collect::<Vec<_>>();
-    assert_eq!(targets.len(), 2);
-    for target in ["aarch64-apple-darwin", "x86_64-apple-darwin"] {
+    assert_eq!(targets.len(), 5);
+    for target in [
+        "aarch64-apple-darwin",
+        "x86_64-apple-darwin",
+        "x86_64-pc-windows-msvc",
+        "x86_64-unknown-linux-gnu",
+        "aarch64-unknown-linux-gnu",
+    ] {
         assert!(targets.contains(&target));
     }
     let (build_jobs, draft) = text.split_once("  draft:\n").expect("Dedicated draft job");
@@ -81,7 +87,25 @@ fn assert_draft_release_policy(text: &str) {
     assert!(draft.contains("--verify-tag --draft"));
     assert!(draft.contains("--prerelease"));
     assert!(draft.contains("verify-assets"));
-    assert!(draft.contains("--platform macos"));
+    assert!(draft.contains("--platform all"));
+    let attach = draft
+        .lines()
+        .find(|line| line.contains("gh release create"))
+        .expect("Release attachment command");
+    assert!(attach.contains("dist/*.tar.gz dist/*.zip"));
+    assert!(!attach.contains("sha256"));
+    assert!(!attach.contains("SHA256SUMS"));
+    assert!(!attach.contains("dist/* "));
+    assert!(build_jobs.contains("shell: bash"));
+    assert!(build_jobs.contains("runs-on: ${{ matrix.os }}"));
+    for check in [
+        "cargo fmt --check",
+        "cargo clippy --locked --all-targets",
+        "cargo test --locked --target",
+        "cargo build --release --locked --target",
+    ] {
+        assert!(build_jobs.contains(check));
+    }
     assert!(draft.contains("check-unused"));
     assert!(!text.contains("--clobber"));
     assert!(!text.contains("--draft=false"));
