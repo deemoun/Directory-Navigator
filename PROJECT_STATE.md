@@ -39,6 +39,10 @@
   test forces identical creation times. Windows all-target Clippy cross-check
   passes; Mac fmt/Clippy, 343 tests and release build pass. Native Windows
   execution still requires the manual workflow.
+- Workflow policy assertions normalize CRLF before locating the draft job;
+  regression exercises LF/CRLF/mixed checkout endings without weakening rules.
+  Policy regressions, Windows-target all-target Clippy and all four Mac Cargo
+  checks pass (344 tests, one opt-in ignored); no CI run started.
 - New-installation welcome uses Directory Navigator/Cargo version, profile-aware
   controls, deletion mode, Start/Keyboard settings/Help, and ≡ → Welcome reopening.
   Dedicated modal focus blocks background input/screensavers and survives resizing.
@@ -277,7 +281,7 @@
   English/Russian labels and targets fit 80×25/120×40. Release macOS PTY passes
   Auto→Classic→Mac, saved/reloaded preferences, editor save/close, viewer wrap/search,
   copy cancellation, resize and terminal restoration.
-- macOS ARM64: fmt check, Clippy (including all test targets) with denied warnings, 343 passing tests
+- macOS ARM64: fmt check, Clippy (including all test targets) with denied warnings, 344 passing tests
   (one opt-in real-Trash success test ignored), release build.
 - Menu tests enforce working entries, unique mnemonics, normalized separators,
   unchanged headings, Block selection/clipboard/undo, Paragraph styling and clock

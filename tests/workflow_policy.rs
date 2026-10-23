@@ -58,6 +58,13 @@ fn every_workflow_is_dispatch_only() -> io::Result<()> {
 fn draft_release_is_mac_only_and_write_permission_is_isolated() -> io::Result<()> {
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(".github/workflows/release.yml");
     let text = fs::read_to_string(path)?;
+    assert_draft_release_policy(&text);
+    Ok(())
+}
+
+fn assert_draft_release_policy(text: &str) {
+    // Git may check YAML out as CRLF on Windows; policy is independent of EOLs.
+    let text = text.replace("\r\n", "\n");
     let targets = text
         .lines()
         .filter_map(|line| line.trim().strip_prefix("target: "))
@@ -82,6 +89,20 @@ fn draft_release_is_mac_only_and_write_permission_is_isolated() -> io::Result<()
     assert!(text.contains("cancel-in-progress: false"));
     assert!(text.contains("type: string"));
     assert!(text.contains("git write-tree"));
+}
+
+#[test]
+fn draft_release_policy_accepts_windows_and_mixed_line_endings() -> io::Result<()> {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(".github/workflows/release.yml");
+    let lf = fs::read_to_string(path)?.replace("\r\n", "\n");
+    assert_draft_release_policy(&lf);
+    assert_draft_release_policy(&lf.replace('\n', "\r\n"));
+    let mixed = lf
+        .lines()
+        .enumerate()
+        .map(|(index, line)| format!("{line}{}", if index % 2 == 0 { "\r\n" } else { "\n" }))
+        .collect::<String>();
+    assert_draft_release_policy(&mixed);
     Ok(())
 }
 
