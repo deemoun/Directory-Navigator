@@ -120,3 +120,53 @@ fn linux_builds_are_independent_and_cannot_publish() -> io::Result<()> {
     }
     Ok(())
 }
+
+#[test]
+fn windows_builds_are_independent_and_package_the_executable() -> io::Result<()> {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(".github/workflows/windows.yml");
+    let text = fs::read_to_string(path)?;
+    for required in [
+        "runs-on: windows-2022",
+        "BUILD_TARGET: x86_64-pc-windows-msvc",
+        "contents: read",
+        "ref: ${{ github.sha }}",
+        "type: string",
+        "scripts/release.py prepare",
+        "cargo fmt --check",
+        "cargo clippy --locked --all-targets",
+        "cargo test --locked",
+        "cargo build --release --locked",
+        "release/dn.exe",
+        "--version",
+        "$LASTEXITCODE -ne 0",
+        "Compress-Archive",
+        "Get-FileHash",
+        "SHA256SUMS.txt",
+        "LICENSE, README.md",
+        "docs/USER_GUIDE.md",
+        "windows-downloads",
+        "actions/upload-artifact@",
+        "retention-days: 30",
+    ] {
+        assert!(
+            text.contains(required),
+            "Missing Windows build requirement: {required}"
+        );
+    }
+    for forbidden in [
+        "contents: write",
+        "persist-credentials: true",
+        "git push",
+        "git tag",
+        "gh release",
+        "needs:",
+        "apple-darwin",
+        "unknown-linux",
+    ] {
+        assert!(
+            !text.contains(forbidden),
+            "Unexpected Windows workflow dependency/capability: {forbidden}"
+        );
+    }
+    Ok(())
+}

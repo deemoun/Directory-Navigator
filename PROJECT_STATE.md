@@ -21,6 +21,11 @@
 - Separate manual Build Linux checks/builds native ARM64/x86_64 with a version
   input, verified archives/checksums and read-only permissions; no tags/releases.
   Linux failures do not block Mac drafts. Fixed Linux openpty test Clippy warning.
+- Separate manual Build Windows checks/builds x86_64 MSVC, verifies the requested
+  version, and uploads dn.exe/docs/license in a versioned ZIP with SHA-256 files.
+  Read-only permissions; no tags/releases or dependency on Mac/Linux workflows.
+  Workflow YAML/policy checks, ten helper tests and all four local Cargo checks
+  pass; Windows/Linux native builds still require manual GitHub validation.
 - New-installation welcome uses Directory Navigator/Cargo version, profile-aware
   controls, deletion mode, Start/Keyboard settings/Help, and ≡ → Welcome reopening.
   Dedicated modal focus blocks background input/screensavers and survives resizing.
@@ -259,7 +264,7 @@
   English/Russian labels and targets fit 80×25/120×40. Release macOS PTY passes
   Auto→Classic→Mac, saved/reloaded preferences, editor save/close, viewer wrap/search,
   copy cancellation, resize and terminal restoration.
-- macOS ARM64: fmt check, Clippy (including all test targets) with denied warnings, 340 passing tests
+- macOS ARM64: fmt check, Clippy (including all test targets) with denied warnings, 341 passing tests
   (one opt-in real-Trash success test ignored), release build.
 - Menu tests enforce working entries, unique mnemonics, normalized separators,
   unchanged headings, Block selection/clipboard/undo, Paragraph styling and clock

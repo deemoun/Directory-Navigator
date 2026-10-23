@@ -189,14 +189,23 @@ macOS builds remain unsigned and unnotarized. The repository must permit Actions
 to write contents/create tags; restrictive tag rules can block the final job.
 All workflows remain manual-only; nothing runs on pushes or tags.
 
-### Separate Linux builds
+### Separate Windows and Linux builds
 
-Open **Actions → Build Linux → Run workflow**, choose a branch and enter the
-version without `v`. This independent, manual-only workflow checks, tests and builds
-Linux x86_64 and ARM64. Download **linux-downloads** from the run's **Artifacts**
-for both versioned archives, individual checksums and `SHA256SUMS.txt` (30-day
-retention). It creates no tags or GitHub releases and cannot block the Mac draft.
-The selected version is embedded in these builds; the source branch is unchanged.
+These workflows are independent of the Mac draft release and run only when you
+choose **Run workflow**. Select a source branch and enter the version without `v`.
+
+| Actions workflow | Targets | Download under the run's Artifacts |
+| --- | --- | --- |
+| **Build Windows** | Windows x86_64 | **windows-downloads**: ZIP with `dn.exe` |
+| **Build Linux** | Linux x86_64 and ARM64 | **linux-downloads**: two TAR.GZ archives with `dn` |
+
+Both workflows check, test and build the app, verify the requested executable
+version, and include the README, user guide, MIT license, individual SHA-256
+checksums and `SHA256SUMS.txt`. Downloads are retained for 30 days. They create no
+tags or GitHub releases and cannot block the Mac draft. The selected version is
+embedded in the binaries; the source branch is unchanged. Windows builds are
+unsigned. A successful build does not replace testing in Windows Terminal or a
+Linux terminal.
 
 Release helper tests (Python 3.12+, standard library only):
 

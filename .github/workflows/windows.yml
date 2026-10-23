@@ -1,0 +1,78 @@
+name: Build Windows
+run-name: Windows Directory Navigator ${{ inputs.version }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'App version without v (for example 1.0.0 or 1.1.0-beta.1)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-build-${{ github.repository }}-${{ github.ref }}-${{ inputs.version }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build x86_64-pc-windows-msvc
+    runs-on: windows-2022
+    timeout-minutes: 45
+    env:
+      RELEASE_VERSION: ${{ inputs.version }}
+      BUILD_TARGET: x86_64-pc-windows-msvc
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Set build version
+        run: python scripts/release.py prepare "$env:RELEASE_VERSION"
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+          components: rustfmt, clippy
+      - name: Check formatting
+        run: cargo fmt --check
+      - name: Clippy
+        run: cargo clippy --locked --all-targets --target "$env:BUILD_TARGET" -- -D warnings
+      - name: Test
+        run: cargo test --locked --target "$env:BUILD_TARGET"
+      - name: Build release
+        run: cargo build --release --locked --target "$env:BUILD_TARGET"
+      - name: Verify version and package
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $binary = "target/$env:BUILD_TARGET/release/dn.exe"
+          $version = & $binary --version
+          if ($LASTEXITCODE -ne 0 -or $version -cne "Directory Navigator $env:RELEASE_VERSION") {
+            throw "Built executable does not report the requested version"
+          }
+          New-Item -ItemType Directory -Path dist/package/docs -Force | Out-Null
+          Copy-Item $binary, LICENSE, README.md dist/package/
+          Copy-Item docs/USER_GUIDE.md dist/package/docs/
+          $archive = "dn-{0}-{1}.zip" -f $env:RELEASE_VERSION, $env:BUILD_TARGET
+          Compress-Archive -Path dist/package/* -DestinationPath "dist/$archive"
+          $hash = (Get-FileHash "dist/$archive" -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  $archive" | Set-Content -Encoding ascii "dist/$archive.sha256"
+          "$hash  $archive" | Set-Content -Encoding ascii dist/SHA256SUMS.txt
+      - name: Upload binary and checksums
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-downloads
+          path: |
+            dist/dn-*.zip
+            dist/dn-*.sha256
+            dist/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 30
