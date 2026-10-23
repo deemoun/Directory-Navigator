@@ -109,7 +109,8 @@ keeps the previous settings. The clock, panel dates and file information follow
 these preferences. Defaults remain English, year-month-day and 24-hour time.
 English and Russian catalogs are embedded, so the binary needs no companion files.
 Untranslated diagnostics fall back to English; system errors retain their original text.
-- Older `config.txt` files migrate on save; the old file is retained as a backup.
+
+Only `config.conf` is loaded. There is no fallback or migration from other filenames.
 
 File operations refuse existing destinations. Trash is the default deletion mode;
 a Trash failure never falls back to permanent deletion. Permanent deletion can be
@@ -123,6 +124,18 @@ workflows on copies and report problems with your OS, terminal and reproduction 
 
 For detailed shortcuts, limits and user-menu configuration, see the
 [user guide](docs/USER_GUIDE.md).
+
+### Original Tetris scores
+
+To import an old DOS Navigator leaderboard, copy **`dn.tet`** (or `DN.TET`) beside
+`config.conf`, then open/reopen Tetris. Its Tetris scores merge with modern scores
+in `tetris.conf`, keeping the highest ten and avoiding repeated imports. The
+original file stays untouched. Pentix scores are not imported.
+
+DOS files do not identify their text encoding: the first import uses CP437 for
+English or CP866 for Russian, according to the selected interface language. That
+choice is remembered in the Tetris file. Unicode names remain supported for new
+scores; unavailable original line counts display “—”.
 
 ## Development
 

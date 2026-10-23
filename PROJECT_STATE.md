@@ -21,7 +21,7 @@
 - New-installation welcome uses Directory Navigator/Cargo version, profile-aware
   controls, deletion mode, Start/Keyboard settings/Help, and ≡ → Welcome reopening.
   Dedicated modal focus blocks background input/screensavers and survives resizing.
-  Only successful initial loads with neither modern nor legacy settings show it;
+  Only successful initial loads without config.conf show it;
   dismissal uses normal settings persistence, with no onboarding key or dependency.
 - Keyboard profiles Auto/Classic DN/Mac-friendly persist via config.conf/desktop.
   Classic DN is the default for new/missing/unknown settings on every platform;
@@ -35,6 +35,11 @@
   archives; Ctrl+Enter/F3/F4 retain explicit behavior. Options Edit/Reload, automatic
   reload after editor close/startup/Load desktop, bounded background reads, inactive
   starter template, validation errors and stale-launch suppression. No new deps.
+- Read-only dn.tet/DN.TET import decodes original 740/760-byte DOS tables, merges
+  only Tetris top ten into tetris.conf without duplicate reimports, and preserves
+  the source/Pentix data. CP437/CP866 selected on first import and remembered;
+  unknown line counts display “—”. Modern Unicode scores and original scoring/
+  qualification/tie rules remain; v1 score files read, v2 holds import metadata.
 - Tetris final-score → qualifying Unicode name → highlighted top-ten flow.
   Named records include lines and start/end levels; Enter accepts, Esc records
   Anonymous. Immediate separate tetris.conf beside settings, independent of
@@ -134,7 +139,7 @@
   About credits Dmitry Yarygin as author.
   Public documentation describes DOS Navigator inspiration; the app uses MIT licensing.
 
-- Versioned UTF-8 settings store loads legacy files and saves preferences on normal
+- Versioned UTF-8 settings store reads only config.conf and saves preferences on normal
   exit (System Setup opt-out). Save/Load desktop share its baseline. Unchanged
   files are skipped; external changes, lock conflicts, bad files and write errors
   are reported without silently overwriting them. Failed saves cancel exit.
@@ -143,9 +148,9 @@
 - Screen rest defaults to 10 minutes; setup includes 30/60-minute delays.
   Existing saved delays remain unchanged.
 
-- Settings use config.conf; legacy config.txt loads when no .conf exists and
-  migrates on save, retaining the old file. Migration preserves extension keys
-  and detects conflicting changes to either file.
+- Settings use config.conf only; config.txt is ignored with no fallback, migration,
+  conflict checks or writes against that filename. Missing .conf uses defaults/
+  first-run welcome. Existing locking/atomic saves/unknown-key handling stay intact.
 
 - Bottom row is a Unicode command prompt with blinking cursor; native terminal
   execution reuses the existing runner. Pure cd navigates the panel; shell commands
@@ -220,7 +225,15 @@
   1.2.3-rc.1 built with --locked, packaged and extracted; binary version/checksum
   verified without changing the development version. Remote release and other
   release targets remain untested; no GitHub run/tag/release was created here.
-- Welcome tests cover missing/existing/legacy/invalid/inaccessible settings, CLI
+- Conf-only tests verify ignored/unchanged config.txt files (including broken
+  links), .conf defaults/welcome, save/reload/unknown-key preservation and conflict
+  safeguards. DOS score fixtures verify both record layouts, XOR/endian fields,
+  CP437/CP866, stable duplicate/tie merging, unknown lines/name whitespace, modern
+  round trips, retries, malformed/readonly/link inputs and unchanged original files.
+  Release macOS PTY passes ignored txt + normal conf persistence and DOS fixture
+  import/display/reopen without duplicates, with terminal restoration. A real
+  user-supplied dn.tet has not been tested; other platforms remain untested.
+- Welcome tests cover missing/existing/ignored-txt/invalid/inaccessible settings, CLI
   bypass, session-only dismissal, save-on-exit/restart behavior, modal isolation,
   locale/profile updates, mouse controls, screensaver suppression and small sizes.
   Release macOS PTY passes first/subsequent launches, Help/settings return,
@@ -234,7 +247,7 @@
   English/Russian labels and targets fit 80×25/120×40. Release macOS PTY passes
   Auto→Classic→Mac, saved/reloaded preferences, editor save/close, viewer wrap/search,
   copy cancellation, resize and terminal restoration.
-- macOS ARM64: fmt check, Clippy (including all test targets) with denied warnings, 325 passing tests
+- macOS ARM64: fmt check, Clippy (including all test targets) with denied warnings, 334 passing tests
   (one opt-in real-Trash success test ignored), release build.
 - Menu tests enforce working entries, unique mnemonics, normalized separators,
   unchanged headings, Block selection/clipboard/undo, Paragraph styling and clock

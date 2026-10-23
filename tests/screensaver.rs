@@ -259,7 +259,7 @@ fn idle_respects_modals_jobs_games_and_clock_ticks() -> io::Result<()> {
 #[test]
 fn config_round_trip_legacy_and_invalid_values() -> io::Result<()> {
     let temp = Temp::new()?;
-    let path = temp.0.join("config.txt");
+    let path = temp.0.join("config.conf");
     assert_eq!(Config::read(&path)?.saver_minutes, 10);
     fs::write(&path, "hidden=true\n")?;
     assert_eq!(Config::read(&path)?.saver_minutes, 10);

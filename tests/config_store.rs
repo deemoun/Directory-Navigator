@@ -283,7 +283,7 @@ fn native_bookmarks_and_symlink_configuration_safety() -> io::Result<()> {
 }
 
 #[test]
-fn legacy_txt_migrates_on_save_with_extension_keys_retained() -> io::Result<()> {
+fn txt_is_ignored_and_conf_is_created_with_defaults() -> io::Result<()> {
     let t = Temp::new()?;
     fs::create_dir_all(t.path().parent().unwrap())?;
     let legacy = t.path().with_file_name("config.txt");
@@ -291,12 +291,12 @@ fn legacy_txt_migrates_on_save_with_extension_keys_retained() -> io::Result<()> 
     fs::write(&legacy, original)?;
     let mut store = Store::new(Some(t.path()));
     let config = store.load()?;
-    assert!(!config.show_hidden);
-    assert_eq!(config.saver_minutes, 1);
+    assert!(config.show_hidden);
+    assert_eq!(config.saver_minutes, dn::screensaver::DEFAULT_DELAY);
     assert!(!t.path().exists());
     assert!(store.save(&config, false)?);
     assert_eq!(Config::read(&t.path())?, config);
-    assert!(fs::read_to_string(t.path())?.contains("future_key=preserved"));
+    assert!(!fs::read_to_string(t.path())?.contains("future_key=preserved"));
     assert_eq!(fs::read_to_string(legacy)?, original);
     assert!(!store.save(&config, false)?);
     Ok(())
@@ -318,7 +318,7 @@ fn conf_takes_precedence_and_invalid_conf_does_not_fall_back() -> io::Result<()>
 }
 
 #[test]
-fn changed_legacy_or_new_conf_blocks_migration() -> io::Result<()> {
+fn txt_changes_are_ignored_but_new_conf_still_blocks_save() -> io::Result<()> {
     let t = Temp::new()?;
     fs::create_dir_all(t.path().parent().unwrap())?;
     let legacy = t.path().with_file_name("config.txt");
@@ -326,11 +326,13 @@ fn changed_legacy_or_new_conf_blocks_migration() -> io::Result<()> {
     let mut store = Store::new(Some(t.path()));
     let config = store.load()?;
     fs::write(&legacy, "hidden=true\n")?;
-    assert!(store.save(&config, false).is_err());
-    assert!(!t.path().exists());
+    assert!(store.save(&config, false)?);
+    assert_eq!(Config::read(&t.path())?, Config::default());
     store.load()?;
     fs::write(t.path(), "show_clock=false\n")?;
-    assert!(store.save(&config, false).is_err());
+    let mut changed = config.clone();
+    changed.show_hidden = false;
+    assert!(store.save(&changed, false).is_err());
     assert_eq!(fs::read_to_string(t.path())?, "show_clock=false\n");
     Ok(())
 }

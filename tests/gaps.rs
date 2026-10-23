@@ -104,7 +104,7 @@ fn bookmark_encoding_configuration_native_legacy_and_invalid() -> io::Result<()>
         use std::os::windows::ffi::OsStringExt;
         config.bookmarks[0] = Some(t.0.join(std::ffi::OsString::from_wide(&[0xd800])));
     }
-    let destination = t.0.join("config.txt");
+    let destination = t.0.join("config.conf");
     config.save(&destination)?;
     assert_eq!(Config::read(&destination)?.bookmarks, config.bookmarks);
     for value in [

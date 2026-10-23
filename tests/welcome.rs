@@ -115,8 +115,7 @@ fn only_initial_missing_settings_show_welcome_and_normal_exit_establishes_instal
     Ok(())
 }
 #[test]
-fn disabled_saving_and_legacy_and_empty_settings_keep_expected_startup_behavior() -> io::Result<()>
-{
+fn disabled_saving_txt_is_ignored_and_empty_conf_skips_welcome() -> io::Result<()> {
     let t = Temp::new()?;
     let mut a = t.app()?;
     a.load_initial_config();
@@ -135,8 +134,8 @@ fn disabled_saving_and_legacy_and_empty_settings_keep_expected_startup_behavior(
     )?;
     let mut c = t.app()?;
     c.load_initial_config();
-    assert!(c.welcome.dialog.is_none());
-    assert!(!c.config.show_clock);
+    assert!(c.welcome.dialog.is_some());
+    assert!(c.config.show_clock);
     fs::remove_file(t.config().with_file_name("config.txt"))?;
     fs::write(t.config(), "")?;
     let mut d = t.app()?;
@@ -190,8 +189,8 @@ fn dangling_configuration_links_are_errors_not_new_installations() -> io::Result
         symlink(t.0.join("missing"), t.config().with_file_name(name))?;
         let mut a = t.app()?;
         a.load_initial_config();
-        assert!(a.welcome.dialog.is_none());
-        assert!(!a.dialogs.is_empty());
+        assert_eq!(a.welcome.dialog.is_some(), name == "config.txt");
+        assert_eq!(a.dialogs.is_empty(), name == "config.txt");
     }
     Ok(())
 }

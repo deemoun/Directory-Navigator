@@ -2,6 +2,7 @@
 //! Retains the 12×19 well, seven figures, rotation sizes, delays and scoring.
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 mod controls;
+pub mod dos_scores;
 pub mod scores;
 pub use controls::{action, key, open, paste, GameAction};
 
@@ -54,7 +55,7 @@ pub struct Record {
     pub name: String,
     pub start_level: u8,
     pub score: u64,
-    pub lines: u32,
+    pub lines: Option<u32>,
     pub level: u8,
 }
 

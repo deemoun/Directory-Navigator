@@ -41,7 +41,12 @@ pub fn open(app: &mut App) {
             .path()
             .ok()
             .map(|p| p.with_file_name("tetris.conf"));
-        let error = app.game_scores.load(path).err();
+        let encoding = if app.config.language == crate::localization::Language::Russian {
+            super::dos_scores::Encoding::Cp866
+        } else {
+            super::dos_scores::Encoding::Cp437
+        };
+        let error = app.game_scores.load_with_encoding(path, encoding).err();
         app.tetris = Some(Game {
             records: app.game_scores.board.records.clone(),
             name: app.game_scores.board.last_name.clone(),
@@ -240,7 +245,7 @@ fn persist(app: &mut App) {
             g.highlighted = g
                 .records
                 .iter()
-                .rposition(|r| r.score == g.score && r.name == g.name && r.lines == g.lines);
+                .rposition(|r| r.score == g.score && r.name == g.name && r.lines == Some(g.lines));
         }
         if result.is_ok() {
             g.notice = "Scores saved".into();
@@ -268,7 +273,7 @@ fn submit(app: &mut App, anonymous: bool) {
     let record = super::Record {
         name: name.clone(),
         score: g.score,
-        lines: g.lines,
+        lines: Some(g.lines),
         start_level: g.start_level,
         level: g.level,
     };

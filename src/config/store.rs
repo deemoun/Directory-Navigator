@@ -29,7 +29,6 @@ pub struct Store {
     path: Option<PathBuf>,
     disk: Option<Vec<u8>>,
     loaded: Option<Config>,
-    legacy: Option<Vec<u8>>,
 }
 impl Store {
     pub fn new(path: Option<PathBuf>) -> Self {
@@ -37,7 +36,6 @@ impl Store {
             path,
             disk: None,
             loaded: None,
-            legacy: None,
         }
     }
     pub fn path(&self) -> io::Result<&Path> {
@@ -45,25 +43,17 @@ impl Store {
             .as_deref()
             .ok_or_else(|| io::Error::other("Cannot determine the configuration directory"))
     }
-    /// True only after a successful load that found neither modern nor legacy settings.
+    /// True only after a successful load that found no settings file.
     pub fn is_new_installation(&self) -> bool {
-        self.loaded.is_some() && self.disk.is_none() && self.legacy.is_none()
+        self.loaded.is_some() && self.disk.is_none()
     }
     pub fn load(&mut self) -> io::Result<Config> {
         let disk = read_bytes(self.path()?)?;
-        let legacy = if disk.is_none()
-            && self.path()?.file_name() == Some(std::ffi::OsStr::new("config.conf"))
-        {
-            read_bytes(&self.path()?.with_file_name("config.txt"))?
-        } else {
-            None
-        };
-        let config = match disk.as_ref().or(legacy.as_ref()) {
+        let config = match disk.as_ref() {
             Some(bytes) => Config::parse(bytes)?,
             None => Config::default(),
         };
         self.disk = disk;
-        self.legacy = legacy;
         self.loaded = Some(config.clone());
         Ok(config)
     }
@@ -84,20 +74,8 @@ impl Store {
                 "Settings changed outside this instance. Load desktop before saving again",
             ));
         }
-        if let Some(legacy) = &self.legacy {
-            if read_bytes(&path.with_file_name("config.txt"))?.as_ref() != Some(legacy) {
-                return Err(io::Error::other("Legacy settings changed outside this instance. Load desktop before saving again"));
-            }
-        }
-        config.save_preserving(
-            &path,
-            self.disk
-                .as_deref()
-                .or(self.legacy.as_deref())
-                .unwrap_or_default(),
-        )?;
+        config.save_preserving(&path, self.disk.as_deref().unwrap_or_default())?;
         self.disk = read_bytes(&path)?;
-        self.legacy = None;
         self.loaded = Some(config.clone());
         Ok(true)
     }

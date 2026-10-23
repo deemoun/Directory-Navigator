@@ -209,7 +209,8 @@ fn draw_page(frame: &mut Frame, app: &mut App, game_rect: Rect, screen: Screen) 
                 (i + 1).to_string(),
                 crate::formatting::tail(&crate::filesystem::display_name(&r.name), 20),
                 r.score.to_string(),
-                r.lines.to_string(),
+                r.lines
+                    .map_or_else(|| "—".into(), |lines| lines.to_string()),
                 format!("{} / {}", r.start_level, r.level),
             ])
             .style(dos(if game.highlighted == Some(i) {

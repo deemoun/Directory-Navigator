@@ -15,15 +15,14 @@ Ctrl+click marks files. F4 opens the native UTF-8 editor.
 
 ## First start
 
-Directory Navigator shows a compact welcome when neither `config.conf` nor legacy
-`config.txt` exists. It lists the active profile’s controls, opening behavior and
+Directory Navigator shows a compact welcome when `config.conf` does not exist. It lists the active profile’s controls, opening behavior and
 current deletion mode. **Start**, Esc or the title close control dismisses it;
 **Keyboard settings** and **Help** return to the welcome when closed. **≡ → Welcome…**
 opens it again without changing panel state.
 
 Dismissing the welcome writes no files. Normal settings saving on exit prevents
 it appearing on later launches. If saving is disabled and no configuration exists,
-it appears next time. Existing, invalid or inaccessible configurations do not
+it appears next time. Existing, invalid or inaccessible `.conf` settings do not
 trigger it; settings errors are reported separately. Load desktop never triggers it.
 There is no startup delay or splash timer. CLI help/version bypass the interface.
 
@@ -224,9 +223,9 @@ implemented commands; unsupported placeholders are omitted. Arrow keys navigate;
 Right opens a submenu, Left/Esc
 returns, and letters activate the highlighted mnemonics.
 Defaults load from XDG_CONFIG_HOME/dn/config.conf, HOME/.config/dn/config.conf,
-or APPDATA/DOSNavigator/config.conf on Windows. The directory stays unchanged. If `config.conf` is absent, legacy
-`config.txt` is loaded and migrated on the next save; the old file is kept as a
-backup. An existing `config.conf` always takes precedence.
+or APPDATA/DOSNavigator/config.conf on Windows. Only `config.conf` is loaded;
+`config.txt` is ignored and never read, migrated or modified. Without a `.conf`
+file, defaults and the first-run welcome apply.
 The UTF-8 `key=value` file has a version header, comments and lossless native
 bookmark encoding. Older files remain readable; unknown extension keys are kept.
 Unreadable, malformed or newer-version files report errors rather than being
@@ -493,9 +492,11 @@ unfinished game does not add a score.
 
 Names, scores, lines, start/end levels and the last player name are stored in
 `tetris.conf` beside `config.conf`, not in the program’s directory. This is a
-separate UTF-8 `key=value` file: `tetris_version=1`, `last_name=...`, then up to ten
+separate UTF-8 `key=value` file. Existing version 1 files remain readable;
+version 2 supports imported records with unknown line counts (`-`) and a remembered
+`dn_tet_encoding=cp437` or `cp866`. Both contain `last_name=...` and up to ten
 `score=points,lines,start,end,name` records. Names may contain commas; control
-characters are rejected. Old installations start with an empty table.
+characters are rejected.
 
 Accepted scores save immediately, even if preference auto-save is disabled.
 Writes use a private staging file and lock, merging the latest disk scores before
@@ -504,4 +505,23 @@ unsupported and symlinked files are not silently replaced. A failure leaves the
 score in memory and shows an error with Retry save. Unsaved scores remain available
 when closing/reopening the game during the session; retry after fixing the error.
 An explicitly abandoned name prompt or exiting the app before acceptance does not
-commit that result. The old DOS binary `dn.tet` format is not imported.
+commit that result.
+
+To import original scores, copy `dn.tet` or `DN.TET` beside `config.conf`, then
+open/reopen Tetris. The original countdown-XOR binary format is read directly:
+20 short-string/level/signed-score records, of which only the ten Tetris slots
+are imported; the Pentix table is left alone. Packed 740-byte and word-aligned
+760-byte tables are supported. The source file is never written, renamed or deleted.
+If both filenames exist on a case-sensitive filesystem, lowercase takes priority.
+
+Imported scores merge with the existing top ten, preserving ties and duplicate
+slots while avoiding repeated imports on subsequent opens. The modern file is
+saved through its normal lock/staging mechanism, independently of preference
+auto-save. Corrupt original files report an error; existing modern scores remain
+visible. An invalid modern score file is never replaced by an import.
+
+The original has no encoding label or line count. Choose the correct interface
+language before the first import: English uses DOS CP437; Russian uses CP866.
+The encoding choice is then remembered in `tetris.conf`, so changing the interface
+language cannot create duplicate entries. Original line counts display “—”.
+New scores still support Unicode names, full line counts and modern integer limits.

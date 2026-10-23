@@ -458,7 +458,7 @@ fn viewer_text_hex_bounds_and_mouse_close() -> io::Result<()> {
 fn saved_preferences_and_hidden_date_sorting() -> io::Result<()> {
     use dn::{config::Config, panel::SortMode};
     let temp = Temp::new()?;
-    let config_path = temp.0.join("settings/config.txt");
+    let config_path = temp.0.join("settings/config.conf");
     let mut config = Config::read(&config_path)?;
     config.show_hidden = false;
     config.sorts = [SortMode::Date, SortMode::Size];
@@ -731,7 +731,7 @@ fn options_mouse_dialogs_cancel_apply_and_save_real_preferences() -> io::Result<
     input::handle(&mut app, KeyEvent::new(KeyCode::F(8), KeyModifiers::NONE));
     assert!(app.prompt.is_some()); // F8 still always requires confirmation.
     input::handle(&mut app, KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
-    let config_path = temp.0.join("config.txt");
+    let config_path = temp.0.join("config.conf");
     app.config.save(&config_path)?;
     let saved = dn::config::Config::read(&config_path)?;
     assert!(

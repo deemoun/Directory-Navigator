@@ -97,7 +97,7 @@ fn game_over_records_restart_and_ceiling_collision() {
             name: "Anonymous".into(),
             start_level: 1,
             score,
-            lines: 0,
+            lines: Some(0),
             level: 1,
         });
     }
@@ -354,7 +354,7 @@ fn game_dialog_mouse_setup_cancel_apply_scores_and_resize() -> io::Result<()> {
         name: "Anonymous".into(),
         start_level: 1,
         score: 123,
-        lines: 4,
+        lines: Some(4),
         level: 2,
     })?;
     render(&mut app, 80, 25)?;
@@ -446,7 +446,7 @@ fn score_qualification_ties_anonymous_and_grapheme_name_limits() -> io::Result<(
             name: "other".into(),
             start_level: 1,
             score: score * 100,
-            lines: 0,
+            lines: Some(0),
             level: 1,
         });
     }
@@ -478,7 +478,7 @@ fn score_files_merge_instances_and_refuse_corruption_symlinks_and_readonly() -> 
         store.add(Record {
             name: format!("name,{score}"),
             score,
-            lines: 1,
+            lines: Some(1),
             start_level: 1,
             level: 2,
         })?;
@@ -489,7 +489,7 @@ fn score_files_merge_instances_and_refuse_corruption_symlinks_and_readonly() -> 
     b.save()?;
     assert_eq!(Board::parse(&fs::read(&path)?)?.records.len(), 2);
     for invalid in [
-        b"tetris_version=2\n".as_slice(),
+        b"tetris_version=3\n".as_slice(),
         b"tetris_version=1\nscore=1,0,11,1,bad\n",
         b"tetris_version=1\nscore=18446744073709551616,0,1,1,bad\n",
         b"tetris_version=1\nlast_name=bad\tname\n",
@@ -501,7 +501,7 @@ fn score_files_merge_instances_and_refuse_corruption_symlinks_and_readonly() -> 
     b.add(Record {
         name: "pending".into(),
         score: 100,
-        lines: 0,
+        lines: Some(0),
         start_level: 1,
         level: 1,
     })?;
@@ -516,7 +516,7 @@ fn score_files_merge_instances_and_refuse_corruption_symlinks_and_readonly() -> 
     b.add(Record {
         name: "readonly pending".into(),
         score: 200,
-        lines: 0,
+        lines: Some(0),
         start_level: 1,
         level: 1,
     })?;
