@@ -9,6 +9,7 @@ pub enum Screen {
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Focus {
+    ConfigImport,
     Welcome,
     CommandHistory,
     Message,
@@ -66,6 +67,9 @@ pub fn current(app: &App) -> Focus {
         };
     }
     if screen == Screen::Manager {
+        if app.config_import.is_some() {
+            return Focus::ConfigImport;
+        }
         if app.command_line.dialog.is_some() {
             return Focus::CommandHistory;
         }

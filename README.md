@@ -120,7 +120,21 @@ these preferences. Defaults remain English, year-month-day and 24-hour time.
 English and Russian catalogs are embedded, so the binary needs no companion files.
 Untranslated diagnostics fall back to English; system errors retain their original text.
 
-Only `config.conf` is loaded. There is no fallback or migration from other filenames.
+`config.conf` uses TOML with `config_version = 2` and grouped sections.
+Only this format is supported; older flat files are not migrated. Invalid settings
+are renamed to `_old_config.conf` (numbered if occupied), then defaults load.
+Normal saving creates a fresh configuration; inaccessible/read-only files and
+failed recovery still report errors.
+Unknown TOML settings are retained. Only `config.conf` is loaded automatically;
+`config.txt` is ignored.
+
+**Options → Import DOS settings…** reads an original `DN.CFG` and previews supported
+clock, hidden-file, sorting, highlighting, selection, editor and screensaver
+preferences. Apply affects this session; normal saving persists it. Cancel changes
+nothing, and the DOS file is never modified. DOS paths, desktop windows, commands,
+hardware settings and custom palettes are excluded; Trash and confirmation safeguards
+are retained. Compatibility is based on source-derived fixtures; a real user-supplied
+`DN.CFG` has not yet been tested.
 
 File operations refuse existing destinations. Trash is the default deletion mode;
 a Trash failure never falls back to permanent deletion. Permanent deletion can be

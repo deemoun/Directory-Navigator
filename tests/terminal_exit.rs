@@ -151,7 +151,7 @@ fn delayed_fragmented_mouse_release_does_not_leak_to_shell() -> io::Result<()> {
         fs::create_dir_all(directory.join("config/dn"))?;
         fs::write(
             directory.join("config/dn/config.conf"),
-            "save_on_exit=false\n",
+            "config_version=2\n[application]\nsave_on_exit=false\n",
         )?;
         let mut master_fd = 0;
         let mut slave_fd = 0;

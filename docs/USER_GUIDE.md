@@ -30,8 +30,8 @@ There is no startup delay or splash timer. CLI help/version bypass the interface
 
 **Options → Configuration → Keyboard shortcuts** selects **Automatic**, **Classic
 DN** or **Mac-friendly**. Apply changes the profile immediately; Cancel preserves
-it. Save/Load desktop and normal settings persistence include `shortcuts=auto`,
-`shortcuts=classic_dn` or `shortcuts=mac` in `config.conf`. Missing or unknown values
+it. Save/Load desktop and normal settings persistence include `[application]` with `shortcuts = "auto"`,
+`shortcuts = "classic_dn"` or `shortcuts = "mac"` in `config.conf`. Missing values
 use Classic DN on every platform, including macOS. Explicitly saved choices are
 preserved. Automatic remains available and selects Mac-friendly on macOS, Classic
 DN elsewhere. Select Mac-friendly explicitly when preferred, including over SSH.
@@ -226,10 +226,9 @@ Defaults load from XDG_CONFIG_HOME/dn/config.conf, HOME/.config/dn/config.conf,
 or APPDATA/DOSNavigator/config.conf on Windows. Only `config.conf` is loaded;
 `config.txt` is ignored and never read, migrated or modified. Without a `.conf`
 file, defaults and the first-run welcome apply.
-The UTF-8 `key=value` file has a version header, comments and lossless native
-bookmark encoding. Older files remain readable; unknown extension keys are kept.
-Unreadable, malformed or newer-version files report errors rather than being
-replaced. Recognized legacy values retain their existing fallback defaults.
+The UTF-8 TOML file requires `config_version = 2`, grouped sections and lossless
+native bookmark encoding. Unknown TOML values are kept. Invalid contents are preserved under an `_old_`
+prefix and defaults load; inaccessible files still report errors.
 Writes use a private sibling file and atomic replacement; read-only files and
 symlink destinations are refused. A short-lived `config.conf.lock` coordinates
 saves, and external changes require Load desktop before saving again. If a crash
@@ -525,3 +524,86 @@ language before the first import: English uses DOS CP437; Russian uses CP866.
 The encoding choice is then remembered in `tetris.conf`, so changing the interface
 language cannot create duplicate entries. Original line counts display “—”.
 New scores still support Unicode names, full line counts and modern integer limits.
+
+
+## Grouped settings and DOS preference import
+
+`config.conf` is UTF-8 TOML, with `config_version = 2` at the root. Sections are
+`application`, `interface`, `file_manager`, `panels.left`, `panels.right`, `editor`,
+`regional`, `screensaver` and `bookmarks`. For example:
+
+```toml
+config_version = 2
+
+[application]
+save_on_exit = true
+shortcuts = "classic_dn"
+
+[interface]
+palette = "classic"
+show_clock = true
+
+[panels.left]
+layout = "brief"
+sort = "name"
+columns = "name"
+
+[editor]
+auto_indent = true
+syntax = true
+expand_tabs = true
+tab_size = 8
+
+[regional]
+language = "en"
+date_order = "ymd"
+date_separator = "-"
+time_format = 24
+time_separator = ":"
+
+[screensaver]
+minutes = 10
+```
+
+Omitted fields use current defaults. Known fields require the right TOML type
+and a supported value; invalid settings trigger recovery of the whole file rather
+than partial application. Unknown TOML values are kept on save, although formatting/comments may
+be regenerated. Bookmark slots `1` through `9` retain the existing lossless native
+path encoding; set them through Quick directories rather than typing DOS paths.
+Settings and other configuration filenames/locations have not changed.
+
+Only TOML with `config_version = 2` is supported. Invalid, oversized, older flat, empty,
+unversioned or unsupported-version configurations are renamed to `_old_config.conf`
+and defaults load. Existing recovery files are never overwritten: collisions use
+`_old_1_config.conf`, `_old_2_config.conf`, and so on. Recovery uses the settings
+lock; read-only files, symlinks, inaccessible files or failed renames report errors
+and are not discarded. Recovery does not reopen the first-run welcome. There is no
+format migration or `config.txt` fallback. Missing files use defaults;
+Save desktop or normal saving on exit creates a new TOML configuration.
+Locks, external-edit checks, read-only/symlink protections and the 1 MiB bound
+continue to apply. Load desktop reloads the file; it does not import DOS settings.
+
+Choose **Options → Import DOS settings…**, enter the original `DN.CFG` path, then
+review **current → imported** values and skipped records. The reader runs in the
+background; close/cancel discards pending replies. Arrows, PageUp/PageDown,
+Home/End and the wheel scroll the preview; Left/Right pan long lines. Tab chooses
+Apply or Cancel. The title close control also cancels. Apply is unavailable for
+invalid files or when there are no changes.
+
+Supported imports are clock visibility, hidden-file visibility, Name/Extension/
+Size/Date sorting for both panels, file highlighting, selection markers, Space
+marking, Delete-key handling, editor auto-indent, tab width 1–16 and screensaver
+delay. Original delay selectors 0/1/2/3/4 map to disabled/1/2/5/10 minutes.
+Unfamiliar record layouts, unsupported modes and invalid tab widths are reported
+as skipped. Truncated data, duplicate supported blocks, invalid termination and
+unsupported signatures are rejected. Input is limited to 1 MiB and must be a
+regular file, not a symlink.
+
+Apply changes supported preferences in memory. Save desktop or normal saving on
+exit persists them. The original DOS file is never written, renamed or deleted.
+Trash mode, confirmations, shortcuts, language/date formatting, palette and other
+preferences stay as they were. DOS drive paths, `.DSK` windows, hardware options,
+commands, macros and custom palette files are not imported. User menus,
+associations and Tetris score files retain their separate formats. Support is
+currently verified against fixtures derived from the original format; real-world
+`DN.CFG` compatibility remains provisional until tested with a supplied file.

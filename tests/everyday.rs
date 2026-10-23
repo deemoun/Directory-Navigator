@@ -405,16 +405,18 @@ fn column_presets_live_preview_cancel_persistence_and_no_rescan() -> io::Result<
     app.config.save(&temp.0.join("config"))?;
     let config = Config::read(&temp.0.join("config"))?;
     assert_eq!(config.columns, app.config.columns);
-    fs::write(temp.0.join("legacy"), "hidden=false\nleft_sort=size\n")?;
+    fs::write(
+        temp.0.join("legacy"),
+        "config_version=2\n[file_manager]\nhidden=false\n[panels.left]\nsort=\"size\"\n",
+    )?;
     let legacy = Config::read(&temp.0.join("legacy"))?;
     assert_eq!(legacy.columns, [ColumnPreset::Name; 2]);
     assert!(!legacy.show_hidden);
     fs::write(
         temp.0.join("legacy"),
-        "left_columns=unknown\nright_columns=name\n",
+        "config_version=2\n[panels.left]\ncolumns=\"unknown\"\n[panels.right]\ncolumns=\"name\"\n",
     )?;
-    let legacy = Config::read(&temp.0.join("legacy"))?;
-    assert_eq!(legacy.columns, [ColumnPreset::Name; 2]);
+    assert!(Config::read(&temp.0.join("legacy")).is_err());
     Ok(())
 }
 

@@ -167,15 +167,19 @@ fn clock_format_midnight_repeated_seconds_and_backwards_time() {
     assert!(!clock.update(before - chrono::Duration::hours(10) + chrono::Duration::days(1)));
 }
 #[test]
-fn appearance_configuration_legacy_unknown_roundtrip_and_interface_clock() -> io::Result<()> {
+fn appearance_configuration_defaults_invalid_roundtrip_and_interface_clock() -> io::Result<()> {
     let t = Temp::new()?;
     let path = t.0.join("settings");
-    fs::write(&path, "hidden=false\n")?;
+    fs::write(&path, "config_version=2\n[file_manager]\nhidden=false\n")?;
     let old = Config::read(&path)?;
     assert_eq!(old.palette, PaletteProfile::ClassicDn);
     assert!(old.show_clock);
-    fs::write(&path, "palette=unknown\n")?;
-    assert_eq!(Config::read(&path)?.palette, PaletteProfile::ClassicDn);
+    fs::write(
+        &path,
+        "config_version=2\n[interface]\npalette=\"unknown\"\n",
+    )?;
+    assert!(Config::read(&path).is_err());
+    fs::write(&path, "config_version=2\n")?;
     let config = Config {
         palette: PaletteProfile::Terminal,
         show_clock: false,

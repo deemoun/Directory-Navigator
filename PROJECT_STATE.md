@@ -3,7 +3,7 @@
 ## Architecture
 - Native Rust `dn`: Ratatui/Crossterm/Chrono, Unicode segmentation, Unix libc;
   macOS native Trash via `trash`, Windows native shell APIs; minimal ZIP/TAR/gzip
-  codec features via zip/tar/flate2.
+  codec features via zip/tar/flate2; TOML parser for grouped preferences.
 - Modular app/input/panels, operations, dialogs, configuration, editor, viewer
   and utilities. Shared focus policy and explicit viewport preparation.
 - Cancellable panel scanners; bounded short-task pool; dedicated file-operation
@@ -12,6 +12,17 @@
   state owns session dialogs/options/results; quick view owns debounced reads.
 
 ## Implemented
+- config.conf uses typed TOML v2 sections only; no flat-format reader, conversion
+  or migration backups. Invalid contents move to exclusive `_old_config.conf`
+  (numbered on collision), then defaults load and normal saves work. Missing files
+  use defaults; read-only/symlink/inaccessible/locked recovery failures remain errors.
+  Native bookmarks and unknown TOML data survive saves; no .txt fallback.
+  Existing lock/conflict/size/read-only/symlink/staging protections remain.
+- Options → Import DOS settings reads bounded DN.CFG blocks in a cancellable worker,
+  previews supported preferences/skips and offers Apply/Cancel with modal mouse/key
+  controls. No source writes or automatic imports; paths/commands/desktop objects,
+  palettes, Trash and confirmation policy are excluded. Mapping is independently
+  implemented from documented source layouts; real DOS files remain untested.
 - Manual Build draft release accepts a validated SemVer, builds/checks two native
   macOS Apple Silicon/Intel targets, verifies embedded versions and packages versioned assets.
   Final write-only job verifies complete checksums and tags the identical source
@@ -168,7 +179,8 @@
   exit (System Setup opt-out). Save/Load desktop share its baseline. Unchanged
   files are skipped; external changes, lock conflicts, bad files and write errors
   are reported without silently overwriting them. Failed saves cancel exit.
-  Atomic private staging, bounded reads and native bookmarks remain; no new deps.
+  Atomic private staging, bounded reads and native bookmarks remain. TOML v2
+  adds the toml dependency; other user-menu/association/score formats stay separate.
 
 - Screen rest defaults to 10 minutes; setup includes 30/60-minute delays.
   Existing saved delays remain unchanged.
@@ -194,6 +206,17 @@
   entries. Keyboard/mouse navigation uses the reduced menu set.
 
 ## Validation
+- Grouped config/import: focused tests cover types/defaults/unknown values,
+  recovery of invalid/old/empty/unversioned files without overwriting backups, native paths,
+  TLV mappings/bounds/termination/duplicates, readonly source/cancellation/stale
+  replies, unrelated live sorts, Apply/Cancel and resized mouse geometry.
+  Config recovery adds collision, oversized, lock, read-only, symlink and
+  save/reload regressions. All four Mac Cargo checks pass (364 tests, one
+  opt-in ignored); Windows-target all-target Clippy passes.
+  Native Linux/Windows execution remains untested.
+  Release PTY reached preview Cancel/Apply and resizing, but full import workflow
+  completion was blocked by test-shell cleanup in the sandbox; outside-sandbox run
+  was declined. No GitHub workflow was triggered.
 - Associations: 13 regressions cover parsing/limits/native argv, literal command
   execution/spawn errors, internal tools, directory/Ctrl+Enter precedence, stale
   replies, invalid-config recovery, safe definition editing/reload, archive
@@ -237,7 +260,7 @@
   history, panel/modal precedence and cursor visibility after resizing. Release
   macOS PTY passed execution/return, history, directory changes, Unicode resize,
   listing refresh and terminal/cursor restoration.
-- Settings tests cover complete/legacy/native round trips, unchanged exits, unknown
+- Settings tests cover complete/native TOML round trips, unchanged exits, unknown
   keys, invalid/versioned/oversized files, symlinks/read-only errors, locks,
   concurrent changes, Apply/Cancel and exit recovery. Release macOS PTY passed
   two-run persistence, clock/sort reload, conflict recovery, mouse opt-out,
@@ -275,13 +298,13 @@
 - Classic DN defaults on all platforms and saved Mac/Auto choices round-trip.
   Release macOS PTY verifies Classic first start, switching to Mac in Settings,
   saved-profile restart, welcome/Help/mouse/resize and terminal restoration.
-- Keyboard-profile tests cover legacy/unknown configuration, Apply/Cancel and
+- Keyboard-profile tests cover missing/invalid configuration, Apply/Cancel and
   desktop persistence, original confirmations and unsaved guards, prefix input
   isolation, paste/mouse/focus changes, editor word movement and user-menu review.
   English/Russian labels and targets fit 80×25/120×40. Release macOS PTY passes
   Auto→Classic→Mac, saved/reloaded preferences, editor save/close, viewer wrap/search,
   copy cancellation, resize and terminal restoration.
-- macOS ARM64: fmt check, Clippy (including all test targets) with denied warnings, 344 passing tests
+- macOS ARM64: fmt check, Clippy (including all test targets) with denied warnings, 364 passing tests
   (one opt-in real-Trash success test ignored), release build.
 - Menu tests enforce working entries, unique mnemonics, normalized separators,
   unchanged headings, Block selection/clipboard/undo, Paragraph styling and clock

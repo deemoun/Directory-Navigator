@@ -257,11 +257,11 @@ fn idle_respects_modals_jobs_games_and_clock_ticks() -> io::Result<()> {
     Ok(())
 }
 #[test]
-fn config_round_trip_legacy_and_invalid_values() -> io::Result<()> {
+fn config_round_trip_defaults_and_invalid_values() -> io::Result<()> {
     let temp = Temp::new()?;
     let path = temp.0.join("config.conf");
     assert_eq!(Config::read(&path)?.saver_minutes, 10);
-    fs::write(&path, "hidden=true\n")?;
+    fs::write(&path, "config_version=2\n[file_manager]\nhidden=true\n")?;
     assert_eq!(Config::read(&path)?.saver_minutes, 10);
     for value in screensaver::DELAYS {
         let c = Config {
@@ -272,8 +272,11 @@ fn config_round_trip_legacy_and_invalid_values() -> io::Result<()> {
         assert_eq!(Config::read(&path)?.saver_minutes, value);
     }
     for value in ["bad", "-1", "3", "255"] {
-        fs::write(&path, format!("saver_minutes={value}\n"))?;
-        assert_eq!(Config::read(&path)?.saver_minutes, 10);
+        fs::write(
+            &path,
+            format!("config_version=2\n[screensaver]\nminutes={value}\n"),
+        )?;
+        assert!(Config::read(&path).is_err());
     }
     Ok(())
 }

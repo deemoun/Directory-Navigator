@@ -192,7 +192,7 @@ System Setup	Система
 S~y~stem Information	~С~истема
 S~y~stem Setup...	~С~истема...
 Tab / ↑↓ choose · Space toggle · Enter OK · Esc Cancel	Tab / ↑↓ — выбор · Пробел — смена · Enter OK · Esc отмена
-Tab panels · Arrows/PgUp/PgDn/Home/End navigate\nAlt+F/U/P/M/O menus · Alt+X exits\nEnter app/dir/archive · Ctrl+Enter OS app · F3 view · F4 edit · BS parent\nIns / Space marks · Ctrl+A all · Ctrl+U clear\n+ / - group · Alt+E info · Alt+K columns\nAlt+F7 quick search · Ctrl+F7 recursive Find\nCtrl+Q quick view · Ctrl+T tree · Alt+F9 Tetris\nCtrl+1–9 bookmarks set · Alt+1–9 go · Alt+Del filter\nCtrl+K calculator · Ctrl+B ASCII · Alt+Y memory\nCtrl+C compare · Alt+L list file\nAlt+BS directories · Alt+PgUp edits / PgDn views\nF2 user menu · Shift+F2 sort · Ctrl+F3 name / F4 ext / F5 date / F6 size\nF5 copy · F6 move · Shift+F6 rename here\nF7 mkdir · F8 Trash/delete · F9 menu · F10 exit\nCtrl+H hidden · Ctrl+L go to · Ctrl+R refresh\nClick row · Ctrl+click mark · Double-click open\nWheel scrolls · Esc cancels dialogs/operations\nType commands · Enter runs · Esc clears · Ctrl+E/X history · Alt+F8 list\nFile menu: Copy names / paths uses internal clipboard\nOptions: File associations configures Enter actions\nColors: white dirs · green exec · cyan source\nMagenta archives · blue links · yellow marks\nTrash by default; File Manager Setup changes mode.\nExisting destinations are refused; no overwrites.	Tab — сменить панель · Стрелки/PgUp/PgDn/Home/End — навигация\nAlt+F/U/P/M/O — меню · Alt+X — выход\nEnter — открыть · Ctrl+Enter — приложение ОС · F3 просмотр · F4 редактор\nIns / Пробел — отметить · Ctrl+A все · Ctrl+U снять отметки\n+ / - — группа · Alt+E свойства · Alt+K колонки\nAlt+F7 — быстрый поиск · Ctrl+F7 — поиск по папкам\nCtrl+Q — быстрый просмотр · Ctrl+T — дерево · Alt+F9 — Тетрис\nCtrl+1–9 — назначить закладку · Alt+1–9 — перейти · Alt+Del фильтр\nCtrl+K калькулятор · Ctrl+B символы · Alt+Y память\nCtrl+C сравнить · Alt+L список файлов\nAlt+BS история папок · Alt+PgUp редактор / PgDn просмотр\nF2 меню пользователя · Shift+F2 сортировка\nF5 копировать · F6 переместить · Shift+F6 переименовать\nF7 создать папку · F8 корзина/удаление · F9 меню · F10 выход\nCtrl+H скрытые · Ctrl+L перейти · Ctrl+R обновить\nЩелчок — выбрать · Ctrl+щелчок — отметить · Двойной — открыть\nКолесо — прокрутка · Esc — отмена\nКоманды: Enter выполнить · Esc очистить · Ctrl+E/X история · Alt+F8 список\nФайл: копирование имён/путей во внутренний буфер\nБелый — папки · Зелёный — программы · Бирюзовый — исходники\nПурпурный — архивы · Синий — ссылки · Жёлтый — отметки\nПо умолчанию файлы перемещаются в корзину.\nСуществующие назначения не перезаписываются.\nПараметры → Ассоциации файлов — действия Enter
+Tab panels · Arrows/PgUp/PgDn/Home/End navigate\nAlt+F/U/P/M/O menus · Alt+X exits\nEnter app/dir/archive · Ctrl+Enter OS app · F3 view · F4 edit · BS parent\nIns / Space marks · Ctrl+A all · Ctrl+U clear\n+ / - group · Alt+E info · Alt+K columns\nAlt+F7 quick search · Ctrl+F7 recursive Find\nCtrl+Q quick view · Ctrl+T tree · Alt+F9 Tetris\nCtrl+1–9 bookmarks set · Alt+1–9 go · Alt+Del filter\nCtrl+K calculator · Ctrl+B ASCII · Alt+Y memory\nCtrl+C compare · Alt+L list file\nAlt+BS directories · Alt+PgUp edits / PgDn views\nF2 user menu · Shift+F2 sort · Ctrl+F3 name / F4 ext / F5 date / F6 size\nF5 copy · F6 move · Shift+F6 rename here\nF7 mkdir · F8 Trash/delete · F9 menu · F10 exit\nCtrl+H hidden · Ctrl+L go to · Ctrl+R refresh\nClick row · Ctrl+click mark · Double-click open\nWheel scrolls · Esc cancels dialogs/operations\nType commands · Enter runs · Esc clears · Ctrl+E/X history · Alt+F8 list\nFile menu: Copy names / paths uses internal clipboard\nOptions: File associations configures Enter actions\nOptions: Import DOS settings previews DN.CFG preferences\nColors: white dirs · green exec · cyan source\nMagenta archives · blue links · yellow marks\nTrash by default; File Manager Setup changes mode.\nExisting destinations are refused; no overwrites.	Tab — сменить панель · Стрелки/PgUp/PgDn/Home/End — навигация\nAlt+F/U/P/M/O — меню · Alt+X — выход\nEnter — открыть · Ctrl+Enter — приложение ОС · F3 просмотр · F4 редактор\nIns / Пробел — отметить · Ctrl+A все · Ctrl+U снять отметки\n+ / - — группа · Alt+E свойства · Alt+K колонки\nAlt+F7 — быстрый поиск · Ctrl+F7 — поиск по папкам\nCtrl+Q — быстрый просмотр · Ctrl+T — дерево · Alt+F9 — Тетрис\nCtrl+1–9 — назначить закладку · Alt+1–9 — перейти · Alt+Del фильтр\nCtrl+K калькулятор · Ctrl+B символы · Alt+Y память\nCtrl+C сравнить · Alt+L список файлов\nAlt+BS история папок · Alt+PgUp редактор / PgDn просмотр\nF2 меню пользователя · Shift+F2 сортировка\nF5 копировать · F6 переместить · Shift+F6 переименовать\nF7 создать папку · F8 корзина/удаление · F9 меню · F10 выход\nCtrl+H скрытые · Ctrl+L перейти · Ctrl+R обновить\nЩелчок — выбрать · Ctrl+щелчок — отметить · Двойной — открыть\nКолесо — прокрутка · Esc — отмена\nКоманды: Enter выполнить · Esc очистить · Ctrl+E/X история · Alt+F8 список\nФайл: копирование имён/путей во внутренний буфер\nБелый — папки · Зелёный — программы · Бирюзовый — исходники\nПурпурный — архивы · Синий — ссылки · Жёлтый — отметки\nПо умолчанию файлы перемещаются в корзину.\nСуществующие назначения не перезаписываются.\nПараметры → Ассоциации файлов — действия Enter\nПараметры → Импорт настроек DOS — просмотр параметров DN.CFG
 Tab width	Ширина табуляции
 Terminal	Терминал
 Terminal size	Размер терминала
@@ -449,3 +449,34 @@ Ctrl+O displays a guide; Esc cancels the prefix.	Ctrl+O показывает п�
 Classic keys: F1–F10 and Alt/Ctrl combinations.	Классические клавиши: F1–F10 и сочетания Alt/Ctrl.
 F1 opens help; keyboard settings offer a Mac-friendly profile.	F1 — справка; в настройках клавиш доступен профиль Mac.
 Trash	Корзина
+~I~mport DOS settings...	~И~мпорт настроек DOS...
+Import DOS settings	Импорт настроек DOS
+DOS configuration file	Файл настроек DOS
+Reading DOS settings…	Чтение настроек DOS…
+Import error	Ошибка импорта
+Setting: current → imported	Параметр: текущий → импортированный
+No settings changes available.	Нет доступных изменений настроек.
+Skipped settings	Пропущенные настройки
+DOS paths, palettes, commands and desktop windows are not imported.	Пути DOS, палитры, команды и окна рабочего стола не импортируются.
+Trash, confirmations and unrelated preferences stay unchanged.	Корзина, подтверждения и прочие настройки остаются без изменений.
+Apply changes this session; normal settings saving persists them.	Применить для этого сеанса; обычное сохранение запишет настройки.
+DOS settings applied for this session.	Настройки DOS применены для этого сеанса.
+Show clock	Показывать часы
+Show hidden files	Показывать скрытые файлы
+Both panel sorts	Сортировка обеих панелей
+Highlight groups	Группы подсветки
+Selection markers	Метки выбора
+Space marks entries	Пробел отмечает элементы
+Delete key enabled	Клавиша Delete включена
+Editor auto-indent	Автоотступ редактора
+Editor tab width	Ширина табуляции редактора
+Screensaver minutes	Заставка: минуты
+Unsupported panel sort mode	Неподдерживаемая сортировка панели
+Unsupported screensaver delay selector	Неподдерживаемый интервал заставки
+Unsupported editor tab width	Неподдерживаемая ширина табуляции
+Unsupported block	Неподдерживаемый блок
+Unfamiliar block layout	Неизвестный формат блока
+Unsupported blocks skipped	Пропущено неподдерживаемых блоков
+Import worker stopped.	Рабочий процесс импорта остановлен.
+Choose an original DN.CFG file. A read-only preview shows supported preferences before Apply. DOS paths, commands and desktop windows are not imported.	Выберите исходный файл DN.CFG. Поддерживаемые параметры будут показаны перед применением. Пути DOS, команды и окна рабочего стола не импортируются.
+Options: Import DOS settings previews DN.CFG preferences	Параметры: импорт настроек DOS показывает параметры DN.CFG

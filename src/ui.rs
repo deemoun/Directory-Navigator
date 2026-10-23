@@ -8,6 +8,7 @@ mod archive_view;
 mod clock;
 mod colors_view;
 mod command_history_view;
+mod config_import_view;
 mod dialog_style;
 mod directory_tree_view;
 mod discovery_view;
@@ -186,5 +187,6 @@ fn draw_content(frame: &mut Frame, app: &mut App) {
     colors_view::draw(frame, app, area);
     screensaver_view::draw_setup(frame, app, area);
     command_history_view::draw(frame, app, area);
+    config_import_view::draw(frame, app, area);
     draw_info_dialog(frame, app, prepared.message.as_ref());
 }

@@ -65,15 +65,19 @@ fn draw(app: &mut App, w: u16, h: u16) -> io::Result<String> {
 }
 
 #[test]
-fn deletion_defaults_legacy_settings_roundtrip_and_cancel() -> io::Result<()> {
+fn deletion_defaults_strict_settings_roundtrip_and_cancel() -> io::Result<()> {
     let temp = Temp::new()?;
     let path = temp.0.join("desktop");
     assert!(Config::default().use_trash);
     assert!(Config::read(&path)?.use_trash);
-    fs::write(&path, "hidden=true\n")?;
+    fs::write(&path, "config_version=2\n[file_manager]\nhidden=true\n")?;
     assert!(Config::read(&path)?.use_trash);
-    fs::write(&path, "use_trash=unknown\n")?;
-    assert!(Config::read(&path)?.use_trash);
+    fs::write(
+        &path,
+        "config_version=2\n[file_manager]\nuse_trash=\"unknown\"\n",
+    )?;
+    assert!(Config::read(&path).is_err());
+    fs::write(&path, "config_version=2\n")?;
     let config = Config {
         use_trash: false,
         ..Default::default()

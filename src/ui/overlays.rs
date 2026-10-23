@@ -87,7 +87,7 @@ pub(super) fn draw_operation_overlays(frame: &mut Frame, app: &mut App, area: Re
         );
         let simple = matches!(
             prompt.kind,
-            PromptKind::GoTo | PromptKind::Operation(Kind::Mkdir)
+            PromptKind::GoTo | PromptKind::ImportDos | PromptKind::Operation(Kind::Mkdir)
         );
         // original-dn/RESOURCE/ENGLISH/DN.DNR dlgMkDir is 49×7.
         let width = if matches!(prompt.kind, PromptKind::Operation(Kind::Mkdir)) {
@@ -146,11 +146,16 @@ pub(super) fn draw_operation_overlays(frame: &mut Frame, app: &mut App, area: Re
                 Rect::new(rect.x + 2, rect.y + 2, rect.width - 4, 5),
             );
         } else {
-            let label = app.config.language.text(if simple {
-                "Directory name"
-            } else {
-                "Destination"
-            });
+            let label = app
+                .config
+                .language
+                .text(if matches!(prompt.kind, PromptKind::ImportDos) {
+                    "DOS configuration file"
+                } else if simple {
+                    "Directory name"
+                } else {
+                    "Destination"
+                });
             let first = label.chars().next().map_or(0, char::len_utf8);
             frame.render_widget(
                 Paragraph::new(Line::from(vec![

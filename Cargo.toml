@@ -9,6 +9,7 @@ readme = "README.md"
 exclude = ["original-dn/**", "dist/**", "release/**", "dn", "dn.exe"]
 
 [dependencies]
+toml = "1"
 ratatui = { version = "0.29", default-features = false, features = ["crossterm"] }
 crossterm = "0.28"
 unicode-segmentation = "1"

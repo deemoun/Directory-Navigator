@@ -144,15 +144,20 @@ fn disabled_saving_txt_is_ignored_and_empty_conf_skips_welcome() -> io::Result<(
     Ok(())
 }
 #[test]
-fn invalid_inaccessible_and_unavailable_settings_report_errors_without_welcome() -> io::Result<()> {
+fn invalid_settings_recover_and_inaccessible_settings_report_errors_without_welcome(
+) -> io::Result<()> {
     let t = Temp::new()?;
     fs::create_dir_all(t.config().parent().unwrap())?;
     fs::write(t.config(), "config_version=999\n")?;
     let mut a = t.app()?;
     a.load_initial_config();
     assert!(a.welcome.dialog.is_none());
-    assert!(!a.dialogs.is_empty());
-    fs::remove_file(t.config())?;
+    assert!(a.dialogs.is_empty());
+    assert_eq!(
+        fs::read_to_string(t.config().with_file_name("_old_config.conf"))?,
+        "config_version=999\n"
+    );
+    assert!(!t.config().exists());
     fs::create_dir(t.config())?;
     let mut a = t.app()?;
     a.load_initial_config();
@@ -167,7 +172,10 @@ fn invalid_inaccessible_and_unavailable_settings_report_errors_without_welcome()
     {
         use std::os::unix::fs::PermissionsExt;
         fs::remove_dir(t.config())?;
-        fs::write(t.config(), "hidden=true\n")?;
+        fs::write(
+            t.config(),
+            "config_version=2\n[file_manager]\nhidden=true\n",
+        )?;
         fs::set_permissions(t.config(), fs::Permissions::from_mode(0o0))?;
         if unsafe { libc::geteuid() } != 0 {
             let mut a = t.app()?;

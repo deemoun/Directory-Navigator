@@ -449,7 +449,12 @@ fn change_all_single_undo_and_search_options_disabled_without_selection() -> io:
 fn editor_preferences_tabs_menu_mouse_and_configuration_roundtrip() -> io::Result<()> {
     let temp = Temp::new()?;
     let path = temp.0.join("config");
-    fs::write(&path, "hidden=false\neditor_tab_size=0\n")?;
+    fs::write(
+        &path,
+        "config_version=2\n[file_manager]\nhidden=false\n[editor]\ntab_size=0\n",
+    )?;
+    assert!(Config::read(&path).is_err());
+    fs::write(&path, "config_version=2\n")?;
     let config = Config::read(&path)?;
     assert_eq!(config.editor.tab_size, 8);
     assert!(config.editor.auto_indent && config.editor.expand_tabs && config.editor.syntax);

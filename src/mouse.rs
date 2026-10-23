@@ -12,6 +12,8 @@ use std::{
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Target {
+    ApplyImport,
+    CancelImport,
     Welcome(crate::welcome::Action),
     ShortcutProfile,
     CommandHistory(crate::command_line::history::Action),
@@ -108,6 +110,10 @@ fn handle_mouse(app: &mut App, event: MouseEvent) {
         .rev()
         .find(|(rect, _)| rect.contains(Position::new(event.column, event.row)))
         .map(|(_, target)| *target);
+    if focus == Focus::ConfigImport {
+        crate::config_import::mouse(app, event, target);
+        return;
+    }
     if focus == Focus::Welcome {
         if event.kind == MouseEventKind::Down(MouseButton::Left) {
             if let Some(Target::Welcome(action)) = target {

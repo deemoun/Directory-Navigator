@@ -52,7 +52,9 @@ fn first_exit_creates_configuration_then_unchanged_exit_does_not_write() -> io::
     assert_eq!(Config::read(&t.path())?, defaults);
     let text = fs::read_to_string(t.path())?;
     assert!(text.starts_with("# Directory Navigator preferences\n"));
-    assert!(text.contains("config_version=1\nsave_on_exit=true"));
+    assert!(text.contains("config_version = 2"));
+    assert!(text.contains("[application]"));
+    assert!(text.contains("save_on_exit = true"));
     assert_eq!(fs::read_dir(t.path().parent().unwrap())?.count(), 1);
     Ok(())
 }
@@ -63,11 +65,11 @@ fn complete_preferences_roundtrip_and_unknown_keys_survive() -> io::Result<()> {
     fs::create_dir_all(t.path().parent().unwrap())?;
     fs::write(
         t.path(),
-        "# legacy file\nhidden=true\nfuture_setting=keep=exact\n",
+        "config_version=2\nfuture_setting=\"keep=exact\"\n[file_manager]\nhidden=true\n",
     )?;
     let mut store = Store::new(Some(t.path()));
     let mut config = store.load()?;
-    assert_eq!(config.layouts, [PanelLayout::Details; 2]);
+    assert_eq!(config.layouts, [PanelLayout::Brief; 2]);
     config.language = dn::localization::Language::Russian;
     config.datetime = dn::regional::DateTimeFormat {
         date_order: dn::regional::DateOrder::Dmy,
@@ -96,7 +98,8 @@ fn complete_preferences_roundtrip_and_unknown_keys_survive() -> io::Result<()> {
     config.bookmarks[0] = Some(t.0.join("Unicode ☺ = name"));
     store.save(&config, true)?;
     assert_eq!(store.load()?, config);
-    assert!(fs::read_to_string(t.path())?.contains("future_setting=keep=exact\n"));
+    let saved: toml::Table = fs::read_to_string(t.path())?.parse().unwrap();
+    assert_eq!(saved["future_setting"].as_str(), Some("keep=exact"));
     config.bookmarks[0] = None;
     store.save(&config, true)?;
     assert!(Config::read(&t.path())?.bookmarks[0].is_none());
@@ -133,19 +136,21 @@ fn competing_instances_and_external_edits_are_not_overwritten() -> io::Result<()
 }
 
 #[test]
-fn invalid_or_unavailable_configuration_is_retained() -> io::Result<()> {
+fn invalid_configuration_recovers_but_unavailable_settings_fail() -> io::Result<()> {
     let t = Temp::new()?;
     fs::create_dir_all(t.path().parent().unwrap())?;
     for invalid in [
         b"not a record".as_slice(),
-        b"config_version=2\n",
+        b"config_version=3\n",
         b"\xff\xfe",
     ] {
         fs::write(t.path(), invalid)?;
         let mut store = Store::new(Some(t.path()));
-        assert!(store.load().is_err());
-        assert!(store.save(&Config::default(), true).is_err());
-        assert_eq!(fs::read(t.path())?, invalid);
+        assert_eq!(store.load()?, Config::default());
+        assert!(!store.is_new_installation());
+        assert!(!t.path().exists());
+        store.save(&Config::default(), true)?;
+        assert_eq!(Config::read(&t.path())?, Config::default());
     }
     fs::write(t.path(), vec![b' '; 1024 * 1024 + 1])?;
     assert!(Config::read(&t.path()).is_err());
@@ -228,7 +233,7 @@ fn exit_save_error_retains_session_and_cancels_quit() -> io::Result<()> {
     let t = Temp::new()?;
     let mut app = t.app()?;
     app.save_config();
-    fs::write(t.path(), "hidden=false\n")?;
+    fs::write(t.path(), "config_version=2\n[file_manager]\nhidden=false\n")?;
     app.config.show_clock = false;
     app.quit = true;
     assert!(!app.save_settings_on_exit());
@@ -240,7 +245,10 @@ fn exit_save_error_retains_session_and_cancels_quit() -> io::Result<()> {
         .unwrap()
         .message
         .contains("Exit cancelled"));
-    assert_eq!(fs::read_to_string(t.path())?, "hidden=false\n");
+    assert_eq!(
+        fs::read_to_string(t.path())?,
+        "config_version=2\n[file_manager]\nhidden=false\n"
+    );
     app.load_config();
     app.quit = true;
     assert!(app.save_settings_on_exit());
@@ -306,14 +314,20 @@ fn txt_is_ignored_and_conf_is_created_with_defaults() -> io::Result<()> {
 fn conf_takes_precedence_and_invalid_conf_does_not_fall_back() -> io::Result<()> {
     let t = Temp::new()?;
     fs::create_dir_all(t.path().parent().unwrap())?;
-    fs::write(t.path().with_file_name("config.txt"), "hidden=false\n")?;
-    fs::write(t.path(), "hidden=true\n")?;
+    fs::write(
+        t.path().with_file_name("config.txt"),
+        "config_version=2\n[file_manager]\nhidden=false\n",
+    )?;
+    fs::write(t.path(), "config_version=2\n[file_manager]\nhidden=true\n")?;
     let mut store = Store::new(Some(t.path()));
     assert!(store.load()?.show_hidden);
-    fs::write(t.path(), "config_version=2\n")?;
-    assert!(store.load().is_err());
-    assert!(store.save(&Config::default(), true).is_err());
-    assert_eq!(fs::read_to_string(t.path())?, "config_version=2\n");
+    fs::write(t.path(), "config_version=3\n")?;
+    assert_eq!(store.load()?, Config::default());
+    assert_eq!(
+        fs::read_to_string(t.path().with_file_name("_old_config.conf"))?,
+        "config_version=3\n"
+    );
+    store.save(&Config::default(), true)?;
     Ok(())
 }
 
@@ -322,10 +336,10 @@ fn txt_changes_are_ignored_but_new_conf_still_blocks_save() -> io::Result<()> {
     let t = Temp::new()?;
     fs::create_dir_all(t.path().parent().unwrap())?;
     let legacy = t.path().with_file_name("config.txt");
-    fs::write(&legacy, "hidden=false\n")?;
+    fs::write(&legacy, "config_version=2\n[file_manager]\nhidden=false\n")?;
     let mut store = Store::new(Some(t.path()));
     let config = store.load()?;
-    fs::write(&legacy, "hidden=true\n")?;
+    fs::write(&legacy, "config_version=2\n[file_manager]\nhidden=true\n")?;
     assert!(store.save(&config, false)?);
     assert_eq!(Config::read(&t.path())?, Config::default());
     store.load()?;

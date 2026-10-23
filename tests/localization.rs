@@ -178,15 +178,16 @@ fn formats_cover_orders_leap_dates_midnight_noon_and_offsets() {
     assert!(clock.update_with(t - chrono::Duration::seconds(1), f));
 }
 #[test]
-fn legacy_and_invalid_config_defaults_and_regional_roundtrip() -> io::Result<()> {
+fn new_and_invalid_config_defaults_and_regional_roundtrip() -> io::Result<()> {
     let t = Temp::new()?;
     let p = t.0.join("config.conf");
-    fs::write(&p, "hidden=true\n")?;
+    fs::write(&p, "config_version=2\n[file_manager]\nhidden=true\n")?;
     let c = Config::read(&p)?;
     assert_eq!(c.language, Language::English);
     assert_eq!(c.datetime, DateTimeFormat::default());
-    fs::write(&p,"language=unknown\ndate_order=unknown\ndate_separator=x\ntime_format=invalid\ntime_separator=x\n")?;
-    assert_eq!(Config::read(&p)?.datetime, DateTimeFormat::default());
+    fs::write(&p,"config_version=2\n[regional]\nlanguage=\"unknown\"\ndate_order=\"unknown\"\ndate_separator=\"x\"\ntime_format=\"invalid\"\ntime_separator=\"x\"\n")?;
+    assert!(Config::read(&p).is_err());
+    fs::write(&p, "config_version=2\n")?;
     let mut store = dn::config::Store::new(Some(p));
     let mut c = store.load()?;
     c.language = Language::Russian;

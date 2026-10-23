@@ -4,7 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-const MAX_CONFIG_BYTES: u64 = 1024 * 1024;
+pub(super) const MAX_CONFIG_BYTES: u64 = 1024 * 1024;
 pub(crate) fn read_bytes(path: &Path) -> io::Result<Option<Vec<u8>>> {
     use std::io::Read;
     let file = match crate::filesystem::open_regular(path) {
@@ -29,6 +29,7 @@ pub struct Store {
     path: Option<PathBuf>,
     disk: Option<Vec<u8>>,
     loaded: Option<Config>,
+    recovered: bool,
 }
 impl Store {
     pub fn new(path: Option<PathBuf>) -> Self {
@@ -36,6 +37,7 @@ impl Store {
             path,
             disk: None,
             loaded: None,
+            recovered: false,
         }
     }
     pub fn path(&self) -> io::Result<&Path> {
@@ -43,15 +45,36 @@ impl Store {
             .as_deref()
             .ok_or_else(|| io::Error::other("Cannot determine the configuration directory"))
     }
-    /// True only after a successful load that found no settings file.
+    /// True only after a successful load with no settings file or recovery.
     pub fn is_new_installation(&self) -> bool {
-        self.loaded.is_some() && self.disk.is_none()
+        self.loaded.is_some() && self.disk.is_none() && !self.recovered
     }
     pub fn load(&mut self) -> io::Result<Config> {
-        let disk = read_bytes(self.path()?)?;
-        let config = match disk.as_ref() {
-            Some(bytes) => Config::parse(bytes)?,
-            None => Config::default(),
+        let path = self.path()?.to_path_buf();
+        let read = || -> io::Result<_> {
+            let disk = read_bytes(&path)?;
+            let config = match disk.as_ref() {
+                Some(bytes) => Config::parse(bytes)?,
+                None => Config::default(),
+            };
+            Ok((disk, config))
+        };
+        let (disk, config) = match read() {
+            Ok(value) => value,
+            Err(error) if error.kind() == io::ErrorKind::InvalidData => {
+                let _lock = SaveLock::acquire(&path)?;
+                // Another instance may have repaired the file before we acquired the lock.
+                match read() {
+                    Ok(value) => value,
+                    Err(error) if error.kind() == io::ErrorKind::InvalidData => {
+                        preserve_invalid(&path)?;
+                        self.recovered = true;
+                        (None, Config::default())
+                    }
+                    Err(error) => return Err(error),
+                }
+            }
+            Err(error) => return Err(error),
         };
         self.disk = disk;
         self.loaded = Some(config.clone());
@@ -74,12 +97,54 @@ impl Store {
                 "Settings changed outside this instance. Load desktop before saving again",
             ));
         }
-        config.save_preserving(&path, self.disk.as_deref().unwrap_or_default())?;
+        config.save_preserving(&path, self.disk.as_deref())?;
         self.disk = read_bytes(&path)?;
         self.loaded = Some(config.clone());
         Ok(true)
     }
 }
+/// Move invalid contents aside without overwriting any earlier recovery file.
+fn preserve_invalid(path: &Path) -> io::Result<()> {
+    let file = crate::filesystem::open_regular(path)?;
+    if file.metadata()?.permissions().readonly() {
+        return Err(io::Error::new(
+            io::ErrorKind::PermissionDenied,
+            "Configuration file is read-only",
+        ));
+    }
+    // Validate the same opened file whose identity we guard before moving it.
+    use std::io::Read;
+    let mut contents = Vec::new();
+    (&file)
+        .take(MAX_CONFIG_BYTES + 1)
+        .read_to_end(&mut contents)?;
+    if Config::parse(&contents).is_ok() {
+        return Err(io::Error::other(
+            "Settings changed during recovery; reload settings",
+        ));
+    }
+    let name = path
+        .file_name()
+        .ok_or_else(|| io::Error::other("Missing settings filename"))?;
+    for number in 0..1000 {
+        let mut backup = std::ffi::OsString::from(if number == 0 {
+            "_old_".to_owned()
+        } else {
+            format!("_old_{number}_")
+        });
+        backup.push(name);
+        if !crate::platform_fs::owns_file(path, &file) {
+            return Err(io::Error::other("Settings changed during recovery"));
+        }
+        match crate::platform_fs::rename_no_replace(path, &path.with_file_name(backup)) {
+            Ok(()) => return crate::platform_fs::sync_parent(path),
+            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => continue,
+            Err(error) => return Err(error),
+        }
+    }
+    Err(io::Error::other("No free settings recovery filename"))
+}
+
 pub(crate) struct SaveLock {
     file: fs::File,
     path: PathBuf,

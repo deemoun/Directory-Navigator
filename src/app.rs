@@ -7,6 +7,7 @@ use crate::{
 use std::{io, path::PathBuf};
 
 pub struct App {
+    pub config_import: Option<crate::config_import::Preview>,
     pub welcome: crate::welcome::State,
     pub shortcuts: crate::shortcuts::State,
     pub associations: crate::associations::State,
@@ -58,6 +59,7 @@ impl App {
     pub fn new(path: PathBuf) -> io::Result<Self> {
         let config = Config::default();
         Ok(Self {
+            config_import: None,
             welcome: Default::default(),
             shortcuts: Default::default(),
             associations: Default::default(),
@@ -134,7 +136,8 @@ impl App {
         let utilities_changed = crate::utilities::poll(self);
         let tools_changed = crate::file_tools::poll(self);
         let editor_changed = crate::editor::poll(self);
-        let mut changed = self
+        let mut changed = crate::config_import::poll(self);
+        changed |= self
             .tetris
             .as_mut()
             .is_some_and(|game| game.tick(std::time::Instant::now()));
@@ -287,6 +290,7 @@ impl App {
                 crate::focus::current(self),
                 crate::focus::Focus::Manager | crate::focus::Focus::QuickSearch
             ) && self.quick_view.as_ref().is_some_and(|q| q.pending()))
+            || self.config_import.as_ref().is_some_and(|p| p.loading())
             || self.directory_tree.as_ref().is_some_and(|t| t.loading())
             || crate::user_menu::pending(&self.user_menu)
             || self.associations.busy()
@@ -450,6 +454,11 @@ impl App {
             prompt.base.join(&prompt.field)
         };
         match prompt.kind {
+            PromptKind::ImportDos => {
+                if let Err(error) = crate::config_import::start(self, destination) {
+                    self.error(error.to_string());
+                }
+            }
             PromptKind::GoTo => {
                 self.panels[self.active].go_to(destination, self.config.show_hidden)
             }

@@ -32,6 +32,10 @@ fn handle_key(app: &mut App, key: KeyEvent) {
         crate::dialog::message_key(app, key.code);
         return;
     }
+    if focus == Focus::ConfigImport {
+        crate::config_import::key(app, key);
+        return;
+    }
     if focus == Focus::Welcome {
         crate::welcome::key(app, key);
         return;

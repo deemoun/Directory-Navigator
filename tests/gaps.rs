@@ -120,12 +120,15 @@ fn bookmark_encoding_configuration_native_legacy_and_invalid() -> io::Result<()>
     }
     fs::write(
         &destination,
-        "hidden=false\nbookmark_1=foreign:abcd\nbookmark_9=bad\nbookmark_500=unix:ff\n",
+        "config_version=2\n[file_manager]\nhidden=false\n[bookmarks]\n1=\"foreign:abcd\"\n9=\"bad\"\n500=\"unix:ff\"\n",
     )?;
     let config = Config::read(&destination)?;
     assert!(!config.show_hidden);
     assert!(config.bookmarks.iter().all(Option::is_none));
-    fs::write(&destination, "hidden=true\n")?;
+    fs::write(
+        &destination,
+        "config_version=2\n[file_manager]\nhidden=true\n",
+    )?;
     assert!(Config::read(&destination)?
         .bookmarks
         .iter()

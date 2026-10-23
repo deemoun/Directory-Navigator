@@ -1,3 +1,4 @@
+mod format;
 pub(crate) mod store;
 use crate::columns::ColumnPreset;
 use crate::panel::SortMode;
@@ -89,220 +90,22 @@ impl Config {
         }
     }
 
-    fn parse(bytes: &[u8]) -> io::Result<Self> {
-        let text = std::str::from_utf8(bytes)
-            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
-        let mut config = Self {
-            layouts: [PanelLayout::Details; 2],
-            ..Self::default()
-        };
-        for (number, line) in text.lines().enumerate() {
-            let line = line.trim();
-            if line.is_empty() || line.starts_with('#') || line.starts_with(';') {
-                continue;
-            }
-            if !line.contains('=') {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!("Invalid configuration record at line {}", number + 1),
-                ));
-            }
-            if let Some((key, value)) = line.split_once('=') {
-                match key.trim() {
-                    "shortcuts" => {
-                        config.shortcuts = crate::shortcuts::Profile::parse(value.trim())
-                    }
-                    "language" => {
-                        config.language = crate::localization::Language::parse(value.trim())
-                    }
-                    "date_order" => {
-                        config.datetime.date_order = crate::regional::DateOrder::parse(value.trim())
-                    }
-                    "date_separator" => {
-                        config.datetime.date_separator = value
-                            .trim()
-                            .chars()
-                            .next()
-                            .filter(|c| matches!(c, '-' | '.' | '/'))
-                            .unwrap_or('-')
-                    }
-                    "time_format" => config.datetime.twelve_hour = value.trim() == "12",
-                    "time_separator" => {
-                        config.datetime.time_separator = if value.trim() == "." { '.' } else { ':' }
-                    }
-                    "config_version" if value.trim() != "1" => {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidData,
-                            "Unsupported configuration version",
-                        ))
-                    }
-                    "save_on_exit" => config.save_on_exit = value.trim() != "false",
-                    "palette" => {
-                        config.palette = crate::palette::PaletteProfile::parse(value.trim())
-                    }
-                    "saver_minutes" => {
-                        config.saver_minutes = value
-                            .trim()
-                            .parse::<u8>()
-                            .ok()
-                            .filter(|v| crate::screensaver::DELAYS.contains(v))
-                            .unwrap_or(crate::screensaver::DEFAULT_DELAY)
-                    }
-                    "show_clock" => config.show_clock = value.trim() != "false",
-                    "editor_auto_indent" => config.editor.auto_indent = value.trim() != "false",
-                    "editor_syntax" => config.editor.syntax = value.trim() != "false",
-                    "editor_expand_tabs" => config.editor.expand_tabs = value.trim() != "false",
-                    "editor_tab_size" => {
-                        config.editor.tab_size = value
-                            .trim()
-                            .parse::<u8>()
-                            .ok()
-                            .filter(|v| (1..=16).contains(v))
-                            .unwrap_or(8)
-                    }
-                    "hidden" => config.show_hidden = value.trim() != "false",
-                    "highlight" => config.highlight_files = value.trim() != "false",
-                    "tags" => config.show_tags = value.trim() != "false",
-                    "space_select" => config.space_select = value.trim() != "false",
-                    "delete_key" => config.delete_key = value.trim() != "false",
-                    "use_trash" => config.use_trash = value.trim() != "false",
-                    "backspace_parent" => config.backspace_parent = value.trim() != "false",
-                    "left_layout" | "right_layout" => {
-                        config.layouts[usize::from(key.trim() == "right_layout")] =
-                            PanelLayout::parse(value.trim());
-                    }
-                    "left_columns" | "right_columns" => {
-                        config.columns[usize::from(key.trim() == "right_columns")] =
-                            ColumnPreset::parse(value.trim());
-                    }
-                    "left_sort" | "right_sort" => {
-                        let mode = match value.trim() {
-                            "extension" => SortMode::Extension,
-                            "size" => SortMode::Size,
-                            "date" => SortMode::Date,
-                            _ => SortMode::Name,
-                        };
-                        config.sorts[usize::from(key.trim() == "right_sort")] = mode;
-                    }
-                    key if key.starts_with("bookmark_") => {
-                        if let Some(slot) = key
-                            .strip_prefix("bookmark_")
-                            .and_then(|s| s.parse::<usize>().ok())
-                            .filter(|s| (1..=9).contains(s))
-                        {
-                            config.bookmarks[slot - 1] = crate::bookmarks::decode(value.trim());
-                        }
-                    }
-                    _ => {}
-                }
-            }
-        }
-        Ok(config)
+    pub fn parse(bytes: &[u8]) -> io::Result<Self> {
+        format::parse(bytes)
     }
 
     pub fn save(&self, path: &Path) -> io::Result<()> {
-        self.save_preserving(path, &[])
+        self.save_preserving(path, read_bytes(path)?.as_deref())
     }
 
-    fn encode(&self) -> io::Result<Vec<u8>> {
+    fn save_preserving(&self, path: &Path, previous: Option<&[u8]>) -> io::Result<()> {
         use std::io::Write;
-        let name = |sort| match sort {
-            SortMode::Name => "name",
-            SortMode::Extension => "extension",
-            SortMode::Size => "size",
-            SortMode::Date => "date",
-        };
-        let mut output = Vec::new();
-
-        writeln!(output, "# Directory Navigator preferences\n# Saved automatically on normal exit; Options > Save desktop saves now.\nconfig_version=1\nsave_on_exit={}", self.save_on_exit)?;
-        writeln!(output, "shortcuts={}", self.shortcuts.key())?;
-        writeln!(
-            output,
-            "language={}\ndate_order={}\ndate_separator={}\ntime_format={}\ntime_separator={}",
-            self.language.key(),
-            self.datetime.date_order.key(),
-            self.datetime.date_separator,
-            if self.datetime.twelve_hour {
-                "12"
-            } else {
-                "24"
-            },
-            self.datetime.time_separator
-        )?;
-        write!(
-            output,
-            "hidden={}\nleft_sort={}\nright_sort={}\n",
-            self.show_hidden,
-            name(self.sorts[0]),
-            name(self.sorts[1])
-        )?;
-        writeln!(
-            output,
-            "highlight={}\ntags={}\nspace_select={}\ndelete_key={}\nbackspace_parent={}",
-            self.highlight_files,
-            self.show_tags,
-            self.space_select,
-            self.delete_key,
-            self.backspace_parent
-        )?;
-        writeln!(
-            output,
-            "left_columns={}\nright_columns={}",
-            self.columns[0].key(),
-            self.columns[1].key()
-        )?;
-        writeln!(output, "use_trash={}", self.use_trash)?;
-        writeln!(
-            output,
-            "left_layout={}\nright_layout={}",
-            self.layouts[0].key(),
-            self.layouts[1].key()
-        )?;
-        writeln!(
-            output,
-            "editor_auto_indent={}\neditor_syntax={}\neditor_expand_tabs={}\neditor_tab_size={}",
-            self.editor.auto_indent,
-            self.editor.syntax,
-            self.editor.expand_tabs,
-            self.editor.tab_size
-        )?;
-        for (i, path) in self.bookmarks.iter().enumerate() {
-            if let Some(path) = path {
-                writeln!(
-                    output,
-                    "bookmark_{}={}",
-                    i + 1,
-                    crate::bookmarks::encode(path)
-                )?;
-            }
-        }
-        writeln!(
-            output,
-            "palette={}\nshow_clock={}",
-            self.palette.key(),
-            self.show_clock
-        )?;
-        writeln!(output, "saver_minutes={}", self.saver_minutes)?;
-        Ok(output)
-    }
-
-    fn save_preserving(&self, path: &Path, previous: &[u8]) -> io::Result<()> {
-        use std::io::Write;
-        let mut bytes = self.encode()?;
-        let encoded = String::from_utf8_lossy(&bytes);
-        let known: std::collections::HashSet<_> = encoded
-            .lines()
-            .filter_map(|line| line.split_once('=').map(|(key, _)| key.to_owned()))
-            .collect();
-        // Keep extension keys from newer versions or hand-edited configurations.
-        for line in String::from_utf8_lossy(previous).lines() {
-            if let Some((key, _)) = line.split_once('=') {
-                let key = key.trim();
-                if !known.contains(key) && !key.starts_with("bookmark_") {
-                    bytes.extend_from_slice(line.as_bytes());
-                    bytes.push(b'\n');
-                }
-            }
+        let bytes = format::encode(self, previous)?;
+        if bytes.len() > store::MAX_CONFIG_BYTES as usize {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Configuration exceeds 1 MiB",
+            ));
         }
         match fs::symlink_metadata(path) {
             Ok(metadata) if !metadata.file_type().is_file() => {

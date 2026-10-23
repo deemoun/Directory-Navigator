@@ -431,16 +431,16 @@ fn extension_sort_native_values_shortcuts_and_cycle() -> io::Result<()> {
 }
 
 #[test]
-fn configuration_new_legacy_unknown_and_independent_roundtrip() -> io::Result<()> {
+fn configuration_defaults_invalid_and_independent_roundtrip() -> io::Result<()> {
     let temp = Temp::new()?;
     let file = temp.0.join("config");
     assert_eq!(Config::read(&file)?.layouts, [PanelLayout::Brief; 2]);
     fs::write(
         &file,
-        "left_columns=name_size_modified\nright_columns=name_size\nhidden=false\n",
+        "config_version=2\n[file_manager]\nhidden=false\n[panels.left]\ncolumns=\"name_size_modified\"\n[panels.right]\ncolumns=\"name_size\"\n",
     )?;
     let legacy = Config::read(&file)?;
-    assert_eq!(legacy.layouts, [PanelLayout::Details; 2]);
+    assert_eq!(legacy.layouts, [PanelLayout::Brief; 2]);
     assert_eq!(
         legacy.columns,
         [ColumnPreset::NameSizeModified, ColumnPreset::NameSize]
@@ -448,8 +448,10 @@ fn configuration_new_legacy_unknown_and_independent_roundtrip() -> io::Result<()
     assert!(!legacy.show_hidden);
     fs::write(
         &file,
-        "left_layout=brief\nright_layout=unknown\nleft_sort=extension\n",
+        "config_version=2\n[panels.left]\nlayout=\"brief\"\nsort=\"extension\"\n[panels.right]\nlayout=\"unknown\"\n",
     )?;
+    assert!(Config::read(&file).is_err());
+    fs::write(&file,"config_version=2\n[panels.left]\nlayout=\"brief\"\nsort=\"extension\"\n[panels.right]\nlayout=\"details\"\n")?;
     let mut config = Config::read(&file)?;
     assert_eq!(config.layouts, [PanelLayout::Brief, PanelLayout::Details]);
     assert_eq!(config.sorts[0], SortMode::Extension);

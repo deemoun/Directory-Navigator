@@ -95,10 +95,13 @@ fn defaults_unknown_values_and_configuration_round_trip() -> io::Result<()> {
         config.save(&path)?;
         assert_eq!(Config::read(&path)?.shortcuts, profile);
     }
-    for text in ["hidden=true\n", "shortcuts=unknown\n"] {
-        fs::write(&path, text)?;
-        assert_eq!(Config::read(&path)?.shortcuts, Profile::ClassicDn);
-    }
+    fs::write(&path, "config_version=2\n")?;
+    assert_eq!(Config::read(&path)?.shortcuts, Profile::ClassicDn);
+    fs::write(
+        &path,
+        "config_version=2\n[application]\nshortcuts=\"unknown\"\n",
+    )?;
+    assert!(Config::read(&path).is_err());
     Ok(())
 }
 #[test]

@@ -5,6 +5,7 @@ pub mod app;
 pub mod associations;
 pub mod columns;
 pub mod config;
+pub mod config_import;
 pub mod dialog;
 pub mod editor;
 pub mod file_info;

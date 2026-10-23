@@ -17,6 +17,7 @@ pub enum MenuId {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Action {
+    ImportDosSettings,
     EditAssociations,
     ReloadAssociations,
     CommandHistory,
@@ -219,6 +220,7 @@ pub fn items(menu: usize) -> Vec<Item> {
             line(),
             item("~S~ave desktop", "", SaveSettings),
             item("~L~oad desktop", "", LoadSettings),
+            item("~I~mport DOS settings...", "", ImportDosSettings),
             line(),
             item("C~o~lors...", "", Colors),
         ],
@@ -356,6 +358,7 @@ pub fn execute(app: &mut App, action: Action) {
         Action::Columns => app.open_columns(),
         Action::SaveSettings => app.save_config(),
         Action::LoadSettings => app.load_config(),
+        Action::ImportDosSettings => crate::config_import::open(app),
         Action::Settings(kind) => app.open_settings(kind),
         Action::View(mode) => app.open_viewer_mode(mode),
         Action::Confirmations => app.dialogs.push(crate::dialog::Dialog {
