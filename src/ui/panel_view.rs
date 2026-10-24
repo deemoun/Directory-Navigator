@@ -167,7 +167,16 @@ pub(super) fn draw_panel(
     }
     let bar = geometry.scrollbar;
     if !bar.is_empty() {
-        let attr = if active && !panel.loading && panel.entries.len() > 1 {
+        let classic = profile == crate::palette::PaletteProfile::ClassicDn;
+        let enabled = !panel.loading && panel.entries.len() > 1;
+        let attr = if classic {
+            // DN's white scroll strip stays legible on both panels.
+            if enabled {
+                0xf0
+            } else {
+                0xf8
+            }
+        } else if active && enabled {
             0x70
         } else {
             0x78
@@ -177,7 +186,7 @@ pub(super) fn draw_panel(
                 "▲"
             } else if y + 1 == bar.bottom() {
                 "▼"
-            } else if panel.entries.len() <= 1 {
+            } else if !classic && panel.entries.len() <= 1 {
                 "▓"
             } else {
                 "▒"

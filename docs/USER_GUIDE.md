@@ -266,6 +266,15 @@ Utilities also provides System Information. Information dialogs are read-only sn
 Refresh updates them. Unsupported or denied native fields display their errors.
 Calculator and character-table Copy use DN's internal editor clipboard (Ctrl+V).
 
+The calculator (Ctrl+K) has a compact DN-style expression field and a five-row
+result box: DEC, HEX, BIN, OCT and EXP. Choose a row, then Copy or Ctrl+C. EXP is
+approximate scientific notation with 15 significant digits; DEC keeps exact
+64-bit integers. Long values are shortened on screen but copied in full.
+The arrow beside the expression opens session history; choosing a previous
+expression does not evaluate it. Up/Down in the field still recall history.
+Tab/Shift+Tab move focus, Enter evaluates, F1 opens calculator help and Esc closes
+history first, then the calculator. Other utilities retain their existing layout.
+
 Text viewer: F2 wraps, F7 searches the loaded preview, Shift+F7 continues and
 Ctrl+F7 searches backward. Search and wrapping are disabled in Hex view.
 Filters preserve excluded marks; file operations/export use visible marks only.
@@ -481,6 +490,19 @@ queries or directory scans. Failed queries display “Volume space unavailable�
 No drive selector or DOS drive-letter controls are added.
 
 ## Tetris high scores
+
+The game uses a classic DN-style board with Info, Next and Best panels and
+New / Setup / Top 10 / Pause buttons. The title close control and Esc return to
+files. Top 10 shows Name, Start, End and Score with dotted leaders; the highlighted
+entry's line count remains below the table. Pending scores keep a Retry save
+button, and OK or the title close control returns to the game.
+
+Setup provides ten named levels (1–9 and 0 for level 10) and a Piece preview
+checkbox. Arrows select levels; Tab/Shift+Tab move between levels, preview, OK
+and Cancel. Space toggles preview, Enter applies (or cancels on Cancel), and Esc
+cancels. Applying starts a new game; cancellation preserves the current board,
+score, level, preview and paused state. Classic Tetris is the only implemented
+style; Pentix is not offered.
 
 Alt+F9 opens Tetris. A finished game shows the final score, line count and
 starting/ending levels. Enter/Esc continues: positive scores qualifying for the

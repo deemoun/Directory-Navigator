@@ -16,6 +16,7 @@ pub enum GameAction {
     Setup,
     LevelUp,
     LevelDown,
+    SetLevel(u8),
     Preview,
     Apply,
     Back,
@@ -102,6 +103,7 @@ pub fn action(app: &mut App, action: GameAction) {
         GameAction::Help => game.screen = Screen::Help,
         GameAction::Scores => game.screen = Screen::Scores,
         GameAction::Setup => {
+            game.setup_focus = 0;
             game.screen = Screen::Setup {
                 level: game.start_level,
                 preview: game.preview,
@@ -122,6 +124,14 @@ pub fn action(app: &mut App, action: GameAction) {
         GameAction::LevelDown => {
             if let Screen::Setup { level, .. } = &mut game.screen {
                 *level = level.saturating_sub(1).max(1);
+            }
+        }
+        GameAction::SetLevel(value) => {
+            if let Screen::Setup { level, .. } = &mut game.screen {
+                if (1..=10).contains(&value) {
+                    *level = value;
+                    game.setup_focus = 0;
+                }
             }
         }
         GameAction::Preview => {
@@ -171,13 +181,40 @@ pub fn key(app: &mut App, key: KeyEvent) {
         return;
     }
     if matches!(screen, Some(Screen::Setup { .. })) {
+        let focus = app.desktop.game().map_or(0, |g| g.setup_focus);
         match key.code {
-            KeyCode::Up | KeyCode::Right | KeyCode::Char('+') => action(app, GameAction::LevelUp),
-            KeyCode::Down | KeyCode::Left | KeyCode::Char('-') => {
-                action(app, GameAction::LevelDown)
+            KeyCode::Tab | KeyCode::BackTab => {
+                if let Some(game) = app.desktop.game_mut() {
+                    game.setup_focus = (focus + if key.code == KeyCode::Tab { 1 } else { 3 }) % 4;
+                }
             }
-            KeyCode::Char(' ') | KeyCode::Char('*') => action(app, GameAction::Preview),
-            KeyCode::Enter => action(app, GameAction::Apply),
+            KeyCode::Right | KeyCode::Char('+') => action(app, GameAction::LevelUp),
+            KeyCode::Left | KeyCode::Char('-') => action(app, GameAction::LevelDown),
+            KeyCode::Up if focus == 0 => action(app, GameAction::LevelDown),
+            KeyCode::Down if focus == 0 => action(app, GameAction::LevelUp),
+            KeyCode::Home => action(app, GameAction::SetLevel(1)),
+            KeyCode::End => action(app, GameAction::SetLevel(10)),
+            KeyCode::Char(c @ '0'..='9') => action(
+                app,
+                GameAction::SetLevel(if c == '0' { 10 } else { c as u8 - b'0' }),
+            ),
+            KeyCode::Char('*') => action(app, GameAction::Preview),
+            KeyCode::Char(' ') => action(
+                app,
+                match focus {
+                    2 => GameAction::Apply,
+                    3 => GameAction::Back,
+                    _ => GameAction::Preview,
+                },
+            ),
+            KeyCode::Enter => action(
+                app,
+                if focus == 3 {
+                    GameAction::Back
+                } else {
+                    GameAction::Apply
+                },
+            ),
             _ => {}
         }
         return;

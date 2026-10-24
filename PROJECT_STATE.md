@@ -14,6 +14,35 @@
   state owns session dialogs/options/results; quick view owns debounced reads.
 
 ## Implemented
+- Tetris presentation follows the DN game/setup/Top Ten references: framed
+  Info/Next/Best sidebar, New/Setup/Top 10/Pause shadowed buttons and title close;
+  Name/Start/End/Score dotted leaders, centered OK and conditional Retry save;
+  ten original named level choices and preview checkbox with keyboard/mouse
+  focus, OK/Cancel and title cancellation. Classic Tetris only; no Pentix
+  placeholder. English/Russian resources. Board mechanics, scoring, high-score
+  persistence/import and name entry safeguards remain unchanged.
+  macOS ARM64 fmt/all-target Clippy/381 tests/release pass (one existing opt-in
+  native Trash test ignored). Both palettes/languages, resizing, full u64 score
+  columns, setup cancellation/apply and mouse targets covered. Native PTY workflow
+  checks game/setup/Top 10, level/preview apply, title cancel/close, shell input
+  and terminal restoration. Native Intel/Windows/Linux remain untested locally.
+- Calculator-only compact 72×18 DN layout: framed black expression field with
+  session-history dropdown, radio choices beside a framed right-aligned result
+  box, and shadowed Evaluate/Copy/Close/Help buttons. Adds EXP scientific copy
+  (15 significant digits) while preserving exact DEC/HEX/BIN/OCT evaluation.
+  History recall does not execute/evaluate, help retains expression state, and
+  truncated display values copy in full to the existing internal clipboard.
+  English/Russian resources; other utility layouts and filesystem behavior unchanged.
+  macOS ARM64: fmt, all-target Clippy, 379 tests passed (one existing opt-in
+  native Trash test ignored), release build; calculator PTY workflow covers
+  evaluation/EXP, copy, history recall, help/return, exit and terminal restoration.
+  Both palettes/languages, 80×25/larger/resized screens, clipboard preservation
+  and long-value copying covered. Other platforms not run locally.
+- Classic DN panel scrollbars use a white strip with black stippling, square
+  position marker and arrow buttons on both active/inactive panels. Disabled
+  controls remain subdued; Terminal colors and scroll geometry/input are unchanged.
+  Verified both layouts/panels/profiles at 80×25 and 132×40, including resize,
+  arrows, wheel and drag. macOS ARM64 fmt/Clippy/full tests/release pass.
 - Session window list (Manager → Windows…, editor File → Windows…, Alt+0;
   Mac-friendly Ctrl+O then U) switches between the permanent file manager and
   one retained editor/viewer. Stable identities reject stale mouse targets;

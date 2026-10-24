@@ -322,7 +322,7 @@ fn game_dialog_mouse_setup_cancel_apply_scores_and_resize() -> io::Result<()> {
     }
     click(&mut app, GameAction::Setup);
     render(&mut app, 80, 25)?;
-    click(&mut app, GameAction::LevelUp);
+    click(&mut app, GameAction::SetLevel(2));
     click(&mut app, GameAction::Preview);
     click(&mut app, GameAction::Back);
     assert_eq!(app.desktop.game().unwrap().start_level, 1);
@@ -566,5 +566,247 @@ fn failed_score_save_is_visible_retryable_and_survives_game_close() -> io::Resul
         dn::tetris::scores::Board::parse(&fs::read(&path)?)?.records[0].name,
         "Winner"
     );
+    Ok(())
+}
+
+#[test]
+fn reference_game_scores_and_setup_layouts_preserve_colors_values_and_mouse_bounds(
+) -> io::Result<()> {
+    use dn::{localization::Language, palette::PaletteProfile};
+    let temp = Temp::new()?;
+    for language in [Language::English, Language::Russian] {
+        for profile in [PaletteProfile::ClassicDn, PaletteProfile::Terminal] {
+            let mut app = temp.app()?;
+            app.config.language = language;
+            app.config.palette = profile;
+            tetris::open(&mut app);
+            let game = app.desktop.game_mut().unwrap();
+            game.records = vec![
+                Record {
+                    name: "Winner 界".into(),
+                    start_level: 5,
+                    level: 10,
+                    score: u64::MAX,
+                    lines: None,
+                },
+                Record {
+                    name: "Second".into(),
+                    start_level: 1,
+                    level: 2,
+                    score: 384,
+                    lines: Some(2),
+                },
+            ];
+            game.highlighted = Some(1);
+            for (w, h) in [(80, 25), (132, 40), (80, 25)] {
+                let terminal = render(&mut app, w, h)?;
+                let text: String = terminal
+                    .backend()
+                    .buffer()
+                    .content
+                    .iter()
+                    .map(|c| c.symbol())
+                    .collect();
+                for label in ["Navigator's game", "Info", "Next", "Best", "Top 10"] {
+                    assert!(text.contains(language.text(label)), "{label}");
+                }
+                let close = app
+                    .mouse
+                    .regions
+                    .iter()
+                    .find(|(_, t)| *t == Target::Game(GameAction::Close))
+                    .unwrap()
+                    .0;
+                let origin = (close.x - 2, close.y);
+                let b = terminal.backend().buffer();
+                assert_eq!(b[(origin.0 + 1, origin.1 + 1)].fg, profile.color(15));
+                assert_eq!(b[(origin.0 + 28, origin.1 + 13)].fg, profile.color(14));
+                for action in [
+                    GameAction::New,
+                    GameAction::Setup,
+                    GameAction::Scores,
+                    GameAction::Pause,
+                    GameAction::Close,
+                ] {
+                    assert!(app
+                        .mouse
+                        .regions
+                        .iter()
+                        .any(|(_, t)| *t == Target::Game(action)));
+                }
+                tetris::action(&mut app, GameAction::Scores);
+                let terminal = render(&mut app, w, h)?;
+                let text: String = terminal
+                    .backend()
+                    .buffer()
+                    .content
+                    .iter()
+                    .map(|c| c.symbol())
+                    .collect();
+                for label in ["Tetris Top Ten", "Name", "Start", "End", "Score"] {
+                    assert!(text.contains(language.text(label)), "{label}");
+                }
+                assert!(text.contains("18446744073709551615"));
+                assert!(text.contains("Winner 界"));
+                assert!(text.contains("...."));
+                assert!(!app
+                    .mouse
+                    .regions
+                    .iter()
+                    .any(|(_, t)| *t == Target::Game(GameAction::RetrySave)));
+                let ok = app
+                    .mouse
+                    .regions
+                    .iter()
+                    .find(|(_, t)| *t == Target::Game(GameAction::Back))
+                    .unwrap()
+                    .0;
+                // The border close control cancels only this page and retains the game.
+                mouse::handle(
+                    &mut app,
+                    MouseEvent {
+                        kind: MouseEventKind::Down(MouseButton::Left),
+                        column: ok.x,
+                        row: ok.y,
+                        modifiers: KeyModifiers::NONE,
+                    },
+                );
+                assert_eq!(app.desktop.game().unwrap().screen, Screen::Play);
+                tetris::action(&mut app, GameAction::Setup);
+                let terminal = render(&mut app, w, h)?;
+                let text: String = terminal
+                    .backend()
+                    .buffer()
+                    .content
+                    .iter()
+                    .map(|c| c.symbol())
+                    .collect();
+                for label in [
+                    "Setup game",
+                    "Game style",
+                    "Classic Tetris",
+                    "Piece preview",
+                    "Sanitarium",
+                ] {
+                    assert!(text.contains(language.text(label)), "{label}");
+                }
+                assert!(!text.contains("Pentix"));
+                for level in 1..=10 {
+                    assert!(app
+                        .mouse
+                        .regions
+                        .iter()
+                        .any(|(_, t)| *t == Target::Game(GameAction::SetLevel(level))));
+                }
+                let apply = app
+                    .mouse
+                    .regions
+                    .iter()
+                    .find(|(_, t)| *t == Target::Game(GameAction::Apply))
+                    .unwrap()
+                    .0;
+                assert_eq!(
+                    terminal.backend().buffer()[(apply.x + 1, apply.y + 1)].bg,
+                    profile.color(0)
+                );
+                key(&mut app, KeyCode::Esc);
+                assert_eq!(app.desktop.game().unwrap().records[0].score, u64::MAX);
+            }
+            tetris::action(&mut app, GameAction::Setup);
+            render(&mut app, 40, 10)?;
+            assert!(app.mouse.regions.is_empty());
+            assert!(matches!(
+                app.desktop.game().unwrap().screen,
+                Screen::Setup { .. }
+            ));
+            render(&mut app, 80, 25)?;
+            key(&mut app, KeyCode::Esc);
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn setup_radio_choices_cancel_focus_and_apply_preserve_game_and_saved_records() -> io::Result<()> {
+    let temp = Temp::new()?;
+    let mut app = temp.app()?;
+    tetris::open(&mut app);
+    let game = app.desktop.game_mut().unwrap();
+    game.board[HEIGHT - 1][0] = 14;
+    game.score = 480;
+    game.lines = 2;
+    game.paused = true;
+    let board = game.board;
+    tetris::action(&mut app, GameAction::Setup);
+    render(&mut app, 80, 25)?;
+    click(&mut app, GameAction::SetLevel(10));
+    click(&mut app, GameAction::Preview);
+    assert_eq!(
+        app.desktop.game().unwrap().screen,
+        Screen::Setup {
+            level: 10,
+            preview: false
+        }
+    );
+    assert!(!app
+        .desktop
+        .game_mut()
+        .unwrap()
+        .tick(Instant::now() + Duration::from_secs(600)));
+    for _ in 0..3 {
+        key(&mut app, KeyCode::Tab);
+    }
+    assert_eq!(app.desktop.game().unwrap().setup_focus, 3);
+    key(&mut app, KeyCode::Enter);
+    let game = app.desktop.game().unwrap();
+    assert_eq!(game.screen, Screen::Play);
+    assert_eq!(game.board, board);
+    assert_eq!(
+        (
+            game.score,
+            game.lines,
+            game.level,
+            game.start_level,
+            game.preview,
+            game.paused
+        ),
+        (480, 2, 1, 1, true, true)
+    );
+    tetris::action(&mut app, GameAction::Setup);
+    key(&mut app, KeyCode::Char('0'));
+    assert!(matches!(
+        app.desktop.game().unwrap().screen,
+        Screen::Setup { level: 10, .. }
+    ));
+    key(&mut app, KeyCode::Home);
+    key(&mut app, KeyCode::Down);
+    assert!(matches!(
+        app.desktop.game().unwrap().screen,
+        Screen::Setup { level: 2, .. }
+    ));
+    key(&mut app, KeyCode::Up);
+    key(&mut app, KeyCode::End);
+    key(&mut app, KeyCode::Char('5'));
+    key(&mut app, KeyCode::Tab);
+    key(&mut app, KeyCode::Char(' '));
+    key(&mut app, KeyCode::Tab);
+    assert_eq!(app.desktop.game().unwrap().setup_focus, 2);
+    key(&mut app, KeyCode::Enter);
+    let game = app.desktop.game().unwrap();
+    assert_eq!(game.screen, Screen::Play);
+    assert_eq!(
+        (
+            game.level,
+            game.start_level,
+            game.preview,
+            game.paused,
+            game.score,
+            game.lines
+        ),
+        (5, 5, false, false, 0, 0)
+    );
+    assert_eq!(game.board, [[0; WIDTH]; HEIGHT]);
+    assert!(!temp.0.join("tetris.conf").exists());
+    assert_eq!(fs::read(temp.0.join("keep.txt"))?, b"unchanged");
     Ok(())
 }

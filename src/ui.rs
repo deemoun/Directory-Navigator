@@ -5,6 +5,7 @@ use ratatui::{
     Frame,
 };
 mod archive_view;
+mod calculator_view;
 mod clock;
 mod colors_view;
 mod command_history_view;

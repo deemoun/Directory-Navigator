@@ -6,7 +6,6 @@ use crate::{
 };
 use ratatui::{
     layout::Rect,
-    text::Line,
     widgets::{Paragraph, Wrap},
     Frame,
 };
@@ -49,6 +48,10 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
     let Some(kind) = app.utilities.dialog else {
         return;
     };
+    if kind == Kind::Calculator {
+        super::calculator_view::draw(frame, app, area);
+        return;
+    }
     let height = match kind {
         Kind::Characters => 24,
         Kind::Calculator => 22,
@@ -86,123 +89,7 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
     let x = rect.x + 2;
     let w = rect.width - 4;
     match kind {
-        Kind::Calculator => {
-            let calc = &app.utilities.calculator;
-            let focus = calc.focus;
-            text(
-                frame,
-                profile,
-                Rect::new(x, rect.y + 1, w, 1),
-                app.config
-                    .language
-                    .text("Expression · + - * / % ^ · sqrt() abs() · 0x / 0b / 0o"),
-                false,
-            );
-            let input = Rect::new(x, rect.y + 2, w, 1);
-            let column = Line::from(&calc.expression[..calc.cursor]).width();
-            let scroll = column.saturating_sub(usize::from(w.saturating_sub(1)));
-            frame.render_widget(
-                Paragraph::new(display_name(&calc.expression))
-                    .scroll((0, scroll as u16))
-                    .style(super::dialog_style::input_style(profile, focus == 0)),
-                input,
-            );
-            app.mouse
-                .regions
-                .push((input, Target::Utility(Action::Field)));
-            if focus == 0 {
-                frame.set_cursor_position((input.x + (column - scroll) as u16, input.y));
-            }
-            text(
-                frame,
-                profile,
-                Rect::new(x, rect.y + 3, w, 1),
-                app.config
-                    .language
-                    .text("Up/Down history · Enter evaluates · Tab moves · Esc closes"),
-                false,
-            );
-            let result = calc.result.map(|v| v.representations());
-            let status = calc.error.clone().unwrap_or_else(|| {
-                if calc.result.is_some() {
-                    "Result · Select a representation to copy".into()
-                } else {
-                    "Enter an expression, then Evaluate".into()
-                }
-            });
-            text(
-                frame,
-                profile,
-                Rect::new(x, rect.y + 4, w, 2),
-                &status,
-                false,
-            );
-            for (index, label) in ["DEC", "HEX", "BIN", "OCT"].iter().enumerate() {
-                let value = result
-                    .as_ref()
-                    .map(|values| {
-                        values[index]
-                            .as_ref()
-                            .map(String::as_str)
-                            .unwrap_or_else(|e| e.as_str())
-                    })
-                    .unwrap_or("—");
-                let row = Rect::new(x, rect.y + 6 + index as u16 * 2, w, 2);
-                text(
-                    frame,
-                    profile,
-                    row,
-                    &format!(
-                        "{} {label}: {value}",
-                        if calc.base == index { '●' } else { ' ' }
-                    ),
-                    focus == index + 1,
-                );
-                app.mouse
-                    .regions
-                    .push((row, Target::Utility(Action::Base(index))));
-            }
-            text(
-                frame,
-                profile,
-                Rect::new(x, rect.y + 15, w, 2),
-                &app.utilities.notice,
-                false,
-            );
-            text(
-                frame,
-                profile,
-                Rect::new(x, rect.y + 18, w, 1),
-                app.config
-                    .language
-                    .text("Copy uses DN's internal clipboard · Ctrl+C copies"),
-                false,
-            );
-            button(
-                frame,
-                app,
-                Rect::new(x + 2, rect.bottom() - 2, 16, 1),
-                " [ Evaluate ] ",
-                Action::Evaluate,
-                focus == 5,
-            );
-            button(
-                frame,
-                app,
-                Rect::new(x + 25, rect.bottom() - 2, 14, 1),
-                " [ Copy ] ",
-                Action::Copy,
-                focus == 6,
-            );
-            button(
-                frame,
-                app,
-                Rect::new(rect.right() - 20, rect.bottom() - 2, 14, 1),
-                " [ Close ] ",
-                Action::Close,
-                focus == 7,
-            );
-        }
+        Kind::Calculator => {}
         Kind::Characters => {
             let page = app.utilities.chart.page;
             let focus = app.utilities.chart.focus;

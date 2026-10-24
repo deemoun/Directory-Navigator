@@ -159,7 +159,32 @@ fn fixed_scrollbar_both_layouts_profiles_and_no_listing_reflow() -> io::Result<(
                 assert_eq!(b[(down.x, down.y)].symbol(), "▼");
                 assert_eq!(b[(track.x, track.y)].symbol(), "■");
                 assert_eq!(b[(track.x, track.y)].fg, profile.color(0));
-                assert_eq!(b[(track.x, track.y)].bg, profile.color(7));
+                let background = if profile == PaletteProfile::ClassicDn {
+                    15
+                } else {
+                    7
+                };
+                assert_eq!(b[(track.x, track.y)].bg, profile.color(background));
+                for panel in 0..2 {
+                    let track = region(&app, panel, ScrollAction::Track);
+                    let up = region(&app, panel, ScrollAction::Up);
+                    let down = region(&app, panel, ScrollAction::Down);
+                    let foreground = if profile == PaletteProfile::Terminal && panel != app.active {
+                        8
+                    } else {
+                        0
+                    };
+                    for (x, y, glyph) in [
+                        (up.x, up.y, "▲"),
+                        (down.x, down.y, "▼"),
+                        (track.x, track.y, "■"),
+                        (track.x, track.y + 1, "▒"),
+                    ] {
+                        assert_eq!(b[(x, y)].symbol(), glyph);
+                        assert_eq!(b[(x, y)].fg, profile.color(foreground));
+                        assert_eq!(b[(x, y)].bg, profile.color(background));
+                    }
+                }
                 let slots: Vec<_> = app
                     .mouse
                     .regions

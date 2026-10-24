@@ -486,3 +486,34 @@ File manager	Файловые панели
 Switch	Переключить
 Switching keeps documents open	Документы остаются открытыми
 New file	Новый файл
+Expression	Выражение
+Copy as	Копия в
+Evaluate	Вычислить
+Calculator Help	Помощь: калькулятор
+Expression history	История выражений
+No expression history	История выражений пуста
+Enter evaluates · Tab / Shift+Tab move focus\nAlt+P expression · Alt+E evaluate · Alt+C copy\nAlt+L close · F1 / Alt+H help\nUp/Down recall history while editing\nThe arrow button opens session history; Enter recalls\nDEC / HEX / BIN / OCT / EXP choose the copy format\nCtrl+C copies the full value to the internal clipboard\nLong values are shortened on screen, copied in full\nEXP is approximate scientific notation (15 significant digits)\nOperators: + - * / % ^ and parentheses\nFunctions: sqrt(), abs() · Bases: 0x, 0b, 0o\nOnly expressions are evaluated; commands are never run.	Enter вычисляет · Tab / Shift+Tab перемещают фокус\nAlt+P выражение · Alt+E вычислить · Alt+C копировать\nAlt+L закрыть · F1 / Alt+H помощь\nВ поле ↑/↓ вызывают историю выражений\nКнопка ↓ открывает историю сеанса; Enter выбирает\nDEC / HEX / BIN / OCT / EXP задают формат копии\nCtrl+C копирует полное значение во внутренний буфер\nДлинные значения сокращены на экране, копируются целиком\nEXP — приближённый научный формат (15 значащих цифр)\nОператоры: + - * / % ^ и скобки\nФункции: sqrt(), abs() · Основания: 0x, 0b, 0o\nВычисляются выражения; команды не запускаются.
+Navigator's game	Игра Навигатора
+Info	Инфо
+Best	Рекорд
+New	Новая
+Setup	Настройка
+Top 10	Топ 10
+Pause	Пауза
+Start	Старт
+End	Конец
+Setup game	Настройка игры
+Game style	Вид игры
+Classic Tetris	Классический тетрис
+Piece preview	Следующая фигура
+OK starts a new game · Esc cancels	OK начинает новую игру · Esc отменяет
+Baby	Малыш
+Little fella	Маленький парень
+Big child	Большой ребёнок
+It's easy	Это легко
+Never mind	Неважно
+I'm powerful !	Я всё могу!
+Insanity coming	Безумие приближается
+So what ?..	Ну и что?..
+Madness	Безумие
+Sanitarium	Санаторий

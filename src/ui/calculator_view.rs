@@ -1,0 +1,230 @@
+//! Calculator-only DN dialog; other utility layouts keep their existing chrome.
+use crate::{
+    app::App,
+    filesystem::display_name,
+    formatting,
+    mouse::Target,
+    utilities::{calculator::Value, Action},
+};
+use ratatui::{
+    layout::{Alignment, Rect},
+    text::{Line, Span},
+    widgets::{Block, Borders, Paragraph, Wrap},
+    Frame,
+};
+
+fn hot(
+    label: &str,
+    key: char,
+    normal: ratatui::style::Style,
+    accent: ratatui::style::Style,
+) -> Line<'static> {
+    let mut marked = false;
+    Line::from(
+        label
+            .chars()
+            .map(|c| {
+                let style = if !marked && c.to_ascii_lowercase() == key {
+                    marked = true;
+                    accent
+                } else {
+                    normal
+                };
+                Span::styled(c.to_string(), style)
+            })
+            .collect::<Vec<_>>(),
+    )
+}
+pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
+    let profile = app.config.palette;
+    let dos = profile.styles();
+    let language = app.config.language;
+    let rect =
+        super::dialog_style::window(frame, profile, area, 72, 18, language.text("Calculator"));
+    app.mouse.regions.clear();
+    super::dialog_style::close_button(
+        frame,
+        profile,
+        rect,
+        &mut app.mouse.regions,
+        Target::Utility(Action::Close),
+    );
+    let calc = &app.utilities.calculator;
+    let focus = calc.focus;
+    let expression = Rect::new(rect.x + 2, rect.y + 2, rect.width - 4, 3);
+    frame.render_widget(
+        Block::default()
+            .borders(Borders::ALL)
+            .border_style(dos(0x7f))
+            .title(hot(language.text("Expression"), 'p', dos(0x7f), dos(0x7e))),
+        expression,
+    );
+    let field = Rect::new(expression.x + 2, expression.y + 1, expression.width - 8, 1);
+    let column = Line::from(&calc.expression[..calc.cursor]).width();
+    let scroll = column.saturating_sub(usize::from(field.width - 1));
+    frame.render_widget(
+        Paragraph::new(display_name(&calc.expression))
+            .scroll((0, scroll as u16))
+            .style(super::dialog_style::input_style(profile, focus == 0)),
+        field,
+    );
+    app.mouse
+        .regions
+        .push((field, Target::Utility(Action::Field)));
+    let history_button = Rect::new(expression.right() - 4, field.y, 2, 1);
+    frame.render_widget(
+        Paragraph::new("↓")
+            .alignment(Alignment::Center)
+            .style(dos(0x9f)),
+        history_button,
+    );
+    app.mouse
+        .regions
+        .push((history_button, Target::Utility(Action::CalculatorHistory)));
+    if focus == 0 && !calc.history_open && app.dialogs.is_empty() {
+        frame.set_cursor_position((field.x + (column - scroll) as u16, field.y));
+    }
+    frame.render_widget(
+        Paragraph::new(language.text("Copy as")).style(dos(0x70)),
+        Rect::new(rect.x + 4, rect.y + 6, 11, 1),
+    );
+    let results = Rect::new(rect.x + 16, rect.y + 6, rect.width - 18, 7);
+    frame.render_widget(
+        Block::default()
+            .borders(Borders::ALL)
+            .border_style(dos(0x7f)),
+        results,
+    );
+    let value = calc.result.or_else(|| {
+        (calc.expression.is_empty() && calc.error.is_none()).then_some(Value::Integer(0))
+    });
+    let bases = value.map(Value::representations);
+    for (index, label) in ["DEC", "HEX", "BIN", "OCT", "EXP"].iter().enumerate() {
+        let y = results.y + 1 + index as u16;
+        let radio = Rect::new(rect.x + 4, y, 11, 1);
+        frame.render_widget(
+            Paragraph::new(Line::from(vec![
+                Span::styled(if calc.base == index { "(•) " } else { "( ) " }, dos(0x78)),
+                Span::styled(label[..1].to_string(), dos(0x7e)),
+                Span::styled(
+                    label[1..].to_string(),
+                    dos(if focus == index + 1 { 0x30 } else { 0x78 }),
+                ),
+            ])),
+            radio,
+        );
+        app.mouse
+            .regions
+            .push((radio, Target::Utility(Action::Base(index))));
+        let text = if index == 4 {
+            value.map(Value::scientific).unwrap_or_else(|| "—".into())
+        } else {
+            bases
+                .as_ref()
+                .and_then(|b| b[index].as_ref().ok())
+                .cloned()
+                .unwrap_or_else(|| "—".into())
+        };
+        let row = Rect::new(results.x + 2, y, results.width - 4, 1);
+        frame.render_widget(
+            Paragraph::new(formatting::tail(&text, row.width))
+                .alignment(Alignment::Right)
+                .style(dos(0x78)),
+            row,
+        );
+        app.mouse
+            .regions
+            .push((row, Target::Utility(Action::Base(index))));
+    }
+    let notice = calc
+        .error
+        .as_deref()
+        .filter(|_| !calc.history_open)
+        .unwrap_or(&app.utilities.notice);
+    frame.render_widget(
+        Paragraph::new(language.text(notice))
+            .style(dos(if calc.error.is_some() { 0x74 } else { 0x70 }))
+            .wrap(Wrap { trim: false }),
+        Rect::new(rect.x + 3, rect.y + 13, rect.width - 6, 2),
+    );
+    for (i, (label, command, selected, mnemonic)) in [
+        ("Evaluate", Action::Evaluate, focus == 0 || focus == 6, 'e'),
+        ("Copy", Action::Copy, focus == 7, 'c'),
+        ("Close", Action::Close, focus == 8, 'l'),
+        ("Help", Action::CalculatorHelp, focus == 9, 'h'),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let button = Rect::new(rect.x + 2 + i as u16 * 17, rect.y + 15, 14, 1);
+        frame.render_widget(
+            Paragraph::new(" ".repeat(14)).style(dos(0x00)),
+            Rect::new(button.x + 1, button.y + 1, button.width, 1),
+        );
+        let label = language.text(label);
+        let padding = 12_usize.saturating_sub(Span::raw(label).width());
+        let mut spans = vec![
+            Span::styled(if selected { "►" } else { " " }, dos(0x8b)),
+            Span::raw(" ".repeat(padding / 2)),
+        ];
+        spans.extend(
+            hot(
+                label,
+                mnemonic,
+                dos(if selected { 0x8b } else { 0x8f }),
+                dos(0x8e),
+            )
+            .spans,
+        );
+        spans.push(Span::raw(" ".repeat(padding - padding / 2)));
+        spans.push(Span::styled(if selected { "◄" } else { " " }, dos(0x8b)));
+        frame.render_widget(Paragraph::new(Line::from(spans)).style(dos(0x8f)), button);
+        app.mouse.regions.push((button, Target::Utility(command)));
+    }
+    if calc.history_open {
+        let rows = calc.history.len().clamp(1, 6);
+        let history = Rect::new(
+            expression.x,
+            expression.bottom(),
+            expression.width,
+            rows as u16 + 2,
+        );
+        frame.render_widget(ratatui::widgets::Clear, history);
+        frame.render_widget(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(dos(0x7f))
+                .title(language.text("Expression history"))
+                .style(dos(0x70)),
+            history,
+        );
+        let offset = calc.history_selection.saturating_sub(rows - 1);
+        if calc.history.is_empty() {
+            frame.render_widget(
+                Paragraph::new(language.text("No expression history")).style(dos(0x78)),
+                Rect::new(history.x + 2, history.y + 1, history.width - 4, 1),
+            );
+        }
+        for (index, expression) in calc.history.iter().enumerate().skip(offset).take(rows) {
+            let row = Rect::new(
+                history.x + 1,
+                history.y + 1 + (index - offset) as u16,
+                history.width - 2,
+                1,
+            );
+            frame.render_widget(
+                Paragraph::new(formatting::tail(&display_name(expression), row.width)).style(dos(
+                    if index == calc.history_selection {
+                        0x30
+                    } else {
+                        0x70
+                    },
+                )),
+                row,
+            );
+            app.mouse
+                .regions
+                .push((row, Target::Utility(Action::CalculatorRecall(index))));
+        }
+    }
+}

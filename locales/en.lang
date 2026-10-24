@@ -486,3 +486,34 @@ File manager	File manager
 Switch	Switch
 Switching keeps documents open	Switching keeps documents open
 New file	New file
+Expression	Expression
+Copy as	Copy as
+Evaluate	Evaluate
+Calculator Help	Calculator Help
+Expression history	Expression history
+No expression history	No expression history
+Enter evaluates · Tab / Shift+Tab move focus\nAlt+P expression · Alt+E evaluate · Alt+C copy\nAlt+L close · F1 / Alt+H help\nUp/Down recall history while editing\nThe arrow button opens session history; Enter recalls\nDEC / HEX / BIN / OCT / EXP choose the copy format\nCtrl+C copies the full value to the internal clipboard\nLong values are shortened on screen, copied in full\nEXP is approximate scientific notation (15 significant digits)\nOperators: + - * / % ^ and parentheses\nFunctions: sqrt(), abs() · Bases: 0x, 0b, 0o\nOnly expressions are evaluated; commands are never run.	Enter evaluates · Tab / Shift+Tab move focus\nAlt+P expression · Alt+E evaluate · Alt+C copy\nAlt+L close · F1 / Alt+H help\nUp/Down recall history while editing\nThe arrow button opens session history; Enter recalls\nDEC / HEX / BIN / OCT / EXP choose the copy format\nCtrl+C copies the full value to the internal clipboard\nLong values are shortened on screen, copied in full\nEXP is approximate scientific notation (15 significant digits)\nOperators: + - * / % ^ and parentheses\nFunctions: sqrt(), abs() · Bases: 0x, 0b, 0o\nOnly expressions are evaluated; commands are never run.
+Navigator's game	Navigator's game
+Info	Info
+Best	Best
+New	New
+Setup	Setup
+Top 10	Top 10
+Pause	Pause
+Start	Start
+End	End
+Setup game	Setup game
+Game style	Game style
+Classic Tetris	Classic Tetris
+Piece preview	Piece preview
+OK starts a new game · Esc cancels	OK starts a new game · Esc cancels
+Baby	Baby
+Little fella	Little fella
+Big child	Big child
+It's easy	It's easy
+Never mind	Never mind
+I'm powerful !	I'm powerful !
+Insanity coming	Insanity coming
+So what ?..	So what ?..
+Madness	Madness
+Sanitarium	Sanitarium

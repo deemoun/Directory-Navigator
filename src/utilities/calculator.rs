@@ -4,6 +4,17 @@ pub enum Value {
     Real(f64),
 }
 impl Value {
+    pub fn scientific(self) -> String {
+        let n = match self {
+            Self::Integer(n) => n as f64,
+            Self::Real(n) => n,
+        };
+        let text = format!("{n:.14E}");
+        let (mantissa, exponent) = text.split_once('E').unwrap_or((&text, "0"));
+        let exponent = exponent.parse::<i32>().unwrap_or(0);
+        format!("{mantissa}E{exponent:+05}")
+    }
+
     pub fn representations(self) -> [Result<String, String>; 4] {
         let decimal = match self {
             Self::Integer(n) => n.to_string(),
@@ -329,6 +340,8 @@ pub struct Calculator {
     pub history_cursor: Option<usize>,
     pub draft: String,
     pub focus: usize,
+    pub history_open: bool,
+    pub history_selection: usize,
 }
 impl Calculator {
     pub fn evaluate(&mut self) {
@@ -370,9 +383,14 @@ impl Calculator {
         if self.error.is_some() {
             return Err("Evaluate a valid expression first".into());
         }
-        self.result
-            .ok_or("Evaluate an expression first")?
-            .representations()[self.base]
-            .clone()
+        let value = self.result.ok_or("Evaluate an expression first")?;
+        if self.base == 4 {
+            return Ok(value.scientific());
+        }
+        value
+            .representations()
+            .get(self.base)
+            .cloned()
+            .unwrap_or_else(|| Err("Choose a representation first".into()))
     }
 }
