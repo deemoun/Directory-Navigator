@@ -40,6 +40,61 @@ impl Drop for Temp {
     }
 }
 
+#[cfg(windows)]
+#[test]
+fn windows_settings_use_the_new_directory_without_importing_old_preferences() -> io::Result<()> {
+    const CHILD_ROOT: &str = "DN_CONFIG_LOCATION_TEST_ROOT";
+    if let Some(root) = std::env::var_os(CHILD_ROOT) {
+        let root = PathBuf::from(root);
+        let expected = root.join("Directory Navigator").join("config.conf");
+        let mut app = App::new(root.clone())?;
+        assert_eq!(app.config_store.path()?, expected);
+        assert_eq!(
+            dn::associations::path(&app)?,
+            expected.with_file_name("associations.conf")
+        );
+        app.load_initial_config();
+        assert!(app.dialogs.is_empty());
+        assert!(app.welcome.dialog.is_some());
+        assert_eq!(app.config, Config::default());
+        assert!(app.save_settings_on_exit());
+        assert_eq!(Config::read(&expected)?, Config::default());
+        app.config.show_clock = false;
+        app.load_config();
+        assert!(app.config.show_clock);
+        return Ok(());
+    }
+
+    // Use a child process so APPDATA changes cannot affect parallel tests.
+    let temp = Temp::new()?;
+    let root = temp.0.join("App Data 世界");
+    let old_path = root.join("DOSNavigator").join("config.conf");
+    let old_config = Config {
+        show_clock: false,
+        ..Config::default()
+    };
+    old_config.save(&old_path)?;
+    let old_bytes = fs::read(&old_path)?;
+    let output = std::process::Command::new(std::env::current_exe()?)
+        .args([
+            "--exact",
+            "windows_settings_use_the_new_directory_without_importing_old_preferences",
+            "--nocapture",
+        ])
+        .env(CHILD_ROOT, &root)
+        .env("APPDATA", &root)
+        .output()?;
+    assert!(
+        output.status.success(),
+        "stdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(fs::read(old_path)?, old_bytes);
+    assert!(root.join("Directory Navigator/config.conf").is_file());
+    Ok(())
+}
+
 #[test]
 fn first_exit_creates_configuration_then_unchanged_exit_does_not_write() -> io::Result<()> {
     let t = Temp::new()?;

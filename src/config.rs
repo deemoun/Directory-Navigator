@@ -66,7 +66,7 @@ impl Config {
             std::env::var_os("APPDATA")
                 .map(PathBuf::from)
                 .filter(|base| base.is_absolute())
-                .map(|base| base.join("DOSNavigator").join("config.conf"))
+                .map(|base| base.join("Directory Navigator").join("config.conf"))
         }
         #[cfg(not(windows))]
         {

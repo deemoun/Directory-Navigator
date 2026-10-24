@@ -223,7 +223,7 @@ implemented commands; unsupported placeholders are omitted. Arrow keys navigate;
 Right opens a submenu, Left/Esc
 returns, and letters activate the highlighted mnemonics.
 Defaults load from XDG_CONFIG_HOME/dn/config.conf, HOME/.config/dn/config.conf,
-or APPDATA/DOSNavigator/config.conf on Windows. Only `config.conf` is loaded;
+or APPDATA/Directory Navigator/config.conf on Windows. Only `config.conf` is loaded;
 `config.txt` is ignored and never read, migrated or modified. Without a `.conf`
 file, defaults and the first-run welcome apply.
 The UTF-8 TOML file requires `config_version = 2`, grouped sections and lossless

@@ -141,7 +141,7 @@ Preferences load automatically and save on normal exit. **Options → Save deskt
 saves immediately; **Options → Configuration → System Setup** controls saving on exit.
 
 - macOS/Linux: `~/.config/dn/config.conf`, or `$XDG_CONFIG_HOME/dn/config.conf`.
-- Windows: `%APPDATA%\DOSNavigator\config.conf`.
+- Windows: `%APPDATA%\Directory Navigator\config.conf`.
 
 **Options → Configuration → Language / date & time** changes the interface language,
 date order (year/month/day, day/month/year or month/day/year), date separator and

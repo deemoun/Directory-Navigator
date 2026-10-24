@@ -12,6 +12,13 @@
   state owns session dialogs/options/results; quick view owns debounced reads.
 
 ## Implemented
+- Windows settings use `%APPDATA%/Directory Navigator/config.conf`; no lookup,
+  migration or writes in the former directory. Companion configuration files
+  derive their location from the same settings path. macOS/Linux paths unchanged.
+  Added isolated-process Windows regression for Unicode paths, first-run defaults,
+  save/reload and untouched former settings. Mac fmt/Clippy/tests/release pass
+  (364 tests, one opt-in ignored). Windows cross-check requires missing dependencies;
+  download was declined, so native Windows validation awaits manual CI.
 - Intel CI mouse-exit leakage reproduced on ARM64 with a 250 ms delayed release:
   the old 100 ms cleanup window returned the report to the shell. Shutdown now
   retains capture/raw input until release (one-second lost-release bound), then
