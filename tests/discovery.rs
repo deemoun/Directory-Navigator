@@ -312,7 +312,7 @@ fn find_dialog_shortcuts_memory_modal_precedence_and_result_jump() -> io::Result
     }
     key(&mut a, KeyCode::F(3), KeyModifiers::NONE);
     wait(&mut a, |a| {
-        a.viewer.as_ref().is_some_and(|v| v.contents.is_some())
+        a.desktop.viewer().is_some_and(|v| v.contents.is_some())
     });
     assert!(a.discovery.modal.is_some());
     key(&mut a, KeyCode::Esc, KeyModifiers::NONE);
@@ -593,7 +593,7 @@ fn quick_view_modal_precedence_full_viewer_and_disappearing_file() -> io::Result
     });
     key(&mut a, KeyCode::F(3), KeyModifiers::NONE);
     wait(&mut a, |a| {
-        a.viewer.as_ref().is_some_and(|v| v.contents.is_some())
+        a.desktop.viewer().is_some_and(|v| v.contents.is_some())
     });
     assert!(a.quick_view.is_some());
     key(&mut a, KeyCode::Esc, KeyModifiers::NONE);

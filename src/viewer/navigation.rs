@@ -249,10 +249,10 @@ impl Viewer {
 }
 pub fn action(app: &mut App, action: Action) {
     if action == Action::Close {
-        app.viewer = None;
+        app.desktop.close_viewer();
         return;
     }
-    let Some(viewer) = &mut app.viewer else {
+    let Some(viewer) = app.desktop.viewer_mut() else {
         return;
     };
     match action {
@@ -300,14 +300,18 @@ pub fn action(app: &mut App, action: Action) {
     }
 }
 pub fn paste(app: &mut App, text: &str) {
-    if let Some(dialog) = app.viewer.as_mut().and_then(|v| v.search_dialog.as_mut()) {
+    if let Some(dialog) = app
+        .desktop
+        .viewer_mut()
+        .and_then(|v| v.search_dialog.as_mut())
+    {
         if dialog.focus == 0 {
             dialog::paste_input(&mut dialog.memory.query, &mut dialog.cursor, text);
         }
     }
 }
 pub fn key(app: &mut App, key: KeyEvent) {
-    let Some(viewer) = &mut app.viewer else {
+    let Some(viewer) = app.desktop.viewer_mut() else {
         return;
     };
     if let Some(dialog) = &mut viewer.search_dialog {

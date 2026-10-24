@@ -13,7 +13,7 @@ use std::{
 fn ready(app: &mut App) {
     let end = Instant::now() + Duration::from_secs(5);
     while app.panels.iter().any(|p| p.loading)
-        || app.viewer.as_ref().is_some_and(|v| v.contents.is_none())
+        || app.desktop.viewer().is_some_and(|v| v.contents.is_none())
     {
         app.poll();
         assert!(Instant::now() < end);
@@ -83,14 +83,21 @@ fn unchanged_cells_styles_and_mouse_targets() -> io::Result<()> {
                     }
                     7 => {
                         app.color_dialog = None;
-                        app.viewer = Some(dn::viewer::Viewer::open(path.join("alpha.rs"))?);
+                        app.show_viewer(dn::viewer::Viewer::open(path.join("alpha.rs"))?);
                         ready(&mut app);
                     }
                     8 => {
-                        app.viewer = None;
+                        app.desktop.close_viewer();
                         dn::editor::open(&mut app, true);
                     }
                     _ => dn::editor::action(&mut app, dn::editor::EditorAction::GoTo),
+                }
+                // Keep asynchronous native volume replies out of visual comparisons.
+                for panel in &mut app.panels {
+                    panel.space.result = Some(Ok(dn::volume_space::Space {
+                        available: 128_u128 << 30,
+                        total: 256_u128 << 30,
+                    }));
                 }
                 app.clock.text = " 12:34:56 ".into();
                 let mut terminal = Terminal::new(TestBackend::new(w, h))?;

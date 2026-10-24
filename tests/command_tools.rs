@@ -183,13 +183,13 @@ fn history_empty_editing_navigation_resize_mouse_and_modal_precedence() -> io::R
     draw(&mut a, 120, 40)?;
     click(&mut a, Target::CommandHistory(Action::Cancel));
     assert_eq!(a.command_line.text, "echo 26");
-    a.viewer = Some(dn::viewer::Viewer::from_contents(
+    a.show_viewer(dn::viewer::Viewer::from_contents(
         t.0.join("test"),
         dn::viewer::from_bytes(b"text".to_vec(), dn::viewer::ViewMode::Text),
     ));
     key(&mut a, KeyCode::F(8), KeyModifiers::ALT);
     assert!(a.command_line.dialog.is_none());
-    a.viewer = None;
+    a.desktop.close_viewer();
     dn::editor::open(&mut a, true);
     key(&mut a, KeyCode::F(8), KeyModifiers::ALT);
     assert!(a.command_line.dialog.is_none());

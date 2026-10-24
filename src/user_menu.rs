@@ -311,7 +311,7 @@ pub fn poll(app: &mut App) -> bool {
         }
         return true;
     }
-    if app.user_menu.editing && app.user_menu.task.is_none() && app.editor.is_none() {
+    if app.user_menu.editing && app.user_menu.task.is_none() && app.desktop.editor().is_none() {
         app.user_menu.editing = false;
         reload(app);
         return true;

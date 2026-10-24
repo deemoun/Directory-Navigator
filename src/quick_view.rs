@@ -151,14 +151,10 @@ pub fn toggle(app: &mut App) {
     };
 }
 pub fn poll(app: &mut App) -> bool {
-    if app.editor.is_some()
-        || app.viewer.is_some()
-        || app.tetris.is_some()
-        || !matches!(
-            crate::focus::current(app),
-            crate::focus::Focus::Manager | crate::focus::Focus::QuickSearch
-        )
-    {
+    if !matches!(
+        crate::focus::current(app),
+        crate::focus::Focus::Manager | crate::focus::Focus::QuickSearch
+    ) {
         return false;
     }
     if app

@@ -58,6 +58,7 @@ pub enum Action {
     Columns,
     InvertSelection,
     SwapPanels,
+    WindowList,
     SaveSettings,
     LoadSettings,
     About,
@@ -209,6 +210,7 @@ pub fn items(menu: usize) -> Vec<Item> {
             item("~Q~uick view", "Ctrl+Q", QuickView),
             line(),
             item("~S~wap panels", "", SwapPanels),
+            item("~W~indows...", "Alt+0", WindowList),
         ],
         5 => vec![
             item("~C~onfiguration", "", Submenu(MenuId::Configuration)),
@@ -374,6 +376,7 @@ pub fn execute(app: &mut App, action: Action) {
         Action::SelectAll => app.panels[app.active].select_visible(),
         Action::ClearSelection => app.panels[app.active].selected.clear(),
         Action::InvertSelection => app.panels[app.active].invert_visible(),
+        Action::WindowList => crate::windowing::open(app),
         Action::SwapPanels => { app.panels.swap(0, 1); app.active ^= 1; }
         _ => {}
     }

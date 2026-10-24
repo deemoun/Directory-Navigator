@@ -41,6 +41,7 @@ pub fn items(root: usize) -> Vec<Item> {
             item("~S~ave", "F2", A::Save),
             item("Save ~a~s...", "Shift+F2", A::SaveAs),
             line(),
+            item("~W~indows...", "Alt+0", A::Windows),
             item("~C~lose editor", "Ctrl+F4", A::Close),
             item("E~x~it DN", "Alt+X", A::Quit),
         ],
@@ -85,28 +86,28 @@ pub fn open(app: &mut App, root: usize) {
     if !enabled(root) {
         return;
     }
-    if let Some(editor) = &mut app.editor {
+    if let Some(editor) = app.desktop.editor_mut() {
         editor.menu = Some((root, 0));
     }
 }
 pub fn activate(app: &mut App, row: usize) {
-    let Some((root, _)) = app.editor.as_ref().and_then(|editor| editor.menu) else {
+    let Some((root, _)) = app.desktop.editor().and_then(|editor| editor.menu) else {
         return;
     };
     if let Some(command) = items(root).get(row).and_then(|item| item.action) {
-        if let Some(editor) = &mut app.editor {
+        if let Some(editor) = app.desktop.editor_mut() {
             editor.menu = None;
         }
         super::action(app, command);
     }
 }
 pub fn key(app: &mut App, code: KeyCode) {
-    let Some((root, row)) = app.editor.as_ref().and_then(|editor| editor.menu) else {
+    let Some((root, row)) = app.desktop.editor().and_then(|editor| editor.menu) else {
         return;
     };
     match code {
         KeyCode::Esc | KeyCode::F(10) => {
-            if let Some(editor) = &mut app.editor {
+            if let Some(editor) = app.desktop.editor_mut() {
                 editor.menu = None;
             }
         }
@@ -141,7 +142,7 @@ pub fn key(app: &mut App, code: KeyCode) {
                 KeyCode::Up => (i + choices.len() - 1) % choices.len(),
                 _ => (i + 1) % choices.len(),
             };
-            if let Some(editor) = &mut app.editor {
+            if let Some(editor) = app.desktop.editor_mut() {
                 editor.menu = Some((root, choices[next]));
             }
         }

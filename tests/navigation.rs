@@ -312,7 +312,7 @@ fn quick_search_cached_visibility_command_and_mouse_handoff() -> io::Result<()> 
     alt_search(&mut app);
     paste(&mut app, "alpha");
     key(&mut app, KeyCode::F(3));
-    assert!(app.quick_search.is_none() && app.viewer.is_some());
+    assert!(app.quick_search.is_none() && app.desktop.viewer().is_some());
     key(&mut app, KeyCode::Esc);
     alt_search(&mut app);
     paste(&mut app, "alpha");

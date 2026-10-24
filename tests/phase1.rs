@@ -425,14 +425,14 @@ fn viewer_text_hex_bounds_and_mouse_close() -> io::Result<()> {
         .unwrap();
     input::handle(&mut app, KeyEvent::new(KeyCode::F(3), KeyModifiers::NONE));
     let deadline = Instant::now() + Duration::from_secs(5);
-    while app.viewer.as_ref().is_some_and(|v| v.contents.is_none()) {
+    while app.desktop.viewer().is_some_and(|v| v.contents.is_none()) {
         app.poll();
         assert!(Instant::now() < deadline);
         thread::sleep(Duration::from_millis(1));
     }
     render(&mut app, 80, 25)?;
     input::handle(&mut app, KeyEvent::new(KeyCode::End, KeyModifiers::NONE));
-    assert!(app.viewer.as_ref().unwrap().offset > 0);
+    assert!(app.desktop.viewer().unwrap().offset > 0);
     // An asynchronous error must be visible and modal even over the viewer.
     app.error("test error");
     render(&mut app, 80, 25)?;
@@ -450,7 +450,7 @@ fn viewer_text_hex_bounds_and_mouse_close() -> io::Result<()> {
         dn::mouse::Target::CloseViewer,
         crossterm::event::MouseEventKind::Down(crossterm::event::MouseButton::Left),
     );
-    assert!(app.viewer.is_none());
+    assert!(app.desktop.viewer().is_none());
     Ok(())
 }
 
@@ -782,8 +782,8 @@ fn file_view_submenu_honors_explicit_text_and_hex_modes() -> io::Result<()> {
         menu_action(&mut app, Action::View(mode));
         let deadline = Instant::now() + Duration::from_secs(5);
         while app
-            .viewer
-            .as_ref()
+            .desktop
+            .viewer()
             .is_some_and(|viewer| viewer.contents.is_none())
         {
             app.poll();
@@ -791,8 +791,8 @@ fn file_view_submenu_honors_explicit_text_and_hex_modes() -> io::Result<()> {
             thread::sleep(Duration::from_millis(1));
         }
         assert_eq!(
-            app.viewer
-                .as_ref()
+            app.desktop
+                .viewer()
                 .unwrap()
                 .contents
                 .as_ref()

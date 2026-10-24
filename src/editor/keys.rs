@@ -3,7 +3,7 @@ use crate::{app::App, dialog};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 pub fn key(app: &mut App, key: KeyEvent) {
-    let Some(editor) = &mut app.editor else {
+    let Some(editor) = app.desktop.editor_mut() else {
         return;
     };
     let alt = key.modifiers.contains(KeyModifiers::ALT);

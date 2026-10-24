@@ -125,9 +125,14 @@ Automatic remains optional: it selects Mac-friendly on macOS and Classic DN else
 | F9 / F10 | Menu / exit |
 | Ctrl+F7 / Alt+F7 | Recursive Find / quick filename search |
 | Ctrl+Q / Ctrl+T | Quick view / directory tree |
+| Alt+0 | Switch between file panels and open documents |
 
 Click to select, double-click to open, and Ctrl+click to mark. Inside the viewer
 or editor, use F1 for that screen's controls. macOS may require Fn with function keys.
+
+**Manager → Windows…** (Alt+0) switches between the file panels, editor and viewer
+without closing documents. The Mac-friendly profile also offers **Ctrl+O, then U**.
+F4 returns to an already open editor, preserving unsaved text and undo history.
 
 The bottom row is a command prompt. Type a command and press **Enter** to run it
 in the active panel's directory; **Esc** clears it. **Ctrl+E / Ctrl+X** recall command

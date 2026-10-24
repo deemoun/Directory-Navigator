@@ -62,7 +62,7 @@ pub(super) fn repeat(editor: &mut Editor, reverse: bool) -> Result<(), String> {
     Ok(())
 }
 pub(super) fn submit(app: &mut App, all: bool) -> Result<(), String> {
-    let Some(editor) = &mut app.editor else {
+    let Some(editor) = app.desktop.editor_mut() else {
         return Ok(());
     };
     let Some(Modal::Search(dialog)) = editor.modal.take() else {
@@ -161,7 +161,7 @@ pub(super) fn decision(editor: &mut Editor, command: EditorAction) -> Result<(),
     Ok(())
 }
 pub(super) fn key(app: &mut App, key: KeyEvent) {
-    let Some(editor) = &mut app.editor else {
+    let Some(editor) = app.desktop.editor_mut() else {
         return;
     };
     let command = match &mut editor.modal {

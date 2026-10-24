@@ -149,7 +149,7 @@ pub fn poll(app: &mut App) -> bool {
         Err(message) => app.error(message),
     }
     if app.exit_pending {
-        app.quit = true;
+        app.request_exit();
     }
     true
 }
@@ -170,7 +170,7 @@ pub fn accept(app: &mut App) {
                 }
                 HistoryKind::Edit => crate::editor::open_path(app, path),
                 HistoryKind::View => match Viewer::open_mode(path, ViewMode::Auto) {
-                    Ok(viewer) => app.viewer = Some(viewer),
+                    Ok(viewer) => app.show_viewer(viewer),
                     Err(e) => app.error(e.to_string()),
                 },
             }

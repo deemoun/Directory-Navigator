@@ -74,7 +74,7 @@ pub fn open(app: &mut App) {
     if !app.panels[app.active].loading
         && app.job.is_none()
         && app.dialogs.is_empty()
-        && app.viewer.is_none()
+        && crate::focus::screen(app) == crate::focus::Screen::Manager
         && app.prompt.is_none()
         && app.settings.is_none()
         && app.columns_dialog.is_none()

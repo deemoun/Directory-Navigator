@@ -25,7 +25,7 @@ pub enum GameAction {
 pub fn open(app: &mut App) {
     if app.job.is_some()
         || !app.dialogs.is_empty()
-        || app.viewer.is_some()
+        || crate::focus::screen(app) == crate::focus::Screen::Viewer
         || app.settings.is_some()
         || app.prompt.is_some()
         || app.pattern.is_some()
@@ -35,7 +35,7 @@ pub fn open(app: &mut App) {
     }
     menu::close(app);
     app.quick_search = None;
-    if app.tetris.is_none() {
+    if app.desktop.game().is_none() {
         let path = app
             .config_store
             .path()
@@ -47,7 +47,7 @@ pub fn open(app: &mut App) {
             super::dos_scores::Encoding::Cp437
         };
         let error = app.game_scores.load_with_encoding(path, encoding).err();
-        app.tetris = Some(Game {
+        app.show_game(Game {
             records: app.game_scores.board.records.clone(),
             name: app.game_scores.board.last_name.clone(),
             name_cursor: app.game_scores.board.last_name.len(),
@@ -68,7 +68,7 @@ pub fn open(app: &mut App) {
 
 pub fn action(app: &mut App, action: GameAction) {
     if action == GameAction::Close {
-        app.tetris = None;
+        app.desktop.close_game();
         return;
     }
     if action == GameAction::RetrySave {
@@ -79,7 +79,7 @@ pub fn action(app: &mut App, action: GameAction) {
         submit(app, action == GameAction::SkipName);
         return;
     }
-    let Some(game) = &mut app.tetris else {
+    let Some(game) = app.desktop.game_mut() else {
         return;
     };
     let now = Instant::now();
@@ -144,7 +144,7 @@ pub fn action(app: &mut App, action: GameAction) {
 }
 
 pub fn key(app: &mut App, key: KeyEvent) {
-    let screen = app.tetris.as_ref().map(|game| game.screen);
+    let screen = app.desktop.game().map(|game| game.screen);
     if screen == Some(Screen::Name) {
         match key.code {
             KeyCode::Enter => action(app, GameAction::SubmitName),
@@ -218,7 +218,7 @@ pub fn key(app: &mut App, key: KeyEvent) {
     {
         return;
     }
-    if let Some(game) = &mut app.tetris {
+    if let Some(game) = app.desktop.game_mut() {
         match key.code {
             KeyCode::Left | KeyCode::Home => {
                 game.translate(-1, 0);
@@ -239,7 +239,7 @@ fn qualifies(game: &Game) -> bool {
 }
 fn persist(app: &mut App) {
     let result = app.game_scores.save();
-    if let Some(g) = &mut app.tetris {
+    if let Some(g) = app.desktop.game_mut() {
         g.records = app.game_scores.board.records.clone();
         if g.submitted {
             g.highlighted = g
@@ -255,7 +255,7 @@ fn persist(app: &mut App) {
     }
 }
 fn submit(app: &mut App, anonymous: bool) {
-    let Some(g) = &mut app.tetris else {
+    let Some(g) = app.desktop.game_mut() else {
         return;
     };
     if g.screen != Screen::Name || g.submitted {
@@ -298,7 +298,7 @@ pub fn paste(app: &mut App, text: &str) {
     if text.is_empty() {
         return;
     }
-    let Some(g) = &mut app.tetris else {
+    let Some(g) = app.desktop.game_mut() else {
         return;
     };
     if g.screen != Screen::Name {
@@ -358,7 +358,7 @@ fn edit_name(app: &mut App, key: KeyEvent) {
     ) {
         return;
     }
-    let Some(g) = &mut app.tetris else {
+    let Some(g) = app.desktop.game_mut() else {
         return;
     };
     let previous = g.name[..g.name_cursor]

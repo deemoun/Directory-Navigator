@@ -26,8 +26,8 @@ pub struct App {
     pub file_tools: crate::file_tools::Tools,
     pub editor_clipboard: String,
     pub editor_search: crate::editor::search::SearchMemory,
-    pub editor: Option<crate::editor::Editor>,
-    pub tetris: Option<crate::tetris::Game>,
+    pub desktop: crate::desktop::Desktop,
+    pub window_list: Option<crate::windowing::WindowList>,
     pub game_scores: crate::tetris::scores::Store,
     pub panels: [Panel; 2],
     pub active: usize,
@@ -52,7 +52,6 @@ pub struct App {
         Option<Result<crate::operations::Progress, crate::operations::OperationFailure>>,
     pub notice: String,
     pub exit_pending: bool,
-    pub viewer: Option<crate::viewer::Viewer>,
 }
 
 impl App {
@@ -78,8 +77,8 @@ impl App {
             file_tools: crate::file_tools::Tools::default(),
             editor_clipboard: String::new(),
             editor_search: crate::editor::search::SearchMemory::default(),
-            editor: None,
-            tetris: None,
+            desktop: Default::default(),
+            window_list: None,
             game_scores: Default::default(),
             panels: [
                 Panel::new(path.clone(), config.show_hidden)?,
@@ -106,8 +105,25 @@ impl App {
             last_operation: None,
             notice: "Ready — Ins marks files · F1 help".into(),
             exit_pending: false,
-            viewer: None,
         })
+    }
+
+    pub fn show_editor(&mut self, editor: crate::editor::Editor) {
+        if let Err(error) = self.desktop.open_editor(editor) {
+            self.error(error.to_string());
+        }
+    }
+
+    pub fn show_viewer(&mut self, viewer: crate::viewer::Viewer) {
+        if let Err(error) = self.desktop.open_viewer(viewer) {
+            self.error(error.to_string());
+        }
+    }
+
+    pub fn show_game(&mut self, game: crate::tetris::Game) {
+        if let Err(error) = self.desktop.open_game(game) {
+            self.error(error.to_string());
+        }
     }
 
     pub fn poll(&mut self) -> bool {
@@ -138,8 +154,8 @@ impl App {
         let editor_changed = crate::editor::poll(self);
         let mut changed = crate::config_import::poll(self);
         changed |= self
-            .tetris
-            .as_mut()
+            .desktop
+            .game_mut()
             .is_some_and(|game| game.tick(std::time::Instant::now()));
         changed |= saver_changed
             | associations_changed
@@ -153,16 +169,16 @@ impl App {
             | archive_changed;
         if self.config.show_clock {
             let tick = self.clock.tick_with(self.config.datetime);
-            changed |= tick && self.tetris.is_none();
+            changed |= tick && self.desktop.game().is_none();
         }
         if let Some(info) = &mut self.file_info {
             changed |= info.poll();
         }
-        if let Some(result) = self.viewer.as_mut().and_then(|viewer| viewer.poll()) {
+        if let Some(result) = self.desktop.viewer_mut().and_then(|viewer| viewer.poll()) {
             changed = true;
             match result {
                 Ok(()) => {
-                    if let Some(viewer) = &self.viewer {
+                    if let Some(viewer) = self.desktop.viewer() {
                         self.file_tools.histories.record(
                             crate::file_tools::history::HistoryKind::View,
                             viewer.path.clone(),
@@ -170,7 +186,7 @@ impl App {
                     }
                 }
                 Err(message) => {
-                    self.viewer = None;
+                    self.desktop.close_viewer();
                     self.error(message);
                 }
             }
@@ -270,15 +286,15 @@ impl App {
             }
             self.refresh();
             if self.exit_pending {
-                self.quit = true;
+                self.request_exit();
             }
         }
-        changed
+        changed | crate::windowing::poll(self)
     }
 
     pub fn wait_duration(&self, now: std::time::Instant) -> std::time::Duration {
         use std::time::Duration;
-        if let Some(game) = &self.tetris {
+        if let Some(game) = self.desktop.game() {
             return game.wait_duration(now);
         }
         let pending = self
@@ -303,8 +319,8 @@ impl App {
                     || (p.background_refreshing()
                         && crate::focus::current(self) == crate::focus::Focus::Manager)
             })
-            || self.editor.as_ref().is_some_and(|e| e.busy())
-            || self.viewer.as_ref().is_some_and(|v| v.contents.is_none())
+            || self.desktop.editor().is_some_and(|e| e.busy())
+            || self.desktop.viewer().is_some_and(|v| v.contents.is_none())
             || self
                 .file_info
                 .as_ref()
@@ -338,7 +354,11 @@ impl App {
     }
 
     pub fn request_exit(&mut self) {
-        if self.editor.is_some() {
+        self.window_list = None;
+        if let Some(id) = self.desktop.id(crate::desktop::WindowKind::Editor) {
+            self.desktop.activate(id);
+            // Re-entering this guard after a cancelled quit must be explicit.
+            self.exit_pending = false;
             crate::editor::request_close(self, crate::editor::CloseIntent::Quit);
             return;
         }
@@ -496,7 +516,7 @@ impl App {
             return;
         }
         match crate::viewer::Viewer::open_mode(entry.path.clone(), mode) {
-            Ok(viewer) => self.viewer = Some(viewer),
+            Ok(viewer) => self.show_viewer(viewer),
             Err(error) => self.error(error.to_string()),
         }
     }
@@ -546,7 +566,7 @@ impl App {
         let hidden_changed = self.config.show_hidden != config.show_hidden;
         self.config = config;
         self.clock.tick_with(self.config.datetime);
-        if let Some(editor) = &mut self.editor {
+        if let Some(editor) = self.desktop.editor_mut() {
             editor.apply_preferences(self.config.editor);
         }
         for (panel, sort) in self.panels.iter_mut().zip(self.config.sorts) {

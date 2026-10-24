@@ -6,6 +6,7 @@ pub mod associations;
 pub mod columns;
 pub mod config;
 pub mod config_import;
+pub mod desktop;
 pub mod dialog;
 pub mod editor;
 pub mod file_info;
@@ -63,3 +64,5 @@ pub mod localization;
 pub mod regional;
 
 pub mod volume_space;
+
+pub mod windowing;

@@ -12,6 +12,7 @@ use std::{
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Target {
+    Window(crate::windowing::Action),
     ApplyImport,
     CancelImport,
     Welcome(crate::welcome::Action),
@@ -110,6 +111,10 @@ fn handle_mouse(app: &mut App, event: MouseEvent) {
         .rev()
         .find(|(rect, _)| rect.contains(Position::new(event.column, event.row)))
         .map(|(_, target)| *target);
+    if focus == Focus::WindowList {
+        crate::windowing::mouse(app, event, target);
+        return;
+    }
     if focus == Focus::ConfigImport {
         crate::config_import::mouse(app, event, target);
         return;
@@ -193,7 +198,7 @@ fn handle_mouse(app: &mut App, event: MouseEvent) {
                 }
                 crate::editor::action(app, command);
             }
-        } else if let Some(editor) = &mut app.editor {
+        } else if let Some(editor) = app.desktop.editor_mut() {
             if focus == Focus::Editor {
                 if let Some(buffer) = &mut editor.buffer {
                     match event.kind {
@@ -308,12 +313,12 @@ fn handle_mouse(app: &mut App, event: MouseEvent) {
     if focus == Focus::Viewer {
         match event.kind {
             MouseEventKind::ScrollUp => {
-                if let Some(viewer) = &mut app.viewer {
+                if let Some(viewer) = app.desktop.viewer_mut() {
                     viewer.step(-3);
                 }
             }
             MouseEventKind::ScrollDown => {
-                if let Some(viewer) = &mut app.viewer {
+                if let Some(viewer) = app.desktop.viewer_mut() {
                     viewer.step(3);
                 }
             }
@@ -325,7 +330,7 @@ fn handle_mouse(app: &mut App, event: MouseEvent) {
                 }
             }
             MouseEventKind::Down(MouseButton::Left) if target == Some(Target::CloseViewer) => {
-                app.viewer = None
+                app.desktop.close_viewer()
             }
             _ => {}
         }

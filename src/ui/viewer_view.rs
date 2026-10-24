@@ -14,7 +14,7 @@ pub(super) fn draw_viewer(frame: &mut Frame, app: &mut App, area: Rect) {
     } else {
         None
     };
-    let Some(viewer) = &mut app.viewer else {
+    let Some(viewer) = app.desktop.viewer_mut() else {
         return;
     };
     let regions = Layout::vertical([

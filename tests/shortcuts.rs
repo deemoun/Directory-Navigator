@@ -265,10 +265,10 @@ fn editor_save_find_replace_close_and_quit_keep_unsaved_guards() -> io::Result<(
     let mut app = temp.app()?;
     prefix(&mut app, '4');
     prefix(&mut app, '2'); // Busy editor events must not insert the digit.
-    wait(&mut app, |a| a.editor.as_ref().is_some_and(|e| !e.busy()));
+    wait(&mut app, |a| a.desktop.editor().is_some_and(|e| !e.busy()));
     assert!(app
-        .editor
-        .as_ref()
+        .desktop
+        .editor()
         .unwrap()
         .buffer
         .as_ref()
@@ -278,32 +278,32 @@ fn editor_save_find_replace_close_and_quit_keep_unsaved_guards() -> io::Result<(
     input::paste(&mut app, "new text");
     prefix(&mut app, 'w');
     assert!(matches!(
-        app.editor.as_ref().unwrap().modal,
+        app.desktop.editor().unwrap().modal,
         Some(dn::editor::Modal::ConfirmClose)
     ));
     key(&mut app, K::Esc);
     assert!(!app.quit);
     prefix(&mut app, 'x');
     assert!(matches!(
-        app.editor.as_ref().unwrap().modal,
+        app.desktop.editor().unwrap().modal,
         Some(dn::editor::Modal::ConfirmClose)
     ));
     key(&mut app, K::Esc);
     assert!(!app.quit);
     prefix(&mut app, '2');
-    wait(&mut app, |a| a.editor.as_ref().is_some_and(|e| !e.busy()));
+    wait(&mut app, |a| a.desktop.editor().is_some_and(|e| !e.busy()));
     assert!(fs::read_to_string(temp.0.join("file.txt"))?.starts_with("new text"));
     prefix(&mut app, 'r');
     assert!(matches!(
-        app.editor.as_ref().unwrap().modal,
+        app.desktop.editor().unwrap().modal,
         Some(dn::editor::Modal::Search(_))
     ));
     key(&mut app, K::Esc);
     prefix(&mut app, '0');
-    assert!(app.editor.as_ref().unwrap().menu.is_some());
+    assert!(app.desktop.editor().unwrap().menu.is_some());
     key(&mut app, K::Esc);
     prefix(&mut app, 'w');
-    assert!(app.editor.is_none());
+    assert!(app.desktop.editor().is_none());
     Ok(())
 }
 #[test]
@@ -311,16 +311,23 @@ fn editor_word_navigation_uses_plain_arrows_after_prefix() -> io::Result<()> {
     let temp = Temp::new()?;
     let mut app = temp.app()?;
     prefix(&mut app, '4');
-    wait(&mut app, |a| a.editor.as_ref().is_some_and(|e| !e.busy()));
+    wait(&mut app, |a| a.desktop.editor().is_some_and(|e| !e.busy()));
     input::handle(&mut app, KeyEvent::new(K::Char('o'), M::CONTROL));
     key(&mut app, K::Right);
-    let position = app.editor.as_ref().unwrap().buffer.as_ref().unwrap().cursor;
+    let position = app
+        .desktop
+        .editor()
+        .unwrap()
+        .buffer
+        .as_ref()
+        .unwrap()
+        .cursor;
     assert!(position > 1);
     input::handle(&mut app, KeyEvent::new(K::Char('o'), M::CONTROL));
     input::handle(&mut app, KeyEvent::new(K::Right, M::SHIFT));
     assert!(!app
-        .editor
-        .as_ref()
+        .desktop
+        .editor()
         .unwrap()
         .buffer
         .as_ref()
@@ -335,15 +342,15 @@ fn viewer_wrap_search_and_close_use_the_same_prefix() -> io::Result<()> {
     let mut app = temp.app()?;
     prefix(&mut app, '3');
     wait(&mut app, |a| {
-        a.viewer.as_ref().is_some_and(|v| v.contents.is_some())
+        a.desktop.viewer().is_some_and(|v| v.contents.is_some())
     });
     prefix(&mut app, '2');
-    assert!(app.viewer.as_ref().unwrap().wrap);
+    assert!(app.desktop.viewer().unwrap().wrap);
     prefix(&mut app, '7');
-    assert!(app.viewer.as_ref().unwrap().search_dialog.is_some());
+    assert!(app.desktop.viewer().unwrap().search_dialog.is_some());
     key(&mut app, K::Esc);
     prefix(&mut app, 'w');
-    assert!(app.viewer.is_none());
+    assert!(app.desktop.viewer().is_none());
     Ok(())
 }
 #[test]
@@ -398,8 +405,8 @@ fn user_menu_prefix_preserves_command_review_and_definition_editing() -> io::Res
     assert!(app.user_menu.modal.as_ref().unwrap().review.is_none());
     prefix(&mut app, '4');
     wait(&mut app, |a| {
-        a.editor.as_ref().is_some_and(|e| e.buffer.is_some())
+        a.desktop.editor().is_some_and(|e| e.buffer.is_some())
     });
-    assert_eq!(app.editor.as_ref().unwrap().path, Some(path));
+    assert_eq!(app.desktop.editor().unwrap().path, Some(path));
     Ok(())
 }

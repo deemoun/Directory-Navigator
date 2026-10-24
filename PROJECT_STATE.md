@@ -4,6 +4,8 @@
 - Native Rust `dn`: Ratatui/Crossterm/Chrono, Unicode segmentation, Unix libc;
   macOS native Trash via `trash`, Windows native shell APIs; minimal ZIP/TAR/gzip
   codec features via zip/tar/flate2; TOML parser for grouped preferences.
+- Session Desktop owns editor/viewer/game content, stable WindowId values and
+  explicit active-screen identity; file panels remain the permanent base.
 - Modular app/input/panels, operations, dialogs, configuration, editor, viewer
   and utilities. Shared focus policy and explicit viewport preparation.
 - Cancellable panel scanners; bounded short-task pool; dedicated file-operation
@@ -12,6 +14,27 @@
   state owns session dialogs/options/results; quick view owns debounced reads.
 
 ## Implemented
+- Session window list (Manager → Windows…, editor File → Windows…, Alt+0;
+  Mac-friendly Ctrl+O then U) switches between the permanent file manager and
+  one retained editor/viewer. Stable identities reject stale mouse targets;
+  closing active content returns to the most recently used remaining screen.
+  F4 resumes retained editor; Open/exit retain unsaved guards, including hidden
+  editors. Exit after editor approval still cancels/waits for operation/export
+  workers. English/Russian dialog uses existing chrome and palettes, supports
+  keyboard/mouse, resizing and modal precedence. No dependencies/config changes;
+  multiple documents, cascade/tile and games in the list remain deferred.
+  Verified on macOS ARM64: fmt, all-target Clippy, 376 tests passed (one existing
+  opt-in native Trash test ignored), release build, and the 40-scene pre-Desktop
+  UI baseline (cells/styles/mouse targets). Native PTY smoke checks window
+  switching, retained drafts, hidden-editor exit/cancel/discard, successful status,
+  shell input and terminal restoration with isolated settings. Intel/Windows/Linux
+  execution remains unverified locally; no GitHub workflow was dispatched.
+- Internal Desktop foundation replaces independent App editor/viewer/game fields.
+  Lifecycle creation/removal maintains unique session IDs and the previous screen
+  precedence; focus and rendering share its active identity. Editor/viewer modals
+  and cancellable workers stay owned by their content; app-wide overlays unchanged.
+  This foundation originally changed no UI; the session window list builds on it
+  without adding further content ownership layers. Still one screen per kind.
 - Windows settings use `%APPDATA%/Directory Navigator/config.conf`; no lookup,
   migration or writes in the former directory. Companion configuration files
   derive their location from the same settings path. macOS/Linux paths unchanged.
@@ -219,6 +242,12 @@
   entries. Keyboard/mouse navigation uses the reduced menu set.
 
 ## Validation
+- Desktop refactor: pre/post captures match all cells, styles and mouse targets in
+  40 scenes (80×25/132×40, both palettes), using fixed volume snapshots on the
+  original HEAD and refactored code to avoid native-I/O timing noise. Identity,
+  guard, replacement, file-switch failure and late-worker tests pass. All four Mac
+  Cargo checks pass: 369 tests, one opt-in ignored; terminal restoration included.
+  Native Linux/Windows execution was not performed; no CI was started.
 - Grouped config/import: focused tests cover types/defaults/unknown values,
   recovery of invalid/old/empty/unversioned files without overwriting backups, native paths,
   TLV mappings/bounds/termination/duplicates, readonly source/cancellation/stale
@@ -317,7 +346,7 @@
   English/Russian labels and targets fit 80×25/120×40. Release macOS PTY passes
   Auto→Classic→Mac, saved/reloaded preferences, editor save/close, viewer wrap/search,
   copy cancellation, resize and terminal restoration.
-- macOS ARM64: fmt check, Clippy (including all test targets) with denied warnings, 364 passing tests
+- macOS ARM64: fmt check, Clippy (including all test targets) with denied warnings, 369 passing tests
   (one opt-in real-Trash success test ignored), release build.
 - Menu tests enforce working entries, unique mnemonics, normalized separators,
   unchanged headings, Block selection/clipboard/undo, Paragraph styling and clock
@@ -362,6 +391,9 @@
   Linux/Windows remain untested locally.
 
 ## Limitations and next steps
+- Desktop is an ownership foundation only: multiple documents, window switching,
+  geometry, Cascade/Tile and desktop-window persistence remain future stages.
+  Next: multiple full-screen documents and a window list before overlapping layouts.
 - Ancestor/entry snapshots detect replacements between operation stages, but
   path-based recursion still has check-to-use races; full descriptor-relative
   traversal remains future hardening. Nesting beyond 512 in discovery is

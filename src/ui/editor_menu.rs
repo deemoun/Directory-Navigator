@@ -17,7 +17,7 @@ pub(super) fn draw_bar(frame: &mut Frame, app: &mut App, area: Rect) {
     let dos = profile.styles();
     frame.render_widget(Block::default().style(dos(0x70)), area);
     let header = super::clock::header(app, area);
-    let current = app.editor.as_ref().and_then(|e| e.menu);
+    let current = app.desktop.editor().and_then(|e| e.menu);
     let mut x = area.x;
     for (root, label) in menus::LABELS.iter().enumerate() {
         let label = language.text(label);
@@ -61,7 +61,7 @@ pub(super) fn draw_dropdown(frame: &mut Frame, app: &mut App, area: Rect) {
     let language = app.config.language;
     let profile = app.config.palette;
     let dos = profile.styles();
-    let Some(editor) = &app.editor else {
+    let Some(editor) = app.desktop.editor() else {
         return;
     };
     let Some((root, selected)) = editor.menu else {

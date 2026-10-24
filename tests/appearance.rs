@@ -346,19 +346,19 @@ fn clock_editor_viewer_dialog_and_game_precedence() -> io::Result<()> {
     let path = t.0.join("long name ".repeat(15));
     fs::write(&path, "view me")?;
     let mut app = t.app()?;
-    app.viewer = Some(Viewer::open(path)?);
+    app.show_viewer(Viewer::open(path)?);
     wait(&mut app, |a| {
-        a.viewer.as_ref().is_some_and(|v| v.contents.is_some())
+        a.desktop.viewer().is_some_and(|v| v.contents.is_some())
     });
     let text = app.clock.text.clone();
     assert!(draw(&mut app, 80, 25)?.contains(&text));
-    app.viewer = None;
+    app.desktop.close_viewer();
     dn::editor::open(&mut app, true);
     assert!(draw(&mut app, 80, 25)?.contains(&text));
     dn::editor::action(&mut app, dn::editor::EditorAction::Help);
     let screen = draw(&mut app, 80, 25)?;
     assert!(screen.contains("Editor"));
-    app.editor = None;
+    app.desktop.close_editor();
     dn::tetris::open(&mut app);
     assert!(!draw(&mut app, 80, 25)?.contains(&text));
     Ok(())
@@ -502,14 +502,14 @@ fn document_headers_use_cyan_close_icons_with_reserved_titles_and_clock() -> io:
         app.config.palette = profile;
         for editor in [false, true] {
             if editor {
-                app.viewer = None;
+                app.desktop.close_viewer();
                 dn::editor::open_path(&mut app, path.clone());
-                wait(&mut app, |a| a.editor.as_ref().is_some_and(|e| !e.busy()));
+                wait(&mut app, |a| a.desktop.editor().is_some_and(|e| !e.busy()));
             } else {
-                app.editor = None;
-                app.viewer = Some(Viewer::open(path.clone())?);
+                app.desktop.close_editor();
+                app.show_viewer(Viewer::open(path.clone())?);
                 wait(&mut app, |a| {
-                    a.viewer.as_ref().is_some_and(|v| v.contents.is_some())
+                    a.desktop.viewer().is_some_and(|v| v.contents.is_some())
                 });
             }
             for (w, h) in [(80, 25), (132, 40), (80, 25)] {
@@ -561,9 +561,9 @@ fn document_headers_use_cyan_close_icons_with_reserved_titles_and_clock() -> io:
                 );
             }
             if editor {
-                app.editor = None;
+                app.desktop.close_editor();
             } else {
-                app.viewer = None;
+                app.desktop.close_viewer();
             }
         }
     }
@@ -576,20 +576,20 @@ fn document_close_icons_respect_modal_precedence_and_unsaved_guard() -> io::Resu
     let path = temp.0.join("sample.txt");
     fs::write(&path, "original file")?;
     let mut app = temp.app()?;
-    app.viewer = Some(Viewer::open(path.clone())?);
+    app.show_viewer(Viewer::open(path.clone())?);
     wait(&mut app, |a| {
-        a.viewer.as_ref().is_some_and(|v| v.contents.is_some())
+        a.desktop.viewer().is_some_and(|v| v.contents.is_some())
     });
     draw(&mut app, 80, 25)?;
     click(&mut app, Target::CloseViewer);
-    assert!(app.viewer.is_none());
+    assert!(app.desktop.viewer().is_none());
     dn::editor::open_path(&mut app, path.clone());
-    wait(&mut app, |a| a.editor.as_ref().is_some_and(|e| !e.busy()));
+    wait(&mut app, |a| a.desktop.editor().is_some_and(|e| !e.busy()));
     draw(&mut app, 80, 25)?;
     dn::editor::paste(&mut app, "unsaved ");
     click(&mut app, Target::Editor(dn::editor::EditorAction::Close));
     assert!(matches!(
-        app.editor.as_ref().and_then(|e| e.modal.as_ref()),
+        app.desktop.editor().and_then(|e| e.modal.as_ref()),
         Some(dn::editor::Modal::ConfirmClose)
     ));
     draw(&mut app, 80, 25)?;
@@ -600,14 +600,14 @@ fn document_close_icons_respect_modal_precedence_and_unsaved_guard() -> io::Resu
         .all(|(_, t)| *t != Target::Editor(dn::editor::EditorAction::Close)));
     click(&mut app, Target::Editor(dn::editor::EditorAction::Cancel));
     assert!(app
-        .editor
-        .as_ref()
+        .desktop
+        .editor()
         .is_some_and(|e| e.dirty() && e.modal.is_none()));
     draw(&mut app, 80, 25)?;
     click(&mut app, Target::Editor(dn::editor::EditorAction::Close));
     draw(&mut app, 80, 25)?;
     click(&mut app, Target::Editor(dn::editor::EditorAction::Discard));
-    assert!(app.editor.is_none());
+    assert!(app.desktop.editor().is_none());
     assert_eq!(fs::read_to_string(path)?, "original file");
     Ok(())
 }

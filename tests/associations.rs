@@ -174,13 +174,13 @@ fn missing_config_is_inactive_and_bad_config_can_be_repaired() -> io::Result<()>
     app.dialogs.clear();
     focus(&mut app, "file.txt");
     key(&mut app, KeyCode::Enter);
-    assert!(!app.dialogs.is_empty() && app.viewer.is_none());
+    assert!(!app.dialogs.is_empty() && app.desktop.viewer().is_none());
     app.dialogs.clear();
     temp.write(".txt=@editor")?;
     associations::reload(&mut app);
     wait(&mut app, |a| !a.associations.busy());
     key(&mut app, KeyCode::Enter);
-    wait(&mut app, |a| a.editor.as_ref().is_some_and(|e| !e.busy()));
+    wait(&mut app, |a| a.desktop.editor().is_some_and(|e| !e.busy()));
     assert!(app.dialogs.is_empty());
     Ok(())
 }
@@ -197,26 +197,26 @@ fn enter_internal_targets_preserve_marks_and_explicit_f3_f4() -> io::Result<()> 
     focus(&mut app, "file.txt");
     let marks = app.panels[0].selected.clone();
     key(&mut app, KeyCode::Enter);
-    wait(&mut app, |a| a.editor.as_ref().is_some_and(|e| !e.busy()));
+    wait(&mut app, |a| a.desktop.editor().is_some_and(|e| !e.busy()));
     assert_eq!(app.panels[0].selected, marks);
     key(&mut app, KeyCode::Esc);
     key(&mut app, KeyCode::F(3));
     wait(&mut app, |a| {
-        a.viewer.as_ref().is_some_and(|v| v.contents.is_some())
+        a.desktop.viewer().is_some_and(|v| v.contents.is_some())
     });
-    assert!(app.editor.is_none());
+    assert!(app.desktop.editor().is_none());
     key(&mut app, KeyCode::Esc);
     key(&mut app, KeyCode::F(4));
-    wait(&mut app, |a| a.editor.as_ref().is_some_and(|e| !e.busy()));
+    wait(&mut app, |a| a.desktop.editor().is_some_and(|e| !e.busy()));
     key(&mut app, KeyCode::Esc);
     focus(&mut app, "raw.bin");
     key(&mut app, KeyCode::Enter);
     wait(&mut app, |a| {
-        a.viewer.as_ref().is_some_and(|v| v.contents.is_some())
+        a.desktop.viewer().is_some_and(|v| v.contents.is_some())
     });
     assert!(
-        app.viewer
-            .as_ref()
+        app.desktop
+            .viewer()
             .unwrap()
             .contents
             .as_ref()
@@ -247,7 +247,7 @@ fn directories_navigate_and_ctrl_enter_bypasses_custom_rules() -> io::Result<()>
     );
     assert!(app.launcher.loading() && !app.associations.busy());
     wait(&mut app, |a| !a.launcher.loading());
-    assert!(app.editor.is_none());
+    assert!(app.desktop.editor().is_none());
     Ok(())
 }
 
@@ -291,7 +291,7 @@ fn edit_creates_only_comments_and_reloads_after_guarded_editor_close() -> io::Re
     let mut app = temp.app()?;
     assert!(!temp.config().exists());
     associations::edit(&mut app);
-    wait(&mut app, |a| a.editor.as_ref().is_some_and(|e| !e.busy()));
+    wait(&mut app, |a| a.desktop.editor().is_some_and(|e| !e.busy()));
     assert_eq!(fs::read_to_string(temp.config())?, format::DEFAULT);
     assert!(app.associations.rules.is_empty());
     // Use the normal editor save path, then close and reload automatically.
@@ -300,7 +300,7 @@ fn edit_creates_only_comments_and_reloads_after_guarded_editor_close() -> io::Re
         &mut app,
         KeyEvent::new(KeyCode::Char('s'), KeyModifiers::CONTROL),
     );
-    wait(&mut app, |a| a.editor.as_ref().is_some_and(|e| !e.busy()));
+    wait(&mut app, |a| a.desktop.editor().is_some_and(|e| !e.busy()));
     key(&mut app, KeyCode::Esc);
     wait(&mut app, |a| a.associations.rules.len() == 1);
     assert_eq!(app.associations.rules[0].target, Target::Viewer);
@@ -320,7 +320,7 @@ fn symlink_and_oversized_configs_are_rejected_without_changing_targets() -> io::
     app.dialogs.clear();
     associations::edit(&mut app);
     wait(&mut app, |a| !a.associations.busy());
-    assert!(app.editor.is_none() && !app.dialogs.is_empty());
+    assert!(app.desktop.editor().is_none() && !app.dialogs.is_empty());
     assert_eq!(fs::read_to_string(original)?, ".txt=@viewer");
     fs::remove_file(temp.config())?;
     temp.write(&" ".repeat(format::MAX_BYTES + 1))?;
@@ -460,12 +460,12 @@ fn mouse_reload_double_click_and_archive_override() -> io::Result<()> {
     mouse::handle(&mut app, event);
     mouse::handle(&mut app, event);
     wait(&mut app, |a| {
-        a.viewer.as_ref().is_some_and(|v| v.contents.is_some())
+        a.desktop.viewer().is_some_and(|v| v.contents.is_some())
     });
     assert!(app.archive.is_none());
     assert!(app
-        .viewer
-        .as_ref()
+        .desktop
+        .viewer()
         .unwrap()
         .contents
         .as_ref()

@@ -173,7 +173,7 @@ pub fn poll(app: &mut App) -> bool {
         }
         Ok(Reply::Preview(path, contents)) => {
             browser.status = "Read-only · Enter browse/view · F3 view · F9 info".into();
-            app.viewer = Some(crate::viewer::Viewer::from_contents(path, contents));
+            app.show_viewer(crate::viewer::Viewer::from_contents(path, contents));
         }
         Err(e) => {
             browser.status = format!("Archive: {e}");

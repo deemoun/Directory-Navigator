@@ -177,8 +177,8 @@ pub fn poll(app: &mut App, now: Instant) -> bool {
         && !app.associations.busy()
         && app.associations.pending.is_none()
         && app.panels.iter().all(|p| !p.loading)
-        && app.editor.as_ref().is_none_or(|e| !e.busy())
-        && app.viewer.as_ref().is_none_or(|v| v.contents.is_some());
+        && app.desktop.editor().is_none_or(|e| !e.busy())
+        && app.desktop.viewer().is_none_or(|v| v.contents.is_some());
     app.screensaver.tick(now, app.config.saver_minutes, allowed)
 }
 pub fn open(app: &mut App) {

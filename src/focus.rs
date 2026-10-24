@@ -1,18 +1,13 @@
 //! One input-precedence policy, matching the order in which layers are painted.
 use crate::app::App;
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Screen {
-    Manager,
-    Viewer,
-    Editor,
-    Game,
-}
+pub use crate::desktop::WindowKind as Screen;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Focus {
     ConfigImport,
     Welcome,
     CommandHistory,
     Message,
+    WindowList,
     SaverSetup,
     Colors,
     Utility,
@@ -39,15 +34,7 @@ pub enum Focus {
     Game,
 }
 pub fn screen(app: &App) -> Screen {
-    if app.editor.is_some() {
-        Screen::Editor
-    } else if app.viewer.is_some() {
-        Screen::Viewer
-    } else if app.tetris.is_some() {
-        Screen::Game
-    } else {
-        Screen::Manager
-    }
+    app.desktop.active().kind
 }
 pub fn current(app: &App) -> Focus {
     let screen = screen(app);
@@ -57,7 +44,10 @@ pub fn current(app: &App) -> Focus {
     if !app.dialogs.is_empty() {
         return Focus::Message;
     }
-    if let Some(editor) = app.editor.as_ref().filter(|_| screen == Screen::Editor) {
+    if app.window_list.is_some() {
+        return Focus::WindowList;
+    }
+    if let Some(editor) = app.desktop.editor().filter(|_| screen == Screen::Editor) {
         return if editor.modal.is_some() {
             Focus::EditorModal
         } else if editor.menu.is_some() {
@@ -112,8 +102,8 @@ pub fn current(app: &App) -> Focus {
     }
     if screen == Screen::Viewer {
         return if app
-            .viewer
-            .as_ref()
+            .desktop
+            .viewer()
             .is_some_and(|v| v.search_dialog.is_some())
         {
             Focus::ViewerSearch

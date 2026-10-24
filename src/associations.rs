@@ -179,7 +179,7 @@ pub fn poll(app: &mut App) -> bool {
             }
             Ok(Reply::Edit(path)) => {
                 crate::editor::open_path(app, path);
-                app.associations.editing = app.editor.is_some();
+                app.associations.editing = app.desktop.editor().is_some();
             }
             Ok(Reply::Open {
                 panel,
@@ -223,7 +223,7 @@ pub fn poll(app: &mut App) -> bool {
         }
         return true;
     }
-    if app.associations.editing && app.editor.is_none() {
+    if app.associations.editing && app.desktop.editor().is_none() {
         app.associations.editing = false;
         reload(app);
         return true;

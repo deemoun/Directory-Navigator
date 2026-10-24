@@ -268,7 +268,7 @@ pub fn action(app: &mut App, command: Action) {
             } else if hit.regular {
                 if command == Action::View {
                     match crate::viewer::Viewer::open(path) {
-                        Ok(v) => app.viewer = Some(v),
+                        Ok(v) => app.show_viewer(v),
                         Err(e) => app.error(e.to_string()),
                     }
                 } else {

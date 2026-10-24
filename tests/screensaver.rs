@@ -177,7 +177,7 @@ fn wake_events_do_not_edit_exit_or_activate_mouse_targets() -> io::Result<()> {
     let temp = Temp::new()?;
     let mut app = temp.app()?;
     dn::editor::open(&mut app, true);
-    wait(&mut app, |a| a.editor.as_ref().is_some_and(|e| !e.busy()));
+    wait(&mut app, |a| a.desktop.editor().is_some_and(|e| !e.busy()));
     draw(&mut app, 80, 25)?;
     dn::editor::paste(&mut app, "unsaved text");
     let idle = Instant::now();
@@ -186,8 +186,8 @@ fn wake_events_do_not_edit_exit_or_activate_mouse_targets() -> io::Result<()> {
     assert!(app.screensaver.active);
     key(&mut app, KeyCode::Esc, KeyModifiers::NONE);
     assert!(app
-        .editor
-        .as_ref()
+        .desktop
+        .editor()
         .and_then(|e| e.buffer.as_ref())
         .is_some_and(|b| b.dirty() && b.text == "unsaved text"));
     for event in [
@@ -229,7 +229,7 @@ fn wake_events_do_not_edit_exit_or_activate_mouse_targets() -> io::Result<()> {
     key(&mut app, KeyCode::Char('x'), KeyModifiers::ALT);
     assert!(!app.quit);
     assert!(app.dialogs.is_empty());
-    assert!(app.editor.as_ref().is_some_and(|e| e.modal.is_none()));
+    assert!(app.desktop.editor().is_some_and(|e| e.modal.is_none()));
     Ok(())
 }
 #[test]

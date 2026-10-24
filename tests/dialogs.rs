@@ -324,7 +324,7 @@ fn title_close_restores_previews_and_keeps_unsaved_document() -> io::Result<()> 
     key(&mut app, KeyCode::Esc, KeyModifiers::NONE);
     draw(&mut app, 80, 25)?;
     title_close(&mut app, Target::Editor(dn::editor::EditorAction::Cancel))?;
-    assert!(app.editor.as_ref().is_some_and(|e| e.modal.is_none()));
+    assert!(app.desktop.editor().is_some_and(|e| e.modal.is_none()));
     assert!(draw(&mut app, 80, 25)?.contains("unsaved content"));
     Ok(())
 }

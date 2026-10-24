@@ -208,13 +208,13 @@ fn edit_missing_default_reload_and_invalid_menu_repair() -> io::Result<()> {
     assert!(!path.exists());
     key(&mut a, KeyCode::F(4));
     wait(&mut a, |a| {
-        a.editor.as_ref().is_some_and(|e| e.buffer.is_some())
+        a.desktop.editor().is_some_and(|e| e.buffer.is_some())
     });
     assert!(path.exists());
     assert_eq!(fs::read_to_string(&path)?, format::DEFAULT);
     key(&mut a, KeyCode::Esc);
     wait(&mut a, |a| {
-        a.editor.is_none() && !user_menu::pending(&a.user_menu)
+        a.desktop.editor().is_none() && !user_menu::pending(&a.user_menu)
     });
     t.open(&mut a, ">3 Bad\n")?;
     assert!(a
@@ -226,7 +226,7 @@ fn edit_missing_default_reload_and_invalid_menu_repair() -> io::Result<()> {
         .contains("line 1"));
     key(&mut a, KeyCode::F(4));
     wait(&mut a, |a| {
-        a.editor.as_ref().is_some_and(|e| e.buffer.is_some())
+        a.desktop.editor().is_some_and(|e| e.buffer.is_some())
     });
     assert_eq!(fs::read_to_string(&path)?, ">3 Bad\n");
     Ok(())

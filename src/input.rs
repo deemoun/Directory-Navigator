@@ -19,6 +19,14 @@ fn handle_key(app: &mut App, key: KeyEvent) {
         return;
     };
     let focus = focus::current(app);
+    if focus == Focus::WindowList {
+        crate::windowing::key(app, key);
+        return;
+    }
+    if key.code == KeyCode::Char('0') && key.modifiers == KeyModifiers::ALT {
+        crate::windowing::open(app);
+        return;
+    }
     let exit = key.code == KeyCode::F(10)
         || (key.code == KeyCode::Char('x') && key.modifiers.contains(KeyModifiers::ALT));
     if exit

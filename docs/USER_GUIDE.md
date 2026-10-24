@@ -149,6 +149,7 @@ an immediate refresh.
 | F9 / F10 | Menu / exit |
 | Alt+F/U/P/M/O | File / Utilities / Panel / Manager / Options |
 | Alt+X | Exit |
+| Alt+0 | Open the session window list |
 | Ctrl+F3 / Ctrl+F4 / Ctrl+F5 / Ctrl+F6 | Sort by name / extension / newest date / largest size |
 | Ctrl+H / Ctrl+L / Ctrl+R | Toggle hidden / go to directory / refresh |
 | Esc | Close viewer/dialog or cancel operation |
@@ -607,3 +608,21 @@ commands, macros and custom palette files are not imported. User menus,
 associations and Tetris score files retain their separate formats. Support is
 currently verified against fixtures derived from the original format; real-world
 `DN.CFG` compatibility remains provisional until tested with a supplied file.
+
+## Switching open windows
+
+**Manager → Windows…** or **Alt+0** opens the window list from the file panels,
+editor or viewer. The editor also has **File → Windows…**. In the Mac-friendly
+profile, press **Ctrl+O**, release, then **U**.
+
+Choose a row with the arrows, Home/End or PageUp/PageDown, then Enter or Switch.
+A double-click also switches; Esc, Cancel or the title close control leaves the
+current window active. A `*` marks an editor with unsaved changes.
+
+Switching keeps documents open, including their cursor, scroll position and undo
+history. Panel paths, marks, filters and the command draft remain in place. F4
+from the panels resumes the existing editor. Close still uses the normal
+unsaved-change guard; exiting the application also checks a background editor.
+
+This first step supports one editor and one viewer alongside the file manager.
+Games and modal dialogs are not switchable. Windows remain session-only.

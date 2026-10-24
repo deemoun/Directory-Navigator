@@ -2,7 +2,7 @@ use crate::app::App;
 use ratatui::{layout::Rect, widgets::Paragraph, Frame};
 pub(super) fn visible(app: &App) -> bool {
     app.config.show_clock
-        && app.tetris.is_none()
+        && app.desktop.game().is_none()
         && app.utilities.size.0 >= 80
         && app.utilities.size.1 >= 25
 }

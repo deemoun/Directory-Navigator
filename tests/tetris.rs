@@ -238,16 +238,16 @@ fn original_shortcut_menu_and_game_keys_preserve_files_and_panel_state() -> io::
     app.panels[0].toggle_selection();
     let sort = app.panels[0].sort;
     input::handle(&mut app, KeyEvent::new(KeyCode::F(9), KeyModifiers::ALT));
-    assert!(app.tetris.is_some());
+    assert!(app.desktop.game().is_some());
     key(&mut app, KeyCode::F(3));
-    assert!(app.tetris.as_ref().unwrap().paused);
+    assert!(app.desktop.game().unwrap().paused);
     key(&mut app, KeyCode::F(3));
-    assert!(!app.tetris.as_ref().unwrap().paused);
+    assert!(!app.desktop.game().unwrap().paused);
     key(&mut app, KeyCode::F(2));
     assert_eq!(app.panels[0].sort, sort);
     key(&mut app, KeyCode::F(5));
     assert!(matches!(
-        app.tetris.as_ref().unwrap().screen,
+        app.desktop.game().unwrap().screen,
         Screen::Setup { .. }
     ));
     key(&mut app, KeyCode::Esc);
@@ -260,11 +260,11 @@ fn original_shortcut_menu_and_game_keys_preserve_files_and_panel_state() -> io::
     ] {
         key(&mut app, code);
     }
-    assert!(app.prompt.is_none() && app.viewer.is_none() && app.job.is_none());
+    assert!(app.prompt.is_none() && app.desktop.viewer().is_none() && app.job.is_none());
     assert_eq!(app.panels[0].selected.len(), 1);
     assert_eq!(app.panels[0].cursor, 1);
     key(&mut app, KeyCode::Esc);
-    assert!(app.tetris.is_none());
+    assert!(app.desktop.game().is_none());
     assert_eq!(fs::read(temp.0.join("keep.txt"))?, b"unchanged");
     menu::open(&mut app, 0);
     let row = menu::items(0)
@@ -272,11 +272,11 @@ fn original_shortcut_menu_and_game_keys_preserve_files_and_panel_state() -> io::
         .position(|item| item.action == Action::Game)
         .unwrap();
     menu::activate(&mut app, 0, row);
-    assert!(app.tetris.is_some() && app.menu.is_none());
+    assert!(app.desktop.game().is_some() && app.menu.is_none());
     key(&mut app, KeyCode::Esc);
     menu::open(&mut app, 3);
     input::handle(&mut app, KeyEvent::new(KeyCode::F(9), KeyModifiers::ALT));
-    assert!(app.tetris.is_some() && app.menu.is_none());
+    assert!(app.desktop.game().is_some() && app.menu.is_none());
     key(&mut app, KeyCode::Esc);
     Ok(())
 }
@@ -307,7 +307,7 @@ fn game_dialog_mouse_setup_cancel_apply_scores_and_resize() -> io::Result<()> {
             assert_eq!(bar, expected);
         }
         assert_eq!(
-            app.tetris.as_ref().unwrap().running(),
+            app.desktop.game().unwrap().running(),
             width >= 80 && height >= 25
         );
         if width >= 80 {
@@ -325,19 +325,19 @@ fn game_dialog_mouse_setup_cancel_apply_scores_and_resize() -> io::Result<()> {
     click(&mut app, GameAction::LevelUp);
     click(&mut app, GameAction::Preview);
     click(&mut app, GameAction::Back);
-    assert_eq!(app.tetris.as_ref().unwrap().start_level, 1);
-    assert!(app.tetris.as_ref().unwrap().preview);
+    assert_eq!(app.desktop.game().unwrap().start_level, 1);
+    assert!(app.desktop.game().unwrap().preview);
     render(&mut app, 80, 25)?;
     click(&mut app, GameAction::Setup);
     key(&mut app, KeyCode::Right);
     key(&mut app, KeyCode::Char(' '));
     key(&mut app, KeyCode::Enter);
-    assert_eq!(app.tetris.as_ref().unwrap().start_level, 2);
-    assert!(!app.tetris.as_ref().unwrap().preview);
+    assert_eq!(app.desktop.game().unwrap().start_level, 2);
+    assert!(!app.desktop.game().unwrap().preview);
     key(&mut app, KeyCode::Char('+'));
-    assert_eq!(app.tetris.as_ref().unwrap().level, 3);
+    assert_eq!(app.desktop.game().unwrap().level, 3);
     key(&mut app, KeyCode::Char('*'));
-    assert!(app.tetris.as_ref().unwrap().preview);
+    assert!(app.desktop.game().unwrap().preview);
     key(&mut app, KeyCode::F(1));
     render(&mut app, 80, 25)?;
     assert!(app
@@ -348,7 +348,7 @@ fn game_dialog_mouse_setup_cancel_apply_scores_and_resize() -> io::Result<()> {
     click(&mut app, GameAction::Back);
     key(&mut app, KeyCode::F(4));
     render(&mut app, 80, 25)?;
-    assert_eq!(app.tetris.as_ref().unwrap().screen, Screen::Scores);
+    assert_eq!(app.desktop.game().unwrap().screen, Screen::Scores);
     key(&mut app, KeyCode::Enter);
     app.game_scores.add(Record {
         name: "Anonymous".into(),
@@ -360,14 +360,14 @@ fn game_dialog_mouse_setup_cancel_apply_scores_and_resize() -> io::Result<()> {
     render(&mut app, 80, 25)?;
     click(&mut app, GameAction::Close);
     tetris::open(&mut app);
-    assert_eq!(app.tetris.as_ref().unwrap().records[0].score, 123);
+    assert_eq!(app.desktop.game().unwrap().records[0].score, 123);
     key(&mut app, KeyCode::F(10));
     assert!(app.quit);
     Ok(())
 }
 
 fn ended(app: &mut App, score: u64) {
-    let g = app.tetris.as_mut().unwrap();
+    let g = app.desktop.game_mut().unwrap();
     g.score = score;
     g.lines = 4;
     g.start_level = 2;
@@ -393,13 +393,13 @@ fn final_score_name_entry_saved_immediately_and_reloaded() -> io::Result<()> {
         .collect();
     assert!(screen.contains("Final score: 1234"));
     key(&mut app, KeyCode::Enter);
-    assert_eq!(app.tetris.as_ref().unwrap().screen, Screen::Name);
+    assert_eq!(app.desktop.game().unwrap().screen, Screen::Name);
     key(&mut app, KeyCode::F(2));
-    assert_eq!(app.tetris.as_ref().unwrap().screen, Screen::Name);
+    assert_eq!(app.desktop.game().unwrap().screen, Screen::Name);
     input::paste(&mut app, "Дмитрий, 世界 👩‍💻");
     render(&mut app, 80, 25)?;
     click(&mut app, GameAction::SubmitName);
-    let g = app.tetris.as_ref().unwrap();
+    let g = app.desktop.game().unwrap();
     assert_eq!(g.screen, Screen::Scores);
     assert_eq!(g.highlighted, Some(0));
     assert_eq!(g.records[0].name, "Дмитрий, 世界 👩‍💻");
@@ -412,7 +412,7 @@ fn final_score_name_entry_saved_immediately_and_reloaded() -> io::Result<()> {
     let mut other = t.app()?;
     tetris::open(&mut other);
     assert_eq!(
-        other.tetris.as_ref().unwrap().records,
+        other.desktop.game().unwrap().records,
         app.game_scores.board.records
     );
     key(&mut other, KeyCode::F(4));
@@ -428,21 +428,21 @@ fn score_qualification_ties_anonymous_and_grapheme_name_limits() -> io::Result<(
     tetris::open(&mut app);
     ended(&mut app, 0);
     key(&mut app, KeyCode::Enter);
-    assert_eq!(app.tetris.as_ref().unwrap().screen, Screen::Scores);
+    assert_eq!(app.desktop.game().unwrap().screen, Screen::Scores);
     assert!(!t.0.join("tetris.conf").exists());
     ended(&mut app, 100);
     key(&mut app, KeyCode::Enter);
     input::paste(&mut app, "é👩‍💻");
     key(&mut app, KeyCode::Backspace);
-    assert_eq!(app.tetris.as_ref().unwrap().name, "é");
+    assert_eq!(app.desktop.game().unwrap().name, "é");
     input::paste(&mut app, "\n");
-    assert_eq!(app.tetris.as_ref().unwrap().name, "é");
+    assert_eq!(app.desktop.game().unwrap().name, "é");
     input::paste(&mut app, &"x".repeat(31));
-    assert_eq!(app.tetris.as_ref().unwrap().name, "é");
+    assert_eq!(app.desktop.game().unwrap().name, "é");
     key(&mut app, KeyCode::Esc);
     assert_eq!(app.game_scores.board.records[0].name, "Anonymous");
     for score in 1..=10 {
-        app.tetris.as_mut().unwrap().records.push(Record {
+        app.desktop.game_mut().unwrap().records.push(Record {
             name: "other".into(),
             start_level: 1,
             score: score * 100,
@@ -450,19 +450,19 @@ fn score_qualification_ties_anonymous_and_grapheme_name_limits() -> io::Result<(
             level: 1,
         });
     }
-    app.tetris
-        .as_mut()
+    app.desktop
+        .game_mut()
         .unwrap()
         .records
         .sort_by_key(|r| std::cmp::Reverse(r.score));
-    app.tetris.as_mut().unwrap().records.truncate(10);
-    let threshold = app.tetris.as_ref().unwrap().records.last().unwrap().score;
+    app.desktop.game_mut().unwrap().records.truncate(10);
+    let threshold = app.desktop.game().unwrap().records.last().unwrap().score;
     ended(&mut app, threshold);
     key(&mut app, KeyCode::Enter);
-    assert_eq!(app.tetris.as_ref().unwrap().screen, Screen::Scores);
+    assert_eq!(app.desktop.game().unwrap().screen, Screen::Scores);
     ended(&mut app, threshold + 1);
     key(&mut app, KeyCode::Enter);
-    assert_eq!(app.tetris.as_ref().unwrap().screen, Screen::Name);
+    assert_eq!(app.desktop.game().unwrap().screen, Screen::Name);
     Ok(())
 }
 #[test]
@@ -552,11 +552,11 @@ fn failed_score_save_is_visible_retryable_and_survives_game_close() -> io::Resul
     input::paste(&mut app, "Winner");
     key(&mut app, KeyCode::Enter);
     assert!(app.game_scores.has_pending());
-    assert!(app.tetris.as_ref().unwrap().notice.contains("not saved"));
+    assert!(app.desktop.game().unwrap().notice.contains("not saved"));
     assert_eq!(fs::read_to_string(&path)?, "invalid");
     tetris::action(&mut app, GameAction::Close);
     tetris::open(&mut app);
-    assert_eq!(app.tetris.as_ref().unwrap().records[0].name, "Winner");
+    assert_eq!(app.desktop.game().unwrap().records[0].name, "Winner");
     fs::write(&path, "tetris_version=1\nlast_name=Anonymous\n")?;
     tetris::action(&mut app, GameAction::Scores);
     render(&mut app, 80, 25)?;

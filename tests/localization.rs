@@ -257,12 +257,12 @@ fn regional_apply_cancel_navigation_and_mouse_geometry() -> io::Result<()> {
         }
     }
     // Ordinary viewer content remains byte-for-byte untranslated.
-    a.viewer = Some(Viewer::from_contents(
+    a.show_viewer(Viewer::from_contents(
         t.0.join("Name"),
         dn::viewer::from_bytes(b"Name\nSize".to_vec(), dn::viewer::ViewMode::Text),
     ));
     assert!(draw(&mut a, 80, 25)?.contains("Name"));
-    a.viewer = None;
+    a.desktop.close_viewer();
     input::handle(
         &mut a,
         crossterm::event::KeyEvent::new(KeyCode::F(1), KeyModifiers::NONE),
@@ -307,15 +307,15 @@ fn russian_menus_editor_modals_and_metadata_fit_without_translating_paths() -> i
     }
     editor::open_path(&mut a, path.clone());
     let end = Instant::now() + Duration::from_secs(5);
-    while a.editor.as_ref().is_some_and(|e| e.busy()) {
+    while a.desktop.editor().is_some_and(|e| e.busy()) {
         a.poll();
         assert!(Instant::now() < end);
         thread::sleep(Duration::from_millis(1));
     }
-    assert!(a.editor.is_some());
+    assert!(a.desktop.editor().is_some());
     let original = a
-        .editor
-        .as_ref()
+        .desktop
+        .editor()
         .unwrap()
         .buffer
         .as_ref()
@@ -344,7 +344,7 @@ fn russian_menus_editor_modals_and_metadata_fit_without_translating_paths() -> i
     assert!(s.contains("Найти:"));
     editor::action(&mut a, editor::EditorAction::Cancel);
     assert_eq!(
-        a.editor.as_ref().unwrap().buffer.as_ref().unwrap().text,
+        a.desktop.editor().unwrap().buffer.as_ref().unwrap().text,
         original
     );
     let info = dn::file_info::inspect(&path)?;

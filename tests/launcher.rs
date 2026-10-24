@@ -73,19 +73,19 @@ fn enter_missing_file_reports_error_instead_of_opening_internal_tools_and_keys_r
     fs::remove_file(&file)?;
     key(&mut app, KeyCode::Enter);
     assert!(app.launcher.loading());
-    assert!(app.viewer.is_none() && app.editor.is_none());
+    assert!(app.desktop.viewer().is_none() && app.desktop.editor().is_none());
     wait(&mut app, |a| !a.launcher.loading());
     assert!(app.dialogs.last().unwrap().message.contains("Cannot open"));
     key(&mut app, KeyCode::Enter);
     fs::write(&file, "restored")?;
     key(&mut app, KeyCode::F(3));
     wait(&mut app, |a| {
-        a.viewer.as_ref().is_some_and(|v| v.contents.is_some())
+        a.desktop.viewer().is_some_and(|v| v.contents.is_some())
     });
     key(&mut app, KeyCode::Esc);
     key(&mut app, KeyCode::F(4));
-    wait(&mut app, |a| a.editor.as_ref().is_some_and(|e| !e.busy()));
-    assert!(app.editor.is_some());
+    wait(&mut app, |a| a.desktop.editor().is_some_and(|e| !e.busy()));
+    assert!(app.desktop.editor().is_some());
     Ok(())
 }
 
@@ -123,7 +123,7 @@ fn directory_enter_and_missing_file_double_click_share_correct_actions() -> io::
     mouse::handle(&mut app, event);
     mouse::handle(&mut app, event);
     assert!(app.launcher.loading());
-    assert!(app.viewer.is_none());
+    assert!(app.desktop.viewer().is_none());
     wait(&mut app, |a| !a.launcher.loading());
     assert!(!app.dialogs.is_empty());
     Ok(())
@@ -205,7 +205,7 @@ fn background_launch_preserves_native_request_panel_and_reports_backend_errors()
         .unwrap()
         .message
         .contains("No default application"));
-    assert!(app.viewer.is_none() && app.editor.is_none());
+    assert!(app.desktop.viewer().is_none() && app.desktop.editor().is_none());
     Ok(())
 }
 

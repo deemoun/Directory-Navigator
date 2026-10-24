@@ -49,7 +49,7 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
         Block::default().borders(Borders::ALL).style(dos(0x07)),
         well,
     );
-    let Some(game) = app.tetris.as_ref() else {
+    let Some(game) = app.desktop.game() else {
         return;
     };
     for (y, row) in game.board.iter().enumerate() {
@@ -199,7 +199,7 @@ fn draw_page(frame: &mut Frame, app: &mut App, game_rect: Rect, screen: Screen) 
         _ => "Tetris Setup",
     };
     super::dialog_style::window(frame, profile, rect, width, height, language.text(title));
-    let Some(game) = &app.tetris else {
+    let Some(game) = app.desktop.game() else {
         return;
     };
     if screen == Screen::Scores {

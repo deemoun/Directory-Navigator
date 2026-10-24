@@ -38,7 +38,7 @@ pub fn prepare(app: &mut App, area: Rect) -> Prepared {
     if let Some(q) = &mut app.quick_view {
         q.layout(panel_areas[q.source ^ 1]);
     }
-    if let Some(game) = &mut app.tetris {
+    if let Some(game) = app.desktop.game_mut() {
         game.set_obscured(
             area.width < 80 || area.height < 25,
             std::time::Instant::now(),
@@ -50,7 +50,7 @@ pub fn prepare(app: &mut App, area: Rect) -> Prepared {
     if area.width >= 80 && area.height >= 25 {
         match crate::focus::screen(app) {
             crate::focus::Screen::Editor => {
-                if let Some(e) = &mut app.editor {
+                if let Some(e) = app.desktop.editor_mut() {
                     e.rows = usize::from(area.height - 4).max(1);
                     e.columns = usize::from(area.width.saturating_sub(editor_gutter(e))).max(1);
                     e.keep_visible();
@@ -58,7 +58,7 @@ pub fn prepare(app: &mut App, area: Rect) -> Prepared {
             }
             crate::focus::Screen::Viewer => {
                 app.page_rows = regions[1].height as usize;
-                if let Some(v) = &mut app.viewer {
+                if let Some(v) = app.desktop.viewer_mut() {
                     v.layout(regions[1].width);
                 }
             }

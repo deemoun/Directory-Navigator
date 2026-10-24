@@ -117,7 +117,7 @@ fn layout_is_available_to_commands_without_painting() -> io::Result<()> {
     dn::layout::prepare(&mut app, Rect::new(0, 0, 80, 25));
     key(&mut app, KeyCode::F(4), KeyModifiers::SHIFT);
     input::paste(&mut app, "text\nsecond");
-    let editor = app.editor.as_ref().expect("editor");
+    let editor = app.desktop.editor().expect("editor");
     assert!(editor.columns > 60);
     assert_eq!(editor.rows, 21);
     assert_eq!(editor.scroll_column, 0);

@@ -24,6 +24,7 @@ pub enum EditorAction {
     Cut,
     Paste,
     Help,
+    Windows,
     Close,
     Quit,
     Submit,
@@ -42,7 +43,11 @@ pub enum EditorAction {
     Position(usize, bool),
 }
 pub fn open(app: &mut App, new: bool) {
-    if app.editor.is_some() || app.job.is_some() || app.tetris.is_some() || app.viewer.is_some() {
+    if app.job.is_some() || crate::focus::screen(app) == crate::focus::Screen::Game {
+        return;
+    }
+    if let Some(id) = app.desktop.id(crate::desktop::WindowKind::Editor) {
+        app.desktop.activate(id);
         return;
     }
     let panel = &app.panels[app.active];
@@ -69,13 +74,14 @@ pub fn open(app: &mut App, new: bool) {
             editor.search_options = app.editor_search.options;
             menu::close(app);
             app.quick_search = None;
-            app.editor = Some(editor);
+            app.show_editor(editor);
         }
         Err(error) => app.error(error),
     }
 }
 pub fn open_path(app: &mut App, path: PathBuf) {
-    if app.editor.is_some() {
+    if let Some(id) = app.desktop.id(crate::desktop::WindowKind::Editor) {
+        app.desktop.activate(id);
         request_action(app, PendingAction::Open(path));
         return;
     }
@@ -85,15 +91,15 @@ pub fn open_path(app: &mut App, path: PathBuf) {
             editor.search = app.editor_search.query.clone();
             editor.replacement = app.editor_search.replacement.clone();
             editor.search_options = app.editor_search.options;
-            app.editor = Some(editor);
+            app.show_editor(editor);
         }
         Err(error) => app.error(error),
     }
 }
 pub fn poll(app: &mut App) -> bool {
     let reply = app
-        .editor
-        .as_ref()
+        .desktop
+        .editor()
         .and_then(|editor| editor.worker.as_ref())
         .and_then(|worker| match worker.try_recv() {
             Ok(reply) => Some(reply),
@@ -107,7 +113,7 @@ pub fn poll(app: &mut App) -> bool {
     };
     let mut error = None;
     let mut saved = false;
-    if let Some(editor) = &mut app.editor {
+    if let Some(editor) = app.desktop.editor_mut() {
         editor.worker = None;
         editor.saving = false;
         match reply {
@@ -160,14 +166,18 @@ pub fn poll(app: &mut App) -> bool {
     }
     if let Some(error) = error {
         if app
-            .editor
-            .as_ref()
+            .desktop
+            .editor()
             .is_some_and(|editor| editor.buffer.is_none())
         {
-            app.editor = None;
+            app.desktop.close_editor();
         }
         app.error(error);
-    } else if let Some(pending) = app.editor.as_mut().and_then(|editor| editor.closing.take()) {
+    } else if let Some(pending) = app
+        .desktop
+        .editor_mut()
+        .and_then(|editor| editor.closing.take())
+    {
         request_action(app, pending);
     }
     if saved {
@@ -185,7 +195,7 @@ pub fn request_close(app: &mut App, intent: CloseIntent) {
     );
 }
 fn request_action(app: &mut App, pending: PendingAction) {
-    let Some(editor) = &mut app.editor else {
+    let Some(editor) = app.desktop.editor_mut() else {
         return;
     };
     editor.menu = None;
@@ -204,22 +214,22 @@ fn request_action(app: &mut App, pending: PendingAction) {
     complete_pending(app);
 }
 fn complete_pending(app: &mut App) {
-    let pending = app.editor.as_mut().and_then(|editor| {
+    let pending = app.desktop.editor_mut().and_then(|editor| {
         editor.modal = None;
         editor.closing.take()
     });
     match pending {
         Some(PendingAction::Open(path)) => {
-            if let Some(editor) = &mut app.editor {
+            if let Some(editor) = app.desktop.editor_mut() {
                 if let Err(error) = editor.load_next(path) {
                     app.error(error);
                 }
             }
         }
-        Some(PendingAction::Close) => app.editor = None,
+        Some(PendingAction::Close) => app.desktop.close_editor(),
         Some(PendingAction::Quit) => {
-            app.editor = None;
-            app.quit = true;
+            app.desktop.close_editor();
+            app.request_exit();
         }
         None => {}
     }
@@ -238,7 +248,7 @@ fn prompt(editor: &mut Editor, kind: PromptKind) {
     });
 }
 pub fn paste(app: &mut App, text: &str) {
-    let Some(editor) = &mut app.editor else {
+    let Some(editor) = app.desktop.editor_mut() else {
         return;
     };
     if editor.busy() {
@@ -273,7 +283,7 @@ pub fn paste(app: &mut App, text: &str) {
     }
 }
 fn submit_prompt(app: &mut App) -> Result<(), String> {
-    let Some(editor) = &mut app.editor else {
+    let Some(editor) = app.desktop.editor_mut() else {
         return Ok(());
     };
     let Some(Modal::Prompt {
@@ -322,6 +332,10 @@ fn submit_prompt(app: &mut App) -> Result<(), String> {
 }
 pub fn action(app: &mut App, command: EditorAction) {
     use EditorAction as A;
+    if command == A::Windows {
+        crate::windowing::open(app);
+        return;
+    }
     if command == A::Quit {
         request_action(app, PendingAction::Quit);
         return;
@@ -330,7 +344,7 @@ pub fn action(app: &mut App, command: EditorAction) {
         request_action(app, PendingAction::Close);
         return;
     }
-    if app.editor.as_ref().is_none_or(Editor::busy) {
+    if app.desktop.editor().is_none_or(Editor::busy) {
         return;
     }
     if let A::MenuRoot(root) = command {
@@ -346,7 +360,7 @@ pub fn action(app: &mut App, command: EditorAction) {
         return;
     }
     if !matches!(command, A::MenuSurface | A::SearchChoice(_)) {
-        if let Some(editor) = &mut app.editor {
+        if let Some(editor) = app.desktop.editor_mut() {
             editor.menu = None;
         }
     }
@@ -355,8 +369,8 @@ pub fn action(app: &mut App, command: EditorAction) {
         A::SearchSubmit(all) => search_controls::submit(app, all),
         A::Discard
             if app
-                .editor
-                .as_ref()
+                .desktop
+                .editor()
                 .is_some_and(|e| matches!(e.modal, Some(Modal::ConfirmClose))) =>
         {
             complete_pending(app);
@@ -364,7 +378,7 @@ pub fn action(app: &mut App, command: EditorAction) {
         }
         A::SaveDesktop => {
             app.save_config();
-            if let Some(editor) = &mut app.editor {
+            if let Some(editor) = app.desktop.editor_mut() {
                 editor.notice = if app.dialogs.is_empty() {
                     "Desktop preferences saved"
                 } else {
@@ -376,7 +390,7 @@ pub fn action(app: &mut App, command: EditorAction) {
         }
         _ => apply(app, command),
     };
-    if let Some(editor) = &mut app.editor {
+    if let Some(editor) = app.desktop.editor_mut() {
         editor.recolor();
         editor.keep_visible();
     }
@@ -386,7 +400,7 @@ pub fn action(app: &mut App, command: EditorAction) {
 }
 fn apply(app: &mut App, command: EditorAction) -> Result<(), String> {
     use EditorAction as A;
-    let Some(editor) = &mut app.editor else {
+    let Some(editor) = app.desktop.editor_mut() else {
         return Ok(());
     };
     if matches!(command, A::ReplaceYes | A::ReplaceNo | A::ReplaceAll)

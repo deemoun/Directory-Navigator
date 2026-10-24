@@ -175,15 +175,15 @@ fn viewed_and_edited_histories_record_only_success_and_guard_open() -> io::Resul
     file_tools::open_history(&mut app, HistoryKind::View);
     file_tools::accept(&mut app);
     wait(&mut app, |a| {
-        a.viewer.as_ref().is_some_and(|v| v.contents.is_some())
+        a.desktop.viewer().is_some_and(|v| v.contents.is_some())
     });
     assert_eq!(
         app.file_tools.histories.get(HistoryKind::View),
         std::slice::from_ref(&a)
     );
-    app.viewer = None;
+    app.desktop.close_viewer();
     editor::open_path(&mut app, a.clone());
-    wait(&mut app, |a| a.editor.as_ref().is_some_and(|e| !e.busy()));
+    wait(&mut app, |a| a.desktop.editor().is_some_and(|e| !e.busy()));
     assert_eq!(
         app.file_tools.histories.get(HistoryKind::Edit),
         std::slice::from_ref(&a)
@@ -191,15 +191,15 @@ fn viewed_and_edited_histories_record_only_success_and_guard_open() -> io::Resul
     editor::paste(&mut app, "changed");
     editor::open_path(&mut app, b.clone());
     assert!(matches!(
-        app.editor.as_ref().unwrap().modal,
+        app.desktop.editor().unwrap().modal,
         Some(editor::Modal::ConfirmClose)
     ));
     editor::action(&mut app, EditorAction::Cancel);
-    assert_eq!(app.editor.as_ref().unwrap().path.as_ref(), Some(&a));
+    assert_eq!(app.desktop.editor().unwrap().path.as_ref(), Some(&a));
     editor::open_path(&mut app, t.0.join("missing"));
     editor::action(&mut app, EditorAction::Discard);
-    wait(&mut app, |a| a.editor.as_ref().is_some_and(|e| !e.busy()));
-    assert!(app.editor.as_ref().unwrap().dirty());
+    wait(&mut app, |a| a.desktop.editor().is_some_and(|e| !e.busy()));
+    assert!(app.desktop.editor().unwrap().dirty());
     assert_eq!(
         app.file_tools.histories.get(HistoryKind::Edit),
         std::slice::from_ref(&a)
@@ -207,7 +207,7 @@ fn viewed_and_edited_histories_record_only_success_and_guard_open() -> io::Resul
     app.dialogs.clear();
     editor::open_path(&mut app, b.clone());
     editor::action(&mut app, EditorAction::Discard);
-    wait(&mut app, |a| a.editor.as_ref().is_some_and(|e| !e.busy()));
+    wait(&mut app, |a| a.desktop.editor().is_some_and(|e| !e.busy()));
     assert_eq!(
         app.file_tools.histories.get(HistoryKind::Edit),
         [b.clone(), a]
@@ -215,7 +215,7 @@ fn viewed_and_edited_histories_record_only_success_and_guard_open() -> io::Resul
     editor::action(&mut app, EditorAction::SaveAs);
     let saved = t.0.join("saved.txt");
     if let Some(editor::Modal::Prompt { field, cursor, .. }) =
-        &mut app.editor.as_mut().unwrap().modal
+        &mut app.desktop.editor_mut().unwrap().modal
     {
         *field = saved.to_string_lossy().into_owned();
         *cursor = field.len();
@@ -223,16 +223,16 @@ fn viewed_and_edited_histories_record_only_success_and_guard_open() -> io::Resul
         panic!("save as dialog")
     }
     editor::action(&mut app, EditorAction::Submit);
-    wait(&mut app, |a| a.editor.as_ref().is_some_and(|e| !e.busy()));
+    wait(&mut app, |a| a.desktop.editor().is_some_and(|e| !e.busy()));
     assert_eq!(app.file_tools.histories.get(HistoryKind::Edit)[0], saved);
-    app.editor = None;
+    app.desktop.close_editor();
     app.dialogs.clear();
     app.file_tools
         .histories
         .record(HistoryKind::View, t.0.join("missing"));
     file_tools::open_history(&mut app, HistoryKind::View);
     file_tools::accept(&mut app);
-    wait(&mut app, |a| a.viewer.is_none());
+    wait(&mut app, |a| a.desktop.viewer().is_none());
     assert!(!app.dialogs.is_empty());
     assert_eq!(
         app.file_tools.histories.get(HistoryKind::View)[0],

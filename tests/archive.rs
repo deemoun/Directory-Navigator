@@ -307,9 +307,9 @@ fn browser_enter_f3_return_parent_and_panel_state_preservation() -> io::Result<(
     key(&mut a, KeyCode::Enter);
     select(&mut a, "文.txt");
     key(&mut a, KeyCode::F(3));
-    wait(&mut a, |a| a.viewer.is_some());
+    wait(&mut a, |a| a.desktop.viewer().is_some());
     assert_eq!(
-        a.viewer.as_ref().unwrap().contents.as_ref().unwrap().lines,
+        a.desktop.viewer().unwrap().contents.as_ref().unwrap().lines,
         ["ARCHIVE PREVIEW"]
     );
     assert!(a
@@ -318,7 +318,7 @@ fn browser_enter_f3_return_parent_and_panel_state_preservation() -> io::Result<(
         .get(dn::file_tools::history::HistoryKind::View)
         .is_empty());
     key(&mut a, KeyCode::F(2));
-    assert!(a.viewer.as_ref().unwrap().wrap);
+    assert!(a.desktop.viewer().unwrap().wrap);
     key(&mut a, KeyCode::Esc);
     assert_eq!(focus::current(&a), Focus::Archive);
     key(&mut a, KeyCode::Backspace);
@@ -354,7 +354,7 @@ fn mouse_double_click_modals_buttons_and_resizing() -> io::Result<()> {
     key(&mut a, KeyCode::Esc);
     draw(&mut a, 80, 25)?;
     click(&mut a, Target::Archive(Action::View));
-    wait(&mut a, |a| a.viewer.is_some());
+    wait(&mut a, |a| a.desktop.viewer().is_some());
     key(&mut a, KeyCode::Esc);
     draw(&mut a, 80, 25)?;
     click(&mut a, Target::Archive(Action::Close));
@@ -385,7 +385,7 @@ fn close_stop_refresh_and_failed_open_do_not_publish_stale_replies() -> io::Resu
     for _ in 0..10 {
         a.poll();
     }
-    assert!(a.viewer.is_none());
+    assert!(a.desktop.viewer().is_none());
     archive::open(&mut a, t.0.join("missing.zip"));
     finish(&mut a);
     assert!(!a.dialogs.is_empty());

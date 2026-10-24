@@ -14,7 +14,7 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
     let profile = app.config.palette;
     let dos = profile.styles();
     super::editor_menu::draw_bar(frame, app, Rect::new(area.x, area.y, area.width, 1));
-    let Some(editor) = &mut app.editor else {
+    let Some(editor) = app.desktop.editor_mut() else {
         return;
     };
     let path = editor
@@ -123,6 +123,7 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
             && editor.modal.is_none()
             && editor.menu.is_none()
             && app.dialogs.is_empty()
+            && app.window_list.is_none()
             && !prefix_armed
         {
             frame.set_cursor_position((

@@ -273,7 +273,7 @@ fn game_import_uses_selected_language_and_shows_unknown_lines_at_both_sizes() ->
     app.config_store = ConfigStore::new(Some(t.0.join("config.conf")));
     app.config.language = dn::localization::Language::Russian;
     tetris::open(&mut app);
-    assert_eq!(app.tetris.as_ref().unwrap().records[0].name, "Дмитрий");
+    assert_eq!(app.desktop.game().unwrap().records[0].name, "Дмитрий");
     tetris::action(&mut app, GameAction::Scores);
     for (w, h) in [(80, 25), (120, 40), (80, 25)] {
         let mut terminal = Terminal::new(TestBackend::new(w, h))?;

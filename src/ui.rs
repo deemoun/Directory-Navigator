@@ -32,6 +32,7 @@ mod user_menu_view;
 mod utilities_view;
 mod viewer_view;
 mod welcome_view;
+mod windows_view;
 use overlays::{draw_info_dialog, draw_operation_overlays};
 use panel_view::draw_panel;
 
@@ -46,6 +47,7 @@ fn draw_content(frame: &mut Frame, app: &mut App) {
     let profile = app.config.palette;
     let dos = profile.styles();
     let area = frame.area();
+    let screen = app.desktop.active().kind;
     let prepared = crate::layout::prepare(app, area);
     app.mouse.regions.clear();
     if app.screensaver.active {
@@ -56,7 +58,7 @@ fn draw_content(frame: &mut Frame, app: &mut App) {
     if area.width < 80 || area.height < 25 {
         frame.render_widget(
             Paragraph::new(
-                if app.editor.is_some() {
+                if screen == crate::desktop::WindowKind::Editor {
                     "Directory Navigator\nTerminal too small — resize to 80×25.\nAlt+X requests exit; resize to review unsaved prompts."
                 } else { "Directory Navigator\nTerminal too small — resize to 80×25.\nF10 exits." },
             )
@@ -66,14 +68,16 @@ fn draw_content(frame: &mut Frame, app: &mut App) {
         );
         return;
     }
-    if app.editor.is_some() {
+    if screen == crate::desktop::WindowKind::Editor {
         editor_view::draw(frame, app, area);
+        windows_view::draw(frame, app, area);
         draw_info_dialog(frame, app, prepared.message.as_ref());
         return;
     }
-    if app.viewer.is_some() {
+    if screen == crate::desktop::WindowKind::Viewer {
         draw_viewer(frame, app, area);
         tools_view::draw_tools(frame, app, area);
+        windows_view::draw(frame, app, area);
         draw_info_dialog(frame, app, prepared.message.as_ref());
         return;
     }
@@ -163,13 +167,14 @@ fn draw_content(frame: &mut Frame, app: &mut App) {
             buttons[index],
         );
     }
-    if app.tetris.is_some() {
+    if screen == crate::desktop::WindowKind::Game {
         tetris_view::draw(frame, app, area);
         return;
     }
     if app.welcome.dialog.is_some() {
         welcome_view::draw(frame, app, area);
         settings_view::draw_settings(frame, app, area);
+        windows_view::draw(frame, app, area);
         draw_info_dialog(frame, app, prepared.message.as_ref());
         return;
     }
@@ -188,5 +193,6 @@ fn draw_content(frame: &mut Frame, app: &mut App) {
     screensaver_view::draw_setup(frame, app, area);
     command_history_view::draw(frame, app, area);
     config_import_view::draw(frame, app, area);
+    windows_view::draw(frame, app, area);
     draw_info_dialog(frame, app, prepared.message.as_ref());
 }

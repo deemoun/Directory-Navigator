@@ -410,43 +410,43 @@ fn viewer_modal_cancel_mouse_controls_hex_and_session_query() -> io::Result<()> 
     let path = t.0.join("text");
     fs::write(&path, format!("{} find\nfind end\n", "x".repeat(160)))?;
     let mut app = t.app()?;
-    app.viewer = Some(loaded_viewer(path.clone())?);
+    app.show_viewer(loaded_viewer(path.clone())?);
     draw(&mut app, 80, 25)?;
     click(&mut app, Target::Viewer(View::Wrap));
-    assert!(app.viewer.as_ref().unwrap().wrap);
+    assert!(app.desktop.viewer().unwrap().wrap);
     key(&mut app, KeyCode::F(7), KeyModifiers::NONE);
     viewer::paste(&mut app, "find");
     draw(&mut app, 80, 25)?;
     click(&mut app, Target::Viewer(View::Submit));
     draw(&mut app, 80, 25)?;
-    assert!(app.viewer.as_ref().unwrap().current.is_some());
+    assert!(app.desktop.viewer().unwrap().current.is_some());
     assert_eq!(app.viewer_search.query, "find");
     key(&mut app, KeyCode::F(7), KeyModifiers::SHIFT);
     assert_eq!(
-        app.viewer.as_ref().unwrap().current.as_ref().unwrap().line,
+        app.desktop.viewer().unwrap().current.as_ref().unwrap().line,
         1
     );
     key(&mut app, KeyCode::F(7), KeyModifiers::CONTROL);
     assert_eq!(
-        app.viewer.as_ref().unwrap().current.as_ref().unwrap().line,
+        app.desktop.viewer().unwrap().current.as_ref().unwrap().line,
         0
     );
-    let offset = app.viewer.as_ref().unwrap().offset;
-    let current = app.viewer.as_ref().unwrap().current.clone();
+    let offset = app.desktop.viewer().unwrap().offset;
+    let current = app.desktop.viewer().unwrap().current.clone();
     key(&mut app, KeyCode::F(7), KeyModifiers::NONE);
     viewer::paste(&mut app, "bad");
     key(&mut app, KeyCode::Esc, KeyModifiers::NONE);
-    assert_eq!(app.viewer.as_ref().unwrap().offset, offset);
-    assert_eq!(app.viewer.as_ref().unwrap().current, current);
+    assert_eq!(app.desktop.viewer().unwrap().offset, offset);
+    assert_eq!(app.desktop.viewer().unwrap().current, current);
     assert_eq!(app.viewer_search.query, "find");
     draw(&mut app, 120, 40)?;
-    app.viewer = None;
-    app.viewer = Some(loaded_viewer(path)?);
-    assert!(!app.viewer.as_ref().unwrap().wrap);
+    app.desktop.close_viewer();
+    app.show_viewer(loaded_viewer(path)?);
+    assert!(!app.desktop.viewer().unwrap().wrap);
     key(&mut app, KeyCode::F(7), KeyModifiers::NONE);
     assert_eq!(
-        app.viewer
-            .as_ref()
+        app.desktop
+            .viewer()
             .unwrap()
             .search_dialog
             .as_ref()
@@ -456,17 +456,17 @@ fn viewer_modal_cancel_mouse_controls_hex_and_session_query() -> io::Result<()> 
         "find"
     );
     key(&mut app, KeyCode::Esc, KeyModifiers::NONE);
-    app.viewer
-        .as_mut()
+    app.desktop
+        .viewer_mut()
         .unwrap()
         .contents
         .as_mut()
         .unwrap()
         .binary = true;
     viewer::action(&mut app, View::Wrap);
-    assert!(!app.viewer.as_ref().unwrap().wrap);
+    assert!(!app.desktop.viewer().unwrap().wrap);
     viewer::action(&mut app, View::Find);
-    assert!(app.viewer.as_ref().unwrap().search_dialog.is_none());
+    assert!(app.desktop.viewer().unwrap().search_dialog.is_none());
     draw(&mut app, 80, 25)?;
     assert!(!app
         .mouse
@@ -505,7 +505,7 @@ fn viewport_search_highlights_only_rendered_rows_and_menu_fit() -> io::Result<()
     )
     .unwrap();
     assert_eq!(v.current.as_ref().unwrap().line, 500);
-    app.viewer = Some(v);
+    app.show_viewer(v);
     draw(&mut app, 80, 25)?;
     assert!(app
         .mouse
@@ -560,15 +560,15 @@ fn viewer_search_case_checkbox_modal_scroll_and_match_highlighting() -> io::Resu
     let path = t.0.join("text");
     fs::write(&path, "ALPHA\nalpha\n")?;
     let mut app = t.app()?;
-    app.viewer = Some(loaded_viewer(path)?);
+    app.show_viewer(loaded_viewer(path)?);
     draw(&mut app, 80, 25)?;
     key(&mut app, KeyCode::F(7), KeyModifiers::NONE);
     viewer::paste(&mut app, "alpha");
     draw(&mut app, 80, 25)?;
     click(&mut app, Target::Viewer(View::Case));
     assert!(
-        !app.viewer
-            .as_ref()
+        !app.desktop
+            .viewer()
             .unwrap()
             .search_dialog
             .as_ref()
@@ -576,7 +576,7 @@ fn viewer_search_case_checkbox_modal_scroll_and_match_highlighting() -> io::Resu
             .memory
             .case_sensitive
     );
-    let offset = app.viewer.as_ref().unwrap().offset;
+    let offset = app.desktop.viewer().unwrap().offset;
     mouse::handle(
         &mut app,
         MouseEvent {
@@ -586,10 +586,10 @@ fn viewer_search_case_checkbox_modal_scroll_and_match_highlighting() -> io::Resu
             modifiers: KeyModifiers::NONE,
         },
     );
-    assert_eq!(app.viewer.as_ref().unwrap().offset, offset);
+    assert_eq!(app.desktop.viewer().unwrap().offset, offset);
     click(&mut app, Target::Viewer(View::Submit));
     assert_eq!(
-        app.viewer.as_ref().unwrap().current.as_ref().unwrap().line,
+        app.desktop.viewer().unwrap().current.as_ref().unwrap().line,
         0
     );
     let mut terminal = Terminal::new(TestBackend::new(80, 25))?;

@@ -263,7 +263,7 @@ fn calculator_mouse_keyboard_paste_copy_reopen_and_editor_clipboard() -> io::Res
     dn::editor::open(&mut app, true);
     key(&mut app, KeyCode::Char('v'), KeyModifiers::CONTROL);
     assert_eq!(
-        app.editor.as_ref().unwrap().buffer.as_ref().unwrap().text,
+        app.desktop.editor().unwrap().buffer.as_ref().unwrap().text,
         "0x42"
     );
     Ok(())
@@ -469,6 +469,6 @@ fn utility_menus_modal_precedence_editor_keys_and_small_terminal() -> io::Result
     dn::editor::open(&mut app, true);
     key(&mut app, KeyCode::Char('b'), KeyModifiers::CONTROL);
     assert!(app.utilities.dialog.is_none());
-    assert!(app.editor.is_some());
+    assert!(app.desktop.editor().is_some());
     Ok(())
 }
