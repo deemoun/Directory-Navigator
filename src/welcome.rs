@@ -1,6 +1,8 @@
 //! Session-only welcome state. Configuration existence determines first-run display.
 use crate::{app::App, settings::SettingsKind};
-use crossterm::event::{KeyCode as K, KeyEvent, KeyModifiers as M};
+use crossterm::event::KeyEvent;
+#[cfg(not(feature = "turbo-vision"))]
+use crossterm::event::{KeyCode as K, KeyModifiers as M};
 
 #[derive(Default)]
 pub struct State {
@@ -40,6 +42,11 @@ pub fn action(app: &mut App, action: Action) {
         Action::Help => crate::dialog::keyboard_help(app),
     }
 }
+#[cfg(feature = "turbo-vision")]
+pub fn key(app: &mut App, key: KeyEvent) {
+    crate::turbo::forms::welcome_key(app, key);
+}
+#[cfg(not(feature = "turbo-vision"))]
 pub fn key(app: &mut App, key: KeyEvent) {
     let (width, height) = app.utilities.size;
     if width < 80 || height < 25 {

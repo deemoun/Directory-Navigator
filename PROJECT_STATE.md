@@ -4,8 +4,11 @@
 - Native Rust `dn`: Ratatui/Crossterm/Chrono, Unicode segmentation, Unix libc;
   macOS native Trash via `trash`, Windows native shell APIs; minimal ZIP/TAR/gzip
   codec features via zip/tar/flate2; TOML parser for grouped preferences.
-- Session Desktop owns editor/viewer/game content, stable WindowId values and
-  explicit active-screen identity; file panels remain the permanent base.
+- Session Desktop owns editor/viewer/game content and stable WindowId values;
+  default Turbo Vision build reads selection from the native Desktop/Window
+  registry. Native foreground modal scope captures input before controller
+  dispatch. File panels remain the permanent base; the comparison build retains
+  the old active-screen model.
 - Modular app/input/panels, operations, dialogs, configuration, editor, viewer
   and utilities. Shared focus policy and explicit viewport preparation.
 - Cancellable panel scanners; bounded short-task pool; dedicated file-operation
@@ -14,6 +17,22 @@
   state owns session dialogs/options/results; quick view owns debounced reads.
 
 ## Implemented
+- Native Turbo Vision desktop/control increment: stable document identities map
+  to native views; TV owns selection/z-order, with no second active-screen cache.
+  Full-screen native documents paint the retained skin and a native foreground
+  modal scope gates input. Native close cannot bypass application save/exit
+  guards. Welcome and path/operation prompts use native Dialog/Group focus and
+  Button commands plus a Unicode custom field. Existing mouse targets and
+  Ratatui visual composition remain; other controls/menus still require porting.
+  Full migration is NOT complete. No workflow runs, UI redesign, configuration
+  changes or filesystem-policy changes belong to this increment.
+  macOS ARM64: fmt, all-target Clippy, 391 passing Rust tests (one existing
+  opt-in native Trash test ignored), release build and 36 decoded visual scene
+  comparisons pass. Original-backend desktop/welcome/dialog/terminal/workflow
+  checks: 36 pass. Native PTYs pass Welcome/settings/help return, Unicode mkdir
+  cancel/submit, resize, editor/window/unsaved guards, calculator, Tetris and
+  shell handoff/restoration. Windows-target Clippy is blocked by Cargo's
+  windows-numerics path-source/cache error; native Intel/Windows/Linux untested.
 - Turbo Vision migration IN PROGRESS on feature/turbo-vision: pinned 4.1.0 core,
   real TV custom View/diff buffer and event transport enabled by default. The
   existing Ratatui canvas/control/focus layers remain; this is NOT a full native
@@ -29,7 +48,7 @@
   Native Intel/Windows/Linux are not validated.
   Final transport increment: fmt/all-target Clippy/386 Rust tests/release pass
   on macOS ARM64 (one existing opt-in native Trash test ignored). Full native
-  Desktop/window/control migration remains outstanding; do not call it complete.
+  remaining control/renderer migration is outstanding; do not call it complete.
 - Tetris presentation follows the DN game/setup/Top Ten references: framed
   Info/Next/Best sidebar, New/Setup/Top 10/Pause shadowed buttons and title close;
   Name/Start/End/Score dotted leaders, centered OK and conditional Retry save;

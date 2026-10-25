@@ -24,9 +24,15 @@ fn run() -> io::Result<()> {
     let mut app = App::new(std::env::current_dir()?)?;
     app.load_initial_config();
     let (session, mut terminal) = Session::start()?;
+    #[cfg(feature = "turbo-vision")]
+    terminal.backend_mut().bind_desktop(app.desktop.native());
     let mut dirty = true;
     loop {
         dirty |= app.poll();
+        #[cfg(feature = "turbo-vision")]
+        app.desktop
+            .native()
+            .set_scope(dn::turbo::desktop::Scope::for_app(&app));
         if dirty {
             session.cursor_style(dn::focus::current(&app) == dn::focus::Focus::Manager)?;
             terminal.draw(|frame| ui::draw(frame, &mut app))?;
@@ -71,6 +77,10 @@ fn run() -> io::Result<()> {
             }
             if let Event::Mouse(mouse) = &event {
                 session.mouse_event(mouse.kind);
+            }
+            #[cfg(feature = "turbo-vision")]
+            if app.desktop.native().dispatch().is_none() {
+                continue;
             }
             match event {
                 Event::Key(key) => {

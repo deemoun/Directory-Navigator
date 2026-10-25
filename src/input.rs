@@ -157,6 +157,12 @@ fn handle_key(app: &mut App, key: KeyEvent) {
         crate::menu::key(app, key.code);
         return;
     }
+    #[cfg(feature = "turbo-vision")]
+    if focus == Focus::Prompt {
+        crate::turbo::forms::prompt_key(app, key);
+        return;
+    }
+    #[cfg(not(feature = "turbo-vision"))]
     if let Some(prompt) = app.prompt.as_mut().filter(|_| focus == Focus::Prompt) {
         match key.code {
             KeyCode::Esc => app.prompt = None,

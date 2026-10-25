@@ -1,6 +1,8 @@
 //! Transitional Turbo Vision output host. DN models and the tested canvas remain
 //! intact while native window/control adapters are migrated separately.
 mod codec;
+pub mod desktop;
+pub mod forms;
 use codec::Codec;
 use ratatui::{
     backend::{Backend, WindowSize},
@@ -15,7 +17,6 @@ use std::{
 use turbo_vision::{
     core::{draw::Cell as TvCell, event::Event, geometry::Rect as TvRect},
     terminal::{Backend as TvBackend, Terminal as TvTerminal},
-    views::{View, ViewCore},
 };
 fn lock<T>(value: &Mutex<T>) -> io::Result<MutexGuard<'_, T>> {
     value
@@ -69,36 +70,10 @@ impl<W: Write + Send + 'static> TvBackend for Transport<W> {
         lock(&self.writer)?.write_all(b"\x1b[?25l")
     }
 }
-struct Surface {
-    core: ViewCore,
-    cells: Vec<(i16, i16, TvCell)>,
-}
-impl View for Surface {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
-        self
-    }
-    fn get_palette(&self) -> Option<turbo_vision::core::palette::Palette> {
-        None
-    }
-
-    fn core(&self) -> &ViewCore {
-        &self.core
-    }
-    fn core_mut(&mut self) -> &mut ViewCore {
-        &mut self.core
-    }
-    fn draw(&mut self, terminal: &mut TvTerminal) {
-        for &(x, y, cell) in &self.cells {
-            terminal.write_cell(x, y, cell);
-        }
-    }
-    fn handle_event(&mut self, _: &mut Event) {}
-}
 pub struct TurboBackend<W: Write + Send + 'static> {
     terminal: TvTerminal,
+    desktop: desktop::NativeDesktop,
+    pixels: Vec<TvCell>,
     codec: Arc<Mutex<Codec>>,
     dimensions: Arc<Mutex<Size>>,
     writer: Arc<Mutex<W>>,
@@ -132,6 +107,14 @@ impl<W: Write + Send + 'static> TurboBackend<W> {
         .map_err(|e| io::Error::other(e.to_string()))?;
         Ok(Self {
             terminal,
+            desktop: desktop::NativeDesktop::new(crate::desktop::WindowInfo {
+                id: crate::desktop::WindowId::MANAGER,
+                kind: crate::desktop::WindowKind::Manager,
+            }),
+            pixels: vec![
+                TvCell::new(' ', turbo_vision::core::palette::Attr::from_u8(0x07));
+                usize::from(size.width) * usize::from(size.height)
+            ],
             codec,
             dimensions,
             writer,
@@ -140,6 +123,9 @@ impl<W: Write + Send + 'static> TurboBackend<W> {
             cursor_visible: false,
             fixed,
         })
+    }
+    pub fn bind_desktop(&mut self, desktop: desktop::NativeDesktop) {
+        self.desktop = desktop;
     }
     /// One event reader, through TV's host backend, with lossless DN payloads.
     pub fn poll_event(&mut self, timeout: Duration) -> io::Result<Option<crossterm::event::Event>> {
@@ -155,6 +141,10 @@ impl<W: Write + Send + 'static> TurboBackend<W> {
             *lock(&self.dimensions)? = size;
             lock(&self.codec)?.resize(size);
             self.terminal.resize(size.width, size.height);
+            self.pixels = vec![
+                TvCell::new(' ', turbo_vision::core::palette::Attr::from_u8(0x07));
+                usize::from(size.width) * usize::from(size.height)
+            ];
         }
         Ok(())
     }
@@ -185,10 +175,6 @@ impl<W: Write + Send + 'static> Backend for TurboBackend<W> {
     {
         let size = self.current_size()?;
         self.resize(size)?;
-        let mut surface = Surface {
-            core: ViewCore::new(TvRect::new(0, 0, size.width as i16, size.height as i16)),
-            cells: Vec::new(),
-        };
         {
             let mut codec = lock(&self.codec)?;
             for (x, y, cell) in content {
@@ -196,17 +182,20 @@ impl<W: Write + Send + 'static> Backend for TurboBackend<W> {
                     continue;
                 }
                 let (cell, width) = codec.cell(x, y, cell)?;
-                surface.cells.push((x as i16, y as i16, cell));
+                self.pixels[usize::from(y) * usize::from(size.width) + usize::from(x)] = cell;
                 for offset in 1..width.min(usize::from(size.width - x)) {
                     let px = x + offset as u16;
                     codec.continuation(px, y);
-                    surface
-                        .cells
-                        .push((px as i16, y as i16, TvCell::new('\0', cell.attr)));
+                    self.pixels[usize::from(y) * usize::from(size.width) + usize::from(px)] =
+                        TvCell::new('\0', cell.attr);
                 }
             }
         }
-        self.terminal.draw_view(&mut surface);
+        self.desktop.draw(
+            &mut self.terminal,
+            TvRect::new(0, 0, size.width as i16, size.height as i16),
+            &self.pixels,
+        );
         Ok(())
     }
     fn hide_cursor(&mut self) -> io::Result<()> {
@@ -227,6 +216,10 @@ impl<W: Write + Send + 'static> Backend for TurboBackend<W> {
     fn clear(&mut self) -> io::Result<()> {
         self.terminal.clear();
         self.terminal.force_full_redraw();
+        self.pixels.fill(TvCell::new(
+            ' ',
+            turbo_vision::core::palette::Attr::from_u8(0x07),
+        ));
         lock(&self.codec)?.resize(*lock(&self.dimensions)?);
         lock(&self.writer)?.write_all(b"\x1b[2J")
     }

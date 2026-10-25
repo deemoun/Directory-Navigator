@@ -240,6 +240,10 @@ fn all_existing_screen_kinds_reach_turbo_vision_without_cell_changes() -> io::Re
                     }
                     let output = Output::default();
                     let mut native = TurboBackend::with_size(output.clone(), size)?;
+                    native.bind_desktop(app.desktop.native());
+                    app.desktop
+                        .native()
+                        .set_scope(dn::turbo::desktop::Scope::for_app(&app));
                     native.draw(painted.into_iter())?;
                     native.flush()?;
                     assert_eq!(
