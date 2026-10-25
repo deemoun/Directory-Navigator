@@ -41,10 +41,22 @@ pub use theme::entry_color;
 use viewer_view::draw_viewer;
 
 pub fn draw(frame: &mut Frame, app: &mut App) {
-    draw_content(frame, app);
+    #[cfg(feature = "turbo-vision")]
+    app.desktop.native().set_game_scene(None);
+    draw_content(frame, app, false);
     shortcuts_view::draw_prefix(frame, app);
 }
-fn draw_content(frame: &mut Frame, app: &mut App) {
+/// Runtime composition: native game content is painted by its TV document.
+/// `draw` remains the legacy renderer for comparison and headless contracts.
+#[cfg(feature = "turbo-vision")]
+pub fn draw_native(frame: &mut Frame, app: &mut App) {
+    app.desktop.native().set_game_scene(None);
+    draw_content(frame, app, !crate::shortcuts::armed(app));
+    shortcuts_view::draw_prefix(frame, app);
+}
+fn draw_content(frame: &mut Frame, app: &mut App, native_game: bool) {
+    #[cfg(not(feature = "turbo-vision"))]
+    let _ = native_game;
     let profile = app.config.palette;
     let dos = profile.styles();
     let area = frame.area();
@@ -169,6 +181,17 @@ fn draw_content(frame: &mut Frame, app: &mut App) {
         );
     }
     if screen == crate::desktop::WindowKind::Game {
+        #[cfg(feature = "turbo-vision")]
+        if native_game
+            && app
+                .desktop
+                .game()
+                .is_some_and(|g| g.screen == crate::tetris::Screen::Play)
+        {
+            let scene = crate::turbo::tetris::prepare(app, area.width, area.height);
+            app.desktop.native().set_game_scene(Some(scene));
+            return;
+        }
         tetris_view::draw(frame, app, area);
         return;
     }

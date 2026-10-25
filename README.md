@@ -94,9 +94,11 @@ On Windows, the executable is `target\release\dn.exe`.
 On the `feature/turbo-vision` branch, the default build uses a pinned Turbo Vision
 4.1.0 desktop, window selection and terminal transport. Welcome and operation
 prompts use native dialog focus and button commands, with a custom Unicode input
-control. This is an **in-progress migration**: Ratatui still composes the visual
-skin, and other menus/dialogs retain their existing controllers. It is not yet a
-complete native widget port. Unicode graphemes, indexed colors, paste and terminal
+control. Tetris's play window now draws directly through Turbo Vision while
+preserving its existing appearance; its setup/help/score/name-entry pages still
+use the previous renderer. This is an **in-progress migration**: Ratatui still
+composes the other visual surfaces, and other menus/dialogs retain their existing
+controllers. It is not yet a complete native widget port. Unicode graphemes, indexed colors, paste and terminal
 cleanup are preserved.
 Use `cargo build --release --no-default-features` to build the original terminal
 backend for comparison. See [migration status](docs/TURBO_VISION_MIGRATION.md).

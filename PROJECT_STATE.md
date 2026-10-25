@@ -17,6 +17,13 @@
   state owns session dialogs/options/results; quick view owns debounced reads.
 
 ## Implemented
+- Native Tetris play-window drawing: the default runtime paints the game frame,
+  well/pieces, Info/Next/Best panels, pause banner, buttons and footer directly
+  through Turbo Vision. Existing rules, keyboard/mouse actions and score storage
+  remain. Setup/help/scores/game-over/name-entry pages still use the old renderer.
+  Native glyph references are independent of the retained canvas; differential
+  comparisons cover text/colors/targets, both palettes/languages, transitions and
+  resizing. This is the first game renderer slice, not a full game control port.
 - Native Turbo Vision desktop/control increment: stable document identities map
   to native views; TV owns selection/z-order, with no second active-screen cache.
   Full-screen native documents paint the retained skin and a native foreground

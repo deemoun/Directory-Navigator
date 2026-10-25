@@ -3,6 +3,7 @@
 mod codec;
 pub mod desktop;
 pub mod forms;
+pub(crate) mod tetris;
 use codec::Codec;
 use ratatui::{
     backend::{Backend, WindowSize},
@@ -191,10 +192,20 @@ impl<W: Write + Send + 'static> Backend for TurboBackend<W> {
                 }
             }
         }
+        let scene = self.desktop.game_scene();
+        let native = {
+            let mut codec = lock(&self.codec)?;
+            codec.clear_native();
+            scene
+                .as_ref()
+                .map(|scene| scene.encode(&mut codec, size.width, size.height))
+                .transpose()?
+        };
         self.desktop.draw(
             &mut self.terminal,
             TvRect::new(0, 0, size.width as i16, size.height as i16),
             &self.pixels,
+            native.as_deref().unwrap_or_default(),
         );
         Ok(())
     }

@@ -35,6 +35,9 @@ fn run() -> io::Result<()> {
             .set_scope(dn::turbo::desktop::Scope::for_app(&app));
         if dirty {
             session.cursor_style(dn::focus::current(&app) == dn::focus::Focus::Manager)?;
+            #[cfg(feature = "turbo-vision")]
+            terminal.draw(|frame| ui::draw_native(frame, &mut app))?;
+            #[cfg(not(feature = "turbo-vision"))]
             terminal.draw(|frame| ui::draw(frame, &mut app))?;
             dirty = false;
         }

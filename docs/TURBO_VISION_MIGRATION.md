@@ -3,7 +3,8 @@
 The migration is **not complete**. Turbo Vision now owns the native desktop,
 modeless-window selection, z-order and a foreground modal input scope. Welcome
 and operation prompts use native Dialog/Group focus and Button command dispatch,
-with a custom Unicode field control. Ratatui still composes the visual skin;
+with a custom Unicode field control. The Tetris play window draws directly through TV;
+Ratatui still composes the other visual surfaces;
 other menus/dialogs and the application event controllers remain. This is a
 native ownership/control increment, not completion of the full widget port.
 
@@ -25,7 +26,8 @@ native ownership/control increment, not completion of the full widget port.
   The model reads active identity from the native desktop rather than a second
   cached selection. Models still own buffers and workers; native windows cannot
   bypass unsaved-document or filesystem guards by closing themselves.
-- The selected native document paints the existing full-screen skin. A native
+- The selected native document paints the existing full-screen skin (with native
+  Tetris play content replacing that part of the canvas). A native
   modal foreground view captures delivery ahead of background documents; closing
   or replacing a document updates its modal owner immediately. Resize and shell
   resume invalidate native raster state; inactive views retain no stale codec
@@ -38,6 +40,37 @@ native ownership/control increment, not completion of the full widget port.
   their mouse targets remain in the existing dispatcher.
 - `--no-default-features` retains the original backend as a comparison/rollback
   build. CLI help/version remain noninteractive. Formats/configuration unchanged.
+
+## Native Tetris play renderer
+
+The default runtime now draws the Tetris play window directly from the game model
+through the native document's `Terminal::write_cell` path. This includes its frame,
+well, settled/falling pieces, preview, score/level/best panels, pause/game-over
+banner, shadowed buttons and function bar. The game is absent from the Ratatui
+canvas on this path; the surrounding file-manager shell remains on the canvas.
+Native cells have separate codec references so removing or replacing the game
+cannot invalidate Unicode tokens still used by the retained background.
+
+Game rules, keyboard actions, mouse dispatch and score persistence are unchanged.
+Setup, Help, Top Ten, Game Over and name-entry pages still use the existing
+renderer; porting those pages and native input controls is a later increment.
+The original renderer remains available with `--no-default-features` and as a
+headless comparison oracle (`ui::draw`); the default executable uses
+`ui::draw_native`.
+
+A differential-frame comparison checks text, foreground/background colors and
+mouse targets across both palettes, English/Russian, three terminal sizes,
+piece movement/rotation, pause, preview, legacy pages, close/reopen, resize,
+undersized terminals, game-over banner and screensaver return. It also checks
+that native game content is absent from the legacy canvas. A separate check
+covers a terminal shrinking between scene preparation and native painting.
+
+Local macOS ARM64 validation for this slice: the full Rust suite (393 passed,
+one existing opt-in Trash test ignored), final focused Tetris/transport/desktop
+checks (22 passed, including the additional resize-race check), fallback checks
+(30 passed), formatting, all-target Clippy and release build pass. Interactive
+terminal checks cover game/setup/Top Ten, level/preview apply, mouse cancel/close,
+shell input and terminal restoration. Other native platforms remain unvalidated.
 
 ## Remaining required work for a full transition
 

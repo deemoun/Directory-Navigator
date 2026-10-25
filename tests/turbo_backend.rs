@@ -259,3 +259,232 @@ fn all_existing_screen_kinds_reach_turbo_vision_without_cell_changes() -> io::Re
     fs::remove_dir_all(directory)?;
     result
 }
+
+// Track the final colored screen across multiple differential frames. This
+// catches native cells left behind when pieces move or a legacy page takes over.
+fn colored_screen(bytes: &str, size: Size) -> Vec<(String, String, String)> {
+    use unicode_segmentation::UnicodeSegmentation;
+    let mut cells = vec![
+        (" ".into(), "default".into(), "default".into());
+        usize::from(size.width) * usize::from(size.height)
+    ];
+    let (mut x, mut y) = (0usize, 0usize);
+    let (mut fg, mut bg) = ("default".to_owned(), "default".to_owned());
+    let mut rest = bytes;
+    while !rest.is_empty() {
+        if let Some(sequence) = rest.strip_prefix("\x1b[") {
+            let end = sequence.find(|c: char| c.is_ascii_alphabetic()).unwrap();
+            let p = &sequence[..end];
+            match sequence.as_bytes()[end] {
+                b'H' => {
+                    let mut params = p.split(';').map(|n| n.parse::<usize>().unwrap_or(1));
+                    y = params.next().unwrap_or(1).saturating_sub(1);
+                    x = params.next().unwrap_or(1).saturating_sub(1);
+                }
+                b'J' if p == "2" => cells.fill((" ".into(), "default".into(), "default".into())),
+                b'm' => {
+                    let params: Vec<_> = p
+                        .split(';')
+                        .map(|n| n.parse::<u16>().unwrap_or(0))
+                        .collect();
+                    let mut i = 0;
+                    while i < params.len() {
+                        match params[i] {
+                            0 => {
+                                fg = "default".into();
+                                bg = "default".into();
+                            }
+                            39 => fg = "default".into(),
+                            49 => bg = "default".into(),
+                            38 | 48 => {
+                                let count = if params[i + 1] == 5 { 3 } else { 5 };
+                                let color = format!("{:?}", &params[i + 1..i + count]);
+                                if params[i] == 38 {
+                                    fg = color;
+                                } else {
+                                    bg = color;
+                                }
+                                i += count;
+                                continue;
+                            }
+                            _ => {}
+                        }
+                        i += 1;
+                    }
+                }
+                _ => {}
+            }
+            rest = &sequence[end + 1..];
+            continue;
+        }
+        let end = rest.find('\x1b').unwrap_or(rest.len());
+        for glyph in rest[..end].graphemes(true) {
+            let width = ratatui::text::Span::raw(glyph).width();
+            if x < usize::from(size.width) && y < usize::from(size.height) {
+                cells[y * usize::from(size.width) + x] = (glyph.into(), fg.clone(), bg.clone());
+                for offset in 1..width.min(usize::from(size.width) - x) {
+                    cells[y * usize::from(size.width) + x + offset] =
+                        (String::new(), fg.clone(), bg.clone());
+                }
+            }
+            x += width;
+        }
+        rest = &rest[end..];
+    }
+    cells
+}
+
+#[test]
+fn native_tetris_matches_legacy_colors_text_targets_and_transitions() -> io::Result<()> {
+    use dn::{
+        app::App,
+        localization::Language,
+        palette::PaletteProfile,
+        tetris::{Game, Record, Screen},
+        ui,
+    };
+    use ratatui::Terminal;
+    for palette in [PaletteProfile::ClassicDn, PaletteProfile::Terminal] {
+        for language in [Language::English, Language::Russian] {
+            for size in [Size::new(80, 25), Size::new(132, 40), Size::new(83, 27)] {
+                let mut app = App::new(std::env::current_dir()?)?;
+                app.config.palette = palette;
+                app.config.language = language;
+                app.show_game(Game::with_seed(7, std::time::Instant::now()));
+                let game = app.desktop.game_mut().unwrap();
+                game.records.push(Record {
+                    name: "界 e\u{301} 👩‍💻 \u{f0000}".into(),
+                    start_level: 1,
+                    level: 4,
+                    lines: Some(12),
+                    score: 1234,
+                });
+                game.board[18] = [9; dn::tetris::WIDTH];
+                let legacy_output = Output::default();
+                let native_output = Output::default();
+                let mut legacy =
+                    Terminal::new(TurboBackend::with_size(legacy_output.clone(), size)?)?;
+                let mut native =
+                    Terminal::new(TurboBackend::with_size(native_output.clone(), size)?)?;
+                legacy.backend_mut().bind_desktop(app.desktop.native());
+                native.backend_mut().bind_desktop(app.desktop.native());
+                let (mut expected, mut actual) = (String::new(), String::new());
+                for step in 0..18 {
+                    if let Some(game) = app.desktop.game_mut() {
+                        match step {
+                            1 => {
+                                game.translate(-1, 0);
+                            }
+                            2 => game.paused = true,
+                            3 => {
+                                game.paused = false;
+                                game.preview = false;
+                            }
+                            4 => {
+                                game.screen = Screen::Setup {
+                                    level: 3,
+                                    preview: false,
+                                }
+                            }
+                            5 => game.screen = Screen::Scores,
+                            6 => game.screen = Screen::Help,
+                            7 => game.screen = Screen::Name,
+                            8 => game.screen = Screen::Play,
+                            9 => {
+                                game.rotate();
+                                game.preview = true;
+                            }
+                            _ => {}
+                        }
+                    }
+                    if step == 10 {
+                        app.desktop.close_game();
+                    }
+                    if step == 11 {
+                        app.show_game(Game::with_seed(99, std::time::Instant::now()));
+                    }
+                    if step == 12 {
+                        // Both native raster and legacy canvas must survive resize.
+                        legacy.backend_mut().resize(Size::new(100, 30))?;
+                        native.backend_mut().resize(Size::new(100, 30))?;
+                    }
+                    if step == 13 {
+                        legacy.backend_mut().resize(Size::new(50, 12))?;
+                        native.backend_mut().resize(Size::new(50, 12))?;
+                    }
+                    if step == 14 {
+                        legacy.backend_mut().resize(size)?;
+                        native.backend_mut().resize(size)?;
+                    }
+                    if step == 15 {
+                        app.desktop.game_mut().unwrap().over = true;
+                    }
+                    if step == 16 {
+                        app.screensaver.start(std::time::Instant::now());
+                    }
+                    if step == 17 {
+                        app.screensaver.activity(std::time::Instant::now());
+                    }
+                    legacy.draw(|frame| ui::draw(frame, &mut app))?;
+                    let targets = format!("{:?}", app.mouse.regions);
+                    expected.push_str(&legacy_output.take());
+                    let painted = native.draw(|frame| ui::draw_native(frame, &mut app))?;
+                    if step == 0 {
+                        let legacy_canvas: String = painted
+                            .buffer
+                            .content
+                            .iter()
+                            .map(|cell| cell.symbol())
+                            .collect();
+                        assert!(
+                            !legacy_canvas.contains(language.text("Navigator's game")),
+                            "native game must not be rendered into the Ratatui canvas"
+                        );
+                    }
+                    assert_eq!(
+                        format!("{:?}", app.mouse.regions),
+                        targets,
+                        "mouse targets step={step}"
+                    );
+                    actual.push_str(&native_output.take());
+                    let dimensions = match step {
+                        12 => Size::new(100, 30),
+                        13 => Size::new(50, 12),
+                        _ => size,
+                    };
+                    let expected_cells = colored_screen(&expected, dimensions);
+                    let actual_cells = colored_screen(&actual, dimensions);
+                    if let Some(index) = expected_cells
+                        .iter()
+                        .zip(&actual_cells)
+                        .position(|(a, b)| a != b)
+                    {
+                        panic!("palette={palette:?},language={language:?},size={size:?},step={step},x={},y={}: expected {:?}, actual {:?}",index%usize::from(dimensions.width),index/usize::from(dimensions.width),expected_cells[index],actual_cells[index]);
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn native_tetris_clips_a_scene_prepared_before_terminal_shrink() -> io::Result<()> {
+    use dn::{app::App, tetris::Game, ui};
+    use ratatui::{backend::TestBackend, Terminal};
+    let mut app = App::new(std::env::current_dir()?)?;
+    app.show_game(Game::default());
+    let mut canvas = Terminal::new(TestBackend::new(132, 40))?;
+    canvas.draw(|frame| ui::draw_native(frame, &mut app))?;
+    let output = Output::default();
+    let mut native = TurboBackend::with_size(output.clone(), Size::new(40, 12))?;
+    native.bind_desktop(app.desktop.native());
+    native.draw(std::iter::empty())?;
+    native.flush()?;
+    // Repainting at the new dimensions drops the stale game scene entirely.
+    let mut canvas = Terminal::new(TestBackend::new(40, 12))?;
+    canvas.draw(|frame| ui::draw_native(frame, &mut app))?;
+    native.draw(std::iter::empty())?;
+    native.flush()?;
+    Ok(())
+}

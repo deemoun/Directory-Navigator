@@ -28,7 +28,7 @@ impl Codec {
         self.symbols.clear();
         self.free.clear();
         self.next = 0;
-        self.positions = vec![None; usize::from(size.width) * usize::from(size.height)];
+        self.positions = vec![None; 2 * usize::from(size.width) * usize::from(size.height)];
         self.size = size;
     }
     fn release(&mut self, x: u16, y: u16) {
@@ -112,6 +112,17 @@ impl Codec {
             }
         }
         Ok((TvCell::new(ch, attr), Span::raw(symbol).width().max(1)))
+    }
+    // Native views and the retained canvas have separate live-cell references.
+    // Hiding a native view must not retire a glyph still used by its background.
+    pub fn clear_native(&mut self) {
+        let start = usize::from(self.size.width) * usize::from(self.size.height);
+        for token in self.positions[start..].iter_mut().filter_map(Option::take) {
+            self.glyphs.get_mut(&token).expect("live native glyph").1 -= 1;
+        }
+    }
+    pub fn native_cell(&mut self, x: u16, y: u16, cell: &Cell) -> io::Result<(TvCell, usize)> {
+        self.cell(x, y + self.size.height, cell)
     }
     pub fn continuation(&mut self, x: u16, y: u16) {
         self.release(x, y);
@@ -215,6 +226,34 @@ fn color_parameters(color: Color, foreground: bool) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn native_layer_retirement_preserves_background_graphemes() -> io::Result<()> {
+        let mut codec = Codec::default();
+        codec.resize(Size::new(8, 2));
+        let mut source = Cell::default();
+        source.set_symbol("e\u{301}");
+        let background = codec.cell(0, 0, &source)?.0.ch;
+        let native = codec.native_cell(0, 0, &source)?.0.ch;
+        assert_eq!(background, native);
+        codec.clear_native();
+        codec.committed();
+        assert_eq!(codec.glyphs[&background].1, 1);
+        assert_eq!(
+            codec.decode(background.to_string().as_bytes())?,
+            "e\u{301}".as_bytes()
+        );
+        for n in 0..1024 {
+            source.set_symbol(&format!("界\u{301}{n}"));
+            codec.native_cell(1, 0, &source)?;
+            codec.clear_native();
+            codec.committed();
+            assert_eq!(codec.glyphs.len(), 1);
+        }
+        codec.cell(0, 0, &Cell::default())?;
+        codec.committed();
+        assert!(codec.glyphs.is_empty());
+        Ok(())
+    }
     #[test]
     fn retired_graphemes_are_reclaimed_after_commit_and_live_cells_keep_shared_tokens(
     ) -> io::Result<()> {

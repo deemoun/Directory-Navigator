@@ -54,6 +54,7 @@ struct Document {
     scope: Scope,
     mailbox: Mailbox,
     pixels: Vec<Cell>,
+    native: Vec<(u16, u16, Cell)>,
 }
 impl Document {
     fn new(bounds: Rect, info: WindowInfo, scope: Scope, mailbox: Mailbox) -> Self {
@@ -68,6 +69,7 @@ impl Document {
             scope,
             mailbox,
             pixels: Vec::new(),
+            native: Vec::new(),
         }
     }
 }
@@ -105,6 +107,10 @@ impl View for Document {
         for (i, cell) in self.pixels.iter().copied().enumerate() {
             terminal.write_cell((i % width) as i16, (i / width) as i16, cell);
         }
+        // Native game cells are produced from the game model, not Ratatui widgets.
+        for &(x, y, cell) in &self.native {
+            terminal.write_cell(x as i16, y as i16, cell);
+        }
     }
     fn handle_event(&mut self, event: &mut Event) {
         if event.what == EventType::Command && event.command == INPUT {
@@ -126,6 +132,7 @@ struct Host {
     modal: Option<(Scope, ViewId)>,
     mailbox: Mailbox,
     bounds: Rect,
+    game_scene: Option<Rc<super::tetris::Scene>>,
 }
 impl NativeDesktop {
     pub fn new(manager: WindowInfo) -> Self {
@@ -144,7 +151,14 @@ impl NativeDesktop {
             modal: None,
             mailbox,
             bounds,
+            game_scene: None,
         })))
+    }
+    pub(crate) fn set_game_scene(&self, scene: Option<super::tetris::Scene>) {
+        self.0.borrow_mut().game_scene = scene.map(Rc::new);
+    }
+    pub(super) fn game_scene(&self) -> Option<Rc<super::tetris::Scene>> {
+        self.0.borrow().game_scene.clone()
     }
     pub fn active(&self) -> WindowInfo {
         self.0.borrow().active()
@@ -210,7 +224,13 @@ impl NativeDesktop {
         let receipt = host.mailbox.borrow_mut().take();
         receipt
     }
-    pub(super) fn draw(&self, terminal: &mut Terminal, bounds: Rect, pixels: &[Cell]) {
+    pub(super) fn draw(
+        &self,
+        terminal: &mut Terminal,
+        bounds: Rect,
+        pixels: &[Cell],
+        native: &[(u16, u16, Cell)],
+    ) {
         let mut host = self.0.borrow_mut();
         if host.bounds != bounds {
             host.bounds = bounds;
@@ -227,8 +247,10 @@ impl NativeDesktop {
                 .downcast_mut::<Document>()
                 .expect("DN native window");
             document.pixels.clear();
+            document.native.clear();
             if i + 1 == count {
                 document.pixels.extend_from_slice(pixels);
+                document.native.extend_from_slice(native);
             }
         }
         terminal.draw_view(&mut host.desktop);

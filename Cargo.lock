@@ -202,6 +202,7 @@ dependencies = [
  "trash",
  "turbo-vision",
  "unicode-segmentation",
+ "unicode-width 0.2.0",
  "windows 0.62.2",
  "zip",
 ]
