@@ -1,4 +1,4 @@
-use crossterm::event::{self, Event, MouseEventKind};
+use crossterm::event::{Event, MouseEventKind};
 use dn::{app::App, input, mouse, terminal::Session, ui};
 use std::io;
 
@@ -64,8 +64,7 @@ fn run() -> io::Result<()> {
             continue;
         }
         let timeout = app.wait_duration(std::time::Instant::now());
-        if event::poll(timeout)? {
-            let event = event::read()?;
+        if let Some(event) = session.poll(&mut terminal, timeout)? {
             if dn::screensaver::event(&mut app, &event, std::time::Instant::now()) {
                 dirty = true;
                 continue;

@@ -54,7 +54,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist/package/docs
-          cp "target/${BUILD_TARGET}/release/dn" LICENSE README.md dist/package/
+          cp "target/${BUILD_TARGET}/release/dn" LICENSE README.md THIRD_PARTY_NOTICES.md dist/package/
           cp docs/USER_GUIDE.md dist/package/docs/
           COPYFILE_DISABLE=1 tar -czf "dist/dn-${BUILD_TARGET}.tar.gz" -C dist/package .
           cd dist
@@ -67,7 +67,7 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           New-Item -ItemType Directory -Force dist/package/docs | Out-Null
-          Copy-Item "target/$env:BUILD_TARGET/release/dn.exe", LICENSE, README.md dist/package/
+          Copy-Item "target/$env:BUILD_TARGET/release/dn.exe", LICENSE, README.md, THIRD_PARTY_NOTICES.md dist/package/
           Copy-Item docs/USER_GUIDE.md dist/package/docs/
           $archive = "dn-$env:BUILD_TARGET.zip"
           Compress-Archive -Path dist/package/* -DestinationPath "dist/$archive"

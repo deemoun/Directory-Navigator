@@ -8,13 +8,18 @@ use crossterm::{
     style::{Attribute, ResetColor, SetAttribute},
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use ratatui::{backend::CrosstermBackend, Terminal};
+#[cfg(not(feature = "turbo-vision"))]
+use ratatui::backend::CrosstermBackend;
+use ratatui::Terminal;
 use std::{
     cell::Cell,
     io::{self, IsTerminal, Stdout},
     time::{Duration, Instant},
 };
 
+#[cfg(feature = "turbo-vision")]
+pub type Screen = Terminal<crate::turbo::TurboBackend<Stdout>>;
+#[cfg(not(feature = "turbo-vision"))]
 pub type Screen = Terminal<CrosstermBackend<Stdout>>;
 
 pub struct Session {
@@ -68,6 +73,22 @@ fn restore_input(mouse_down: bool) {
 }
 
 impl Session {
+    pub fn poll(&self, screen: &mut Screen, timeout: Duration) -> io::Result<Option<event::Event>> {
+        #[cfg(feature = "turbo-vision")]
+        {
+            screen.backend_mut().poll_event(timeout)
+        }
+        #[cfg(not(feature = "turbo-vision"))]
+        {
+            let _ = screen;
+            if event::poll(timeout)? {
+                Ok(Some(event::read()?))
+            } else {
+                Ok(None)
+            }
+        }
+    }
+
     pub fn mouse_event(&self, kind: MouseEventKind) {
         match kind {
             MouseEventKind::Down(_) => self.mouse_down.set(true),
@@ -122,6 +143,9 @@ impl Session {
             EnableMouseCapture,
             EnableBracketedPaste
         )?;
+        #[cfg(feature = "turbo-vision")]
+        let screen = Terminal::new(crate::turbo::TurboBackend::new(io::stdout())?)?;
+        #[cfg(not(feature = "turbo-vision"))]
         let screen = Terminal::new(CrosstermBackend::new(io::stdout()))?;
         Ok((guard, screen))
     }

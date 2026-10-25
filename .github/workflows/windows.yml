@@ -59,7 +59,7 @@ jobs:
             throw "Built executable does not report the requested version"
           }
           New-Item -ItemType Directory -Path dist/package/docs -Force | Out-Null
-          Copy-Item $binary, LICENSE, README.md dist/package/
+          Copy-Item $binary, LICENSE, README.md, THIRD_PARTY_NOTICES.md dist/package/
           Copy-Item docs/USER_GUIDE.md dist/package/docs/
           $archive = "dn-{0}-{1}.zip" -f $env:RELEASE_VERSION, $env:BUILD_TARGET
           Compress-Archive -Path dist/package/* -DestinationPath "dist/$archive"

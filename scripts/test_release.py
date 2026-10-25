@@ -66,7 +66,7 @@ class ReleaseTests(unittest.TestCase):
             binary.parent.mkdir(parents=True)
             binary.write_bytes(b"fake binary")
             binary.chmod(0o755)
-        for name in ["LICENSE", "README.md", "docs/USER_GUIDE.md"]:
+        for name in ["LICENSE", "README.md", "THIRD_PARTY_NOTICES.md", "docs/USER_GUIDE.md"]:
             path = self.root / name
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text("fixture: " + name)
@@ -81,12 +81,12 @@ class ReleaseTests(unittest.TestCase):
                 archive_path = output / release.archive_name("1.2.3", target)
                 if target.endswith("windows-msvc"):
                     with zipfile.ZipFile(archive_path) as archive:
-                        self.assertEqual(archive.namelist(), ["dn.exe", "LICENSE", "README.md", "docs/USER_GUIDE.md"])
+                        self.assertEqual(archive.namelist(), ["dn.exe", "LICENSE", "README.md", "THIRD_PARTY_NOTICES.md", "docs/USER_GUIDE.md"])
                         self.assertEqual(archive.read("dn.exe"), b"fake binary")
                         self.assertTrue(all(not member.is_dir() for member in archive.infolist()))
                 else:
                     with tarfile.open(archive_path) as archive:
-                        self.assertEqual(archive.getnames(), ["dn", "LICENSE", "README.md", "docs/USER_GUIDE.md"])
+                        self.assertEqual(archive.getnames(), ["dn", "LICENSE", "README.md", "THIRD_PARTY_NOTICES.md", "docs/USER_GUIDE.md"])
                         self.assertTrue(archive.getmember("dn").mode & 0o111)
                         self.assertTrue(all(member.isfile() for member in archive.getmembers()))
         release.verify_assets(output, "1.2.3")

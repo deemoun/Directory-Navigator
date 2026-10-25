@@ -14,6 +14,22 @@
   state owns session dialogs/options/results; quick view owns debounced reads.
 
 ## Implemented
+- Turbo Vision migration IN PROGRESS on feature/turbo-vision: pinned 4.1.0 core,
+  real TV custom View/diff buffer and event transport enabled by default. The
+  existing Ratatui canvas/control/focus layers remain; this is NOT a full native
+  widget/window migration. See docs/TURBO_VISION_MIGRATION.md for required work.
+  Transport preserves indexed palette semantics, complete graphemes, wide-cell
+  continuations and cursor order. One Session keeps paste and exit/suspend guards.
+  Original backend builds with --no-default-features. Dependency notice included
+  in release archives; no workflow triggers or external runs changed.
+  Transport: 36 independently decoded screen/palette/size comparisons pass;
+  glyph/color/cursor/resize and bounded-token tests pass. Mac ARM64 native PTY
+  editor/window-list, calculator, Tetris and shell suspend/resume workflows pass.
+  Fallback terminal/welcome/workflow checks (19) and packaging helpers (11) pass.
+  Native Intel/Windows/Linux are not validated.
+  Final transport increment: fmt/all-target Clippy/386 Rust tests/release pass
+  on macOS ARM64 (one existing opt-in native Trash test ignored). Full native
+  Desktop/window/control migration remains outstanding; do not call it complete.
 - Tetris presentation follows the DN game/setup/Top Ten references: framed
   Info/Next/Best sidebar, New/Setup/Top 10/Pause shadowed buttons and title close;
   Name/Start/End/Score dotted leaders, centered OK and conditional Retry save;
