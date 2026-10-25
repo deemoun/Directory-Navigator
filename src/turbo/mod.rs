@@ -2,12 +2,14 @@
 pub(crate) mod characters;
 mod codec;
 pub mod desktop;
+pub mod file_dialog;
 pub mod forms;
 pub(crate) mod manager;
 mod mouse;
 pub(crate) mod panes;
 #[doc(hidden)]
 pub mod scene;
+mod surface;
 pub(crate) mod tetris;
 use crate::presentation::layout::{Position, Size};
 use codec::Codec;

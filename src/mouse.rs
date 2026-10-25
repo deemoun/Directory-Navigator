@@ -113,7 +113,18 @@ fn handle_mouse(app: &mut App, event: MouseEvent) {
     }
     if event.kind == MouseEventKind::Up(MouseButton::Left) {
         app.mouse.scrollbar_drag = None;
-        return;
+        // Native file-dialog buttons activate on release, unlike DN's
+        // immediate command targets. Keep the release inside its live scope.
+        if !(focus::current(app) == Focus::EditorModal
+            && matches!(
+                app.desktop
+                    .active_editor()
+                    .and_then(|e| e.modals.editor_modal()),
+                Some(crate::editor::Modal::File(_))
+            ))
+        {
+            return;
+        }
     }
     if matches!(event.kind, MouseEventKind::Down(_)) {
         app.mouse.scrollbar_drag = None;
@@ -204,6 +215,17 @@ fn handle_mouse(app: &mut App, event: MouseEvent) {
                 crate::screensaver::command(app, i);
             }
         }
+        return;
+    }
+    if focus == Focus::EditorModal
+        && matches!(
+            app.desktop
+                .active_editor()
+                .and_then(|e| e.modals.editor_modal()),
+            Some(crate::editor::Modal::File(_))
+        )
+    {
+        crate::editor::file_mouse(app, event);
         return;
     }
     if matches!(

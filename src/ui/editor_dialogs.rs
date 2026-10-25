@@ -45,7 +45,22 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
     let Some(modal) = editor.modals.editor_modal() else {
         return;
     };
+    if let Modal::File(picker) = modal {
+        frame.regions().clear();
+        if let Some(scene) = picker.scene() {
+            let mut scene = scene.clone();
+            if app
+                .modal_top()
+                .is_none_or(|m| m.focus != crate::focus::Focus::EditorModal)
+            {
+                scene.cursor = None;
+            }
+            frame.compose(scene);
+        }
+        return;
+    }
     let title = match modal {
+        Modal::File(_) => unreachable!(),
         Modal::ConfirmClose => " Unsaved changes ",
         Modal::Help => " Editor Help ",
         Modal::Search(dialog) => {
@@ -57,8 +72,6 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
         }
         Modal::Replace(_) => " Confirm replacement ",
         Modal::Prompt { kind, .. } => match kind {
-            PromptKind::Open => " Open file ",
-            PromptKind::SaveAs => " Save As — new destination ",
             PromptKind::GoTo => " Go to line ",
             PromptKind::TabWidth => " Tab width ",
         },
@@ -80,6 +93,7 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
     frame.regions().clear();
     super::dialog_style::close_button(frame, profile, rect, Target::Editor(A::Cancel));
     match modal {
+        Modal::File(_) => unreachable!(),
         Modal::Search(dialog) => {
             let replacing = dialog.replacing;
             let focus = dialog.focus;
@@ -307,8 +321,6 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
             cursor,
         } => {
             let label = match kind {
-                PromptKind::SaveAs => "New file name (existing files are refused)",
-                PromptKind::Open => "File name (absolute or relative path)",
                 PromptKind::GoTo => "Line number (starting at 1)",
                 PromptKind::TabWidth => "Tab columns (1–16); Ctrl+A clears",
             };

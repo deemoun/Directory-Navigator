@@ -11,6 +11,7 @@ use buffer::Buffer;
 pub use controls::{
     action, open, open_path, open_path_background, paste, poll, request_close, EditorAction,
 };
+pub(crate) use controls::{file_key, file_mouse};
 use highlight::{Cache, Language};
 pub use keys::key;
 use std::{path::PathBuf, sync::mpsc};
@@ -46,12 +47,11 @@ impl Default for Preferences {
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PromptKind {
-    Open,
-    SaveAs,
     TabWidth,
     GoTo,
 }
 pub enum Modal {
+    File(Box<crate::turbo::file_dialog::Picker>),
     Prompt {
         kind: PromptKind,
         field: String,

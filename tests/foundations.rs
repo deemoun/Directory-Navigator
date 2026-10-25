@@ -279,15 +279,14 @@ fn canonical_aliases_merge_clean_placeholders_without_losing_edits() -> io::Resu
 
 fn save_as(app: &mut App, path: &std::path::Path) {
     editor::action(app, A::SaveAs);
-    if let Some(editor::Modal::Prompt { field, cursor, .. }) = app
+    if let Some(editor::Modal::File(picker)) = app
         .desktop
         .active_editor_mut()
         .unwrap()
         .modals
         .editor_modal_mut()
     {
-        *field = path.to_string_lossy().into_owned();
-        *cursor = field.len();
+        picker.set_filename(path.to_string_lossy().into_owned());
     } else {
         panic!("Save As prompt");
     }

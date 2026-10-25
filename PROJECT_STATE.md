@@ -22,6 +22,16 @@
 Current Turbo Vision status is authoritative in docs/TURBO_VISION_MIGRATION.md;
 older increment entries below also record earlier migration stages.
 
+- Editor Open/Save As now use Turbo Vision's actual FileDialog and its native
+  input/list/buttons, directory browsing, wildcard filtering and hidden-file
+  control. The existing event loop and owned modal stack drive the widget;
+  preparation captures an immutable scene. Document reuse, safe background I/O,
+  destination reservations and quit cancellation remain guarded by DN. Unicode
+  filename typing/paste, translated controls, mouse release routing, nested help
+  and failure recovery have regression coverage. Native directory enumeration
+  remains synchronous upstream; picker names use UTF-8. macOS ARM64: 434 tests
+  pass (one existing opt-in Trash check ignored), formatting, all-target Clippy,
+  release/no-default-features checks and a native file-dialog terminal workflow.
 - ASCII/CP437 character grid now uses Turbo Vision's reusable Table for drawing,
   keyboard navigation and mouse selection, retaining DN styling, byte details
   and internal clipboard behavior. The showcase's ASCII table is not exported.

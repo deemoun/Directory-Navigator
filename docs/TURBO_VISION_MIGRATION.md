@@ -24,6 +24,16 @@ for this finishing pass. Local runtime validation targets macOS ARM64.
   keyboard navigation and mouse selection. DN supplies the byte mapping,
   single-cell highlight, details and clipboard behavior. The upstream showcase's
   `AsciiTable` is a display-only example, not an exported widget.
+- Editor Open and Save As now use the library's `FileDialog`, including its
+  filename input, file list, directory/wildcard handling, hidden-file toggle and
+  buttons. The owned dialog is driven by the existing event loop; it never starts
+  a second terminal session or nested modal loop. Preparation captures the native
+  widget into an immutable scene, including its cursor and mouse scope.
+  DN retains document reuse, destination reservations and safe background saves.
+  The upstream picker enumerates directories synchronously and displays filenames
+  as UTF-8; document loading/saving still uses the existing workers. Wide and
+  combining filename input uses the native input field's UTF-8 paste path, with
+  the toolkit's internal clipboard restored afterward.
 - The upstream TV revision remains pinned to
   `0f2b396a1844c59e31c4714d68ffb6815662918e`. OS clipboard and screenshot
   features remain disabled. Turbo Vision is now mandatory; no Cargo feature
@@ -66,7 +76,7 @@ See [document foundations](DOCUMENT_FOUNDATIONS.md) for lifecycle and validation
 
 Local macOS ARM64 validation covers:
 
-- 426 native Rust tests pass; the existing opt-in native Trash check stays ignored.
+- 434 native Rust tests pass; the existing opt-in native Trash check stays ignored.
 - Formatting, all-target Clippy, release build and a no-default-features build.
 - 2,898 layout cases check viewport bounds. Feasible allocations compare against
   frozen pre-removal geometry; 40 wrapping cases preserve narrow widths,
@@ -80,6 +90,11 @@ Local macOS ARM64 validation covers:
   quick view, utilities, auxiliary dialogs and screensaver remain covered.
 - Terminal checks also cover three retained editors and two viewers, independent
   undo, editor Open, discard/quit cancellation and Save As.
+- Native file-dialog regressions cover folder navigation, filters, hidden files,
+  translated mnemonics, Unicode filenames, document reuse, save conflicts,
+  cancellation, nested help, immutable painting and translated mouse targets.
+  A terminal workflow checks native browsing and mouse Cancel, Unicode Save As,
+  resizing, quit cancellation, shell handoff and terminal restoration.
 - Terminal checks cover panes, menus, Tetris, viewer search/wrap, quick view,
   calculator history/help, Unicode editor paste, unsaved-close cancel, Save As to
   disposable files, mouse actions, resize, shell input and terminal restoration.

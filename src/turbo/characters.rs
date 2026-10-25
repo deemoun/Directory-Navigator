@@ -9,10 +9,9 @@ use crate::{
     utilities::{characters::Chart, Action},
 };
 use crossterm::event::KeyCode;
-use std::{collections::BTreeMap, io, time::Duration};
+use std::collections::BTreeMap;
 use turbo_vision::{
     core::{event::*, geometry::Point, geometry::Rect as TvRect},
-    terminal::{Backend, Terminal},
     views::{table::Column, table::Table, View},
 };
 
@@ -95,8 +94,7 @@ pub(crate) fn select(chart: &mut Chart, byte: u8) {
 pub(crate) fn draw(chart: &Chart, origin: Rect, screen: Size, profile: PaletteProfile) -> Scene {
     let mut table = table(chart);
     let rows = table.row_count() as u16;
-    let mut terminal = Terminal::with_backend(Box::new(Surface(64, rows)))
-        .expect("in-memory Turbo Vision surface");
+    let mut terminal = super::surface::terminal(64, rows);
     terminal.draw_view(&mut table);
     let mut scene = Scene {
         width: screen.width,
@@ -134,39 +132,6 @@ pub(crate) fn draw(chart: &Chart, origin: Rect, screen: Size, profile: PalettePr
         }
     }
     scene
-}
-
-/// Scratch storage for native widget drawing. Session keeps exclusive ownership
-/// of raw mode, input, the visible terminal and its restoration.
-struct Surface(u16, u16);
-impl Backend for Surface {
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
-        self
-    }
-    fn init(&mut self) -> io::Result<()> {
-        Ok(())
-    }
-    fn cleanup(&mut self) -> io::Result<()> {
-        Ok(())
-    }
-    fn size(&self) -> io::Result<(u16, u16)> {
-        Ok((self.0, self.1))
-    }
-    fn poll_event(&mut self, _: Duration) -> io::Result<Option<Event>> {
-        Ok(None)
-    }
-    fn write_raw(&mut self, _: &[u8]) -> io::Result<()> {
-        Ok(())
-    }
-    fn flush(&mut self) -> io::Result<()> {
-        Ok(())
-    }
-    fn show_cursor(&mut self, _: u16, _: u16) -> io::Result<()> {
-        Ok(())
-    }
-    fn hide_cursor(&mut self) -> io::Result<()> {
-        Ok(())
-    }
 }
 
 #[cfg(test)]

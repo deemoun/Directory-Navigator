@@ -14,6 +14,7 @@ pub(crate) struct ViewportState {
     panels: [(u64, usize, usize, bool, &'static str); 2],
     editor: Option<(u64, usize, usize, usize)>,
     viewer: Option<(usize, u16, bool, usize, bool)>,
+    picker: Option<u64>,
     game: Option<std::mem::Discriminant<crate::tetris::Screen>>,
     windows: Option<(Vec<crate::desktop::WindowId>, usize)>,
     characters: Option<(crate::utilities::characters::Page, bool)>,
@@ -41,6 +42,13 @@ fn viewport_state(app: &App) -> ViewportState {
                 e.buffer.as_ref().map_or(0, |b| b.lines.len()),
             )
         }),
+        picker: app
+            .desktop
+            .active_editor()
+            .and_then(|e| match e.modals.editor_modal() {
+                Some(crate::editor::Modal::File(picker)) => Some(picker.revision),
+                _ => None,
+            }),
         viewer: app.desktop.active_viewer().map(|v| {
             (
                 v.offset,
@@ -256,6 +264,17 @@ pub fn prepare_window(
             info.rows = usize::from(area.height.saturating_sub(4).min(24).saturating_sub(6));
             info.step(0);
         }
+    }
+    let profile = app.config.palette;
+    if let Some(crate::editor::Modal::File(picker)) = app
+        .desktop
+        .active_editor_mut()
+        .and_then(|e| e.modals.editor_modal_mut())
+    {
+        picker.prepare(
+            crate::presentation::layout::Size::new(area.width, area.height),
+            profile,
+        );
     }
     let message = if area.width >= 80 && area.height >= 25 {
         app.last_dialog().map(|d| {

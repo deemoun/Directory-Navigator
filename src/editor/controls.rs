@@ -3,6 +3,7 @@ use crate::{app::App, dialog, menu};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EditorAction {
     Open,
+    FileDialog,
     Save,
     SaveAs,
     Find,
@@ -348,6 +349,83 @@ fn complete_pending(app: &mut App) {
         None => {}
     }
 }
+fn file_prompt(
+    editor: &mut Editor,
+    mode: crate::turbo::file_dialog::Mode,
+    language: crate::localization::Language,
+    hidden: bool,
+) {
+    editor.modals.set_editor_modal(Some(Modal::File(Box::new(
+        crate::turbo::file_dialog::Picker::new(mode, editor.base.clone(), language, hidden),
+    ))));
+}
+fn finish_file(app: &mut App, outcome: Option<crate::turbo::file_dialog::Outcome>) {
+    use crate::turbo::file_dialog::{Mode, Outcome};
+    match outcome {
+        Some(Outcome::Cancelled) => action(app, EditorAction::Cancel),
+        Some(Outcome::Selected(Mode::Open, path)) => {
+            if let Some(editor) = app.desktop.active_editor_mut() {
+                editor.modals.set_editor_modal(None);
+            }
+            open_path(app, path);
+        }
+        Some(Outcome::Selected(Mode::SaveAs, path)) => match prepare_save(app, path, true) {
+            Ok(()) => {
+                if let Some(editor) = app.desktop.active_editor_mut() {
+                    editor.modals.set_editor_modal(None);
+                }
+            }
+            Err(error) => {
+                if let Some(Modal::File(picker)) = app
+                    .desktop
+                    .active_editor_mut()
+                    .and_then(|e| e.modals.editor_modal_mut())
+                {
+                    picker.reset();
+                }
+                app.error(error);
+            }
+        },
+        None => {}
+    }
+}
+pub(crate) fn file_key(app: &mut App, key: crossterm::event::KeyEvent) {
+    if key.code == crossterm::event::KeyCode::F(1) {
+        action(app, EditorAction::Help);
+        return;
+    }
+    let clipboard = app.editor_clipboard.clone();
+    let Some(Modal::File(picker)) = app
+        .desktop
+        .active_editor_mut()
+        .and_then(|e| e.modals.editor_modal_mut())
+    else {
+        return;
+    };
+    use crossterm::event::{KeyCode as K, KeyModifiers as M};
+    if (key.code == K::Char('v') && key.modifiers.contains(M::CONTROL))
+        || (key.code == K::Insert && key.modifiers.contains(M::SHIFT))
+    {
+        picker.paste(&clipboard);
+        return;
+    }
+    let outcome = picker.key(key);
+    finish_file(app, outcome);
+}
+pub(crate) fn file_mouse(app: &mut App, event: crossterm::event::MouseEvent) {
+    let offset = app
+        .layout_key
+        .map_or((0, 0), |(_, bounds, _)| (bounds.x, bounds.y));
+    let outcome = app
+        .desktop
+        .active_editor_mut()
+        .and_then(|e| e.modals.editor_modal_mut())
+        .and_then(|modal| match modal {
+            Modal::File(picker) => picker.mouse(event, offset),
+            _ => None,
+        });
+    finish_file(app, outcome);
+}
 fn prompt(editor: &mut Editor, kind: PromptKind) {
     let field = if kind == PromptKind::TabWidth {
         editor.preferences.tab_size.to_string()
@@ -369,6 +447,10 @@ pub fn paste(app: &mut App, text: &str) {
         return;
     }
     match editor.modals.editor_modal_mut() {
+        Some(Modal::File(picker)) => {
+            picker.paste(text);
+            return;
+        }
         Some(Modal::Prompt { field, cursor, .. }) => {
             dialog::paste_input(field, cursor, text);
             return;
@@ -400,23 +482,10 @@ fn submit_prompt(app: &mut App) -> Result<(), String> {
     let Some(editor) = app.desktop.active_editor_mut() else {
         return Ok(());
     };
-    let Some(Modal::Prompt {
-        kind,
-        field,
-        cursor,
-    }) = editor.modals.take_editor_modal()
-    else {
+    let Some(Modal::Prompt { kind, field, .. }) = editor.modals.take_editor_modal() else {
         return Ok(());
     };
     match kind {
-        PromptKind::Open if !field.is_empty() => {
-            let path = editor.base.join(field);
-            open_path(app, path);
-        }
-        PromptKind::SaveAs if !field.is_empty() => {
-            let path = editor.base.join(field);
-            prepare_save(app, path, true)?;
-        }
         PromptKind::GoTo => {
             let line = field
                 .parse::<usize>()
@@ -436,20 +505,33 @@ fn submit_prompt(app: &mut App) -> Result<(), String> {
             app.config.editor.tab_size = width;
             editor.apply_preferences(app.config.editor);
         }
-        _ => {
-            editor.modals.set_editor_modal(Some(Modal::Prompt {
-                kind,
-                field,
-                cursor,
-            }));
-            return Err("Enter a filename.".into());
-        }
     }
     Ok(())
 }
 pub fn action(app: &mut App, command: EditorAction) {
     app.sync_modals();
     use EditorAction as A;
+    if command == A::Submit
+        && matches!(
+            app.desktop
+                .active_editor()
+                .and_then(|e| e.modals.editor_modal()),
+            Some(Modal::File(_))
+        )
+    {
+        let outcome = match app
+            .desktop
+            .active_editor_mut()
+            .unwrap()
+            .modals
+            .editor_modal_mut()
+        {
+            Some(Modal::File(picker)) => picker.submit(),
+            _ => None,
+        };
+        finish_file(app, outcome);
+        return;
+    }
     if command == A::Windows {
         crate::windowing::open(app);
         return;
@@ -549,7 +631,9 @@ fn apply(app: &mut App, command: EditorAction) -> Result<(), String> {
     match command {
         A::CancelMenu => editor.modals.set_editor_menu(None),
         A::Cancel => {
-            let quit = matches!(editor.modals.editor_modal(), Some(Modal::ConfirmClose));
+            let quit = matches!(editor.modals.editor_modal(), Some(Modal::ConfirmClose))
+                || (editor.closing == Some(PendingAction::Quit)
+                    && matches!(editor.modals.editor_modal(), Some(Modal::File(_))));
             editor.modals.set_editor_modal(None);
             if quit || editor.modals.editor_modal().is_none() {
                 editor.closing = None;
@@ -558,16 +642,31 @@ fn apply(app: &mut App, command: EditorAction) -> Result<(), String> {
                 app.abort_quit();
             }
         }
-        A::Open => prompt(editor, PromptKind::Open),
+        A::Open => file_prompt(
+            editor,
+            crate::turbo::file_dialog::Mode::Open,
+            app.config.language,
+            app.config.show_hidden,
+        ),
         A::Save => {
             editor.modals.set_editor_modal(None);
             if let Some(path) = editor.path.clone() {
                 editor.save(path, false)?;
             } else {
-                prompt(editor, PromptKind::SaveAs);
+                file_prompt(
+                    editor,
+                    crate::turbo::file_dialog::Mode::SaveAs,
+                    app.config.language,
+                    app.config.show_hidden,
+                );
             }
         }
-        A::SaveAs => prompt(editor, PromptKind::SaveAs),
+        A::SaveAs => file_prompt(
+            editor,
+            crate::turbo::file_dialog::Mode::SaveAs,
+            app.config.language,
+            app.config.show_hidden,
+        ),
         A::GoTo => prompt(editor, PromptKind::GoTo),
         A::TabWidth => prompt(editor, PromptKind::TabWidth),
         A::Find | A::Replace => search_controls::open(editor, command == A::Replace),

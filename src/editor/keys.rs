@@ -19,6 +19,10 @@ pub fn key(app: &mut App, key: KeyEvent) {
         }
         return;
     }
+    if matches!(editor.modals.editor_modal(), Some(Modal::File(_))) {
+        file_key(app, key);
+        return;
+    }
     if matches!(
         editor.modals.editor_modal(),
         Some(Modal::Search(_) | Modal::Replace(_))

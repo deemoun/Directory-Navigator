@@ -223,15 +223,14 @@ fn viewed_and_edited_histories_record_only_success_and_guard_open() -> io::Resul
     app.desktop.activate(second);
     editor::action(&mut app, EditorAction::SaveAs);
     let saved = t.0.join("saved.txt");
-    if let Some(editor::Modal::Prompt { field, cursor, .. }) = app
+    if let Some(editor::Modal::File(picker)) = app
         .desktop
         .active_editor_mut()
         .unwrap()
         .modals
         .editor_modal_mut()
     {
-        *field = saved.to_string_lossy().into_owned();
-        *cursor = field.len();
+        picker.set_filename(saved.to_string_lossy().into_owned());
     } else {
         panic!("save as dialog")
     }

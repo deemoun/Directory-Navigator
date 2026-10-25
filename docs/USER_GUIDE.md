@@ -638,6 +638,25 @@ associations and Tetris score files retain their separate formats. Support is
 currently verified against fixtures derived from the original format; real-world
 `DN.CFG` compatibility remains provisional until tested with a supplied file.
 
+## Opening and saving from the editor
+
+The editor's **Open** and **Save As** commands use Turbo Vision's file dialog.
+**Save** also opens this dialog for an untitled document. Type an absolute or
+relative path in **Name**, or browse the **Files** list. Enter on a directory
+opens it; `..` moves to its parent. A wildcard such as `*.txt` filters the list.
+The **Show hidden** checkbox controls hidden entries for this dialog.
+
+Tab and Shift+Tab move between the native controls. Arrows and PageUp/PageDown
+navigate the list; Enter activates the selected item or button. Esc or Cancel
+closes the dialog. F1 opens editor help and returns to the same dialog when
+dismissed. Keyboard mnemonics and mouse controls are available in both languages.
+Unicode filenames and pasted paths are supported.
+
+Open keeps the current document and activates a separate editor, or reuses the
+editor already holding that file. Save As requires a new destination: existing
+files and destinations owned or reserved by another editor are refused. An error
+leaves the document's changes intact.
+
 ## Switching open windows
 
 **Manager → Windows…** or **Alt+0** opens the window list from the file panels,
