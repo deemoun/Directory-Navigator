@@ -110,7 +110,6 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
                 );
             }
             let chart = &app.utilities.chart;
-            let selected = chart.selected();
             for row in 0..if page == Page::Ascii { 8 } else { 16 } {
                 text(
                     frame,
@@ -119,20 +118,18 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
                     &format!("{row:X}_"),
                     false,
                 );
-                for col in 0..16u16 {
-                    let byte = (row * 16 + col) as u8;
-                    let c = chart.mapped(byte);
-                    let cell = Rect::new(x + 4 + col * 4, rect.y + 3 + row, 4, 1);
-                    frame.render_widget(
-                        Paragraph::new(format!(" {} ", if c.is_control() { '·' } else { c }))
-                            .style(dos(if selected == byte { 0x30 } else { 0x1f })),
-                        cell,
-                    );
-                    frame
-                        .regions()
-                        .push((cell, Target::Utility(Action::Cell(byte))));
-                }
             }
+            frame.compose(crate::turbo::characters::draw(
+                chart,
+                Rect::new(
+                    x + 4,
+                    rect.y + 3,
+                    64,
+                    if page == Page::Ascii { 8 } else { 16 },
+                ),
+                crate::presentation::layout::Size::new(area.width, area.height),
+                profile,
+            ));
             let detail = chart.details();
             let copyable = chart.copy_text().is_some();
             text(

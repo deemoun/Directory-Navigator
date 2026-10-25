@@ -20,6 +20,10 @@ for this finishing pass. Local runtime validation targets macOS ARM64.
 - Models retain filesystem policy, asynchronous workers, editing/undo/search,
   viewer navigation, game rules and save-before-close guards. Native input cannot
   bypass those guards. Existing full-screen document layouts are preserved.
+- The ASCII/CP437 grid reuses the library's `Table` control for cell drawing,
+  keyboard navigation and mouse selection. DN supplies the byte mapping,
+  single-cell highlight, details and clipboard behavior. The upstream showcase's
+  `AsciiTable` is a display-only example, not an exported widget.
 - The upstream TV revision remains pinned to
   `0f2b396a1844c59e31c4714d68ffb6815662918e`. OS clipboard and screenshot
   features remain disabled. Turbo Vision is now mandatory; no Cargo feature
@@ -62,7 +66,7 @@ See [document foundations](DOCUMENT_FOUNDATIONS.md) for lifecycle and validation
 
 Local macOS ARM64 validation covers:
 
-- 423 native Rust tests pass; the existing opt-in native Trash check stays ignored.
+- 426 native Rust tests pass; the existing opt-in native Trash check stays ignored.
 - Formatting, all-target Clippy, release build and a no-default-features build.
 - 2,898 layout cases check viewport bounds. Feasible allocations compare against
   frozen pre-removal geometry; 40 wrapping cases preserve narrow widths,

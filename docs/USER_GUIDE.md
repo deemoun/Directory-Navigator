@@ -266,6 +266,13 @@ Utilities also provides System Information. Information dialogs are read-only sn
 Refresh updates them. Unsupported or denied native fields display their errors.
 Calculator and character-table Copy use DN's internal editor clipboard (Ctrl+V).
 
+The character table (Ctrl+B) uses Turbo Vision's native Table control. Choose
+ASCII or DOS CP437, then use the arrow keys or click a cell. Home/End select the
+first/last byte; PageUp/PageDown move through rows. Tab moves between the grid,
+page choices, Copy and Close. Byte values, Unicode code points and UTF-8 bytes
+appear below the grid. ASCII controls cannot be copied; CP437 displays the DOS
+font symbols for low bytes. Each page remembers its selection during the session.
+
 The calculator (Ctrl+K) has a compact DN-style expression field and a five-row
 result box: DEC, HEX, BIN, OCT and EXP. Choose a row, then Copy or Ctrl+C. EXP is
 approximate scientific notation with 15 significant digits; DEC keeps exact

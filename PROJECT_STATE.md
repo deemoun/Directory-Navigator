@@ -22,6 +22,12 @@
 Current Turbo Vision status is authoritative in docs/TURBO_VISION_MIGRATION.md;
 older increment entries below also record earlier migration stages.
 
+- ASCII/CP437 character grid now uses Turbo Vision's reusable Table for drawing,
+  keyboard navigation and mouse selection, retaining DN styling, byte details
+  and internal clipboard behavior. The showcase's ASCII table is not exported.
+  Tests cover every byte, both palettes, page ownership, immutable rendering and
+  clipping; a native terminal check covers copying a CP437 glyph into the editor,
+  retained selection, resizing and terminal restoration.
 - Multi-document foundations: distinct non-reusable WindowId values, resolved-path
   reuse and pending-open coalescing, per-document buffers/history/search/scroll,
   Save As destination reservations, targeted close and MRU quit review. Discarded

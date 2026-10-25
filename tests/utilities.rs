@@ -668,3 +668,73 @@ fn calculator_classic_layout_results_help_mouse_focus_and_resize() -> io::Result
     }
     Ok(())
 }
+
+#[test]
+fn native_character_table_is_read_only_clipped_and_rejects_stale_page_hits() -> io::Result<()> {
+    use dn::{layout, presentation::layout::Rect};
+    let temp = Temp::new()?;
+    let mut app = temp.app()?;
+    utilities::open(&mut app, Kind::Characters);
+    utilities::action(&mut app, Action::Page(Page::Cp437));
+    utilities::action(&mut app, Action::Cell(179));
+    let snapshot = layout::prepare_window(
+        &mut app,
+        Rect::new(7, 3, 80, 25),
+        Rect::new(0, 0, 82, 26),
+        Instant::now(),
+    );
+    let before = (
+        app.utilities.chart.page,
+        app.utilities.chart.cells,
+        app.utilities.chart.focus,
+    );
+    let first = ui::render(&app, &snapshot);
+    assert!(first
+        .hit_regions()
+        .iter()
+        .all(|(r, _)| r.x >= 7 && r.y >= 3 && r.right() <= 82 && r.bottom() <= 26));
+    let second = ui::render(&app, &snapshot);
+    assert_eq!(
+        dn::testing::Buffer::rendered(first),
+        dn::testing::Buffer::rendered(second)
+    );
+    assert_eq!(
+        before,
+        (
+            app.utilities.chart.page,
+            app.utilities.chart.cells,
+            app.utilities.chart.focus
+        )
+    );
+    draw(&mut app, 80, 25)?;
+    let old = app
+        .mouse
+        .regions
+        .iter()
+        .find(|(_, target)| *target == Target::Utility(Action::Cell(255)))
+        .unwrap()
+        .0;
+    let published = app.mouse.frame.unwrap();
+    utilities::action(&mut app, Action::Page(Page::Ascii));
+    layout::update(&mut app);
+    assert_ne!(app.layout_revision, published.revision);
+    mouse::handle(
+        &mut app,
+        MouseEvent {
+            kind: MouseEventKind::Down(MouseButton::Left),
+            column: old.x,
+            row: old.y,
+            modifiers: KeyModifiers::NONE,
+        },
+    );
+    assert_eq!(
+        app.utilities.chart.selected(),
+        0,
+        "old CP437 row cannot select an ASCII byte"
+    );
+    assert_eq!(
+        app.utilities.chart.cells[1], 179,
+        "other page retains its selection"
+    );
+    Ok(())
+}

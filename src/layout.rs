@@ -16,6 +16,7 @@ pub(crate) struct ViewportState {
     viewer: Option<(usize, u16, bool, usize, bool)>,
     game: Option<std::mem::Discriminant<crate::tetris::Screen>>,
     windows: Option<(Vec<crate::desktop::WindowId>, usize)>,
+    characters: Option<(crate::utilities::characters::Page, bool)>,
     menu: Option<(usize, usize)>,
     submenus: Vec<(crate::menu::MenuId, usize)>,
     modal_offsets: Vec<usize>,
@@ -54,6 +55,14 @@ fn viewport_state(app: &App) -> ViewportState {
             .game()
             .map(|g| std::mem::discriminant(&g.screen)),
         windows: app.modals.window_list().map(|l| (l.ids.clone(), l.offset)),
+        characters: (app.utilities.modals.utility_dialog()
+            == Some(crate::utilities::Kind::Characters))
+        .then(|| {
+            (
+                app.utilities.chart.page,
+                app.utilities.chart.copy_text().is_some(),
+            )
+        }),
         menu: app.modals.menu(),
         submenus: app.modals.submenus().to_vec(),
         modal_offsets: vec![

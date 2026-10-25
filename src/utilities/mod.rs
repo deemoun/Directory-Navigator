@@ -160,7 +160,7 @@ pub fn action(app: &mut App, action: Action) {
             app.utilities.chart.focus = 0;
         }
         Action::Cell(cell) => {
-            app.utilities.chart.select(cell);
+            crate::turbo::characters::select(&mut app.utilities.chart, cell);
             app.utilities.chart.focus = 0;
         }
         Action::Refresh => refresh(app),
@@ -315,7 +315,6 @@ pub fn key(app: &mut App, key: KeyEvent) {
         }
         Some(Kind::Characters) => {
             let chart = &mut app.utilities.chart;
-            let byte = chart.selected();
             match key.code {
                 KeyCode::Tab => chart.focus = crate::control_focus::cycle(chart.focus, 5, false),
                 KeyCode::BackTab => chart.focus = crate::control_focus::cycle(chart.focus, 5, true),
@@ -328,16 +327,7 @@ pub fn key(app: &mut App, key: KeyEvent) {
                     })
                 }
                 code if chart.focus == 0 => {
-                    let next = match code {
-                        KeyCode::Left => byte.saturating_sub(1),
-                        KeyCode::Right => byte.saturating_add(1),
-                        KeyCode::Up => byte.saturating_sub(16),
-                        KeyCode::Down => byte.saturating_add(16),
-                        KeyCode::Home => 0,
-                        KeyCode::End => chart.limit(),
-                        _ => byte,
-                    };
-                    chart.select(next);
+                    crate::turbo::characters::key(chart, code);
                 }
                 _ => {}
             }
