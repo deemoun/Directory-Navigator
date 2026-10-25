@@ -213,9 +213,7 @@ scores; unavailable original line counts display “—”.
 
 ## Development
 
-Turbo Vision is the sole UI toolkit; Ratatui and the legacy renderer have been
-removed. See [Turbo Vision architecture and validation](docs/TURBO_VISION_MIGRATION.md)
-and [document foundations](docs/DOCUMENT_FOUNDATIONS.md) for implementation details.
+See [document foundations](docs/DOCUMENT_FOUNDATIONS.md) for implementation details.
 
 ```sh
 cargo fmt --check
