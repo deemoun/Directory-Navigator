@@ -34,20 +34,14 @@ fn hot(
             .collect::<Vec<_>>(),
     )
 }
-pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
+pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
     let profile = app.config.palette;
     let dos = profile.styles();
     let language = app.config.language;
     let rect =
         super::dialog_style::window(frame, profile, area, 72, 18, language.text("Calculator"));
-    app.mouse.regions.clear();
-    super::dialog_style::close_button(
-        frame,
-        profile,
-        rect,
-        &mut app.mouse.regions,
-        Target::Utility(Action::Close),
-    );
+    frame.regions().clear();
+    super::dialog_style::close_button(frame, profile, rect, Target::Utility(Action::Close));
     let calc = &app.utilities.calculator;
     let focus = calc.focus;
     let expression = Rect::new(rect.x + 2, rect.y + 2, rect.width - 4, 3);
@@ -67,8 +61,8 @@ pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
             .style(super::dialog_style::input_style(profile, focus == 0)),
         field,
     );
-    app.mouse
-        .regions
+    frame
+        .regions()
         .push((field, Target::Utility(Action::Field)));
     let history_button = Rect::new(expression.right() - 4, field.y, 2, 1);
     frame.render_widget(
@@ -77,10 +71,10 @@ pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
             .style(dos(0x9f)),
         history_button,
     );
-    app.mouse
-        .regions
+    frame
+        .regions()
         .push((history_button, Target::Utility(Action::CalculatorHistory)));
-    if focus == 0 && !calc.history_open && app.dialogs.is_empty() {
+    if focus == 0 && !calc.history_open && app.dialogs().is_empty() {
         frame.set_cursor_position((field.x + (column - scroll) as u16, field.y));
     }
     frame.render_widget(
@@ -112,8 +106,8 @@ pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
             ])),
             radio,
         );
-        app.mouse
-            .regions
+        frame
+            .regions()
             .push((radio, Target::Utility(Action::Base(index))));
         let text = if index == 4 {
             value.map(Value::scientific).unwrap_or_else(|| "—".into())
@@ -131,8 +125,8 @@ pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
                 .style(dos(0x78)),
             row,
         );
-        app.mouse
-            .regions
+        frame
+            .regions()
             .push((row, Target::Utility(Action::Base(index))));
     }
     let notice = calc
@@ -178,7 +172,7 @@ pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
         spans.push(Span::raw(" ".repeat(padding - padding / 2)));
         spans.push(Span::styled(if selected { "◄" } else { " " }, dos(0x8b)));
         frame.render_widget(Paragraph::new(Line::from(spans)).style(dos(0x8f)), button);
-        app.mouse.regions.push((button, Target::Utility(command)));
+        frame.regions().push((button, Target::Utility(command)));
     }
     if calc.history_open {
         let rows = calc.history.len().clamp(1, 6);
@@ -221,8 +215,8 @@ pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
                 )),
                 row,
             );
-            app.mouse
-                .regions
+            frame
+                .regions()
                 .push((row, Target::Utility(Action::CalculatorRecall(index))));
         }
     }

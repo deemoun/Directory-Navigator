@@ -295,9 +295,13 @@ pub fn submenu_items(menu: MenuId) -> Vec<Item> {
 
 pub fn level_items(app: &App, depth: usize) -> Vec<Item> {
     if depth == 0 {
-        app.menu.map(|(root, _)| items(root)).unwrap_or_default()
+        app.modals
+            .menu()
+            .map(|(root, _)| items(root))
+            .unwrap_or_default()
     } else {
-        app.submenus
+        app.modals
+            .submenus()
             .get(depth - 1)
             .map(|(id, _)| submenu_items(*id))
             .unwrap_or_default()
@@ -306,9 +310,10 @@ pub fn level_items(app: &App, depth: usize) -> Vec<Item> {
 
 pub fn selected_row(app: &App, depth: usize) -> usize {
     if depth == 0 {
-        app.menu.map(|(_, row)| row).unwrap_or(0)
+        app.modals.menu().map(|(_, row)| row).unwrap_or(0)
     } else {
-        app.submenus
+        app.modals
+            .submenus()
             .get(depth - 1)
             .map(|(_, row)| *row)
             .unwrap_or(0)
@@ -323,7 +328,7 @@ pub fn execute(app: &mut App, action: Action) {
         return;
     }
     close(app);
-    app.quick_search = None;
+    app.modals.set_quick_search(None);
     match action {
         Action::CommandHistory => crate::command_line::history::open(app),
         Action::CopyNames(full) => crate::file_tools::clipboard::copy(app,full),
@@ -363,12 +368,12 @@ pub fn execute(app: &mut App, action: Action) {
         Action::ImportDosSettings => crate::config_import::open(app),
         Action::Settings(kind) => app.open_settings(kind),
         Action::View(mode) => app.open_viewer_mode(mode),
-        Action::Confirmations => app.dialogs.push(crate::dialog::Dialog {
+        Action::Confirmations => app.push_dialog(crate::dialog::Dialog {
             title: " Confirmation policy — read-only ",
             message: "[x] Confirm copy/move destinations\n[x] Confirm Trash / permanent deletion\n[x] Refuse existing destinations\n\nThese safeguards are always enabled.\nDeletion mode: Options → File Manager → Setup.\nEsc cancels an operation; completed items remain.\n\nEnter / Esc: close".into(),
         }),
         Action::Game => crate::tetris::open(app),
-        Action::About => app.dialogs.push(crate::dialog::Dialog {
+        Action::About => app.push_dialog(crate::dialog::Dialog {
             title: " About Directory Navigator ",
             message: format!("{}\n{} {}\n{}\n\n{}: Dmitry Yarygin\n\n{}\n{}", crate::APPLICATION_NAME, app.config.language.text("Version"), crate::DISPLAY_VERSION, app.config.language.text("Native Rust terminal file manager"), app.config.language.text("Author"), app.config.language.text("F1: keyboard help"), app.config.language.text("Enter / Esc: close")),
         }),

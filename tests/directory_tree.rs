@@ -52,14 +52,14 @@ fn wait(app: &mut App, done: impl Fn(&App) -> bool) {
 }
 fn settle(app: &mut App) {
     wait(app, |a| {
-        a.directory_tree.as_ref().is_some_and(|t| !t.loading())
+        a.modals.directory_tree().is_some_and(|t| !t.loading())
     });
 }
 fn key(app: &mut App, code: KeyCode) {
     input::handle(app, KeyEvent::new(code, KeyModifiers::NONE));
 }
 fn select(app: &mut App, path: &Path) {
-    let t = app.directory_tree.as_mut().unwrap();
+    let t = app.modals.directory_tree_mut().unwrap();
     t.cursor = t.rows.iter().position(|r| r.path == path).unwrap();
     t.keep_visible();
 }
@@ -154,7 +154,7 @@ fn lazy_expansion_locates_current_and_preserves_panels() -> io::Result<()> {
     let mut a = t.app()?;
     let original = a.panels[0].path.clone();
     open(&mut a);
-    let tree = a.directory_tree.as_ref().unwrap();
+    let tree = a.modals.directory_tree().unwrap();
     assert_eq!(tree.selected().unwrap().path, t.0);
     assert_eq!(tree.root.as_deref(), t.0.ancestors().last());
     assert!(tree.rows.iter().any(|r| r.path == t.0.join("child")));
@@ -166,16 +166,16 @@ fn lazy_expansion_locates_current_and_preserves_panels() -> io::Result<()> {
     key(&mut a, KeyCode::Right);
     settle(&mut a);
     assert!(a
-        .directory_tree
-        .as_ref()
+        .modals
+        .directory_tree()
         .unwrap()
         .rows
         .iter()
         .any(|r| r.path == t.0.join("child/grandchild")));
     key(&mut a, KeyCode::Char(' '));
     assert!(!a
-        .directory_tree
-        .as_ref()
+        .modals
+        .directory_tree()
         .unwrap()
         .rows
         .iter()
@@ -183,12 +183,12 @@ fn lazy_expansion_locates_current_and_preserves_panels() -> io::Result<()> {
     key(&mut a, KeyCode::Right);
     settle(&mut a);
     assert_eq!(
-        a.directory_tree.as_ref().unwrap().selected().unwrap().path,
+        a.modals.directory_tree().unwrap().selected().unwrap().path,
         t.0.join("child")
     );
     assert_eq!(a.panels[0].path, original);
     key(&mut a, KeyCode::Esc);
-    assert!(a.directory_tree.is_none());
+    assert!(a.modals.directory_tree().is_none());
     assert_eq!(a.panels[1].path, original);
     Ok(())
 }
@@ -212,7 +212,7 @@ fn opening_and_failed_navigation_preserve_state() -> io::Result<()> {
     key(&mut a, KeyCode::Enter);
     wait(&mut a, |a| !a.panels[0].loading);
     assert_eq!(a.panels[0].path, child);
-    assert!(!a.dialogs.is_empty());
+    assert!(!a.dialogs().is_empty());
     Ok(())
 }
 #[test]
@@ -223,8 +223,8 @@ fn refresh_hidden_and_stale_close() -> io::Result<()> {
     a.config.show_hidden = false;
     open(&mut a);
     assert!(!a
-        .directory_tree
-        .as_ref()
+        .modals
+        .directory_tree()
         .unwrap()
         .rows
         .iter()
@@ -232,8 +232,8 @@ fn refresh_hidden_and_stale_close() -> io::Result<()> {
     directory_tree::action(&mut a, Action::Hidden);
     settle(&mut a);
     assert!(a
-        .directory_tree
-        .as_ref()
+        .modals
+        .directory_tree()
         .unwrap()
         .rows
         .iter()
@@ -244,8 +244,8 @@ fn refresh_hidden_and_stale_close() -> io::Result<()> {
     directory_tree::action(&mut a, Action::Refresh);
     settle(&mut a);
     assert!(a
-        .directory_tree
-        .as_ref()
+        .modals
+        .directory_tree()
         .unwrap()
         .rows
         .iter()
@@ -254,8 +254,8 @@ fn refresh_hidden_and_stale_close() -> io::Result<()> {
     directory_tree::action(&mut a, Action::Refresh);
     settle(&mut a);
     assert!(!a
-        .directory_tree
-        .as_ref()
+        .modals
+        .directory_tree()
         .unwrap()
         .rows
         .iter()
@@ -265,10 +265,10 @@ fn refresh_hidden_and_stale_close() -> io::Result<()> {
     for _ in 0..10 {
         a.poll();
     }
-    assert!(a.directory_tree.is_none());
+    assert!(a.modals.directory_tree().is_none());
     open(&mut a);
     assert_eq!(
-        a.directory_tree.as_ref().unwrap().selected().unwrap().path,
+        a.modals.directory_tree().unwrap().selected().unwrap().path,
         t.0
     );
     Ok(())
@@ -285,14 +285,14 @@ fn keyboard_paging_buttons_help_and_resize() -> io::Result<()> {
         draw(&mut a, w, h)?;
     }
     key(&mut a, KeyCode::End);
-    let tree = a.directory_tree.as_ref().unwrap();
+    let tree = a.modals.directory_tree().unwrap();
     assert_eq!(tree.cursor, tree.rows.len() - 1);
     assert!(tree.offset > 0);
     key(&mut a, KeyCode::PageUp);
-    let tree = a.directory_tree.as_ref().unwrap();
+    let tree = a.modals.directory_tree().unwrap();
     assert_eq!(tree.cursor, tree.rows.len() - 1 - tree.page_rows);
     key(&mut a, KeyCode::Home);
-    assert_eq!(a.directory_tree.as_ref().unwrap().cursor, 0);
+    assert_eq!(a.modals.directory_tree().unwrap().cursor, 0);
     key(&mut a, KeyCode::F(1));
     assert_eq!(focus::current(&a), Focus::Message);
     key(&mut a, KeyCode::Esc);
@@ -301,7 +301,7 @@ fn keyboard_paging_buttons_help_and_resize() -> io::Result<()> {
         key(&mut a, KeyCode::Tab);
     }
     key(&mut a, KeyCode::Enter);
-    assert!(a.directory_tree.is_none());
+    assert!(a.modals.directory_tree().is_none());
     Ok(())
 }
 #[test]
@@ -314,12 +314,12 @@ fn mouse_rows_expanders_wheel_and_close() -> io::Result<()> {
     open(&mut a);
     select(&mut a, &t.0.join("child00"));
     draw(&mut a, 80, 25)?;
-    let index = a.directory_tree.as_ref().unwrap().cursor;
+    let index = a.modals.directory_tree().unwrap().cursor;
     click(&mut a, Target::Tree(Action::Toggle(index)));
     settle(&mut a);
     assert!(a
-        .directory_tree
-        .as_ref()
+        .modals
+        .directory_tree()
         .unwrap()
         .rows
         .iter()
@@ -334,10 +334,10 @@ fn mouse_rows_expanders_wheel_and_close() -> io::Result<()> {
             modifiers: KeyModifiers::NONE,
         },
     );
-    assert_eq!(a.directory_tree.as_ref().unwrap().cursor, index + 3);
+    assert_eq!(a.modals.directory_tree().unwrap().cursor, index + 3);
     draw(&mut a, 80, 25)?;
     click(&mut a, Target::Tree(Action::Close));
-    assert!(a.directory_tree.is_none());
+    assert!(a.modals.directory_tree().is_none());
     Ok(())
 }
 #[test]
@@ -349,11 +349,11 @@ fn mouse_double_click_opens_selected_folder() -> io::Result<()> {
     open(&mut a);
     select(&mut a, &child);
     draw(&mut a, 80, 25)?;
-    let i = a.directory_tree.as_ref().unwrap().cursor;
+    let i = a.modals.directory_tree().unwrap().cursor;
     click(&mut a, Target::Tree(Action::Row(i)));
     click(&mut a, Target::Tree(Action::Row(i)));
     wait(&mut a, |a| !a.panels[0].loading);
-    assert!(a.directory_tree.is_none());
+    assert!(a.modals.directory_tree().is_none());
     assert_eq!(a.panels[0].path, child);
     Ok(())
 }
@@ -380,11 +380,11 @@ fn links_are_visible_leaves_and_cycles_never_expand() -> io::Result<()> {
     let mut a = t.app()?;
     open(&mut a);
     select(&mut a, &t.0.join("cycle"));
-    let count = a.directory_tree.as_ref().unwrap().rows.len();
+    let count = a.modals.directory_tree().unwrap().rows.len();
     key(&mut a, KeyCode::Right);
     settle(&mut a);
-    assert_eq!(a.directory_tree.as_ref().unwrap().rows.len(), count);
-    assert!(a.directory_tree.as_ref().unwrap().status().contains("link"));
+    assert_eq!(a.modals.directory_tree().unwrap().rows.len(), count);
+    assert!(a.modals.directory_tree().unwrap().status().contains("link"));
     key(&mut a, KeyCode::Enter);
     wait(&mut a, |a| !a.panels[0].loading);
     assert_eq!(a.panels[0].path, t.0.join("cycle"));
@@ -467,8 +467,8 @@ fn unreadable_branch_reports_error_and_can_refresh() -> io::Result<()> {
     key(&mut a, KeyCode::Right);
     settle(&mut a);
     assert!(a
-        .directory_tree
-        .as_ref()
+        .modals
+        .directory_tree()
         .unwrap()
         .status()
         .contains("Cannot read branch"));
@@ -477,8 +477,8 @@ fn unreadable_branch_reports_error_and_can_refresh() -> io::Result<()> {
     directory_tree::action(&mut a, Action::Refresh);
     settle(&mut a);
     assert!(a
-        .directory_tree
-        .as_ref()
+        .modals
+        .directory_tree()
         .unwrap()
         .rows
         .iter()

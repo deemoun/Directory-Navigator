@@ -6,7 +6,7 @@ use crate::{
     screensaver::{ACCEPT, CANCEL, DELAYS, PREVIEW},
 };
 
-pub(super) fn draw_sky(frame: &mut impl Frame, app: &mut App, area: Rect) {
+pub(super) fn draw_sky(frame: &mut impl Frame, app: &App, area: Rect) {
     let dos = app.config.palette.styles();
     frame.render_widget(Block::default().style(dos(0x07)), area);
     for (x, y, glyph, attr) in app.screensaver.cells() {
@@ -16,8 +16,8 @@ pub(super) fn draw_sky(frame: &mut impl Frame, app: &mut App, area: Rect) {
         );
     }
 }
-pub(super) fn draw_setup(frame: &mut impl Frame, app: &mut App, area: Rect) {
-    let Some(setup) = &app.screensaver.setup else {
+pub(super) fn draw_setup(frame: &mut impl Frame, app: &App, area: Rect) {
+    let Some(setup) = app.screensaver.modals.screensaver() else {
         return;
     };
     let dos = app.config.palette.styles();
@@ -43,14 +43,8 @@ pub(super) fn draw_setup(frame: &mut impl Frame, app: &mut App, area: Rect) {
         Paragraph::new(app.config.language.text("Time before screen rest")).style(dos(0x70)),
         Rect::new(rect.x + 3, rect.y + 4, 52, 1),
     );
-    app.mouse.regions.clear();
-    super::dialog_style::close_button(
-        frame,
-        app.config.palette,
-        rect,
-        &mut app.mouse.regions,
-        Target::Screensaver(CANCEL),
-    );
+    frame.regions().clear();
+    super::dialog_style::close_button(frame, app.config.palette, rect, Target::Screensaver(CANCEL));
     for (i, minutes) in DELAYS.iter().enumerate() {
         let label = if *minutes == 0 {
             app.config.language.text("Never").to_string()
@@ -71,7 +65,7 @@ pub(super) fn draw_setup(frame: &mut impl Frame, app: &mut App, area: Rect) {
             .style(dos(if setup.cursor == i { 0x30 } else { 0x70 })),
             row,
         );
-        app.mouse.regions.push((row, Target::Screensaver(i)));
+        frame.regions().push((row, Target::Screensaver(i)));
     }
     frame.render_widget(
         Paragraph::new(
@@ -95,6 +89,6 @@ pub(super) fn draw_setup(frame: &mut impl Frame, app: &mut App, area: Rect) {
             app.config.language.text(label),
             setup.cursor == i,
         );
-        app.mouse.regions.push((row, Target::Screensaver(i)));
+        frame.regions().push((row, Target::Screensaver(i)));
     }
 }

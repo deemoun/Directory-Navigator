@@ -151,7 +151,7 @@ pub fn welcome_key(app: &mut App, key: KeyEvent) {
     {
         return;
     }
-    let Some(welcome) = &app.welcome.dialog else {
+    let Some(welcome) = app.welcome.modals.welcome() else {
         return;
     };
     let mut form = Form::new();
@@ -177,7 +177,7 @@ pub fn welcome_key(app: &mut App, key: KeyEvent) {
             .and_then(|i| form.press(i)),
         _ => None,
     };
-    if let Some(welcome) = &mut app.welcome.dialog {
+    if let Some(welcome) = app.welcome.modals.welcome_mut() {
         welcome.focus = form.selected();
     }
     if let Some(index) = selected {
@@ -186,7 +186,7 @@ pub fn welcome_key(app: &mut App, key: KeyEvent) {
 }
 
 pub fn prompt_key(app: &mut App, key: KeyEvent) {
-    let Some(prompt) = &app.prompt else {
+    let Some(prompt) = app.modals.prompt() else {
         return;
     };
     let input = !matches!(
@@ -236,7 +236,7 @@ pub fn prompt_key(app: &mut App, key: KeyEvent) {
         cursor,
         focus,
         ..
-    }) = &mut app.prompt
+    }) = app.modals.prompt_mut()
     {
         let mut data = data.borrow_mut();
         *field = std::mem::take(&mut data.text);
@@ -245,7 +245,7 @@ pub fn prompt_key(app: &mut App, key: KeyEvent) {
     }
     match selected {
         Some(1) => app.submit_prompt(),
-        Some(2) => app.prompt = None,
+        Some(2) => app.modals.set_prompt(None),
         Some(3) => crate::dialog::prompt_help(app),
         _ => {}
     }

@@ -23,22 +23,23 @@ pub enum Modal {
 }
 pub fn open_bookmarks(app: &mut App) {
     menu::close(app);
-    app.quick_search = None;
-    app.navigation_dialog = Some(Modal::Bookmarks { slot: 0, focus: 0 });
+    app.modals.set_quick_search(None);
+    app.modals
+        .set_navigation_dialog(Some(Modal::Bookmarks { slot: 0, focus: 0 }));
 }
 pub fn open_filter(app: &mut App) {
     if app.panels[app.active].loading {
         return;
     }
     menu::close(app);
-    app.quick_search = None;
+    app.modals.set_quick_search(None);
     let field = app.panels[app.active].filter.clone();
     let cursor = field.len();
-    app.navigation_dialog = Some(Modal::Filter {
+    app.modals.set_navigation_dialog(Some(Modal::Filter {
         field,
         cursor,
         focus: 0,
-    });
+    }));
 }
 pub fn assign(app: &mut App, slot: usize) {
     if slot < 9 {
@@ -52,21 +53,21 @@ pub fn go(app: &mut App, slot: usize) {
         return;
     }
     if let Some(path) = app.config.bookmarks.get(slot).and_then(Clone::clone) {
-        app.navigation_dialog = None;
+        app.modals.set_navigation_dialog(None);
         app.panels[app.active].go_to(path, app.config.show_hidden);
     } else {
         app.notice = format!("Bookmark {} is empty", slot + 1);
     }
 }
 pub fn action(app: &mut App, action: Action) {
-    let slot = match &app.navigation_dialog {
+    let slot = match app.modals.navigation_dialog() {
         Some(Modal::Bookmarks { slot, .. }) => *slot,
         _ => 0,
     };
     match action {
         Action::Slot(n) => {
             if n < 9 {
-                if let Some(Modal::Bookmarks { slot, focus }) = &mut app.navigation_dialog {
+                if let Some(Modal::Bookmarks { slot, focus }) = app.modals.navigation_dialog_mut() {
                     *slot = n;
                     *focus = 0;
                 }
@@ -75,14 +76,14 @@ pub fn action(app: &mut App, action: Action) {
         Action::Go => go(app, slot),
         Action::Set => assign(app, slot),
         Action::Clear => app.config.bookmarks[slot] = None,
-        Action::Close => app.navigation_dialog = None,
+        Action::Close => app.modals.set_navigation_dialog(None),
         Action::ApplyFilter => {
-            if let Some(Modal::Filter { field, .. }) = app.navigation_dialog.take() {
+            if let Some(Modal::Filter { field, .. }) = app.modals.take_navigation_dialog() {
                 app.panels[app.active].set_filter(field);
             }
         }
         Action::FilterField => {
-            if let Some(Modal::Filter { focus, .. }) = &mut app.navigation_dialog {
+            if let Some(Modal::Filter { focus, .. }) = app.modals.navigation_dialog_mut() {
                 *focus = 0;
             }
         }
@@ -93,18 +94,18 @@ pub fn paste(app: &mut App, text: &str) {
         field,
         cursor,
         focus: 0,
-    }) = &mut app.navigation_dialog
+    }) = app.modals.navigation_dialog_mut()
     {
         dialog::paste_input(field, cursor, text);
     }
 }
 pub fn key(app: &mut App, key: KeyEvent) {
     if key.code == KeyCode::Esc {
-        app.navigation_dialog = None;
+        app.modals.set_navigation_dialog(None);
         return;
     }
     let mut command = None;
-    match &mut app.navigation_dialog {
+    match app.modals.navigation_dialog_mut() {
         Some(Modal::Bookmarks { slot, focus }) => match key.code {
             KeyCode::Tab => *focus = crate::control_focus::cycle(*focus, 5, false),
             KeyCode::BackTab => *focus = crate::control_focus::cycle(*focus, 5, true),

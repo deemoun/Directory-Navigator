@@ -359,18 +359,18 @@ fn pane(
 }
 
 pub(crate) fn prepare(
-    app: &mut App,
+    app: &App,
     prepared: &Prepared,
     width: u16,
     height: u16,
 ) -> (Scene, Vec<Rect>) {
-    app.desktop.native().sync_panes(app.active, (width, height));
     let mut s = Scene {
         width,
         height,
         profile: app.config.palette,
         cells: BTreeMap::new(),
         cursor: None,
+        regions: Vec::new(),
     };
     s.fill(0, 0, width, height, 0x87);
     let bar = prepared.regions[0];
@@ -390,7 +390,7 @@ pub(crate) fn prepare(
         let label = app.config.language.text(label);
         let width = crate::menu::plain(label).width() as u16 + 3;
         let r = Rect::new(x, bar.y, width, 1).intersection(header);
-        let selected = app.menu.is_some_and(|(root, _)| root == index);
+        let selected = app.modals.menu().is_some_and(|(root, _)| root == index);
         let normal = if selected { 0x30 } else { 0x70 };
         let hot = if selected { 0x3e } else { 0x74 };
         let mut items = vec![(" ".into(), normal)];
@@ -403,7 +403,7 @@ pub(crate) fn prepare(
         items.push(("  ".into(), normal));
         runs(&mut s, r, &items, 0x70, false);
         positions.push(r);
-        app.mouse.regions.push((r, Target::Menu(index)));
+        s.regions.push((r, Target::Menu(index)));
         x += width;
     }
     if clock {
@@ -433,7 +433,7 @@ pub(crate) fn prepare(
             *area,
             (index, index == app.active),
             &app.config,
-            app.quick_search.as_ref().filter(|q| q.panel == index),
+            app.modals.quick_search().filter(|q| q.panel == index),
             &prepared.panels[index],
         );
     }

@@ -21,12 +21,15 @@ enum Reply {
 }
 #[derive(Default)]
 pub struct State {
+    open_epoch: u64,
+    pub(crate) requests: crate::requests::RequestScope,
     pub rules: Vec<format::Rule>,
     pub pending: Option<runner::Plan>,
     error: Option<String>,
     task: Option<Task<io::Result<Reply>>>,
     loading: bool,
     editing: bool,
+    editing_document: Option<crate::desktop::WindowId>,
 }
 impl State {
     pub fn busy(&self) -> bool {
@@ -37,15 +40,18 @@ pub fn path(app: &App) -> io::Result<PathBuf> {
     Ok(app.config_store.path()?.with_file_name("associations.conf"))
 }
 pub fn reload(app: &mut App) {
+    app.associations.open_epoch = app.desktop.activation_revision();
     crate::menu::close(app);
     app.associations.task = None;
     app.associations.pending = None;
     app.associations.loading = false;
     let result = path(app).and_then(|path| {
-        Task::spawn("dn-associations", move |cancel| {
-            cancel.check()?;
-            format::load(&path).map(Reply::Loaded)
-        })
+        app.associations
+            .requests
+            .spawn("dn-associations", move |cancel| {
+                cancel.check()?;
+                format::load(&path).map(Reply::Loaded)
+            })
     });
     match result {
         Ok(task) => {
@@ -59,34 +65,37 @@ pub fn reload(app: &mut App) {
     }
 }
 pub fn edit(app: &mut App) {
+    app.associations.open_epoch = app.desktop.activation_revision();
     crate::menu::close(app);
     app.associations.task = None;
     app.associations.pending = None;
     app.associations.loading = false;
     let result = path(app).and_then(|path| {
-        Task::spawn("dn-associations-edit", move |cancel| {
-            cancel.check()?;
-            if let Some(parent) = path.parent() {
-                fs::create_dir_all(parent)?;
-            }
-            match fs::symlink_metadata(&path) {
-                Err(e) if e.kind() == io::ErrorKind::NotFound => {
-                    let mut staged = crate::publication::StagedFile::create(&path)?;
-                    staged.file.write_all(format::DEFAULT.as_bytes())?;
-                    cancel.check()?;
-                    match staged.publish(&path) {
-                        Ok(()) => {}
-                        Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {}
-                        Err(e) => return Err(e),
-                    }
+        app.associations
+            .requests
+            .spawn("dn-associations-edit", move |cancel| {
+                cancel.check()?;
+                if let Some(parent) = path.parent() {
+                    fs::create_dir_all(parent)?;
                 }
-                Err(e) => return Err(e),
-                Ok(_) => {}
-            }
-            format::read(&path)?; // Editing can repair invalid syntax, but never follows a link.
-            cancel.check()?;
-            Ok(Reply::Edit(path))
-        })
+                match fs::symlink_metadata(&path) {
+                    Err(e) if e.kind() == io::ErrorKind::NotFound => {
+                        let mut staged = crate::publication::StagedFile::create(&path)?;
+                        staged.file.write_all(format::DEFAULT.as_bytes())?;
+                        cancel.check()?;
+                        match staged.publish(&path) {
+                            Ok(()) => {}
+                            Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {}
+                            Err(e) => return Err(e),
+                        }
+                    }
+                    Err(e) => return Err(e),
+                    Ok(_) => {}
+                }
+                format::read(&path)?; // Editing can repair invalid syntax, but never follows a link.
+                cancel.check()?;
+                Ok(Reply::Edit(path))
+            })
     });
     match result {
         Ok(task) => {
@@ -98,6 +107,7 @@ pub fn edit(app: &mut App) {
 }
 /// Returns true when custom handling claimed this Enter action.
 pub fn open(app: &mut App, path: PathBuf) -> bool {
+    app.associations.open_epoch = app.desktop.activation_revision();
     if app.associations.busy() {
         app.error("File associations are loading; try again shortly.");
         return true;
@@ -127,27 +137,30 @@ pub fn open(app: &mut App, path: PathBuf) -> bool {
     }
     let panel = app.active;
     let cwd = app.panels[panel].path.clone();
-    match Task::spawn("dn-associated-open", move |cancel| {
-        cancel.check()?;
-        let file = crate::filesystem::open_regular(&path)?;
-        let metadata = fs::symlink_metadata(&path)?;
-        if !crate::platform_fs::same_identity(&metadata, &file.metadata()?) {
-            return Err(io::Error::other("File changed before association launch"));
-        }
-        let command = if let format::Target::Command(args) = &target {
-            Some(format::command(args, &path, cwd.clone())?)
-        } else {
-            None
-        };
-        cancel.check()?;
-        Ok(Reply::Open {
-            panel,
-            path,
-            cwd,
-            target,
-            command,
-        })
-    }) {
+    match app
+        .associations
+        .requests
+        .spawn("dn-associated-open", move |cancel| {
+            cancel.check()?;
+            let file = crate::filesystem::open_regular(&path)?;
+            let metadata = fs::symlink_metadata(&path)?;
+            if !crate::platform_fs::same_identity(&metadata, &file.metadata()?) {
+                return Err(io::Error::other("File changed before association launch"));
+            }
+            let command = if let format::Target::Command(args) = &target {
+                Some(format::command(args, &path, cwd.clone())?)
+            } else {
+                None
+            };
+            cancel.check()?;
+            Ok(Reply::Open {
+                panel,
+                path,
+                cwd,
+                target,
+                command,
+            })
+        }) {
         Ok(task) => {
             app.associations.task = Some(task);
             app.associations.loading = false;
@@ -178,8 +191,11 @@ pub fn poll(app: &mut App) -> bool {
                 app.notice = "File associations loaded".into();
             }
             Ok(Reply::Edit(path)) => {
-                crate::editor::open_path(app, path);
-                app.associations.editing = app.desktop.editor().is_some();
+                let foreground = app.associations.open_epoch == app.desktop.activation_revision()
+                    && app.modal_top().is_none();
+                app.associations.editing_document =
+                    crate::editor::controls::open_path_with_focus(app, path, foreground);
+                app.associations.editing = app.associations.editing_document.is_some();
             }
             Ok(Reply::Open {
                 panel,
@@ -223,7 +239,12 @@ pub fn poll(app: &mut App) -> bool {
         }
         return true;
     }
-    if app.associations.editing && app.desktop.editor().is_none() {
+    if app.associations.editing
+        && app
+            .associations
+            .editing_document
+            .is_none_or(|id| !app.desktop.contains(id))
+    {
         app.associations.editing = false;
         reload(app);
         return true;

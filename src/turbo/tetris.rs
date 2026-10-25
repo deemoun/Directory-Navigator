@@ -41,7 +41,7 @@ impl Scene {
     }
 }
 
-pub(crate) fn prepare(app: &mut App, width: u16, height: u16) -> Scene {
+pub(crate) fn prepare(app: &App, width: u16, height: u16) -> Scene {
     assert!(width >= 80 && height >= 25);
     let language = app.config.language;
     let mut scene = Scene {
@@ -50,6 +50,7 @@ pub(crate) fn prepare(app: &mut App, width: u16, height: u16) -> Scene {
         profile: app.config.palette,
         cells: BTreeMap::new(),
         cursor: None,
+        regions: Vec::new(),
     };
     let x = (width - 54) / 2;
     let y = (height - 23) / 2;
@@ -209,7 +210,7 @@ pub(crate) fn prepare(app: &mut App, width: u16, height: u16) -> Scene {
         scene.text(slot.x, slot.y, slot.width, language.text(label), 0x30);
         regions.push((slot, Target::Game(action)));
     }
-    app.mouse.regions = regions;
+    scene.regions = regions;
     pages::draw(&mut scene, app, y);
     scene
 }

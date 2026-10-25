@@ -47,7 +47,10 @@ impl Drop for Temp {
 fn wait(app: &mut App) {
     let deadline = Instant::now() + Duration::from_secs(5);
     while app.panels.iter().any(|panel| panel.loading)
-        || app.desktop.editor().is_some_and(|editor| editor.busy())
+        || app
+            .desktop
+            .active_editor()
+            .is_some_and(|editor| editor.busy())
     {
         app.poll();
         assert!(Instant::now() < deadline);
@@ -61,7 +64,12 @@ fn modified(app: &mut App, code: KeyCode, modifiers: KeyModifiers) {
     input::handle(app, KeyEvent::new(code, modifiers));
 }
 fn buffer(app: &App) -> &Buffer {
-    app.desktop.editor().unwrap().buffer.as_ref().unwrap()
+    app.desktop
+        .active_editor()
+        .unwrap()
+        .buffer
+        .as_ref()
+        .unwrap()
 }
 fn begin(app: &mut App, text: &str) {
     editor::open(app, true);
@@ -96,7 +104,13 @@ fn click(app: &mut App, command: A) {
     );
 }
 fn search_field(app: &mut App, query: &str, replacement: Option<&str>) {
-    if let Some(Modal::Search(dialog)) = &mut app.desktop.editor_mut().unwrap().modal {
+    if let Some(Modal::Search(dialog)) = app
+        .desktop
+        .active_editor_mut()
+        .unwrap()
+        .modals
+        .editor_modal_mut()
+    {
         dialog.query = query.into();
         dialog.cursors[0] = query.len();
         if let Some(replacement) = replacement {
@@ -270,16 +284,40 @@ fn original_keys_menu_precedence_and_deferred_function_keys() -> io::Result<()> 
     let mut app = temp.app()?;
     begin(&mut app, "one two");
     key(&mut app, KeyCode::F(10));
-    assert!(app.desktop.editor().unwrap().menu.is_some());
+    assert!(app
+        .desktop
+        .active_editor()
+        .unwrap()
+        .modals
+        .editor_menu()
+        .is_some());
     assert!(!app.quit);
     key(&mut app, KeyCode::Esc);
-    assert!(app.desktop.editor().unwrap().menu.is_none());
-    assert!(app.desktop.editor().unwrap().modal.is_none());
+    assert!(app
+        .desktop
+        .active_editor()
+        .unwrap()
+        .modals
+        .editor_menu()
+        .is_none());
+    assert!(app
+        .desktop
+        .active_editor()
+        .unwrap()
+        .modals
+        .editor_modal()
+        .is_none());
     for code in [KeyCode::F(4), KeyCode::F(5), KeyCode::F(8), KeyCode::F(9)] {
         key(&mut app, code);
     }
     assert_eq!(buffer(&app).text, "one two");
-    assert!(app.desktop.editor().unwrap().modal.is_none());
+    assert!(app
+        .desktop
+        .active_editor()
+        .unwrap()
+        .modals
+        .editor_modal()
+        .is_none());
     key(&mut app, KeyCode::Home);
     modified(
         &mut app,
@@ -298,15 +336,21 @@ fn original_keys_menu_precedence_and_deferred_function_keys() -> io::Result<()> 
     assert_eq!(buffer(&app).text, "one two");
     modified(&mut app, KeyCode::Char('g'), KeyModifiers::ALT);
     assert!(matches!(
-        app.desktop.editor().unwrap().modal,
+        app.desktop.active_editor().unwrap().modals.editor_modal(),
         Some(Modal::Prompt { .. })
     ));
     key(&mut app, KeyCode::F(10));
-    assert!(app.desktop.editor().unwrap().menu.is_none());
+    assert!(app
+        .desktop
+        .active_editor()
+        .unwrap()
+        .modals
+        .editor_menu()
+        .is_none());
     key(&mut app, KeyCode::Esc);
     modified(&mut app, KeyCode::F(4), KeyModifiers::CONTROL);
     assert!(matches!(
-        app.desktop.editor().unwrap().modal,
+        app.desktop.active_editor().unwrap().modals.editor_modal(),
         Some(Modal::ConfirmClose)
     ));
     key(&mut app, KeyCode::Char('c'));
@@ -317,65 +361,82 @@ fn original_keys_menu_precedence_and_deferred_function_keys() -> io::Result<()> 
 }
 
 #[test]
-fn open_guard_cancel_discard_failed_load_and_clipboard_across_files() -> io::Result<()> {
+fn multiple_open_documents_preserve_close_guards_and_shared_clipboard() -> io::Result<()> {
     let temp = Temp::new()?;
     fs::write(temp.0.join("second"), "second\r\n")?;
     let mut app = temp.app()?;
     begin(&mut app, "original");
+    let original = app.desktop.active().id;
     editor::action(&mut app, A::SelectAll);
     editor::action(&mut app, A::Copy);
     open_path(&mut app, "second");
-    assert!(matches!(
-        app.desktop.editor().unwrap().modal,
-        Some(Modal::ConfirmClose)
-    ));
-    key(&mut app, KeyCode::Esc);
-    assert_eq!(buffer(&app).text, "original");
-    open_path(&mut app, "missing");
-    key(&mut app, KeyCode::Char('d'));
-    wait(&mut app);
-    assert!(!app.dialogs.is_empty());
-    assert_eq!(buffer(&app).text, "original");
-    assert!(buffer(&app).dirty());
-    key(&mut app, KeyCode::Esc);
-    open_path(&mut app, "second");
-    key(&mut app, KeyCode::Char('d'));
+    let second = app.desktop.active().id;
+    assert_ne!(original, second);
     wait(&mut app);
     assert_eq!(buffer(&app).text, "second\r\n");
     assert_eq!(app.editor_clipboard, "original");
+    open_path(&mut app, "missing");
+    wait(&mut app);
+    assert!(!app.dialogs().is_empty());
+    assert_eq!(app.desktop.active().id, second);
+    assert_eq!(buffer(&app).text, "second\r\n");
     key(&mut app, KeyCode::Esc);
-    assert!(app.desktop.editor().is_none());
+    key(&mut app, KeyCode::Esc);
+    assert!(!app.desktop.contains(second));
+    assert_eq!(app.desktop.active().id, original);
+    key(&mut app, KeyCode::Esc);
+    assert!(matches!(
+        app.desktop.editor(original).unwrap().modals.editor_modal(),
+        Some(Modal::ConfirmClose)
+    ));
+    editor::action(&mut app, A::Cancel);
+    assert_eq!(buffer(&app).text, "original");
     editor::open(&mut app, true);
     modified(&mut app, KeyCode::Insert, KeyModifiers::SHIFT);
     assert_eq!(buffer(&app).text, "original");
+    assert!(app.desktop.editor(original).unwrap().dirty());
     Ok(())
 }
 
 #[test]
-fn open_after_save_as_and_failed_save_does_not_switch() -> io::Result<()> {
+fn save_as_and_failed_save_affect_only_their_document() -> io::Result<()> {
     let temp = Temp::new()?;
     fs::write(temp.0.join("second"), "second")?;
     let mut app = temp.app()?;
     begin(&mut app, "first");
-    open_path(&mut app, "second");
-    key(&mut app, KeyCode::Char('s'));
+    let first = app.desktop.active().id;
+    editor::action(&mut app, A::SaveAs);
     editor::paste(&mut app, "first.txt");
     key(&mut app, KeyCode::Enter);
     wait(&mut app);
     assert_eq!(fs::read_to_string(temp.0.join("first.txt"))?, "first");
-    assert_eq!(buffer(&app).text, "second");
+    open_path(&mut app, "second");
+    wait(&mut app);
+    let second = app.desktop.active().id;
+    assert_ne!(first, second);
     editor::paste(&mut app, "edit");
     fs::write(temp.0.join("second"), "external")?;
-    open_path(&mut app, "first.txt");
-    key(&mut app, KeyCode::Char('s'));
+    editor::action(&mut app, A::Save);
     wait(&mut app);
     assert_eq!(buffer(&app).text, "editsecond");
     assert!(buffer(&app).dirty());
-    assert!(!app.dialogs.is_empty());
+    assert!(!app.dialogs().is_empty());
+    assert_eq!(app.desktop.active().id, second);
     assert_eq!(
-        app.desktop.editor().unwrap().path.as_ref(),
-        Some(&temp.0.join("second"))
+        app.desktop
+            .editor(first)
+            .unwrap()
+            .buffer
+            .as_ref()
+            .unwrap()
+            .text,
+        "first"
     );
+    app.clear_dialogs();
+    open_path(&mut app, "first.txt");
+    assert_eq!(app.desktop.active().id, first);
+    assert!(!buffer(&app).dirty());
+    assert!(app.desktop.editor(second).unwrap().dirty());
     Ok(())
 }
 
@@ -386,7 +447,13 @@ fn find_scope_reverse_origin_and_prompted_replace_cancel() -> io::Result<()> {
     begin(&mut app, "foo x foo y foo");
     key(&mut app, KeyCode::F(7));
     search_field(&mut app, "foo", None);
-    if let Some(Modal::Search(dialog)) = &mut app.desktop.editor_mut().unwrap().modal {
+    if let Some(Modal::Search(dialog)) = app
+        .desktop
+        .active_editor_mut()
+        .unwrap()
+        .modals
+        .editor_modal_mut()
+    {
         dialog.options.entire_scope = true;
     }
     key(&mut app, KeyCode::Enter);
@@ -395,23 +462,29 @@ fn find_scope_reverse_origin_and_prompted_replace_cancel() -> io::Result<()> {
     assert_eq!(buffer(&app).selected(), 6..9);
     modified(&mut app, KeyCode::F(7), KeyModifiers::ALT);
     assert_eq!(buffer(&app).selected(), 0..3);
-    assert!(!app.desktop.editor().unwrap().search_options.backward);
+    assert!(!app.desktop.active_editor().unwrap().search_options.backward);
     editor::action(&mut app, A::SelectAll);
     modified(&mut app, KeyCode::F(7), KeyModifiers::CONTROL);
     search_field(&mut app, "foo", Some("bar"));
-    if let Some(Modal::Search(dialog)) = &mut app.desktop.editor_mut().unwrap().modal {
+    if let Some(Modal::Search(dialog)) = app
+        .desktop
+        .active_editor_mut()
+        .unwrap()
+        .modals
+        .editor_modal_mut()
+    {
         dialog.options.selected_scope = true;
     }
     key(&mut app, KeyCode::Enter);
     assert!(matches!(
-        app.desktop.editor().unwrap().modal,
+        app.desktop.active_editor().unwrap().modals.editor_modal(),
         Some(Modal::Replace(_))
     ));
     key(&mut app, KeyCode::Char('y'));
     key(&mut app, KeyCode::Char('n'));
     key(&mut app, KeyCode::Esc);
     assert_eq!(buffer(&app).text, "bar x foo y foo");
-    assert!(app.desktop.editor().unwrap().notice.contains("1"));
+    assert!(app.desktop.active_editor().unwrap().notice.contains("1"));
     editor::action(&mut app, A::Undo);
     assert_eq!(buffer(&app).text, "foo x foo y foo");
     Ok(())
@@ -432,12 +505,18 @@ fn change_all_single_undo_and_search_options_disabled_without_selection() -> io:
         .any(|(_, t)| *t == Target::Editor(A::SearchChoice(6))));
     click(&mut app, A::SearchSubmit(true));
     assert_eq!(buffer(&app).text, "aa aa aa");
-    assert!(app.desktop.editor().unwrap().notice.contains("3"));
+    assert!(app.desktop.active_editor().unwrap().notice.contains("3"));
     modified(&mut app, KeyCode::Char('z'), KeyModifiers::CONTROL);
     assert_eq!(buffer(&app).text, "a a a");
     modified(&mut app, KeyCode::F(7), KeyModifiers::CONTROL);
     search_field(&mut app, "a", Some(""));
-    if let Some(Modal::Search(dialog)) = &mut app.desktop.editor_mut().unwrap().modal {
+    if let Some(Modal::Search(dialog)) = app
+        .desktop
+        .active_editor_mut()
+        .unwrap()
+        .modals
+        .editor_modal_mut()
+    {
         dialog.options.prompt = false;
     }
     key(&mut app, KeyCode::Enter);
@@ -490,7 +569,10 @@ fn editor_preferences_tabs_menu_mouse_and_configuration_roundtrip() -> io::Resul
     key(&mut app, KeyCode::Esc);
     key(&mut app, KeyCode::Char('d'));
     editor::open(&mut app, true);
-    assert_eq!(app.desktop.editor().unwrap().preferences, config.editor);
+    assert_eq!(
+        app.desktop.active_editor().unwrap().preferences,
+        config.editor
+    );
     Ok(())
 }
 
@@ -510,7 +592,13 @@ fn all_editor_menu_roots_mnemonics_mouse_targets_and_clipboard_modern_aliases() 
         key(&mut app, KeyCode::Esc);
     }
     menus::open(&mut app, 3);
-    assert!(app.desktop.editor().unwrap().menu.is_none());
+    assert!(app
+        .desktop
+        .active_editor()
+        .unwrap()
+        .modals
+        .editor_menu()
+        .is_none());
     modified(&mut app, KeyCode::Char('a'), KeyModifiers::CONTROL);
     modified(&mut app, KeyCode::Char('x'), KeyModifiers::CONTROL);
     assert!(buffer(&app).text.is_empty());
@@ -519,7 +607,7 @@ fn all_editor_menu_roots_mnemonics_mouse_targets_and_clipboard_modern_aliases() 
     modified(&mut app, KeyCode::Char('s'), KeyModifiers::ALT);
     key(&mut app, KeyCode::Char('f'));
     assert!(matches!(
-        app.desktop.editor().unwrap().modal,
+        app.desktop.active_editor().unwrap().modals.editor_modal(),
         Some(Modal::Search(_))
     ));
     key(&mut app, KeyCode::Esc);
@@ -574,7 +662,10 @@ fn block_menu_reuses_selection_clipboard_actions_and_keeps_paragraph_dimmed() ->
             .filter(|(_, t)| matches!(t, Target::Editor(A::MenuRoot(_))))
             .all(|(r, _)| r.right() <= w - 10));
         modified(&mut app, KeyCode::Char('b'), KeyModifiers::ALT);
-        assert_eq!(app.desktop.editor().unwrap().menu, Some((4, 0)));
+        assert_eq!(
+            app.desktop.active_editor().unwrap().modals.editor_menu(),
+            Some((4, 0))
+        );
         render(&mut app, w, h)?;
         key(&mut app, KeyCode::Esc);
     }

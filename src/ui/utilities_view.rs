@@ -23,7 +23,7 @@ fn text(
 }
 fn button(
     frame: &mut impl Frame,
-    app: &mut App,
+    app: &App,
     rect: Rect,
     label: &str,
     action: Action,
@@ -37,12 +37,12 @@ fn button(
         app.config.language.text(label),
         focused,
     );
-    app.mouse.regions.push((rect, Target::Utility(action)));
+    frame.regions().push((rect, Target::Utility(action)));
 }
-pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
+pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
     let profile = app.config.palette;
     let dos = profile.styles();
-    let Some(kind) = app.utilities.dialog else {
+    let Some(kind) = app.utilities.modals.utility_dialog() else {
         return;
     };
     if kind == Kind::Calculator {
@@ -75,14 +75,8 @@ pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
         rect.height,
         app.config.language.text(title),
     );
-    app.mouse.regions.clear();
-    super::dialog_style::close_button(
-        frame,
-        profile,
-        rect,
-        &mut app.mouse.regions,
-        Target::Utility(Action::Close),
-    );
+    frame.regions().clear();
+    super::dialog_style::close_button(frame, profile, rect, Target::Utility(Action::Close));
     let x = rect.x + 2;
     let w = rect.width - 4;
     match kind {
@@ -134,8 +128,8 @@ pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
                             .style(dos(if selected == byte { 0x30 } else { 0x1f })),
                         cell,
                     );
-                    app.mouse
-                        .regions
+                    frame
+                        .regions()
                         .push((cell, Target::Utility(Action::Cell(byte))));
                 }
             }

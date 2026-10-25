@@ -1,5 +1,5 @@
 pub mod buffer;
-mod controls;
+pub(crate) mod controls;
 mod editing;
 pub mod highlight;
 mod keys;
@@ -8,7 +8,9 @@ pub mod search;
 mod search_controls;
 pub mod storage;
 use buffer::Buffer;
-pub use controls::{action, open, open_path, paste, poll, request_close, EditorAction};
+pub use controls::{
+    action, open, open_path, open_path_background, paste, poll, request_close, EditorAction,
+};
 use highlight::{Cache, Language};
 pub use keys::key;
 use std::{path::PathBuf, sync::mpsc};
@@ -18,7 +20,6 @@ use storage::Snapshot;
 pub enum PendingAction {
     Close,
     Quit,
-    Open(PathBuf),
 }
 // Compatibility for callers asking to close the editor or the application.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -65,14 +66,20 @@ enum Reply {
     Loaded(PathBuf, Result<(Buffer, Snapshot, bool), String>),
     Saved(Result<(PathBuf, Snapshot), String>),
 }
+struct SaveDestination {
+    path: PathBuf,
+    key: PathBuf,
+    save_as: bool,
+}
 pub struct Editor {
+    pub(crate) requests: crate::requests::RequestScope,
+    pub modals: crate::modals::ModalStack,
     pub path: Option<PathBuf>,
     pub base: PathBuf,
     pub buffer: Option<Buffer>,
     pub highlight: Cache,
     pub colors: bool,
     pub preferences: Preferences,
-    pub menu: Option<(usize, usize)>,
     pub search_options: search::SearchOptions,
     pub replacement: String,
     pub search_revision: u64,
@@ -81,7 +88,6 @@ pub struct Editor {
     pub scroll_column: usize,
     pub rows: usize,
     pub columns: usize,
-    pub modal: Option<Modal>,
     pub notice: String,
     pub search: String,
     original: Option<Snapshot>,
@@ -89,17 +95,20 @@ pub struct Editor {
     worker: Option<crate::task::Task<Reply>>,
     saving: bool,
     closing: Option<PendingAction>,
+    save_identity: Option<PathBuf>,
+    save_prepare: Option<crate::task::Task<Result<SaveDestination, String>>>,
 }
 impl Editor {
     fn new(base: PathBuf) -> Result<Self, String> {
         Ok(Self {
+            requests: Default::default(),
+            modals: Default::default(),
             path: None,
             base,
             buffer: Some(Buffer::new(String::new())?),
             highlight: Cache::new(Language::Plain),
             colors: true,
             preferences: Preferences::default(),
-            menu: None,
             search_options: search::SearchOptions::default(),
             replacement: String::new(),
             search_scope: None,
@@ -108,7 +117,6 @@ impl Editor {
             scroll_column: 0,
             rows: 1,
             columns: 1,
-            modal: None,
             notice: "New UTF-8 document".into(),
             search: String::new(),
             original: None,
@@ -116,30 +124,24 @@ impl Editor {
             worker: None,
             saving: false,
             closing: None,
+            save_prepare: None,
+            save_identity: None,
         })
     }
     fn load(path: PathBuf, base: PathBuf) -> Result<Self, String> {
         let mut editor = Self::new(base)?;
         let file = path.clone();
-        let receive = crate::task::Task::spawn("dn-editor-load", move |_| {
-            Reply::Loaded(file.clone(), storage::load(&file))
-        })
-        .map_err(|e| e.to_string())?;
+        let receive = editor
+            .requests
+            .spawn("dn-editor-load", move |_| {
+                Reply::Loaded(file.clone(), storage::load(&file))
+            })
+            .map_err(|e| e.to_string())?;
         editor.path = Some(path);
         editor.buffer = None;
         editor.worker = Some(receive);
         editor.notice = "Reading file…".into();
         Ok(editor)
-    }
-    fn load_next(&mut self, path: PathBuf) -> Result<(), String> {
-        let receive = crate::task::Task::spawn("dn-editor-load", move |_| {
-            Reply::Loaded(path.clone(), storage::load(&path))
-        })
-        .map_err(|e| e.to_string())?;
-        self.worker = Some(receive);
-        self.saving = false;
-        self.notice = "Reading next file…".into();
-        Ok(())
     }
     pub fn apply_preferences(&mut self, mut preferences: Preferences) {
         preferences.tab_size = preferences.tab_size.clamp(1, 16);
@@ -150,7 +152,15 @@ impl Editor {
         }
     }
     pub fn busy(&self) -> bool {
-        self.worker.is_some()
+        self.worker.is_some() || self.save_prepare.is_some()
+    }
+    pub(crate) fn cancel_quit(&mut self) {
+        if self.closing == Some(PendingAction::Quit) {
+            self.closing = None;
+            if matches!(self.modals.editor_modal(), Some(Modal::ConfirmClose)) {
+                self.modals.set_editor_modal(None);
+            }
+        }
     }
     pub fn dirty(&self) -> bool {
         self.buffer.as_ref().is_some_and(Buffer::dirty)
@@ -165,13 +175,15 @@ impl Editor {
         let text = buffer.text.clone();
         let original = if save_as { None } else { self.original.clone() };
         let bom = self.bom;
-        let receive = crate::task::Task::spawn("dn-editor-save", move |_| {
-            Reply::Saved(
-                storage::save(&path, &text, bom, original.as_ref())
-                    .map(|snapshot| (path, snapshot)),
-            )
-        })
-        .map_err(|e| e.to_string())?;
+        let receive = self
+            .requests
+            .spawn("dn-editor-save", move |_| {
+                Reply::Saved(
+                    storage::save(&path, &text, bom, original.as_ref())
+                        .map(|snapshot| (path, snapshot)),
+                )
+            })
+            .map_err(|e| e.to_string())?;
         self.worker = Some(receive);
         self.saving = true;
         self.notice = "Saving…".into();

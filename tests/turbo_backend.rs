@@ -707,22 +707,22 @@ fn native_file_manager_matches_panes_shell_overlays_and_mouse_targets() -> io::R
                             6=>app.config.columns=[ColumnPreset::NameSizeModified;2],
                             7=>app.config.layouts=[if layout==PanelLayout::Brief {PanelLayout::Details} else {PanelLayout::Brief};2],
                             8=>{app.config.show_tags=false;app.config.highlight_files=false;}
-                            9=>{dn::quick_search::open(&mut app); let q=app.quick_search.as_mut().unwrap();q.query="missing界".into();q.no_match=true;}
-                            10=>{app.quick_search.as_mut().unwrap().query="item".into();app.quick_search.as_mut().unwrap().no_match=false;}
-                            11=>{app.quick_search=None;app.panels[1].set_filter("*.txt".into());}
+                            9=>{dn::quick_search::open(&mut app); let q=app.modals.quick_search_mut().unwrap();q.query="missing界".into();q.no_match=true;}
+                            10=>{app.modals.quick_search_mut().unwrap().query="item".into();app.modals.quick_search_mut().unwrap().no_match=false;}
+                            11=>{app.modals.set_quick_search(None);app.panels[1].set_filter("*.txt".into());}
                             12=>app.panels[1].set_filter(String::new()),
                             13=>app.panels[0].loading=true,
                             14=>{app.panels[0].loading=false;app.panels[0].entries.clear();}
                             15=>{app.panels[0].entries=dn::filesystem::scan(&fixture.0,false)?;app.panels[0].entries[1].size=None;app.panels[0].space.result=Some(Err("unavailable".into()));}
                             16=>app.command_line.insert("echo 界 e\u{301} 👩‍💻 and a rather long command to exercise scrolling")?,
-                            17=>app.menu=Some((0,0)),
+                            17=>app.modals.set_menu(Some((0,0))),
                             18=>{dn::menu::close(&mut app);app.prompt_operation(dn::operations::Kind::Mkdir,false);}
-                            19=>{app.prompt=None;dn::welcome::open(&mut app);}
-                            20=>{app.welcome.dialog=None;dn::dialog::keyboard_help(&mut app);}
-                            21=>{app.dialogs.clear();dn::quick_view::toggle(&mut app);}
+                            19=>{app.modals.set_prompt(None);dn::welcome::open(&mut app);}
+                            20=>{app.welcome.modals.set_welcome(None);dn::dialog::keyboard_help(&mut app);}
+                            21=>{app.clear_dialogs();dn::quick_view::toggle(&mut app);}
                             22=>{dn::quick_view::toggle(&mut app);dn::palette::open(&mut app);}
-                            23=>{app.color_dialog=None;dn::windowing::open(&mut app);}
-                            24=>{app.window_list=None;app.config.shortcuts=dn::shortcuts::Profile::Mac;dn::input::handle(&mut app,crossterm::event::KeyEvent::new(crossterm::event::KeyCode::Char('o'),crossterm::event::KeyModifiers::CONTROL));}
+                            23=>{app.modals.set_color_dialog(None);dn::windowing::open(&mut app);}
+                            24=>{app.modals.set_window_list(None);app.config.shortcuts=dn::shortcuts::Profile::Mac;dn::input::handle(&mut app,crossterm::event::KeyEvent::new(crossterm::event::KeyCode::Char('o'),crossterm::event::KeyModifiers::CONTROL));}
                             25=>{app.shortcuts.clear();app.screensaver.start(Instant::now());}
                             26=>{app.screensaver.activity(Instant::now());}
                             27=>{snapshot.backend_mut().resize(50,12);native.resize(Size::new(50,12))?;}
@@ -731,7 +731,7 @@ fn native_file_manager_matches_panes_shell_overlays_and_mouse_targets() -> io::R
                             30=>app.desktop.close_game(),
                             31=>app.open_settings(dn::settings::SettingsKind::Keyboard),
                             32 => {
-                                app.settings = None;
+                                app.modals.set_settings(None);
                                 dn::menu::open(&mut app, 1);
                                 let row = dn::menu::level_items(&app,0).iter().position(|item| matches!(item.action,dn::menu::Action::Submenu(_))).unwrap();
                                 dn::menu::activate(&mut app,0,row);
@@ -869,7 +869,7 @@ fn native_requested_surfaces_match_headless_frames() -> io::Result<()> {
                             viewer::from_bytes(contents.as_bytes().to_vec(), mode),
                         ));
                         if case == 16 {
-                            app.desktop.viewer_mut().unwrap().wrap = true;
+                            app.desktop.active_viewer_mut().unwrap().wrap = true;
                         }
                         if case == 18 {
                             viewer::action(&mut app, viewer::Action::Find);
@@ -878,7 +878,7 @@ fn native_requested_surfaces_match_headless_frames() -> io::Result<()> {
                     if (19..=31).contains(&case) {
                         editor::open(&mut app, true);
                         editor::paste(&mut app, &contents);
-                        let e = app.desktop.editor_mut().unwrap();
+                        let e = app.desktop.active_editor_mut().unwrap();
                         e.colors = true;
                         e.buffer.as_mut().unwrap().cursor = 0;
                         e.keep_visible();
@@ -907,7 +907,7 @@ fn native_requested_surfaces_match_headless_frames() -> io::Result<()> {
                     }
                     match case {
                         0=>{dn::menu::open(&mut app,1);let i=dn::menu::level_items(&app,0).iter().position(|i|matches!(i.action,dn::menu::Action::Submenu(_))).unwrap();dn::menu::activate(&mut app,0,i);}
-                        1=>{app.prompt_operation(dn::operations::Kind::Mkdir,false);let p=app.prompt.as_mut().unwrap();p.field="界 e\u{301} 👩‍💻".into();p.cursor=p.field.len();}
+                        1=>{app.prompt_operation(dn::operations::Kind::Mkdir,false);let p=app.modals.prompt_mut().unwrap();p.field="界 e\u{301} 👩‍💻".into();p.cursor=p.field.len();}
                         2=>app.prompt_operation(dn::operations::Kind::Delete,false),
                         3=>app.error("Cannot read 界 e\u{301} 👩‍💻: a long diagnostic with spaces and a missing configuration directory.\n\nTry another path."),
                         4=>dn::welcome::open(&mut app),
@@ -921,7 +921,7 @@ fn native_requested_surfaces_match_headless_frames() -> io::Result<()> {
                         35=>utilities::open(&mut app,Kind::Characters),
                         36=>utilities::open(&mut app,Kind::System),37=>utilities::open(&mut app,Kind::Memory),
                         38=>dn::palette::open(&mut app),
-                        39=>app.screensaver.setup=Some(Default::default()),
+                        39=>app.screensaver.modals.set_screensaver(Some(Default::default())),
                         40=>dn::command_line::history::open(&mut app),
                         41=>dn::user_menu::open(&mut app,dn::user_menu::Source::Auto),
                         42=>app.open_file_info(),
@@ -936,7 +936,7 @@ fn native_requested_surfaces_match_headless_frames() -> io::Result<()> {
                             ));
                             if case == 44 {
                                 app.desktop
-                                    .viewer_mut()
+                                    .active_viewer_mut()
                                     .unwrap()
                                     .find(
                                         &viewer::SearchMemory {
@@ -951,10 +951,10 @@ fn native_requested_surfaces_match_headless_frames() -> io::Result<()> {
                                 viewer::action(&mut app, viewer::Action::Find);
                                 let d = app
                                     .desktop
-                                    .viewer_mut()
+                                    .active_viewer_mut()
                                     .unwrap()
-                                    .search_dialog
-                                    .as_mut()
+                                    .modals
+                                    .viewer_search_mut()
                                     .unwrap();
                                 d.memory.query = "界 e\u{301} 👩‍💻".repeat(12);
                                 d.cursor = d.memory.query.len();
@@ -970,8 +970,12 @@ fn native_requested_surfaces_match_headless_frames() -> io::Result<()> {
                             editor::paste(&mut app, &source);
                             if case == 45 || case == 50 {
                                 editor::action(&mut app, EditorAction::Replace);
-                                if let Some(editor::Modal::Search(d)) =
-                                    &mut app.desktop.editor_mut().unwrap().modal
+                                if let Some(editor::Modal::Search(d)) = app
+                                    .desktop
+                                    .active_editor_mut()
+                                    .unwrap()
+                                    .modals
+                                    .editor_modal_mut()
                                 {
                                     d.query = "let".into();
                                     d.replacement = "const 界".into();

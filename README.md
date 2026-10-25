@@ -102,7 +102,13 @@ layout dependency. The application owns those presentation types and its bounded
 layout allocator. There is no backend selection feature: ordinary and
 `--no-default-features` builds both use Turbo Vision. Behavioral tests capture
 frames from the same native painter used by the runtime.
-See [migration status](docs/TURBO_VISION_MIGRATION.md) for validation details.
+Multiple editors and viewers can stay open through **Alt+0 / Windows…**, each
+with independent document state. Reopening a file activates its existing document;
+close and quit preserve unsaved-change guards across all editors. Windows remain
+full-screen and session-only.
+
+See [migration status](docs/TURBO_VISION_MIGRATION.md) and
+[document foundations](docs/DOCUMENT_FOUNDATIONS.md) for architecture and validation.
 
 | Platform | Current status |
 | --- | --- |

@@ -38,15 +38,15 @@ fn menu_width(
     (names + keys + 8).max(18) as u16
 }
 
-pub(super) fn draw_dropdowns(frame: &mut impl Frame, app: &mut App, bar: &[Rect], area: Rect) {
+pub(super) fn draw_dropdowns(frame: &mut impl Frame, app: &App, bar: &[Rect], area: Rect) {
     let language = app.config.language;
     let profile = app.config.palette;
     let dos = profile.styles();
-    let Some((root, _)) = app.menu else {
+    let Some((root, _)) = app.modals.menu() else {
         return;
     };
     let mut parent: Option<Rect> = None;
-    for depth in 0..=app.submenus.len() {
+    for depth in 0..=app.modals.submenus().len() {
         let entries = menu::level_items(app, depth);
         let width = menu_width(&entries, language, app.config.shortcuts).min(area.width);
         let height = (entries.len() as u16 + 2).min(area.height - 1);
@@ -73,7 +73,7 @@ pub(super) fn draw_dropdowns(frame: &mut impl Frame, app: &mut App, bar: &[Rect]
             Block::default().borders(Borders::ALL).style(dos(0x70)),
             rect,
         );
-        app.mouse.regions.push((rect, Target::MenuSurface));
+        frame.regions().push((rect, Target::MenuSurface));
         for (row, item) in entries
             .iter()
             .enumerate()
@@ -131,8 +131,8 @@ pub(super) fn draw_dropdowns(frame: &mut impl Frame, app: &mut App, bar: &[Rect]
                 normal,
             ));
             frame.render_widget(Paragraph::new(Line::from(spans)), row_rect);
-            app.mouse
-                .regions
+            frame
+                .regions()
                 .push((row_rect, Target::MenuItem(depth, row)));
         }
         parent = Some(rect);

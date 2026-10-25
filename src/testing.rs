@@ -60,6 +60,15 @@ pub struct Buffer {
     pub content: Vec<Cell>,
 }
 impl Buffer {
+    pub fn rendered(result: crate::ui::RenderedFrame) -> Self {
+        let mut frame = NativeFrame::new(
+            Rect::new(0, 0, result.scene.width, result.scene.height),
+            result.scene.profile,
+        );
+        frame.replace(result.scene);
+        Self::capture(frame).0
+    }
+
     pub fn content(&self) -> &[Cell] {
         &self.content
     }

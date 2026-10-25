@@ -7,10 +7,10 @@ use crate::{
     mouse::Target,
     navigation_tools::{Action, Modal},
 };
-pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
+pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
     let profile = app.config.palette;
     let dos = profile.styles();
-    let Some(modal) = &app.navigation_dialog else {
+    let Some(modal) = app.modals.navigation_dialog() else {
         return;
     };
     let height = if matches!(modal, Modal::Bookmarks { .. }) {
@@ -38,14 +38,8 @@ pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
         rect.height,
         app.config.language.text(title),
     );
-    app.mouse.regions.clear();
-    super::dialog_style::close_button(
-        frame,
-        profile,
-        rect,
-        &mut app.mouse.regions,
-        Target::Navigation(Action::Close),
-    );
+    frame.regions().clear();
+    super::dialog_style::close_button(frame, profile, rect, Target::Navigation(Action::Close));
     let x = rect.x + 2;
     let w = rect.width - 4;
     let mut buttons = Vec::new();
@@ -62,8 +56,8 @@ pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
                         .style(dos(if *slot == i { 0x30 } else { 0x70 })),
                     row,
                 );
-                app.mouse
-                    .regions
+                frame
+                    .regions()
                     .push((row, Target::Navigation(Action::Slot(i))));
             }
             frame.render_widget(
@@ -104,8 +98,8 @@ pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
                     .style(super::dialog_style::input_style(profile, *focus == 0)),
                 input,
             );
-            app.mouse
-                .regions
+            frame
+                .regions()
                 .push((input, Target::Navigation(Action::FilterField)));
             if *focus == 0 {
                 frame.set_cursor_position((x + (column - scroll) as u16, input.y));
@@ -126,6 +120,6 @@ pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
     }
     for (rect, label, action, focus) in buttons {
         super::dialog_style::button(frame, profile, rect, app.config.language.text(label), focus);
-        app.mouse.regions.push((rect, Target::Navigation(action)));
+        frame.regions().push((rect, Target::Navigation(action)));
     }
 }

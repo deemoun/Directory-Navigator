@@ -54,8 +54,8 @@ fn windows_settings_use_the_new_directory_without_importing_old_preferences() ->
             expected.with_file_name("associations.conf")
         );
         app.load_initial_config();
-        assert!(app.dialogs.is_empty());
-        assert!(app.welcome.dialog.is_some());
+        assert!(app.dialogs().is_empty());
+        assert!(app.welcome.modals.welcome().is_some());
         assert_eq!(app.config, Config::default());
         assert!(app.save_settings_on_exit());
         assert_eq!(Config::read(&expected)?, Config::default());
@@ -269,7 +269,7 @@ fn settings_apply_cancel_and_autosave_opt_out() -> io::Result<()> {
     let t = Temp::new()?;
     let mut app = t.app()?;
     app.open_settings(SettingsKind::System);
-    app.settings.as_mut().unwrap().draft.save_on_exit = false;
+    app.modals.settings_mut().unwrap().draft.save_on_exit = false;
     settings::key(&mut app, crossterm::event::KeyCode::Esc);
     assert!(app.config.save_on_exit);
     app.open_settings(SettingsKind::System);
@@ -295,7 +295,7 @@ fn exit_save_error_retains_session_and_cancels_quit() -> io::Result<()> {
     assert!(!app.quit);
     assert!(!app.config.show_clock);
     assert!(app
-        .dialogs
+        .dialogs()
         .last()
         .unwrap()
         .message

@@ -11,11 +11,12 @@ pub(crate) struct Glyph {
     pub(crate) style: Option<crate::presentation::style::Style>,
 }
 #[derive(Clone)]
-pub(crate) struct Scene {
+pub struct Scene {
     pub(crate) width: u16,
     pub(crate) height: u16,
     pub(crate) profile: PaletteProfile,
     pub(crate) cells: BTreeMap<(u16, u16), Glyph>,
+    pub(crate) regions: Vec<(crate::presentation::layout::Rect, crate::mouse::Target)>,
     pub(crate) cursor: Option<(u16, u16)>,
 }
 impl Glyph {

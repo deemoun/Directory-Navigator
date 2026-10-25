@@ -24,12 +24,16 @@ pub(super) const INPUT: u16 = 0xff00;
 pub enum Scope {
     Content,
     Layer(Focus),
+    Modal(crate::modals::ModalInfo),
     Screensaver,
 }
 impl Scope {
     pub fn for_app(app: &crate::app::App) -> Self {
         if app.screensaver.active {
             return Self::Screensaver;
+        }
+        if let Some(modal) = app.modal_top() {
+            return Self::Modal(modal);
         }
         match crate::focus::current(app) {
             Focus::Manager | Focus::Editor | Focus::Viewer | Focus::Game => Self::Content,

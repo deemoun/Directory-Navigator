@@ -1,7 +1,78 @@
 //! Explicit viewport preparation. Painting consumes these dimensions and geometry.
 use crate::presentation::layout::{Constraint, Layout, Rect};
 use crate::{app::App, panel_layout::PanelGeometry};
-pub struct Prepared {
+pub type Prepared = LayoutSnapshot;
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct FrameContext {
+    pub owner: crate::desktop::WindowId,
+    pub revision: u64,
+    pub modal: Option<crate::modals::ModalId>,
+}
+/// Changes that alter the meaning or placement of published hit regions.
+#[derive(PartialEq, Eq)]
+pub(crate) struct ViewportState {
+    panels: [(u64, usize, usize, bool, &'static str); 2],
+    editor: Option<(u64, usize, usize, usize)>,
+    viewer: Option<(usize, u16, bool, usize, bool)>,
+    game: Option<std::mem::Discriminant<crate::tetris::Screen>>,
+    windows: Option<(Vec<crate::desktop::WindowId>, usize)>,
+    menu: Option<(usize, usize)>,
+    submenus: Vec<(crate::menu::MenuId, usize)>,
+    modal_offsets: Vec<usize>,
+}
+fn viewport_state(app: &App) -> ViewportState {
+    ViewportState {
+        panels: std::array::from_fn(|i| {
+            let p = &app.panels[i];
+            (
+                p.revision,
+                p.offset,
+                p.entries.len(),
+                p.loading,
+                app.config.layouts[i].key(),
+            )
+        }),
+        editor: app.desktop.active_editor().map(|e| {
+            (
+                e.buffer.as_ref().map_or(0, |b| b.revision()),
+                e.scroll_row,
+                e.scroll_column,
+                e.buffer.as_ref().map_or(0, |b| b.lines.len()),
+            )
+        }),
+        viewer: app.desktop.active_viewer().map(|v| {
+            (
+                v.offset,
+                v.horizontal,
+                v.wrap,
+                v.rows.len(),
+                v.contents.is_some(),
+            )
+        }),
+        game: app
+            .desktop
+            .game()
+            .map(|g| std::mem::discriminant(&g.screen)),
+        windows: app.modals.window_list().map(|l| (l.ids.clone(), l.offset)),
+        menu: app.modals.menu(),
+        submenus: app.modals.submenus().to_vec(),
+        modal_offsets: vec![
+            app.modals.archive().map_or(0, |m| m.offset),
+            app.modals.directory_tree().map_or(0, |m| m.offset),
+            app.user_menu.modals.user_menu().map_or(0, |m| m.offset),
+            app.discovery.modals.discovery().map_or(0, |m| m.offset),
+            app.command_line
+                .modals
+                .command_history()
+                .map_or(0, |m| m.offset),
+        ],
+    }
+}
+pub struct LayoutSnapshot {
+    pub context: FrameContext,
+    pub bounds: Rect,
+    pub clip: Rect,
+    pub screen: crate::presentation::layout::Size,
     pub regions: [Rect; 4],
     pub panel_areas: [Rect; 2],
     pub panels: [PanelGeometry; 2],
@@ -14,7 +85,50 @@ pub fn editor_gutter(editor: &crate::editor::Editor) -> u16 {
         .map(|b| b.lines.len().to_string().len() as u16 + 2)
         .unwrap_or(3)
 }
-pub fn prepare(app: &mut App, area: Rect) -> Prepared {
+pub fn prepare(app: &mut App, area: Rect) -> LayoutSnapshot {
+    prepare_window(
+        app,
+        area,
+        Rect::new(0, 0, area.right(), area.bottom()),
+        std::time::Instant::now(),
+    )
+}
+pub fn prepare_window(
+    app: &mut App,
+    bounds: Rect,
+    screen: Rect,
+    now: std::time::Instant,
+) -> LayoutSnapshot {
+    app.sync_modals();
+    let clip = bounds.intersection(screen);
+    let owner = app.desktop.active().id;
+    let key = (owner, bounds, screen);
+    if app.layout_key != Some(key) {
+        app.layout_revision = app
+            .layout_revision
+            .checked_add(1)
+            .expect("layout revision exhausted");
+        app.layout_key = Some(key);
+        app.mouse.scrollbar_drag = None;
+    }
+    app.sync_modals();
+    let mut context = FrameContext {
+        owner,
+        revision: app.layout_revision,
+        modal: app.modal_top().map(|m| m.id),
+    };
+    let area = Rect::new(0, 0, bounds.width, bounds.height);
+    if let Some(list) = app.modals.window_list_mut() {
+        list.rows = (list.ids.len() + 6)
+            .max(12)
+            .min(usize::from(area.height.saturating_sub(2)))
+            .saturating_sub(6)
+            .max(1);
+        list.keep_visible();
+    }
+    app.desktop
+        .native()
+        .sync_panes(app.active, (bounds.width, bounds.height));
     if app.utilities.size != (area.width, area.height) {
         app.mouse.scrollbar_drag = None;
     }
@@ -39,10 +153,7 @@ pub fn prepare(app: &mut App, area: Rect) -> Prepared {
         q.layout(panel_areas[q.source ^ 1]);
     }
     if let Some(game) = app.desktop.game_mut() {
-        game.set_obscured(
-            area.width < 80 || area.height < 25,
-            std::time::Instant::now(),
-        );
+        game.set_obscured(area.width < 80 || area.height < 25, now);
     }
     if app.screensaver.active {
         app.screensaver.resize(area.width, area.height);
@@ -50,7 +161,7 @@ pub fn prepare(app: &mut App, area: Rect) -> Prepared {
     if area.width >= 80 && area.height >= 25 {
         match crate::focus::screen(app) {
             crate::focus::Screen::Editor => {
-                if let Some(e) = app.desktop.editor_mut() {
+                if let Some(e) = app.desktop.active_editor_mut() {
                     e.rows = usize::from(area.height - 4).max(1);
                     e.columns = usize::from(area.width.saturating_sub(editor_gutter(e))).max(1);
                     e.keep_visible();
@@ -58,7 +169,7 @@ pub fn prepare(app: &mut App, area: Rect) -> Prepared {
             }
             crate::focus::Screen::Viewer => {
                 app.page_rows = regions[1].height as usize;
-                if let Some(v) = app.desktop.viewer_mut() {
+                if let Some(v) = app.desktop.active_viewer_mut() {
                     v.layout(regions[1].width);
                 }
             }
@@ -74,11 +185,20 @@ pub fn prepare(app: &mut App, area: Rect) -> Prepared {
         && area.height >= 25
         && crate::focus::screen(app) == crate::focus::Screen::Manager
     {
-        if let Some(b) = &mut app.archive {
+        if let Some(preview) = app.modals.config_import_mut() {
+            let rows = usize::from(area.height.min(21).saturating_sub(5));
+            preview.offset = preview.offset.min(
+                preview
+                    .lines(app.config.language)
+                    .len()
+                    .saturating_sub(rows),
+            );
+        }
+        if let Some(b) = app.modals.archive_mut() {
             b.rows = usize::from(area.height.saturating_sub(4).min(30).saturating_sub(9)).max(1);
             b.keep_visible();
         }
-        if let Some(m) = &mut app.user_menu.modal {
+        if let Some(m) = app.user_menu.modals.user_menu_mut() {
             let height = if m.review.is_some() {
                 area.height.saturating_sub(4).min(26)
             } else {
@@ -89,7 +209,7 @@ pub fn prepare(app: &mut App, area: Rect) -> Prepared {
             m.rows = usize::from(height.saturating_sub(7)).max(1);
             m.keep_visible();
         }
-        if let Some(t) = &mut app.directory_tree {
+        if let Some(t) = app.modals.directory_tree_mut() {
             t.page_rows = usize::from(
                 crate::directory_tree::geometry(area)
                     .height
@@ -98,7 +218,7 @@ pub fn prepare(app: &mut App, area: Rect) -> Prepared {
             .max(1);
             t.keep_visible();
         }
-        if let Some(m) = &mut app.discovery.modal {
+        if let Some(m) = app.discovery.modals.discovery_mut() {
             m.rows = usize::from(area.height.saturating_sub(4).min(26).saturating_sub(11)).max(1);
             m.keep_visible();
         }
@@ -108,7 +228,7 @@ pub fn prepare(app: &mut App, area: Rect) -> Prepared {
             offset,
             rows,
             ..
-        }) = &mut app.file_tools.dialog
+        }) = app.file_tools.modals.file_tools_mut()
         {
             *rows = usize::from(area.height.saturating_sub(4).min(22) - 6);
             *cursor = (*cursor).min(paths.len().saturating_sub(1));
@@ -119,7 +239,7 @@ pub fn prepare(app: &mut App, area: Rect) -> Prepared {
                 *offset = *cursor + 1 - *rows;
             }
         }
-        if let Some(d) = &mut app.command_line.dialog {
+        if let Some(d) = app.command_line.modals.command_history_mut() {
             d.rows = crate::command_line::history::geometry(area).1;
             d.keep_visible();
         }
@@ -129,7 +249,7 @@ pub fn prepare(app: &mut App, area: Rect) -> Prepared {
         }
     }
     let message = if area.width >= 80 && area.height >= 25 {
-        app.dialogs.last().map(|d| {
+        app.last_dialog().map(|d| {
             message_layout(
                 area,
                 app.config.language.text(d.title),
@@ -140,9 +260,24 @@ pub fn prepare(app: &mut App, area: Rect) -> Prepared {
         None
     };
     if let Some(m) = &message {
-        app.message_offset = app.message_offset.min(m.maximum);
+        app.set_message_offset(app.message_offset().min(m.maximum));
     }
-    Prepared {
+    crate::command_line::prepare(app, regions[2]);
+    app.command_line.translate_input(bounds.x);
+    let state = viewport_state(app);
+    if app.layout_state.as_ref() != Some(&state) {
+        app.layout_revision = app
+            .layout_revision
+            .checked_add(1)
+            .expect("layout revision exhausted");
+        app.layout_state = Some(state);
+        context.revision = app.layout_revision;
+    }
+    LayoutSnapshot {
+        context,
+        bounds,
+        clip,
+        screen: crate::presentation::layout::Size::new(screen.right(), screen.bottom()),
         message,
         regions,
         panel_areas,
@@ -151,9 +286,8 @@ pub fn prepare(app: &mut App, area: Rect) -> Prepared {
 }
 /// Prepare after commands, even when no terminal draw is requested.
 pub fn update(app: &mut App) {
-    let (w, h) = app.utilities.size;
-    if w > 0 && h > 0 {
-        let _ = prepare(app, Rect::new(0, 0, w, h));
+    if let Some((_, bounds, screen)) = app.layout_key {
+        let _ = prepare_window(app, bounds, screen, std::time::Instant::now());
     }
 }
 
@@ -214,4 +348,51 @@ pub(crate) fn wrap(text: &str, width: u16) -> Vec<String> {
         result.push(row);
     }
     result
+}
+
+impl LayoutSnapshot {
+    pub fn to_screen(&self, rect: Rect) -> Rect {
+        Rect::new(
+            self.bounds.x.saturating_add(rect.x),
+            self.bounds.y.saturating_add(rect.y),
+            rect.width,
+            rect.height,
+        )
+        .intersection(self.clip)
+    }
+    pub(crate) fn transform(&self, scene: &mut crate::turbo::scene::Scene) {
+        scene.cells = std::mem::take(&mut scene.cells)
+            .into_iter()
+            .filter_map(|((x, y), mut glyph)| {
+                let x = x.saturating_add(self.bounds.x);
+                let y = y.saturating_add(self.bounds.y);
+                if !self.clip.contains((x, y).into()) {
+                    return None;
+                }
+                use unicode_width::UnicodeWidthStr;
+                if glyph.text.width() > usize::from(self.clip.right() - x)
+                    || (glyph.text.is_empty() && x == self.clip.x && self.clip.x > self.bounds.x)
+                {
+                    glyph.text = " ".into();
+                }
+                Some(((x, y), glyph))
+            })
+            .collect();
+        scene.regions = std::mem::take(&mut scene.regions)
+            .into_iter()
+            .filter_map(|(r, t)| {
+                let r = self.to_screen(r);
+                (!r.is_empty()).then_some((r, t))
+            })
+            .collect();
+        scene.cursor = scene.cursor.and_then(|(x, y)| {
+            let p = (
+                x.saturating_add(self.bounds.x),
+                y.saturating_add(self.bounds.y),
+            );
+            self.clip.contains(p.into()).then_some(p)
+        });
+        scene.width = self.screen.width;
+        scene.height = self.screen.height;
+    }
 }

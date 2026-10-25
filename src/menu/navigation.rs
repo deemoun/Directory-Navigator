@@ -3,20 +3,19 @@ use crate::app::App;
 use crossterm::event::KeyCode;
 
 pub fn close(app: &mut App) {
-    app.menu = None;
-    app.submenus.clear();
+    app.modals.set_menu(None);
 }
 pub fn open(app: &mut App, root: usize) {
     let root = root % super::LABELS.len();
     let entries = items(root);
-    app.menu = Some((
+    app.modals.set_menu(Some((
         root % super::LABELS.len(),
         entries
             .iter()
             .position(|item| item.selectable())
             .unwrap_or(0),
-    ));
-    app.submenus.clear();
+    )));
+    app.modals.submenus_mut().clear();
 }
 pub fn open_mnemonic(app: &mut App, character: char) -> bool {
     if let Some(index) = super::LABELS
@@ -30,12 +29,12 @@ pub fn open_mnemonic(app: &mut App, character: char) -> bool {
     }
 }
 fn select(app: &mut App, depth: usize, row: usize) {
-    app.submenus.truncate(depth);
+    app.modals.submenus_mut().truncate(depth);
     if depth == 0 {
-        if let Some((_, selected)) = &mut app.menu {
+        if let Some((_, selected)) = app.modals.menu_mut() {
             *selected = row;
         }
-    } else if let Some((_, selected)) = app.submenus.get_mut(depth - 1) {
+    } else if let Some((_, selected)) = app.modals.submenus_mut().get_mut(depth - 1) {
         *selected = row;
     }
 }
@@ -51,23 +50,23 @@ pub fn activate(app: &mut App, depth: usize, row: usize) {
                 .iter()
                 .position(|item| item.selectable())
                 .unwrap_or(0);
-            app.submenus.push((id, first));
+            app.modals.submenus_mut().push((id, first));
         }
         action => super::execute(app, action),
     }
 }
 pub fn key(app: &mut App, code: KeyCode) {
-    let Some((root, _)) = app.menu else {
+    let Some((root, _)) = app.modals.menu() else {
         return;
     };
-    let depth = app.submenus.len();
+    let depth = app.modals.submenus().len();
     let entries = level_items(app, depth);
     let row = selected_row(app, depth);
     match code {
         KeyCode::F(1) => super::execute(app, Action::Key(1)),
         KeyCode::F(9) => close(app),
         KeyCode::Esc | KeyCode::Left if depth > 0 => {
-            app.submenus.pop();
+            app.modals.submenus_mut().pop();
         }
         KeyCode::Esc => close(app),
         KeyCode::Left | KeyCode::BackTab => open(

@@ -16,8 +16,8 @@ pub struct Setup {
     pub cursor: usize,
 }
 pub struct State {
+    pub modals: crate::modals::ModalStack,
     pub active: bool,
-    pub setup: Option<Setup>,
     last_input: Instant,
     next_frame: Instant,
     stars: Vec<Star>,
@@ -36,8 +36,8 @@ impl Default for State {
     fn default() -> Self {
         let now = Instant::now();
         Self {
+            modals: Default::default(),
             active: false,
-            setup: None,
             last_input: now,
             next_frame: now,
             stars: Vec::new(),
@@ -177,23 +177,26 @@ pub fn poll(app: &mut App, now: Instant) -> bool {
         && !app.associations.busy()
         && app.associations.pending.is_none()
         && app.panels.iter().all(|p| !p.loading)
-        && app.desktop.editor().is_none_or(|e| !e.busy())
-        && app.desktop.viewer().is_none_or(|v| v.contents.is_some());
+        && app.desktop.active_editor().is_none_or(|e| !e.busy())
+        && app
+            .desktop
+            .active_viewer()
+            .is_none_or(|v| v.contents.is_some());
     app.screensaver.tick(now, app.config.saver_minutes, allowed)
 }
 pub fn open(app: &mut App) {
     crate::menu::close(app);
-    app.screensaver.setup = Some(Setup {
+    app.screensaver.modals.set_screensaver(Some(Setup {
         delay: app.config.saver_minutes,
         cursor: DELAYS
             .iter()
             .position(|v| *v == app.config.saver_minutes)
             .unwrap_or(4),
-    });
+    }));
 }
 pub fn command(app: &mut App, index: usize) {
     if index < DELAYS.len() {
-        if let Some(setup) = &mut app.screensaver.setup {
+        if let Some(setup) = app.screensaver.modals.screensaver_mut() {
             setup.delay = DELAYS[index];
             setup.cursor = index;
         }
@@ -201,15 +204,15 @@ pub fn command(app: &mut App, index: usize) {
         app.screensaver.start(Instant::now());
     } else {
         if index == ACCEPT {
-            if let Some(setup) = &app.screensaver.setup {
+            if let Some(setup) = app.screensaver.modals.screensaver() {
                 app.config.saver_minutes = setup.delay;
             }
         }
-        app.screensaver.setup = None;
+        app.screensaver.modals.set_screensaver(None);
     }
 }
 pub fn key(app: &mut App, code: KeyCode) {
-    let Some(setup) = &mut app.screensaver.setup else {
+    let Some(setup) = app.screensaver.modals.screensaver_mut() else {
         return;
     };
     match code {

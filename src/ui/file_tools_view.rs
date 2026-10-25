@@ -8,9 +8,9 @@ use crate::{
     mouse::Target,
 };
 
-pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
+pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
     let profile = app.config.palette;
-    let Some(modal) = &app.file_tools.dialog else {
+    let Some(modal) = app.file_tools.modals.file_tools() else {
         return;
     };
     let (title, height) = match modal {
@@ -34,15 +34,9 @@ pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
         rect.height,
         app.config.language.text(title),
     );
-    app.mouse.regions.clear();
+    frame.regions().clear();
     if !matches!(modal, ToolDialog::Busy) {
-        super::dialog_style::close_button(
-            frame,
-            profile,
-            rect,
-            &mut app.mouse.regions,
-            Target::Tool(ToolAction::Cancel),
-        );
+        super::dialog_style::close_button(frame, profile, rect, Target::Tool(ToolAction::Cancel));
     }
     let mut controls = Vec::new();
     let x = rect.x + 2;
@@ -275,7 +269,7 @@ pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
             ),
             _ => {}
         }
-        app.mouse.regions.push((row, Target::Tool(action)));
+        frame.regions().push((row, Target::Tool(action)));
     }
 }
 fn text(

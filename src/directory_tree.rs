@@ -139,6 +139,7 @@ pub enum Action {
     PageDown,
 }
 pub struct Tree {
+    pub(crate) requests: crate::requests::RequestScope,
     pub panel: usize,
     pub original: PathBuf,
     pub root: Option<PathBuf>,
@@ -157,6 +158,7 @@ pub struct Tree {
 impl Tree {
     pub fn new(panel: usize, path: PathBuf, hidden: bool) -> io::Result<Self> {
         let mut tree = Self {
+            requests: Default::default(),
             panel,
             original: path,
             root: None,
@@ -177,7 +179,7 @@ impl Tree {
     }
     fn locate(&mut self) -> io::Result<()> {
         let path = self.original.clone();
-        self.pending = Some(Pending::Locate(Task::spawn(
+        self.pending = Some(Pending::Locate(self.requests.spawn(
             "dn-tree-locate",
             move |cancel| {
                 cancel.check()?;
@@ -491,7 +493,7 @@ impl Tree {
                 let source = path.clone();
                 let hidden = self.hidden;
                 let reveal = self.reveal.clone();
-                match Task::spawn("dn-tree-branch", move |cancel| {
+                match self.requests.spawn("dn-tree-branch", move |cancel| {
                     scan(&source, hidden, &reveal, limit, &cancel)
                 }) {
                     Ok(task) => self.pending = Some(Pending::Branch(path, task)),
@@ -513,22 +515,22 @@ pub fn open(app: &mut App) {
         return;
     }
     crate::menu::close(app);
-    app.quick_search = None;
+    app.modals.set_quick_search(None);
     match Tree::new(
         app.active,
         app.panels[app.active].path.clone(),
         app.config.show_hidden,
     ) {
-        Ok(tree) => app.directory_tree = Some(tree),
+        Ok(tree) => app.modals.set_directory_tree(Some(tree)),
         Err(e) => app.error(e.to_string()),
     }
 }
 pub fn action(app: &mut App, command: Action) {
     if command == Action::Close {
-        app.directory_tree = None;
+        app.modals.set_directory_tree(None);
         return;
     }
-    let Some(tree) = &mut app.directory_tree else {
+    let Some(tree) = app.modals.directory_tree_mut() else {
         return;
     };
     match command {
@@ -538,7 +540,7 @@ pub fn action(app: &mut App, command: Action) {
             };
             let path = row.path.clone();
             let panel = tree.panel;
-            app.directory_tree = None;
+            app.modals.set_directory_tree(None);
             app.active = panel;
             app.panels[panel].go_to(path, app.config.show_hidden);
         }
@@ -574,7 +576,7 @@ pub fn action(app: &mut App, command: Action) {
     }
 }
 pub fn key(app: &mut App, key: KeyEvent) {
-    let Some(tree) = &mut app.directory_tree else {
+    let Some(tree) = app.modals.directory_tree_mut() else {
         return;
     };
     tree.last_click = None;
@@ -582,18 +584,18 @@ pub fn key(app: &mut App, key: KeyEvent) {
         match key.code {
             KeyCode::Char('r') => tree.refresh(),
             KeyCode::Char('h') => tree.toggle_hidden(),
-            KeyCode::F(4) => app.directory_tree = None,
+            KeyCode::F(4) => app.modals.set_directory_tree(None),
             _ => {}
         }
         return;
     }
     match key.code{
-        KeyCode::Esc=>app.directory_tree=None,KeyCode::Tab=>tree.focus = crate::control_focus::cycle(tree.focus, 5, false),KeyCode::BackTab=>tree.focus = crate::control_focus::cycle(tree.focus, 5, true),
+        KeyCode::Esc=>app.modals.set_directory_tree(None),KeyCode::Tab=>tree.focus = crate::control_focus::cycle(tree.focus, 5, false),KeyCode::BackTab=>tree.focus = crate::control_focus::cycle(tree.focus, 5, true),
         KeyCode::Up=>tree.step(-1),KeyCode::Down=>tree.step(1),KeyCode::PageUp=>tree.step(-(tree.page_rows as isize)),KeyCode::PageDown=>tree.step(tree.page_rows as isize),KeyCode::Home=>tree.step(isize::MIN),KeyCode::End=>tree.step(isize::MAX),
         KeyCode::Left|KeyCode::Backspace|KeyCode::Char('-')=>tree.left(),KeyCode::Right|KeyCode::Char('+')=>tree.right(),
         KeyCode::Char(' ') if tree.focus==0=>tree.toggle(),
         KeyCode::Enter|KeyCode::Char(' ')=>{let command=match tree.focus{2=>Action::Refresh,3=>Action::Hidden,4=>Action::Close,_=>Action::Open};action(app,command);},
-        KeyCode::F(1)=>app.dialogs.push(crate::dialog::Dialog{title:" Directory tree help ",message:"Up/Down and Page keys move through visible directories.\nRight/+ expands; Left/− collapses or selects the parent.\nSpace toggles a branch; Enter/double-click opens it.\nCtrl+R refreshes the selected branch; Ctrl+H shows hidden.\nLinks are leaves: Enter follows one explicitly.\nEsc/Ctrl+F4 closes without changing either panel.".into()}),_=>{}
+        KeyCode::F(1)=>app.push_dialog(crate::dialog::Dialog{title:" Directory tree help ",message:"Up/Down and Page keys move through visible directories.\nRight/+ expands; Left/− collapses or selects the parent.\nSpace toggles a branch; Enter/double-click opens it.\nCtrl+R refreshes the selected branch; Ctrl+H shows hidden.\nLinks are leaves: Enter follows one explicitly.\nEsc/Ctrl+F4 closes without changing either panel.".into()}),_=>{}
     }
 }
 pub fn mouse(app: &mut App, event: MouseEvent, target: Option<crate::mouse::Target>) {
@@ -604,7 +606,7 @@ pub fn mouse(app: &mut App, event: MouseEvent, target: Option<crate::mouse::Targ
             }
         }
         MouseEventKind::ScrollUp | MouseEventKind::ScrollDown => {
-            if let Some(tree) = &mut app.directory_tree {
+            if let Some(tree) = app.modals.directory_tree_mut() {
                 tree.step(if event.kind == MouseEventKind::ScrollUp {
                     -3
                 } else {

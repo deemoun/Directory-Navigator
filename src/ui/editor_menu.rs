@@ -10,13 +10,16 @@ use crate::{
     menu::plain,
     mouse::Target,
 };
-pub(super) fn draw_bar(frame: &mut impl Frame, app: &mut App, area: Rect) {
+pub(super) fn draw_bar(frame: &mut impl Frame, app: &App, area: Rect) {
     let language = app.config.language;
     let profile = app.config.palette;
     let dos = profile.styles();
     frame.render_widget(Block::default().style(dos(0x70)), area);
     let header = super::clock::header(app, area);
-    let current = app.desktop.editor().and_then(|e| e.menu);
+    let current = app
+        .desktop
+        .active_editor()
+        .and_then(|e| e.modals.editor_menu());
     let mut x = area.x;
     for (root, label) in menus::LABELS.iter().enumerate() {
         let label = language.text(label);
@@ -48,22 +51,22 @@ pub(super) fn draw_bar(frame: &mut impl Frame, app: &mut App, area: Rect) {
         spans.push(Span::styled("  ", normal));
         frame.render_widget(Paragraph::new(Line::from(spans)).style(normal), rect);
         if menus::enabled(root) {
-            app.mouse
-                .regions
+            frame
+                .regions()
                 .push((rect, Target::Editor(A::MenuRoot(root))));
         }
         x += rect.width;
     }
     super::clock::draw(frame, app, area);
 }
-pub(super) fn draw_dropdown(frame: &mut impl Frame, app: &mut App, area: Rect) {
+pub(super) fn draw_dropdown(frame: &mut impl Frame, app: &App, area: Rect) {
     let language = app.config.language;
     let profile = app.config.palette;
     let dos = profile.styles();
-    let Some(editor) = app.desktop.editor() else {
+    let Some(editor) = app.desktop.active_editor() else {
         return;
     };
-    let Some((root, selected)) = editor.menu else {
+    let Some((root, selected)) = editor.modals.editor_menu() else {
         return;
     };
     let entries = menus::items(root);
@@ -99,19 +102,15 @@ pub(super) fn draw_dropdown(frame: &mut impl Frame, app: &mut App, area: Rect) {
         })
         .collect::<Vec<_>>();
     // Consume clicks outside the menu; the underlying document never receives them.
-    app.mouse.regions.clear();
-    app.mouse
-        .regions
-        .push((area, Target::Editor(A::CancelMenu)));
+    frame.regions().clear();
+    frame.regions().push((area, Target::Editor(A::CancelMenu)));
     draw_bar(frame, app, Rect::new(area.x, area.y, area.width, 1));
     frame.render_widget(Clear, rect);
     frame.render_widget(
         Block::default().borders(Borders::ALL).style(dos(0x70)),
         rect,
     );
-    app.mouse
-        .regions
-        .push((rect, Target::Editor(A::MenuSurface)));
+    frame.regions().push((rect, Target::Editor(A::MenuSurface)));
     for (row, item) in entries.iter().enumerate() {
         let row_rect = Rect::new(rect.x + 1, rect.y + 1 + row as u16, width - 2, 1);
         if item.label.is_empty() {
@@ -163,8 +162,8 @@ pub(super) fn draw_dropdown(frame: &mut impl Frame, app: &mut App, area: Rect) {
         ));
         frame.render_widget(Paragraph::new(Line::from(spans)).style(normal), row_rect);
         if item.action.is_some() {
-            app.mouse
-                .regions
+            frame
+                .regions()
                 .push((row_rect, Target::Editor(A::MenuRow(row))));
         }
     }

@@ -220,7 +220,7 @@ fn app_defers_passive_replies_under_dialogs_then_repaints() -> io::Result<()> {
     app.poll();
     assert_eq!(app.panels[0].revision, revision);
     assert!(app.panels[0].background_refreshing());
-    app.dialogs.clear();
+    app.clear_dialogs();
     while app.panels[0].background_refreshing() {
         if app.panels[0].revision != revision {
             break;

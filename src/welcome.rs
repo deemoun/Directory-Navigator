@@ -4,7 +4,7 @@ use crossterm::event::KeyEvent;
 
 #[derive(Default)]
 pub struct State {
-    pub dialog: Option<Welcome>,
+    pub modals: crate::modals::ModalStack,
     pub(crate) startup_checked: bool,
 }
 #[derive(Default)]
@@ -25,17 +25,17 @@ pub const BUTTONS: [(&str, Action); 3] = [
 
 pub fn open(app: &mut App) {
     crate::menu::close(app);
-    app.quick_search = None;
+    app.modals.set_quick_search(None);
     app.shortcuts.clear();
     app.mouse.reset_click();
-    app.welcome.dialog = Some(Welcome::default());
+    app.welcome.modals.set_welcome(Some(Welcome::default()));
 }
 pub fn action(app: &mut App, action: Action) {
-    if app.welcome.dialog.is_none() {
+    if app.welcome.modals.welcome().is_none() {
         return;
     }
     match action {
-        Action::Start => app.welcome.dialog = None,
+        Action::Start => app.welcome.modals.set_welcome(None),
         Action::Keyboard => app.open_settings(SettingsKind::Keyboard),
         Action::Help => crate::dialog::keyboard_help(app),
     }

@@ -111,12 +111,12 @@ fn manager_numbers_use_original_confirmations_and_preserve_command_draft() -> io
     input::paste(&mut app, "draft command");
     let cursor = app.command_line.cursor;
     prefix(&mut app, '5');
-    assert!(app.prompt.is_some() && app.job.is_none());
+    assert!(app.modals.prompt().is_some() && app.job.is_none());
     assert_eq!(app.command_line.text, "draft command");
     assert_eq!(app.command_line.cursor, cursor);
     key(&mut app, K::Esc);
     prefix(&mut app, '8');
-    assert!(app.prompt.is_some() && app.job.is_none());
+    assert!(app.modals.prompt().is_some() && app.job.is_none());
     assert!(temp.0.join("file.txt").exists());
     key(&mut app, K::Esc);
     prefix(&mut app, '7');
@@ -170,7 +170,7 @@ fn prefix_cancel_unknown_paste_mouse_and_focus_changes_never_insert_commands() -
     app.prompt_goto();
     key(&mut app, K::Char('0'));
     assert!(!app.quit && !shortcuts::armed(&app));
-    assert_eq!(app.prompt.as_ref().unwrap().field, "0");
+    assert_eq!(app.modals.prompt().unwrap().field, "0");
     Ok(())
 }
 #[test]
@@ -178,12 +178,12 @@ fn classic_keys_still_work_and_classic_profile_has_no_prefix() -> io::Result<()>
     let temp = Temp::new()?;
     let mut app = temp.app()?;
     key(&mut app, K::F(5));
-    assert!(app.prompt.is_some());
+    assert!(app.modals.prompt().is_some());
     key(&mut app, K::Esc);
     app.config.shortcuts = Profile::ClassicDn;
     input::handle(&mut app, KeyEvent::new(K::Char('o'), M::CONTROL));
     key(&mut app, K::Char('5'));
-    assert!(!shortcuts::armed(&app) && app.prompt.is_none());
+    assert!(!shortcuts::armed(&app) & app.modals.prompt().is_none());
     assert_eq!(app.command_line.text, "5");
     Ok(())
 }
@@ -193,10 +193,10 @@ fn settings_apply_cancel_mouse_and_desktop_persistence() -> io::Result<()> {
     let mut app = temp.app()?;
     let revision = app.panels[0].revision;
     prefix(&mut app, 'k');
-    assert_eq!(app.settings.as_ref().unwrap().kind, SettingsKind::Keyboard);
+    assert_eq!(app.modals.settings().unwrap().kind, SettingsKind::Keyboard);
     key(&mut app, K::Right);
     assert_eq!(
-        app.settings.as_ref().unwrap().draft.shortcuts,
+        app.modals.settings().unwrap().draft.shortcuts,
         Profile::Auto
     );
     key(&mut app, K::Esc);
@@ -220,7 +220,7 @@ fn settings_apply_cancel_mouse_and_desktop_persistence() -> io::Result<()> {
         },
     );
     assert_eq!(
-        app.settings.as_ref().unwrap().draft.shortcuts,
+        app.modals.settings().unwrap().draft.shortcuts,
         Profile::Auto
     );
     settings::accept(&mut app);
@@ -239,23 +239,23 @@ fn manager_letters_reach_search_history_bookmarks_and_keyboard_settings() -> io:
     let temp = Temp::new()?;
     let mut app = temp.app()?;
     prefix(&mut app, 's');
-    assert!(app.quick_search.is_some());
+    assert!(app.modals.quick_search().is_some());
     key(&mut app, K::Esc);
     prefix(&mut app, 'h');
-    assert!(app.command_line.dialog.is_some());
+    assert!(app.command_line.modals.command_history().is_some());
     key(&mut app, K::Esc);
     prefix(&mut app, 'b');
-    assert!(app.navigation_dialog.is_some());
+    assert!(app.modals.navigation_dialog().is_some());
     key(&mut app, K::Esc);
     prefix(&mut app, 'z');
-    assert_eq!(app.submenus.last().unwrap().0, menu::MenuId::Sort);
+    assert_eq!(app.modals.submenus().last().unwrap().0, menu::MenuId::Sort);
     key(&mut app, K::Char('e'));
     assert_eq!(app.panels[0].sort, dn::panel::SortMode::Extension);
     prefix(&mut app, 'k');
-    assert!(app.settings.is_some());
+    assert!(app.modals.settings().is_some());
     key(&mut app, K::Esc);
     prefix(&mut app, 'i');
-    assert!(app.file_info.is_some());
+    assert!(app.modals.file_info().is_some());
     key(&mut app, K::Esc);
     Ok(())
 }
@@ -265,10 +265,12 @@ fn editor_save_find_replace_close_and_quit_keep_unsaved_guards() -> io::Result<(
     let mut app = temp.app()?;
     prefix(&mut app, '4');
     prefix(&mut app, '2'); // Busy editor events must not insert the digit.
-    wait(&mut app, |a| a.desktop.editor().is_some_and(|e| !e.busy()));
+    wait(&mut app, |a| {
+        a.desktop.active_editor().is_some_and(|e| !e.busy())
+    });
     assert!(app
         .desktop
-        .editor()
+        .active_editor()
         .unwrap()
         .buffer
         .as_ref()
@@ -278,32 +280,40 @@ fn editor_save_find_replace_close_and_quit_keep_unsaved_guards() -> io::Result<(
     input::paste(&mut app, "new text");
     prefix(&mut app, 'w');
     assert!(matches!(
-        app.desktop.editor().unwrap().modal,
+        app.desktop.active_editor().unwrap().modals.editor_modal(),
         Some(dn::editor::Modal::ConfirmClose)
     ));
     key(&mut app, K::Esc);
     assert!(!app.quit);
     prefix(&mut app, 'x');
     assert!(matches!(
-        app.desktop.editor().unwrap().modal,
+        app.desktop.active_editor().unwrap().modals.editor_modal(),
         Some(dn::editor::Modal::ConfirmClose)
     ));
     key(&mut app, K::Esc);
     assert!(!app.quit);
     prefix(&mut app, '2');
-    wait(&mut app, |a| a.desktop.editor().is_some_and(|e| !e.busy()));
+    wait(&mut app, |a| {
+        a.desktop.active_editor().is_some_and(|e| !e.busy())
+    });
     assert!(fs::read_to_string(temp.0.join("file.txt"))?.starts_with("new text"));
     prefix(&mut app, 'r');
     assert!(matches!(
-        app.desktop.editor().unwrap().modal,
+        app.desktop.active_editor().unwrap().modals.editor_modal(),
         Some(dn::editor::Modal::Search(_))
     ));
     key(&mut app, K::Esc);
     prefix(&mut app, '0');
-    assert!(app.desktop.editor().unwrap().menu.is_some());
+    assert!(app
+        .desktop
+        .active_editor()
+        .unwrap()
+        .modals
+        .editor_menu()
+        .is_some());
     key(&mut app, K::Esc);
     prefix(&mut app, 'w');
-    assert!(app.desktop.editor().is_none());
+    assert!(app.desktop.active_editor().is_none());
     Ok(())
 }
 #[test]
@@ -311,12 +321,14 @@ fn editor_word_navigation_uses_plain_arrows_after_prefix() -> io::Result<()> {
     let temp = Temp::new()?;
     let mut app = temp.app()?;
     prefix(&mut app, '4');
-    wait(&mut app, |a| a.desktop.editor().is_some_and(|e| !e.busy()));
+    wait(&mut app, |a| {
+        a.desktop.active_editor().is_some_and(|e| !e.busy())
+    });
     input::handle(&mut app, KeyEvent::new(K::Char('o'), M::CONTROL));
     key(&mut app, K::Right);
     let position = app
         .desktop
-        .editor()
+        .active_editor()
         .unwrap()
         .buffer
         .as_ref()
@@ -327,7 +339,7 @@ fn editor_word_navigation_uses_plain_arrows_after_prefix() -> io::Result<()> {
     input::handle(&mut app, KeyEvent::new(K::Right, M::SHIFT));
     assert!(!app
         .desktop
-        .editor()
+        .active_editor()
         .unwrap()
         .buffer
         .as_ref()
@@ -342,15 +354,23 @@ fn viewer_wrap_search_and_close_use_the_same_prefix() -> io::Result<()> {
     let mut app = temp.app()?;
     prefix(&mut app, '3');
     wait(&mut app, |a| {
-        a.desktop.viewer().is_some_and(|v| v.contents.is_some())
+        a.desktop
+            .active_viewer()
+            .is_some_and(|v| v.contents.is_some())
     });
     prefix(&mut app, '2');
-    assert!(app.desktop.viewer().unwrap().wrap);
+    assert!(app.desktop.active_viewer().unwrap().wrap);
     prefix(&mut app, '7');
-    assert!(app.desktop.viewer().unwrap().search_dialog.is_some());
+    assert!(app
+        .desktop
+        .active_viewer()
+        .unwrap()
+        .modals
+        .viewer_search()
+        .is_some());
     key(&mut app, K::Esc);
     prefix(&mut app, 'w');
-    assert!(app.desktop.viewer().is_none());
+    assert!(app.desktop.active_viewer().is_none());
     Ok(())
 }
 #[test]
@@ -399,14 +419,16 @@ fn user_menu_prefix_preserves_command_review_and_definition_editing() -> io::Res
     wait(&mut app, |a| !dn::user_menu::pending(&a.user_menu));
     assert!(draw(&mut app, 80, 25)?.contains("^O4"));
     prefix(&mut app, '8');
-    assert!(app.user_menu.modal.as_ref().unwrap().review.is_some());
+    assert!(app.user_menu.modals.user_menu().unwrap().review.is_some());
     assert!(app.user_menu.pending.is_none());
     prefix(&mut app, 'w');
-    assert!(app.user_menu.modal.as_ref().unwrap().review.is_none());
+    assert!(app.user_menu.modals.user_menu().unwrap().review.is_none());
     prefix(&mut app, '4');
     wait(&mut app, |a| {
-        a.desktop.editor().is_some_and(|e| e.buffer.is_some())
+        a.desktop
+            .active_editor()
+            .is_some_and(|e| e.buffer.is_some())
     });
-    assert_eq!(app.desktop.editor().unwrap().path, Some(path));
+    assert_eq!(app.desktop.active_editor().unwrap().path, Some(path));
     Ok(())
 }

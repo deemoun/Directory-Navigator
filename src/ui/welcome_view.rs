@@ -2,8 +2,8 @@ use crate::painting::{Frame, Paragraph};
 use crate::presentation::{layout::Rect, text::Line};
 use crate::{app::App, focus::Screen, mouse::Target, shortcuts, welcome};
 
-pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
-    let Some(welcome) = &app.welcome.dialog else {
+pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
+    let Some(welcome) = app.welcome.modals.welcome() else {
         return;
     };
     let profile = app.config.palette;
@@ -16,12 +16,11 @@ pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
         20,
         language.text(" Welcome to Directory Navigator "),
     );
-    app.mouse.regions.clear();
+    frame.regions().clear();
     super::dialog_style::close_button(
         frame,
         profile,
         rect,
-        &mut app.mouse.regions,
         Target::Welcome(welcome::Action::Start),
     );
     let x = rect.x + 3;
@@ -152,6 +151,6 @@ pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
             &crate::menu::plain(language.text(label)),
             welcome.focus == i,
         );
-        app.mouse.regions.push((button, Target::Welcome(action)));
+        frame.regions().push((button, Target::Welcome(action)));
     }
 }

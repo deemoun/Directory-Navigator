@@ -93,17 +93,15 @@ pub(super) fn close_button(
     frame: &mut impl Frame,
     profile: PaletteProfile,
     rect: Rect,
-    regions: &mut Vec<(Rect, crate::mouse::Target)>,
     target: crate::mouse::Target,
 ) {
-    close_control(frame, profile, rect, regions, target, 0x7a);
+    close_control(frame, profile, rect, target, 0x7a);
 }
 
 fn close_control(
     frame: &mut impl Frame,
     profile: PaletteProfile,
     rect: Rect,
-    regions: &mut Vec<(Rect, crate::mouse::Target)>,
     target: crate::mouse::Target,
     color: u8,
 ) {
@@ -119,7 +117,7 @@ fn close_control(
         ])),
         close,
     );
-    regions.push((close, target));
+    frame.regions().push((close, target));
 }
 
 /// Document windows use DN's cyan close marker; modal dialogs use green.
@@ -128,7 +126,6 @@ pub(super) fn document_header(
     profile: PaletteProfile,
     rect: Rect,
     title: &str,
-    regions: &mut Vec<(Rect, crate::mouse::Target)>,
     target: crate::mouse::Target,
 ) {
     let title = crate::formatting::tail(title, rect.width.saturating_sub(14));
@@ -143,5 +140,5 @@ pub(super) fn document_header(
             .style(profile.dos(0x70)),
         rect,
     );
-    close_control(frame, profile, rect, regions, target, 0x7b);
+    close_control(frame, profile, rect, target, 0x7b);
 }

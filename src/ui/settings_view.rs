@@ -6,10 +6,10 @@ use crate::presentation::{
 };
 use crate::{app::App, mouse::Target, settings::SettingsKind};
 
-pub(super) fn draw_settings(frame: &mut impl Frame, app: &mut App, area: Rect) {
+pub(super) fn draw_settings(frame: &mut impl Frame, app: &App, area: Rect) {
     let profile = app.config.palette;
     let dos = profile.styles();
-    let Some(settings) = &app.settings else {
+    let Some(settings) = app.modals.settings() else {
         return;
     };
     if settings.kind == SettingsKind::Keyboard {
@@ -41,14 +41,8 @@ pub(super) fn draw_settings(frame: &mut impl Frame, app: &mut App, area: Rect) {
         height,
         app.config.language.text(settings.title()),
     );
-    app.mouse.regions.clear();
-    super::dialog_style::close_button(
-        frame,
-        profile,
-        rect,
-        &mut app.mouse.regions,
-        Target::CancelSettings,
-    );
+    frame.regions().clear();
+    super::dialog_style::close_button(frame, profile, rect, Target::CancelSettings);
     let two_columns = settings.kind == SettingsKind::FileManager;
     frame.render_widget(
         Paragraph::new(
@@ -101,7 +95,7 @@ pub(super) fn draw_settings(frame: &mut impl Frame, app: &mut App, area: Rect) {
             hot,
         ));
         frame.render_widget(Paragraph::new(Line::from(spans)), row);
-        app.mouse.regions.push((row, Target::Setting(index)));
+        frame.regions().push((row, Target::Setting(index)));
     }
     if settings.kind == SettingsKind::Highlight {
         for (index, (color, label)) in [
@@ -153,12 +147,12 @@ pub(super) fn draw_settings(frame: &mut impl Frame, app: &mut App, area: Rect) {
             app.config.language.text(label),
             settings.cursor == count + index,
         );
-        app.mouse.regions.push((button, *target));
+        frame.regions().push((button, *target));
     }
 }
 
-fn draw_regional(frame: &mut impl Frame, app: &mut App, area: Rect) {
-    let Some(settings) = &app.settings else {
+fn draw_regional(frame: &mut impl Frame, app: &App, area: Rect) {
+    let Some(settings) = app.modals.settings() else {
         return;
     };
     let profile = app.config.palette;
@@ -171,14 +165,8 @@ fn draw_regional(frame: &mut impl Frame, app: &mut App, area: Rect) {
         17,
         language.text(settings.title()),
     );
-    app.mouse.regions.clear();
-    super::dialog_style::close_button(
-        frame,
-        profile,
-        rect,
-        &mut app.mouse.regions,
-        Target::CancelSettings,
-    );
+    frame.regions().clear();
+    super::dialog_style::close_button(frame, profile, rect, Target::CancelSettings);
     let format = settings.draft.datetime;
     let labels = [
         "Language",
@@ -213,7 +201,7 @@ fn draw_regional(frame: &mut impl Frame, app: &mut App, area: Rect) {
             Paragraph::new(text).style(profile.dos(if settings.cursor == i { 0x30 } else { 0x70 })),
             row,
         );
-        app.mouse.regions.push((row, Target::RegionalChoice(i)));
+        frame.regions().push((row, Target::RegionalChoice(i)));
     }
     let now = chrono::Local::now();
     frame.render_widget(
@@ -249,6 +237,6 @@ fn draw_regional(frame: &mut impl Frame, app: &mut App, area: Rect) {
             app.config.language.text(language.text(label)),
             settings.cursor == 5 + i,
         );
-        app.mouse.regions.push((button, target));
+        frame.regions().push((button, target));
     }
 }

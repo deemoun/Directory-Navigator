@@ -18,6 +18,7 @@ enum Probe {
     Information(Vec<String>),
 }
 pub struct QuickView {
+    pub(crate) requests: crate::requests::RequestScope,
     pub source: usize,
     pub viewer: Option<Viewer>,
     pub lines: Vec<String>,
@@ -29,6 +30,7 @@ pub struct QuickView {
 impl QuickView {
     pub fn new(source: usize) -> Self {
         Self {
+            requests: crate::requests::RequestScope::new(crate::requests::Owner::Panel(source)),
             source,
             viewer: None,
             lines: vec!["No entry".into()],
@@ -78,30 +80,35 @@ impl QuickView {
             self.due = None;
             if let Some(signature) = &self.signature {
                 let path = signature.path.clone();
-                match Task::spawn("dn-preview-info", move |cancel| -> Result<Probe, String> {
-                    cancel.check().map_err(|e| e.to_string())?;
-                    let metadata = fs::symlink_metadata(&path).map_err(|e| e.to_string())?;
-                    if metadata.is_file() {
-                        return Ok(Probe::File);
-                    }
-                    let mut lines = vec![crate::filesystem::display_name(&path.to_string_lossy())];
-                    if metadata.is_symlink() {
-                        lines.push("Symbolic link — target not previewed".into());
-                        lines.push(format!(
-                            "Target: {}",
-                            fs::read_link(&path)
-                                .map(|p| crate::filesystem::display_name(&p.to_string_lossy()))
-                                .unwrap_or_else(|e| format!("Unavailable: {e}"))
-                        ));
-                    } else if metadata.is_dir() {
-                        lines.push("Directory".into());
-                        lines
-                            .push("Use Calculate directory sizes for a recursive snapshot.".into());
-                    } else {
-                        lines.push("Special file — content not previewed".into());
-                    }
-                    Ok(Probe::Information(lines))
-                }) {
+                match self.requests.spawn(
+                    "dn-preview-info",
+                    move |cancel| -> Result<Probe, String> {
+                        cancel.check().map_err(|e| e.to_string())?;
+                        let metadata = fs::symlink_metadata(&path).map_err(|e| e.to_string())?;
+                        if metadata.is_file() {
+                            return Ok(Probe::File);
+                        }
+                        let mut lines =
+                            vec![crate::filesystem::display_name(&path.to_string_lossy())];
+                        if metadata.is_symlink() {
+                            lines.push("Symbolic link — target not previewed".into());
+                            lines.push(format!(
+                                "Target: {}",
+                                fs::read_link(&path)
+                                    .map(|p| crate::filesystem::display_name(&p.to_string_lossy()))
+                                    .unwrap_or_else(|e| format!("Unavailable: {e}"))
+                            ));
+                        } else if metadata.is_dir() {
+                            lines.push("Directory".into());
+                            lines.push(
+                                "Use Calculate directory sizes for a recursive snapshot.".into(),
+                            );
+                        } else {
+                            lines.push("Special file — content not previewed".into());
+                        }
+                        Ok(Probe::Information(lines))
+                    },
+                ) {
                     Ok(task) => self.probe = Some(task),
                     Err(e) => self.lines = vec![format!("Preview unavailable: {e}")],
                 }
@@ -123,7 +130,12 @@ impl QuickView {
                 Ok(Probe::File) => {
                     if let Some(signature) = &self.signature {
                         match Viewer::open_preview(signature.path.clone()) {
-                            Ok(viewer) => self.viewer = Some(viewer),
+                            Ok(viewer) => {
+                                viewer
+                                    .requests
+                                    .bind(crate::requests::Owner::Panel(self.source));
+                                self.viewer = Some(viewer);
+                            }
                             Err(e) => self.lines = vec![format!("Preview unavailable: {e}")],
                         }
                     }
@@ -143,7 +155,7 @@ impl QuickView {
 }
 pub fn toggle(app: &mut App) {
     crate::menu::close(app);
-    app.quick_search = None;
+    app.modals.set_quick_search(None);
     app.quick_view = if app.quick_view.is_some() {
         None
     } else {

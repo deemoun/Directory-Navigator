@@ -7,9 +7,10 @@
   codec features via zip/tar/flate2; TOML parser for grouped preferences.
 - Session Desktop owns editor/viewer/game content and stable WindowId values;
   default Turbo Vision build reads selection from the native Desktop/Window
-  registry. Native foreground modal scope captures input before controller
-  dispatch. File panels remain the permanent base; the comparison build retains
-  the old active-screen model.
+  registry. Multiple full-screen editors/viewers use ID-targeted access; the
+  permanent manager remains the base. Owned modal IDs gate native dispatch.
+  Request scopes reject retired owners and replaced generations. Viewport
+  preparation produces immutable layout snapshots; painting is read-only.
 - Modular app/input/panels, operations, dialogs, configuration, editor, viewer
   and utilities. Shared focus policy and explicit viewport preparation.
 - Cancellable panel scanners; bounded short-task pool; dedicated file-operation
@@ -21,6 +22,18 @@
 Current Turbo Vision status is authoritative in docs/TURBO_VISION_MIGRATION.md;
 older increment entries below also record earlier migration stages.
 
+- Multi-document foundations: distinct non-reusable WindowId values, resolved-path
+  reuse and pending-open coalescing, per-document buffers/history/search/scroll,
+  Save As destination reservations, targeted close and MRU quit review. Discarded
+  buffers survive cancellation/settings failure. Modal entries own their payloads,
+  parent and return focus; native receipts carry modal/owner identity. Shared
+  request scopes gate all worker results. Immutable render results carry the
+  scene, cursor and translated/clipped hit regions; stale frames are rejected.
+  macOS ARM64: 423 tests pass (one existing opt-in native Trash check ignored),
+  formatting, all-target Clippy, release and no-default-features checks pass.
+  Native terminal checks cover three editors/two viewers, independent undo,
+  discard/quit cancellation, Save As, resize, shell handoff and restoration.
+  See docs/DOCUMENT_FOUNDATIONS.md for invariants and validation.
 - Turbo Vision is now the sole renderer and a mandatory dependency. Ratatui,
   its text/style/layout aliases, legacy renderer/transport, feature gates and
   duplicate pane/Tetris painters are removed. The lockfile and resolved dependency
@@ -494,9 +507,10 @@ older increment entries below also record earlier migration stages.
   Linux/Windows remain untested locally.
 
 ## Limitations and next steps
-- Desktop is an ownership foundation only: multiple documents, window switching,
-  geometry, Cascade/Tile and desktop-window persistence remain future stages.
-  Next: multiple full-screen documents and a window list before overlapping layouts.
+- Multiple full-screen documents and the window list are implemented. Overlapping
+  or movable windows, Cascade/Tile, shared-buffer views and workspace persistence
+  remain deferred. Command-routing redesign, panel-source abstraction and
+  large-file storage are outside this foundation.
 - Ancestor/entry snapshots detect replacements between operation stages, but
   path-based recursion still has check-to-use races; full descriptor-relative
   traversal remains future hardening. Nesting beyond 512 in discovery is

@@ -3,6 +3,12 @@ use crate::{app::App, operations::Kind, panel::SortMode};
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 
 pub fn handle(app: &mut App, key: KeyEvent) {
+    if app.exit_pending && app.quit_review.is_some() {
+        if key.code == KeyCode::Esc {
+            app.abort_quit();
+        }
+        return;
+    }
     handle_key(app, key);
     crate::layout::update(app);
 }
@@ -121,9 +127,13 @@ fn handle_key(app: &mut App, key: KeyEvent) {
         crate::columns::key(app, key.code);
         return;
     }
-    if let Some(info) = app.file_info.as_mut().filter(|_| focus == Focus::FileInfo) {
+    if let Some(info) = app
+        .modals
+        .file_info_mut()
+        .filter(|_| focus == Focus::FileInfo)
+    {
         match key.code {
-            KeyCode::Esc | KeyCode::Enter => app.file_info = None,
+            KeyCode::Esc | KeyCode::Enter => app.modals.set_file_info(None),
             KeyCode::Up => info.step(-1),
             KeyCode::Down => info.step(1),
             KeyCode::PageUp => info.step(-10),
@@ -293,17 +303,17 @@ fn paste_text(app: &mut App, text: &str) {
         Focus::CommandHistory => crate::command_line::history::paste(app, text),
         Focus::Discovery => crate::discovery::paste(app, text),
         Focus::QuickSearch => {
-            if let Some(s) = &mut app.quick_search {
+            if let Some(s) = app.modals.quick_search_mut() {
                 s.paste(&mut app.panels[s.panel], text);
             }
         }
         Focus::Pattern => {
-            if let Some(p) = &mut app.pattern {
+            if let Some(p) = app.modals.pattern_mut() {
                 p.paste(text);
             }
         }
         Focus::Prompt => {
-            if let Some(p) = &mut app.prompt {
+            if let Some(p) = app.modals.prompt_mut() {
                 p.paste(text);
             }
         }

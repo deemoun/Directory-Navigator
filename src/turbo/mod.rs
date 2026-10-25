@@ -5,7 +5,8 @@ pub mod forms;
 pub(crate) mod manager;
 mod mouse;
 pub(crate) mod panes;
-pub(crate) mod scene;
+#[doc(hidden)]
+pub mod scene;
 pub(crate) mod tetris;
 use crate::presentation::layout::{Position, Size};
 use codec::Codec;

@@ -192,8 +192,8 @@ fn appearance_configuration_defaults_invalid_roundtrip_and_interface_clock() -> 
     let mut app = t.app()?;
     app.open_settings(SettingsKind::Interface);
     let index = app
-        .settings
-        .as_ref()
+        .modals
+        .settings()
         .unwrap()
         .rows()
         .iter()
@@ -316,8 +316,8 @@ fn palette_preview_mouse_keyboard_cancel_apply_and_separate_highlight() -> io::R
     let t = Temp::new()?;
     let mut app = t.app()?;
     menu::execute(&mut app, menu::Action::Colors);
-    assert!(app.color_dialog.is_some());
-    assert!(app.settings.is_none());
+    assert!(app.modals.color_dialog().is_some());
+    assert!(app.modals.settings().is_none());
     let entries = app.panels[0].entries.len();
     draw(&mut app, 80, 25)?;
     click(&mut app, Target::ColorChoice(PaletteProfile::Terminal));
@@ -330,14 +330,14 @@ fn palette_preview_mouse_keyboard_cancel_apply_and_separate_highlight() -> io::R
     palette::open(&mut app);
     key(&mut app, KeyCode::Char('t'), KeyModifiers::NONE);
     key(&mut app, KeyCode::Enter, KeyModifiers::NONE);
-    assert!(app.color_dialog.is_none());
+    assert!(app.modals.color_dialog().is_none());
     assert_eq!(app.config.palette, PaletteProfile::Terminal);
     palette::open(&mut app);
     key(&mut app, KeyCode::Char('c'), KeyModifiers::NONE);
     key(&mut app, KeyCode::Esc, KeyModifiers::NONE);
     assert_eq!(app.config.palette, PaletteProfile::Terminal);
     app.open_settings(SettingsKind::Highlight);
-    assert_eq!(app.settings.as_ref().unwrap().rows().len(), 1);
+    assert_eq!(app.modals.settings().unwrap().rows().len(), 1);
     Ok(())
 }
 #[test]
@@ -348,7 +348,9 @@ fn clock_editor_viewer_dialog_and_game_precedence() -> io::Result<()> {
     let mut app = t.app()?;
     app.show_viewer(Viewer::open(path)?);
     wait(&mut app, |a| {
-        a.desktop.viewer().is_some_and(|v| v.contents.is_some())
+        a.desktop
+            .active_viewer()
+            .is_some_and(|v| v.contents.is_some())
     });
     let text = app.clock.text.clone();
     assert!(draw(&mut app, 80, 25)?.contains(&text));
@@ -504,12 +506,16 @@ fn document_headers_use_cyan_close_icons_with_reserved_titles_and_clock() -> io:
             if editor {
                 app.desktop.close_viewer();
                 dn::editor::open_path(&mut app, path.clone());
-                wait(&mut app, |a| a.desktop.editor().is_some_and(|e| !e.busy()));
+                wait(&mut app, |a| {
+                    a.desktop.active_editor().is_some_and(|e| !e.busy())
+                });
             } else {
                 app.desktop.close_editor();
                 app.show_viewer(Viewer::open(path.clone())?);
                 wait(&mut app, |a| {
-                    a.desktop.viewer().is_some_and(|v| v.contents.is_some())
+                    a.desktop
+                        .active_viewer()
+                        .is_some_and(|v| v.contents.is_some())
                 });
             }
             for (w, h) in [(80, 25), (132, 40), (80, 25)] {
@@ -578,18 +584,24 @@ fn document_close_icons_respect_modal_precedence_and_unsaved_guard() -> io::Resu
     let mut app = temp.app()?;
     app.show_viewer(Viewer::open(path.clone())?);
     wait(&mut app, |a| {
-        a.desktop.viewer().is_some_and(|v| v.contents.is_some())
+        a.desktop
+            .active_viewer()
+            .is_some_and(|v| v.contents.is_some())
     });
     draw(&mut app, 80, 25)?;
     click(&mut app, Target::CloseViewer);
-    assert!(app.desktop.viewer().is_none());
+    assert!(app.desktop.active_viewer().is_none());
     dn::editor::open_path(&mut app, path.clone());
-    wait(&mut app, |a| a.desktop.editor().is_some_and(|e| !e.busy()));
+    wait(&mut app, |a| {
+        a.desktop.active_editor().is_some_and(|e| !e.busy())
+    });
     draw(&mut app, 80, 25)?;
     dn::editor::paste(&mut app, "unsaved ");
     click(&mut app, Target::Editor(dn::editor::EditorAction::Close));
     assert!(matches!(
-        app.desktop.editor().and_then(|e| e.modal.as_ref()),
+        app.desktop
+            .active_editor()
+            .and_then(|e| e.modals.editor_modal()),
         Some(dn::editor::Modal::ConfirmClose)
     ));
     draw(&mut app, 80, 25)?;
@@ -601,13 +613,13 @@ fn document_close_icons_respect_modal_precedence_and_unsaved_guard() -> io::Resu
     click(&mut app, Target::Editor(dn::editor::EditorAction::Cancel));
     assert!(app
         .desktop
-        .editor()
-        .is_some_and(|e| e.dirty() && e.modal.is_none()));
+        .active_editor()
+        .is_some_and(|e| e.dirty() & e.modals.editor_modal().is_none()));
     draw(&mut app, 80, 25)?;
     click(&mut app, Target::Editor(dn::editor::EditorAction::Close));
     draw(&mut app, 80, 25)?;
     click(&mut app, Target::Editor(dn::editor::EditorAction::Discard));
-    assert!(app.desktop.editor().is_none());
+    assert!(app.desktop.active_editor().is_none());
     assert_eq!(fs::read_to_string(path)?, "original file");
     Ok(())
 }

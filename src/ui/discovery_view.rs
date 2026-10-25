@@ -7,10 +7,10 @@ use crate::{
     formatting::tail,
     mouse::Target,
 };
-pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
+pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
     let profile = app.config.palette;
     let dos = profile.styles();
-    let Some(m) = &mut app.discovery.modal else {
+    let Some(m) = app.discovery.modals.discovery() else {
         return;
     };
     let form = m.kind == Kind::FindForm;
@@ -37,14 +37,8 @@ pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
         height,
         app.config.language.text(title),
     );
-    app.mouse.regions.clear();
-    super::dialog_style::close_button(
-        frame,
-        profile,
-        rect,
-        &mut app.mouse.regions,
-        Target::Discovery(Action::Close),
-    );
+    frame.regions().clear();
+    super::dialog_style::close_button(frame, profile, rect, Target::Discovery(Action::Close));
     let x = rect.x + 2;
     let w = rect.width - 4;
     frame.render_widget(
@@ -66,10 +60,10 @@ pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
                 .style(super::dialog_style::input_style(profile, m.focus == 0)),
             input,
         );
-        app.mouse
-            .regions
+        frame
+            .regions()
             .push((input, Target::Discovery(Action::Field)));
-        if m.focus == 0 && app.dialogs.is_empty() {
+        if m.focus == 0 && app.dialogs().is_empty() {
             frame.set_cursor_position((input.x + (column - scroll) as u16, input.y));
         }
         for (i, label, on) in [
@@ -83,8 +77,8 @@ pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
                     .style(dos(if m.focus == i { 0x30 } else { 0x70 })),
                 row,
             );
-            app.mouse
-                .regions
+            frame
+                .regions()
                 .push((row, Target::Discovery(Action::Toggle(i))));
         }
         for (i, label, command) in [(3, "Find", Action::Start), (4, "Cancel", Action::Close)] {
@@ -96,7 +90,7 @@ pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
                 app.config.language.text(label),
                 m.focus == i,
             );
-            app.mouse.regions.push((button, Target::Discovery(command)));
+            frame.regions().push((button, Target::Discovery(command)));
         }
     } else {
         for row in 0..m.rows {
@@ -125,8 +119,8 @@ pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
                     Paragraph::new(text).style(dos(if index == m.cursor { 0x30 } else { 0x70 })),
                     r,
                 );
-                app.mouse
-                    .regions
+                frame
+                    .regions()
                     .push((r, Target::Discovery(Action::Row(index))));
             }
         }
@@ -192,7 +186,7 @@ pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
                     app.config.language.text(label),
                     m.focus == index,
                 );
-                app.mouse.regions.push((r, Target::Discovery(*command)));
+                frame.regions().push((r, Target::Discovery(*command)));
             } else {
                 frame.render_widget(Paragraph::new(*label).style(dos(0x78)), r);
             }

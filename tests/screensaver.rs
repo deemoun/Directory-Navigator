@@ -136,9 +136,15 @@ fn setup_preview_cancel_apply_mouse_and_menu() -> io::Result<()> {
         assert!(setup.contains("30 minutes"));
         assert!(setup.contains("60 minutes"));
         click(&mut app, Target::Screensaver(6));
-        assert_eq!(app.screensaver.setup.as_ref().map(|s| s.delay), Some(60));
+        assert_eq!(
+            app.screensaver.modals.screensaver().map(|s| s.delay),
+            Some(60)
+        );
         click(&mut app, Target::Screensaver(3));
-        assert_eq!(app.screensaver.setup.as_ref().map(|s| s.delay), Some(5));
+        assert_eq!(
+            app.screensaver.modals.screensaver().map(|s| s.delay),
+            Some(5)
+        );
         click(&mut app, Target::Screensaver(screensaver::PREVIEW));
         let sky = draw(&mut app, w, h)?;
         assert!(!sky.contains("Screen savers"));
@@ -177,7 +183,9 @@ fn wake_events_do_not_edit_exit_or_activate_mouse_targets() -> io::Result<()> {
     let temp = Temp::new()?;
     let mut app = temp.app()?;
     dn::editor::open(&mut app, true);
-    wait(&mut app, |a| a.desktop.editor().is_some_and(|e| !e.busy()));
+    wait(&mut app, |a| {
+        a.desktop.active_editor().is_some_and(|e| !e.busy())
+    });
     draw(&mut app, 80, 25)?;
     dn::editor::paste(&mut app, "unsaved text");
     let idle = Instant::now();
@@ -187,7 +195,7 @@ fn wake_events_do_not_edit_exit_or_activate_mouse_targets() -> io::Result<()> {
     key(&mut app, KeyCode::Esc, KeyModifiers::NONE);
     assert!(app
         .desktop
-        .editor()
+        .active_editor()
         .and_then(|e| e.buffer.as_ref())
         .is_some_and(|b| b.dirty() && b.text == "unsaved text"));
     for event in [
@@ -228,8 +236,11 @@ fn wake_events_do_not_edit_exit_or_activate_mouse_targets() -> io::Result<()> {
     app.screensaver.start(Instant::now());
     key(&mut app, KeyCode::Char('x'), KeyModifiers::ALT);
     assert!(!app.quit);
-    assert!(app.dialogs.is_empty());
-    assert!(app.desktop.editor().is_some_and(|e| e.modal.is_none()));
+    assert!(app.dialogs().is_empty());
+    assert!(app
+        .desktop
+        .active_editor()
+        .is_some_and(|e| e.modals.editor_modal().is_none()));
     Ok(())
 }
 #[test]
@@ -247,7 +258,7 @@ fn idle_respects_modals_jobs_games_and_clock_ticks() -> io::Result<()> {
     screensaver::open(&mut app);
     assert!(!screensaver::poll(&mut app, now + Duration::from_secs(120)));
     assert!(!app.screensaver.active);
-    app.screensaver.setup = None;
+    app.screensaver.modals.set_screensaver(None);
     assert!(!screensaver::poll(&mut app, now + Duration::from_secs(179)));
     assert!(screensaver::poll(&mut app, now + Duration::from_secs(180)));
     app.screensaver.activity(now);

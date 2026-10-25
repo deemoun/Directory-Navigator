@@ -78,7 +78,10 @@ fn run() -> io::Result<()> {
             if let Event::Mouse(mouse) = &event {
                 session.mouse_event(mouse.kind);
             }
-            if app.desktop.native().dispatch().is_none() {
+            if app.desktop.native().dispatch().is_none_or(|receipt| {
+                receipt.window != app.desktop.active()
+                    || receipt.scope != dn::turbo::desktop::Scope::for_app(&app)
+            }) {
                 continue;
             }
             match event {

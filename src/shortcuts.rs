@@ -52,10 +52,12 @@ impl Profile {
 #[derive(Default)]
 pub struct State {
     armed: Option<Focus>,
+    owner: Option<crate::desktop::WindowId>,
 }
 impl State {
     pub fn clear(&mut self) {
         self.armed = None;
+        self.owner = None;
     }
 }
 fn eligible(app: &App) -> bool {
@@ -73,6 +75,7 @@ fn eligible(app: &App) -> bool {
 pub fn armed(app: &App) -> bool {
     app.config.shortcuts.is_mac()
         && eligible(app)
+        && app.shortcuts.owner == Some(app.desktop.active().id)
         && app.shortcuts.armed == Some(focus::current(app))
 }
 pub fn key(app: &mut App, key: KeyEvent) -> Option<KeyEvent> {
@@ -92,6 +95,7 @@ pub fn key(app: &mut App, key: KeyEvent) -> Option<KeyEvent> {
     }
     if key.code == K::Char('o') && key.modifiers == M::CONTROL {
         if key.kind != KeyEventKind::Repeat {
+            app.shortcuts.owner = Some(app.desktop.active().id);
             app.shortcuts.armed = if was_armed {
                 None
             } else {
@@ -135,7 +139,7 @@ pub fn key(app: &mut App, key: KeyEvent) -> Option<KeyEvent> {
         )
     {
         crate::menu::close(app);
-        app.quick_search = None;
+        app.modals.set_quick_search(None);
         let brief = app.config.layouts[app.active] == crate::panel_layout::PanelLayout::Brief;
         let panel = &mut app.panels[app.active];
         let capacity = panel.viewport_rows * if brief { 3 } else { 1 };

@@ -238,7 +238,10 @@ fn calculator_mouse_keyboard_paste_copy_reopen_and_editor_clipboard() -> io::Res
     let mut app = t.app()?;
     draw(&mut app, 80, 25)?;
     key(&mut app, KeyCode::Char('k'), KeyModifiers::CONTROL);
-    assert_eq!(app.utilities.dialog, Some(Kind::Calculator));
+    assert_eq!(
+        app.utilities.modals.utility_dialog(),
+        Some(Kind::Calculator)
+    );
     app.utilities.paste("(0x20+1)*2");
     key(&mut app, KeyCode::Enter, KeyModifiers::NONE);
     assert_eq!(app.utilities.calculator.result, Some(Value::Integer(66)));
@@ -264,7 +267,13 @@ fn calculator_mouse_keyboard_paste_copy_reopen_and_editor_clipboard() -> io::Res
     dn::editor::open(&mut app, true);
     key(&mut app, KeyCode::Char('v'), KeyModifiers::CONTROL);
     assert_eq!(
-        app.desktop.editor().unwrap().buffer.as_ref().unwrap().text,
+        app.desktop
+            .active_editor()
+            .unwrap()
+            .buffer
+            .as_ref()
+            .unwrap()
+            .text,
         "0x42"
     );
     Ok(())
@@ -399,7 +408,7 @@ fn native_information_refresh_close_and_stale_replies() -> io::Result<()> {
     thread::sleep(Duration::from_millis(10));
     app.poll();
     assert!(app.utilities.information.is_none());
-    assert!(app.utilities.dialog.is_none());
+    assert!(app.utilities.modals.utility_dialog().is_none());
     Ok(())
 }
 #[test]
@@ -464,13 +473,13 @@ fn utility_menus_modal_precedence_editor_keys_and_small_terminal() -> io::Result
     utilities::open(&mut app, Kind::Calculator);
     app.error("top dialog");
     key(&mut app, KeyCode::Esc, KeyModifiers::NONE);
-    assert!(app.utilities.dialog.is_some());
+    assert!(app.utilities.modals.utility_dialog().is_some());
     key(&mut app, KeyCode::Esc, KeyModifiers::NONE);
-    assert!(app.utilities.dialog.is_none());
+    assert!(app.utilities.modals.utility_dialog().is_none());
     dn::editor::open(&mut app, true);
     key(&mut app, KeyCode::Char('b'), KeyModifiers::CONTROL);
-    assert!(app.utilities.dialog.is_none());
-    assert!(app.desktop.editor().is_some());
+    assert!(app.utilities.modals.utility_dialog().is_none());
+    assert!(app.desktop.active_editor().is_some());
     Ok(())
 }
 
@@ -517,7 +526,10 @@ fn calculator_history_dropdown_recalls_without_evaluation_and_returns_to_draft()
     assert!(app.utilities.calculator.expression.is_empty());
     key(&mut app, KeyCode::Esc, KeyModifiers::NONE);
     assert!(!app.utilities.calculator.history_open);
-    assert_eq!(app.utilities.dialog, Some(Kind::Calculator));
+    assert_eq!(
+        app.utilities.modals.utility_dialog(),
+        Some(Kind::Calculator)
+    );
     for expression in ["1+2", "sqrt(81)"] {
         let calc = &mut app.utilities.calculator;
         calc.expression = expression.into();
@@ -642,7 +654,10 @@ fn calculator_classic_layout_results_help_mouse_focus_and_resize() -> io::Result
             assert_eq!(focus::current(&app), Focus::Message);
             key(&mut app, KeyCode::Esc, KeyModifiers::NONE);
             draw(&mut app, 60, 15)?;
-            assert_eq!(app.utilities.dialog, Some(Kind::Calculator));
+            assert_eq!(
+                app.utilities.modals.utility_dialog(),
+                Some(Kind::Calculator)
+            );
             draw(&mut app, 80, 25)?;
             key(&mut app, KeyCode::Char('e'), KeyModifiers::ALT);
             assert_eq!(

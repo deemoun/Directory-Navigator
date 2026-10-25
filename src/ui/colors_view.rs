@@ -1,8 +1,8 @@
 use crate::painting::{Frame, Paragraph};
 use crate::presentation::layout::Rect;
 use crate::{app::App, mouse::Target, palette::PaletteProfile};
-pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
-    let Some(dialog) = &app.color_dialog else {
+pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
+    let Some(dialog) = app.modals.color_dialog() else {
         return;
     };
     let cursor = dialog.cursor;
@@ -22,14 +22,8 @@ pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
         rect.height,
         app.config.language.text(" Colors "),
     );
-    app.mouse.regions.clear();
-    super::dialog_style::close_button(
-        frame,
-        profile,
-        rect,
-        &mut app.mouse.regions,
-        Target::CancelColors,
-    );
+    frame.regions().clear();
+    super::dialog_style::close_button(frame, profile, rect, Target::CancelColors);
     for (i, label, value) in [
         (
             0,
@@ -52,7 +46,7 @@ pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
             .style(dos(if cursor == i { 0x30 } else { 0x70 })),
             row,
         );
-        app.mouse.regions.push((row, Target::ColorChoice(value)));
+        frame.regions().push((row, Target::ColorChoice(value)));
     }
     frame.render_widget(
         Paragraph::new(app.config.language.text("Preview")).style(dos(0x70)),
@@ -104,6 +98,6 @@ pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
             app.config.language.text(label),
             selected,
         );
-        app.mouse.regions.push((row, target));
+        frame.regions().push((row, target));
     }
 }

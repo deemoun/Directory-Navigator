@@ -1,8 +1,8 @@
 use crate::painting::{Frame, Paragraph};
 use crate::presentation::layout::Rect;
 use crate::{app::App, mouse::Target};
-pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
-    let Some(preview) = &mut app.config_import else {
+pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
+    let Some(preview) = app.modals.config_import() else {
         return;
     };
     let profile = app.config.palette;
@@ -17,10 +17,10 @@ pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
     );
     let rows = usize::from(rect.height.saturating_sub(5));
     let lines = preview.lines(lang);
-    preview.offset = preview.offset.min(lines.len().saturating_sub(rows));
+    let offset = preview.offset.min(lines.len().saturating_sub(rows));
     let body = lines
         .iter()
-        .skip(preview.offset)
+        .skip(offset)
         .take(rows)
         .map(|line| crate::filesystem::display_name(line))
         .collect::<Vec<_>>()
@@ -63,17 +63,11 @@ pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
         if index == 0 && !enabled {
             continue;
         }
-        app.mouse.regions.push((button, target));
+        frame.regions().push((button, target));
     }
     // Remove every background target while retaining only this modal's buttons.
-    app.mouse
-        .regions
+    frame
+        .regions()
         .retain(|(_, target)| matches!(target, Target::ApplyImport | Target::CancelImport));
-    super::dialog_style::close_button(
-        frame,
-        profile,
-        rect,
-        &mut app.mouse.regions,
-        Target::CancelImport,
-    );
+    super::dialog_style::close_button(frame, profile, rect, Target::CancelImport);
 }

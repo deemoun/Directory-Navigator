@@ -57,23 +57,23 @@ impl ColumnDialog {
 
 pub fn choose(app: &mut App, panel: usize, preset: ColumnPreset) {
     if panel < 2 {
-        if let Some(dialog) = &mut app.columns_dialog {
+        if let Some(dialog) = app.modals.columns_dialog_mut() {
             dialog.cursor = panel;
             app.config.columns[panel] = preset;
         }
     }
 }
 pub fn cancel(app: &mut App) {
-    if let Some(dialog) = app.columns_dialog.take() {
+    if let Some(dialog) = app.modals.take_columns_dialog() {
         app.config.columns = dialog.original;
     }
 }
 pub fn accept(app: &mut App) {
-    app.columns_dialog = None;
+    app.modals.set_columns_dialog(None);
     app.notice = "Columns applied · Saved on exit when enabled; Save desktop saves now".into();
 }
 pub fn key(app: &mut App, code: KeyCode) {
-    let Some(dialog) = &mut app.columns_dialog else {
+    let Some(dialog) = app.modals.columns_dialog_mut() else {
         return;
     };
     match code {

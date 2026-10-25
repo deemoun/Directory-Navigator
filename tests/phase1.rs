@@ -148,9 +148,9 @@ fn input_and_rendering_across_terminal_sizes() -> io::Result<()> {
         }
     }
     input::handle(&mut app, KeyEvent::new(KeyCode::F(1), KeyModifiers::NONE));
-    assert_eq!(app.dialogs.len(), 1);
+    assert_eq!(app.dialogs().len(), 1);
     input::handle(&mut app, KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
-    assert!(app.dialogs.is_empty());
+    assert!(app.dialogs().is_empty());
     input::handle(&mut app, KeyEvent::new(KeyCode::F(10), KeyModifiers::NONE));
     assert!(app.quit);
     Ok(())
@@ -223,7 +223,7 @@ fn mouse_menus_function_bar_and_modal_clicks() -> io::Result<()> {
     for width in [80, 120] {
         render(&mut app, width, 25)?;
         mouse_at(&mut app, Target::Function(1), click);
-        assert_eq!(app.dialogs.len(), 1);
+        assert_eq!(app.dialogs().len(), 1);
         render(&mut app, width, 25)?;
         assert!(app
             .mouse
@@ -241,31 +241,31 @@ fn mouse_menus_function_bar_and_modal_clicks() -> io::Result<()> {
             },
         );
         assert!(!app.quit);
-        assert_eq!(app.dialogs.len(), 1);
+        assert_eq!(app.dialogs().len(), 1);
         mouse_at(&mut app, Target::CloseDialog, click);
-        assert!(app.dialogs.is_empty());
+        assert!(app.dialogs().is_empty());
         render(&mut app, width, 25)?;
         mouse_at(&mut app, Target::Menu(4), click);
         render(&mut app, width, 25)?;
         let previous_active = app.active;
         menu_action(&mut app, Action::SwapPanels);
         assert_eq!(app.active, previous_active ^ 1);
-        assert!(app.menu.is_none());
+        assert!(app.modals.menu().is_none());
     }
     render(&mut app, 80, 25)?;
     mouse_at(&mut app, Target::Menu(1), click);
     render(&mut app, 80, 25)?;
     dn::menu::execute(&mut app, Action::Disabled);
-    assert_eq!(app.menu, Some((1, 0)));
+    assert_eq!(app.modals.menu(), Some((1, 0)));
     input::handle(&mut app, KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
     render(&mut app, 80, 25)?;
     mouse_at(&mut app, Target::Function(9), click);
-    assert_eq!(app.menu, Some((1, 0)));
+    assert_eq!(app.modals.menu(), Some((1, 0)));
     input::handle(&mut app, KeyEvent::new(KeyCode::Right, KeyModifiers::NONE));
-    assert_eq!(app.menu, Some((1, 0)));
-    assert_eq!(app.submenus.len(), 1);
+    assert_eq!(app.modals.menu(), Some((1, 0)));
+    assert_eq!(app.modals.submenus().len(), 1);
     input::handle(&mut app, KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
-    assert!(app.submenus.is_empty());
+    assert!(app.modals.submenus().is_empty());
     input::handle(&mut app, KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
     render(&mut app, 40, 10)?;
     assert!(app.mouse.regions.is_empty());
@@ -353,7 +353,7 @@ fn selection_sorting_and_confirmed_background_operations() -> io::Result<()> {
     loaded(panel);
     assert_eq!(panel.selected.len(), 1);
     app.prompt_operation(Kind::Delete, false);
-    assert!(app.prompt.is_some());
+    assert!(app.modals.prompt().is_some());
     assert!(app.job.is_none());
     input::handle(&mut app, KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
     assert!(temp.0.join("a").exists());
@@ -368,7 +368,7 @@ fn selection_sorting_and_confirmed_background_operations() -> io::Result<()> {
         assert!(Instant::now() < deadline);
         thread::sleep(Duration::from_millis(1));
     }
-    assert!(app.dialogs.is_empty());
+    assert!(app.dialogs().is_empty());
     assert_eq!(fs::read(temp.0.join("out/a"))?, b"a");
     assert!(app.panels[0].selected.is_empty());
     app.panels[0].cursor = app.panels[0]
@@ -377,7 +377,7 @@ fn selection_sorting_and_confirmed_background_operations() -> io::Result<()> {
         .position(|e| e.name == "a")
         .unwrap();
     app.prompt_operation(Kind::Move, true);
-    app.prompt.as_mut().unwrap().paste("renamed");
+    app.modals.prompt_mut().unwrap().paste("renamed");
     app.submit_prompt();
     let deadline = Instant::now() + Duration::from_secs(5);
     while app.job.is_some() || app.panels.iter().any(|p| p.loading) {
@@ -385,7 +385,7 @@ fn selection_sorting_and_confirmed_background_operations() -> io::Result<()> {
         assert!(Instant::now() < deadline);
         thread::sleep(Duration::from_millis(1));
     }
-    assert!(app.dialogs.is_empty());
+    assert!(app.dialogs().is_empty());
     assert_eq!(app.panels[0].entries[app.panels[0].cursor].name, "renamed");
     assert_eq!(fs::read(temp.0.join("renamed"))?, b"a");
     app.panels[0].cursor = 0;
@@ -425,14 +425,18 @@ fn viewer_text_hex_bounds_and_mouse_close() -> io::Result<()> {
         .unwrap();
     input::handle(&mut app, KeyEvent::new(KeyCode::F(3), KeyModifiers::NONE));
     let deadline = Instant::now() + Duration::from_secs(5);
-    while app.desktop.viewer().is_some_and(|v| v.contents.is_none()) {
+    while app
+        .desktop
+        .active_viewer()
+        .is_some_and(|v| v.contents.is_none())
+    {
         app.poll();
         assert!(Instant::now() < deadline);
         thread::sleep(Duration::from_millis(1));
     }
     render(&mut app, 80, 25)?;
     input::handle(&mut app, KeyEvent::new(KeyCode::End, KeyModifiers::NONE));
-    assert!(app.desktop.viewer().unwrap().offset > 0);
+    assert!(app.desktop.active_viewer().unwrap().offset > 0);
     // An asynchronous error must be visible and modal even over the viewer.
     app.error("test error");
     render(&mut app, 80, 25)?;
@@ -450,7 +454,7 @@ fn viewer_text_hex_bounds_and_mouse_close() -> io::Result<()> {
         dn::mouse::Target::CloseViewer,
         crossterm::event::MouseEventKind::Down(crossterm::event::MouseButton::Left),
     );
-    assert!(app.desktop.viewer().is_none());
+    assert!(app.desktop.active_viewer().is_none());
     Ok(())
 }
 
@@ -509,7 +513,7 @@ fn unicode_prompt_editing_paste_and_delete_confirmation() -> io::Result<()> {
         loaded(panel);
     }
     app.prompt_operation(Kind::Mkdir, false);
-    let prompt = app.prompt.as_mut().unwrap();
+    let prompt = app.modals.prompt_mut().unwrap();
     prompt.paste("文abc\n");
     prompt.edit(KeyCode::Left);
     prompt.edit(KeyCode::Backspace);
@@ -545,7 +549,7 @@ fn unicode_prompt_editing_paste_and_delete_confirmation() -> io::Result<()> {
         thread::sleep(Duration::from_millis(1));
     }
     assert!(!temp.0.join("delete-me").exists());
-    assert!(app.dialogs.is_empty());
+    assert!(app.dialogs().is_empty());
     Ok(())
 }
 
@@ -652,7 +656,7 @@ fn original_menu_hierarchy_cascades_alignment_and_keyboard_navigation() -> io::R
     }
     menu::open(&mut app, 5);
     menu::key(&mut app, KeyCode::Char('c'));
-    assert_eq!(app.submenus[0].0, MenuId::Configuration);
+    assert_eq!(app.modals.submenus()[0].0, MenuId::Configuration);
     menu::key(&mut app, KeyCode::End);
     // Screen savers remains the last Configuration action after placeholder cleanup.
     let row = menu::selected_row(&app, 1);
@@ -661,18 +665,18 @@ fn original_menu_hierarchy_cascades_alignment_and_keyboard_navigation() -> io::R
         Action::ScreensaverSetup
     );
     menu::key(&mut app, KeyCode::Esc);
-    assert!(app.menu.is_some());
-    assert!(app.submenus.is_empty());
+    assert!(app.modals.menu().is_some());
+    assert!(app.modals.submenus().is_empty());
     menu::key(&mut app, KeyCode::Esc);
-    assert!(app.menu.is_none());
+    assert!(app.modals.menu().is_none());
     input::handle(
         &mut app,
         KeyEvent::new(KeyCode::Char('o'), KeyModifiers::ALT),
     );
-    assert_eq!(app.menu.map(|(root, _)| root), Some(5));
+    assert_eq!(app.modals.menu().map(|(root, _)| root), Some(5));
     menu::key(&mut app, KeyCode::F(1));
-    assert!(app.menu.is_none());
-    assert_eq!(app.dialogs.len(), 1);
+    assert!(app.modals.menu().is_none());
+    assert_eq!(app.dialogs().len(), 1);
     Ok(())
 }
 
@@ -697,11 +701,11 @@ fn options_mouse_dialogs_cancel_apply_and_save_real_preferences() -> io::Result<
     menu_action(&mut app, Action::Submenu(MenuId::Configuration));
     render(&mut app, 80, 25)?;
     menu_action(&mut app, Action::Settings(SettingsKind::Interface));
-    assert!(app.menu.is_none());
-    assert!(app.submenus.is_empty());
+    assert!(app.modals.menu().is_none());
+    assert!(app.modals.submenus().is_empty());
     render(&mut app, 80, 25)?;
     mouse_at(&mut app, Target::Setting(0), click);
-    assert!(!app.settings.as_ref().unwrap().draft.highlight_files);
+    assert!(!app.modals.settings().unwrap().draft.highlight_files);
     assert!(app.config.highlight_files);
     mouse_at(&mut app, Target::CancelSettings, click);
     assert!(app.config.highlight_files);
@@ -725,11 +729,11 @@ fn options_mouse_dialogs_cancel_apply_and_save_real_preferences() -> io::Result<
     );
     assert!(app.panels[0].selected.is_empty());
     input::handle(&mut app, KeyEvent::new(KeyCode::Delete, KeyModifiers::NONE));
-    assert!(app.prompt.is_none());
+    assert!(app.modals.prompt().is_none());
     input::handle(&mut app, KeyEvent::new(KeyCode::Insert, KeyModifiers::NONE));
     assert_eq!(app.panels[0].selected.len(), 1);
     input::handle(&mut app, KeyEvent::new(KeyCode::F(8), KeyModifiers::NONE));
-    assert!(app.prompt.is_some()); // F8 still always requires confirmation.
+    assert!(app.modals.prompt().is_some()); // F8 still always requires confirmation.
     input::handle(&mut app, KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
     let config_path = temp.0.join("config.conf");
     app.config.save(&config_path)?;
@@ -743,12 +747,12 @@ fn options_mouse_dialogs_cancel_apply_and_save_real_preferences() -> io::Result<
     );
     menu::execute(&mut app, Action::Confirmations);
     assert_eq!(
-        app.dialogs.last().unwrap().title,
+        app.last_dialog().unwrap().title,
         " Confirmation policy — read-only "
     );
-    assert!(app.settings.is_none());
+    assert!(app.modals.settings().is_none());
     assert!(app
-        .dialogs
+        .dialogs()
         .last()
         .unwrap()
         .message
@@ -783,7 +787,7 @@ fn file_view_submenu_honors_explicit_text_and_hex_modes() -> io::Result<()> {
         let deadline = Instant::now() + Duration::from_secs(5);
         while app
             .desktop
-            .viewer()
+            .active_viewer()
             .is_some_and(|viewer| viewer.contents.is_none())
         {
             app.poll();
@@ -792,7 +796,7 @@ fn file_view_submenu_honors_explicit_text_and_hex_modes() -> io::Result<()> {
         }
         assert_eq!(
             app.desktop
-                .viewer()
+                .active_viewer()
                 .unwrap()
                 .contents
                 .as_ref()
@@ -904,7 +908,7 @@ fn application_identity_about_help_and_errors() -> io::Result<()> {
     let temp = Temp::new()?;
     let mut app = App::new(temp.0.clone())?;
     dn::menu::execute(&mut app, dn::menu::Action::About);
-    let about = app.dialogs.pop().unwrap();
+    let about = app.pop_dialog().unwrap();
     assert_eq!(about.title, " About Directory Navigator ");
     assert!(about.message.contains(&format!(
         "Directory Navigator\nVersion {}",
@@ -914,12 +918,12 @@ fn application_identity_about_help_and_errors() -> io::Result<()> {
     assert!(about.message.contains("Author: Dmitry Yarygin"));
     assert!(!about.message.contains("RIT"));
     input::handle(&mut app, KeyEvent::new(KeyCode::F(1), KeyModifiers::NONE));
-    let help = app.dialogs.pop().unwrap();
+    let help = app.pop_dialog().unwrap();
     assert!(help.title.contains(dn::APPLICATION_NAME));
     assert!(!help.message.contains("Dos Navigator"));
     app.error("test error");
     assert_eq!(
-        app.dialogs.last().unwrap().title,
+        app.last_dialog().unwrap().title,
         " Directory Navigator — error "
     );
     let info = dn::utilities::information::collect(

@@ -46,8 +46,9 @@ pub enum ToolAction {
 }
 #[derive(Default)]
 pub struct Tools {
+    pub(crate) requests: crate::requests::RequestScope,
+    pub modals: crate::modals::ModalStack,
     pub histories: Histories,
-    pub dialog: Option<ToolDialog>,
     pub comparison: compare::CompareOptions,
     pub full_paths: bool,
     worker: Option<crate::task::Task<Result<PathBuf, String>>>,
@@ -62,7 +63,7 @@ impl Tools {
             cursor,
             focus: 0,
             ..
-        }) = &mut self.dialog
+        }) = self.modals.file_tools_mut()
         {
             dialog::paste_input(field, cursor, text);
         }
@@ -70,19 +71,21 @@ impl Tools {
 }
 fn prepare(app: &mut App) {
     menu::close(app);
-    app.quick_search = None;
+    app.modals.set_quick_search(None);
 }
 pub fn open_history(app: &mut App, kind: HistoryKind) {
     prepare(app);
     let paths = app.file_tools.histories.get(kind).to_vec();
-    app.file_tools.dialog = Some(ToolDialog::History {
-        kind,
-        paths,
-        cursor: 0,
-        offset: 0,
-        rows: 10,
-        last_click: None,
-    });
+    app.file_tools
+        .modals
+        .set_file_tools(Some(ToolDialog::History {
+            kind,
+            paths,
+            cursor: 0,
+            offset: 0,
+            rows: 10,
+            last_click: None,
+        }));
 }
 pub fn open_compare(app: &mut App) {
     prepare(app);
@@ -90,7 +93,9 @@ pub fn open_compare(app: &mut App) {
         app.error("Wait for both directory listings to finish loading.");
         return;
     }
-    app.file_tools.dialog = Some(ToolDialog::Compare { focus: 0 });
+    app.file_tools
+        .modals
+        .set_file_tools(Some(ToolDialog::Compare { focus: 0 }));
 }
 pub fn open_export(app: &mut App) {
     prepare(app);
@@ -108,13 +113,15 @@ pub fn open_export(app: &mut App) {
         return;
     }
     let field = "files.lst".to_string();
-    app.file_tools.dialog = Some(ToolDialog::Export {
-        cursor: field.len(),
-        field,
-        focus: 0,
-        base: panel.path.clone(),
-        paths,
-    });
+    app.file_tools
+        .modals
+        .set_file_tools(Some(ToolDialog::Export {
+            cursor: field.len(),
+            field,
+            focus: 0,
+            base: panel.path.clone(),
+            paths,
+        }));
 }
 pub fn poll(app: &mut App) -> bool {
     let result = app
@@ -132,7 +139,7 @@ pub fn poll(app: &mut App) -> bool {
         return false;
     };
     app.file_tools.worker = None;
-    app.file_tools.dialog = None;
+    app.file_tools.modals.set_file_tools(None);
     match result {
         Ok(path) => {
             app.notice = format!("File list saved: {}", path.display());
@@ -154,7 +161,7 @@ pub fn poll(app: &mut App) -> bool {
     true
 }
 pub fn accept(app: &mut App) {
-    match app.file_tools.dialog.take() {
+    match app.file_tools.modals.take_file_tools() {
         Some(ToolDialog::History {
             kind,
             paths,
@@ -177,12 +184,14 @@ pub fn accept(app: &mut App) {
         }
         Some(ToolDialog::Compare { focus }) => {
             if app.panels.iter().any(|p| p.loading) {
-                app.file_tools.dialog = Some(ToolDialog::Compare { focus });
+                app.file_tools
+                    .modals
+                    .set_file_tools(Some(ToolDialog::Compare { focus }));
                 app.error("Wait for both directory listings to finish loading.");
                 return;
             }
             let result = compare::apply(&mut app.panels, app.file_tools.comparison);
-            app.dialogs.push(dialog::Dialog { title: " Compare directories ", message: format!("Left only: {}\nRight only: {}\nDifferent: {}\nIndeterminate: {}\n\nVisible entries only; contents were not compared.", result.left_only, result.right_only, result.different, result.indeterminate) });
+            app.push_dialog(dialog::Dialog { title: " Compare directories ", message: format!("Left only: {}\nRight only: {}\nDifferent: {}\nIndeterminate: {}\n\nVisible entries only; contents were not compared.", result.left_only, result.right_only, result.different, result.indeterminate) });
         }
         Some(modal @ ToolDialog::Export { .. }) => {
             let ToolDialog::Export {
@@ -195,19 +204,19 @@ pub fn accept(app: &mut App) {
                 return;
             };
             if field.trim().is_empty() {
-                app.file_tools.dialog = Some(modal);
+                app.file_tools.modals.set_file_tools(Some(modal));
                 app.error("Enter a destination filename.");
                 return;
             }
             let destination = base.join(field);
             if let Err(e) = export::encode(paths, app.file_tools.full_paths) {
-                app.file_tools.dialog = Some(modal);
+                app.file_tools.modals.set_file_tools(Some(modal));
                 app.error(e.to_string());
                 return;
             }
             let paths = paths.clone();
             let full_paths = app.file_tools.full_paths;
-            match crate::task::Task::spawn("dn-list-export", move |_| {
+            match app.file_tools.requests.spawn("dn-list-export", move |_| {
                 let result = export::write_list(&destination, &paths, full_paths)
                     .map(|()| {
                         destination
@@ -221,15 +230,15 @@ pub fn accept(app: &mut App) {
             }) {
                 Ok(receive) => {
                     app.file_tools.worker = Some(receive);
-                    app.file_tools.dialog = Some(ToolDialog::Busy);
+                    app.file_tools.modals.set_file_tools(Some(ToolDialog::Busy));
                 }
                 Err(e) => {
-                    app.file_tools.dialog = Some(modal);
+                    app.file_tools.modals.set_file_tools(Some(modal));
                     app.error(e.to_string());
                 }
             }
         }
-        other => app.file_tools.dialog = other,
+        other => app.file_tools.modals.set_file_tools(other),
     }
 }
 pub fn action(app: &mut App, action: ToolAction) {
@@ -237,10 +246,10 @@ pub fn action(app: &mut App, action: ToolAction) {
         ToolAction::Accept => accept(app),
         ToolAction::Cancel => {
             if !app.file_tools.busy() {
-                app.file_tools.dialog = None;
+                app.file_tools.modals.set_file_tools(None);
             }
         }
-        ToolAction::Choice(index) => match &mut app.file_tools.dialog {
+        ToolAction::Choice(index) => match app.file_tools.modals.file_tools_mut() {
             Some(ToolDialog::Compare { focus }) => {
                 *focus = index;
                 match index {
@@ -258,7 +267,7 @@ pub fn action(app: &mut App, action: ToolAction) {
             _ => {}
         },
         ToolAction::Field => {
-            if let Some(ToolDialog::Export { focus, .. }) = &mut app.file_tools.dialog {
+            if let Some(ToolDialog::Export { focus, .. }) = app.file_tools.modals.file_tools_mut() {
                 *focus = 0;
             }
         }
@@ -269,7 +278,7 @@ pub fn action(app: &mut App, action: ToolAction) {
                 paths,
                 last_click,
                 ..
-            }) = &mut app.file_tools.dialog
+            }) = app.file_tools.modals.file_tools_mut()
             {
                 if index < paths.len() {
                     let now = Instant::now();
@@ -292,7 +301,7 @@ pub fn key(app: &mut App, key: KeyEvent) {
         return;
     }
     if key.code == KeyCode::Enter {
-        let cancel = match &app.file_tools.dialog {
+        let cancel = match app.file_tools.modals.file_tools() {
             Some(ToolDialog::Compare { focus }) => *focus == 5,
             Some(ToolDialog::Export { focus, .. }) => *focus == 4,
             _ => false,
@@ -308,7 +317,7 @@ pub fn key(app: &mut App, key: KeyEvent) {
         return;
     }
     let mut choice = None;
-    match &mut app.file_tools.dialog {
+    match app.file_tools.modals.file_tools_mut() {
         Some(ToolDialog::History {
             cursor,
             paths,

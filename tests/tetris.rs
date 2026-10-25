@@ -260,7 +260,9 @@ fn original_shortcut_menu_and_game_keys_preserve_files_and_panel_state() -> io::
     ] {
         key(&mut app, code);
     }
-    assert!(app.prompt.is_none() && app.desktop.viewer().is_none() && app.job.is_none());
+    assert!(
+        app.modals.prompt().is_none() && app.desktop.active_viewer().is_none() && app.job.is_none()
+    );
     assert_eq!(app.panels[0].selected.len(), 1);
     assert_eq!(app.panels[0].cursor, 1);
     key(&mut app, KeyCode::Esc);
@@ -272,11 +274,11 @@ fn original_shortcut_menu_and_game_keys_preserve_files_and_panel_state() -> io::
         .position(|item| item.action == Action::Game)
         .unwrap();
     menu::activate(&mut app, 0, row);
-    assert!(app.desktop.game().is_some() && app.menu.is_none());
+    assert!(app.desktop.game().is_some() & app.modals.menu().is_none());
     key(&mut app, KeyCode::Esc);
     menu::open(&mut app, 3);
     input::handle(&mut app, KeyEvent::new(KeyCode::F(9), KeyModifiers::ALT));
-    assert!(app.desktop.game().is_some() && app.menu.is_none());
+    assert!(app.desktop.game().is_some() & app.modals.menu().is_none());
     key(&mut app, KeyCode::Esc);
     Ok(())
 }

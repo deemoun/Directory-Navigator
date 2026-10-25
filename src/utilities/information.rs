@@ -14,6 +14,7 @@ impl Kind {
 }
 pub type Fields = Vec<(String, String)>;
 pub struct Information {
+    pub(crate) requests: crate::requests::RequestScope,
     pub kind: Kind,
     pub fields: Fields,
     pub offset: usize,
@@ -23,9 +24,10 @@ pub struct Information {
 }
 impl Information {
     pub fn open(kind: Kind, path: PathBuf, size: (u16, u16)) -> std::io::Result<Self> {
-        let receive =
-            crate::task::Task::spawn("dn-information", move |_| collect(kind, path, size))?;
+        let requests = crate::requests::RequestScope::default();
+        let receive = requests.spawn("dn-information", move |_| collect(kind, path, size))?;
         Ok(Self {
+            requests,
             kind,
             fields: Vec::new(),
             offset: 0,

@@ -35,8 +35,8 @@ fn native_selection_is_the_only_document_focus_authority() -> io::Result<()> {
     assert!(!desktop.activate(game));
     let replacement = desktop.open_game(Game::default())?;
     assert_ne!(replacement, game);
-    assert_eq!(native.active().id, preview);
-    desktop.close_viewer();
+    assert_eq!(native.active().id, replacement);
+    desktop.close(preview);
     assert_eq!(native.active().id, replacement);
     desktop.close_game();
     assert_eq!(native.active().id, WindowId::MANAGER);

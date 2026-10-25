@@ -175,7 +175,9 @@ fn viewed_and_edited_histories_record_only_success_and_guard_open() -> io::Resul
     file_tools::open_history(&mut app, HistoryKind::View);
     file_tools::accept(&mut app);
     wait(&mut app, |a| {
-        a.desktop.viewer().is_some_and(|v| v.contents.is_some())
+        a.desktop
+            .active_viewer()
+            .is_some_and(|v| v.contents.is_some())
     });
     assert_eq!(
         app.file_tools.histories.get(HistoryKind::View),
@@ -183,39 +185,50 @@ fn viewed_and_edited_histories_record_only_success_and_guard_open() -> io::Resul
     );
     app.desktop.close_viewer();
     editor::open_path(&mut app, a.clone());
-    wait(&mut app, |a| a.desktop.editor().is_some_and(|e| !e.busy()));
+    wait(&mut app, |a| {
+        a.desktop.active_editor().is_some_and(|e| !e.busy())
+    });
     assert_eq!(
         app.file_tools.histories.get(HistoryKind::Edit),
         std::slice::from_ref(&a)
     );
     editor::paste(&mut app, "changed");
+    let first = app.desktop.active().id;
     editor::open_path(&mut app, b.clone());
-    assert!(matches!(
-        app.desktop.editor().unwrap().modal,
-        Some(editor::Modal::ConfirmClose)
-    ));
-    editor::action(&mut app, EditorAction::Cancel);
-    assert_eq!(app.desktop.editor().unwrap().path.as_ref(), Some(&a));
-    editor::open_path(&mut app, t.0.join("missing"));
-    editor::action(&mut app, EditorAction::Discard);
-    wait(&mut app, |a| a.desktop.editor().is_some_and(|e| !e.busy()));
-    assert!(app.desktop.editor().unwrap().dirty());
+    wait(&mut app, |app| {
+        app.desktop.active_editor().is_some_and(|e| !e.busy())
+    });
+    let second = app.desktop.active().id;
+    assert_ne!(first, second);
+    assert!(app.desktop.editor(first).unwrap().dirty());
     assert_eq!(
         app.file_tools.histories.get(HistoryKind::Edit),
-        std::slice::from_ref(&a)
+        [b.clone(), a.clone()]
     );
-    app.dialogs.clear();
-    editor::open_path(&mut app, b.clone());
-    editor::action(&mut app, EditorAction::Discard);
-    wait(&mut app, |a| a.desktop.editor().is_some_and(|e| !e.busy()));
+    editor::open_path(&mut app, t.0.join("missing"));
+    wait(&mut app, |app| app.desktop.active().id == second);
     assert_eq!(
         app.file_tools.histories.get(HistoryKind::Edit),
         [b.clone(), a]
     );
+    app.clear_dialogs();
+    app.desktop.activate(first);
+    editor::request_close(&mut app, editor::CloseIntent::Panel);
+    assert!(matches!(
+        app.desktop.editor(first).unwrap().modals.editor_modal(),
+        Some(editor::Modal::ConfirmClose)
+    ));
+    editor::action(&mut app, EditorAction::Cancel);
+    assert!(app.desktop.editor(first).unwrap().dirty());
+    app.desktop.activate(second);
     editor::action(&mut app, EditorAction::SaveAs);
     let saved = t.0.join("saved.txt");
-    if let Some(editor::Modal::Prompt { field, cursor, .. }) =
-        &mut app.desktop.editor_mut().unwrap().modal
+    if let Some(editor::Modal::Prompt { field, cursor, .. }) = app
+        .desktop
+        .active_editor_mut()
+        .unwrap()
+        .modals
+        .editor_modal_mut()
     {
         *field = saved.to_string_lossy().into_owned();
         *cursor = field.len();
@@ -223,17 +236,19 @@ fn viewed_and_edited_histories_record_only_success_and_guard_open() -> io::Resul
         panic!("save as dialog")
     }
     editor::action(&mut app, EditorAction::Submit);
-    wait(&mut app, |a| a.desktop.editor().is_some_and(|e| !e.busy()));
+    wait(&mut app, |a| {
+        a.desktop.active_editor().is_some_and(|e| !e.busy())
+    });
     assert_eq!(app.file_tools.histories.get(HistoryKind::Edit)[0], saved);
     app.desktop.close_editor();
-    app.dialogs.clear();
+    app.clear_dialogs();
     app.file_tools
         .histories
         .record(HistoryKind::View, t.0.join("missing"));
     file_tools::open_history(&mut app, HistoryKind::View);
     file_tools::accept(&mut app);
-    wait(&mut app, |a| a.desktop.viewer().is_none());
-    assert!(!app.dialogs.is_empty());
+    wait(&mut app, |a| a.desktop.active_viewer().is_none());
+    assert!(!app.dialogs().is_empty());
     assert_eq!(
         app.file_tools.histories.get(HistoryKind::View)[0],
         t.0.join("missing")
@@ -258,19 +273,19 @@ fn history_dialog_navigation_mouse_resize_and_empty_state() -> io::Result<()> {
     key(&mut app, KeyCode::End, KeyModifiers::NONE);
     draw(&mut app, 80, 25)?;
     assert!(
-        matches!(app.file_tools.dialog,Some(ToolDialog::History {cursor:35,offset,..}) if offset>0)
+        matches!(app.file_tools.modals.file_tools(),Some(ToolDialog::History {cursor:35,offset,..}) if *offset>0)
     );
     draw(&mut app, 130, 40)?;
-    if let Some(ToolDialog::History { cursor, offset, .. }) = &app.file_tools.dialog {
+    if let Some(ToolDialog::History { cursor, offset, .. }) = app.file_tools.modals.file_tools() {
         assert!(*cursor >= *offset);
     }
     key(&mut app, KeyCode::Home, KeyModifiers::NONE);
     draw(&mut app, 80, 25)?;
     click(&mut app, Target::Tool(ToolAction::HistoryRow(0)));
-    assert!(app.file_tools.dialog.is_some());
+    assert!(app.file_tools.modals.file_tools().is_some());
     click(&mut app, Target::Tool(ToolAction::HistoryRow(0)));
     wait(&mut app, |a| !a.panels[0].loading);
-    assert!(!app.dialogs.is_empty());
+    assert!(!app.dialogs().is_empty());
     assert_eq!(app.panels[0].path, t.0);
     Ok(())
 }
@@ -362,7 +377,7 @@ fn comparison_marks_cancellation_shortcuts_and_mouse() -> io::Result<()> {
     assert_eq!([app.panels[0].cursor, app.panels[1].cursor], cursors);
     assert_eq!(app.config.layouts, layouts);
     assert!(!app.panels[0].entries.iter().any(|e| e.name == ".hidden"));
-    app.dialogs.clear();
+    app.clear_dialogs();
     app.panels[0].selected.insert("equal".into());
     file_tools::open_compare(&mut app);
     draw(&mut app, 120, 35)?;
@@ -372,11 +387,11 @@ fn comparison_marks_cancellation_shortcuts_and_mouse() -> io::Result<()> {
         app.panels[0].selected,
         BTreeSet::from([OsString::from("different")])
     );
-    app.dialogs.clear();
+    app.clear_dialogs();
     app.panels[0].refresh(false);
     file_tools::open_compare(&mut app);
-    assert!(app.file_tools.dialog.is_none());
-    assert!(!app.dialogs.is_empty());
+    assert!(app.file_tools.modals.file_tools().is_none());
+    assert!(!app.dialogs().is_empty());
     Ok(())
 }
 #[test]
@@ -460,7 +475,7 @@ fn export_dialog_background_refresh_preserves_selection_cursor_and_format() -> i
     assert!(!t.0.join("files.lst").exists());
     file_tools::open_export(&mut app);
     draw(&mut app, 120, 35)?;
-    if let Some(ToolDialog::Export { field, cursor, .. }) = &mut app.file_tools.dialog {
+    if let Some(ToolDialog::Export { field, cursor, .. }) = app.file_tools.modals.file_tools_mut() {
         *field = "out.lst".into();
         *cursor = field.len();
     }
@@ -483,7 +498,7 @@ fn export_dialog_background_refresh_preserves_selection_cursor_and_format() -> i
         .all(|p| p.entries.iter().any(|e| e.name == "out.lst")));
     app.panels[0].selected.clear();
     file_tools::open_export(&mut app);
-    if let Some(ToolDialog::Export { paths, .. }) = &app.file_tools.dialog {
+    if let Some(ToolDialog::Export { paths, .. }) = app.file_tools.modals.file_tools() {
         assert_eq!(paths, &[t.0.join("beta")]);
     } else {
         panic!("export dialog")
@@ -502,21 +517,25 @@ fn menu_entries_and_modal_precedence() -> io::Result<()> {
         assert!(menu::items(3).iter().any(|i| i.action == action));
     }
     key(&mut app, KeyCode::Char('b'), KeyModifiers::ALT);
-    assert!(app.submenus.iter().any(|(id, _)| *id == menu::MenuId::Sort));
+    assert!(app
+        .modals
+        .submenus()
+        .iter()
+        .any(|(id, _)| *id == menu::MenuId::Sort));
     menu::close(&mut app);
     file_tools::open_compare(&mut app);
     app.error("top dialog");
     key(&mut app, KeyCode::Esc, KeyModifiers::NONE);
-    assert!(app.file_tools.dialog.is_some());
-    assert!(app.dialogs.is_empty());
+    assert!(app.file_tools.modals.file_tools().is_some());
+    assert!(app.dialogs().is_empty());
     key(&mut app, KeyCode::Esc, KeyModifiers::NONE);
-    assert!(app.file_tools.dialog.is_none());
+    assert!(app.file_tools.modals.file_tools().is_none());
     editor::open(&mut app, true);
     editor::paste(&mut app, "copy");
     key(&mut app, KeyCode::Char('a'), KeyModifiers::CONTROL);
     key(&mut app, KeyCode::Char('c'), KeyModifiers::CONTROL);
     assert_eq!(app.editor_clipboard, "copy");
-    assert!(app.file_tools.dialog.is_none());
+    assert!(app.file_tools.modals.file_tools().is_none());
     assert!(!app.quit);
     Ok(())
 }
@@ -552,11 +571,11 @@ fn export_worker_failure_and_exit_wait_for_publication() -> io::Result<()> {
     file_tools::open_export(&mut app);
     file_tools::accept(&mut app);
     wait(&mut app, |a| !a.file_tools.busy());
-    assert!(!app.dialogs.is_empty());
+    assert!(!app.dialogs().is_empty());
     assert_eq!(fs::read_to_string(t.0.join("files.lst"))?, "keep");
-    app.dialogs.clear();
+    app.clear_dialogs();
     file_tools::open_export(&mut app);
-    if let Some(ToolDialog::Export { field, cursor, .. }) = &mut app.file_tools.dialog {
+    if let Some(ToolDialog::Export { field, cursor, .. }) = app.file_tools.modals.file_tools_mut() {
         *field = "complete.lst".into();
         *cursor = field.len();
     }
@@ -589,8 +608,8 @@ fn directory_history_native_paths_and_permission_failures() -> io::Result<()> {
     file_tools::accept(&mut app);
     wait(&mut app, |a| !a.panels[0].loading);
     assert_eq!(app.panels[0].path, t.0);
-    assert!(!app.dialogs.is_empty());
-    app.dialogs.clear();
+    assert!(!app.dialogs().is_empty());
+    app.clear_dialogs();
     let locked = t.0.join("locked");
     fs::create_dir(&locked)?;
     fs::set_permissions(&locked, fs::Permissions::from_mode(0o100))?;
@@ -603,7 +622,7 @@ fn directory_history_native_paths_and_permission_failures() -> io::Result<()> {
     fs::set_permissions(&locked, fs::Permissions::from_mode(0o700))?;
     if unsafe { libc::geteuid() } != 0 {
         assert_eq!(app.panels[0].path, t.0);
-        assert!(!app.dialogs.is_empty());
+        assert!(!app.dialogs().is_empty());
     }
     Ok(())
 }

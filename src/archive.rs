@@ -29,6 +29,8 @@ pub enum Action {
     PageDown,
 }
 pub struct Browser {
+    preview_epoch: u64,
+    pub(crate) requests: crate::requests::RequestScope,
     pub path: PathBuf,
     pub catalog: Option<Arc<Catalog>>,
     pub directory: usize,
@@ -43,10 +45,13 @@ pub struct Browser {
 impl Browser {
     pub fn new(path: PathBuf) -> io::Result<Self> {
         let source = path.clone();
-        let task = Task::spawn("dn-archive-index", move |cancel| {
+        let requests = crate::requests::RequestScope::default();
+        let task = requests.spawn("dn-archive-index", move |cancel| {
             reader::list(source, &cancel).map(|catalog| Reply::List(Arc::new(catalog)))
         })?;
         Ok(Self {
+            preview_epoch: 0,
+            requests,
             path,
             catalog: None,
             directory: 0,
@@ -114,9 +119,9 @@ impl Browser {
 }
 pub fn open(app: &mut App, path: PathBuf) {
     crate::menu::close(app);
-    app.quick_search = None;
+    app.modals.set_quick_search(None);
     match Browser::new(path) {
-        Ok(b) => app.archive = Some(b),
+        Ok(b) => app.modals.set_archive(Some(b)),
         Err(e) => app.error(e.to_string()),
     }
 }
@@ -137,8 +142,8 @@ pub fn poll(app: &mut App) -> bool {
     // Take the reply here so previews can open the ordinary viewer without paths
     // being handed to the filesystem or recorded in viewer history.
     let reply = app
-        .archive
-        .as_ref()
+        .modals
+        .archive()
         .and_then(|a| a.task.as_ref())
         .and_then(|t| match t.try_recv() {
             Ok(r) => Some(r),
@@ -150,7 +155,7 @@ pub fn poll(app: &mut App) -> bool {
     let Some(reply) = reply else {
         return false;
     };
-    let Some(browser) = &mut app.archive else {
+    let Some(browser) = app.modals.archive_mut() else {
         return false;
     };
     browser.task = None;
@@ -173,7 +178,19 @@ pub fn poll(app: &mut App) -> bool {
         }
         Ok(Reply::Preview(path, contents)) => {
             browser.status = "Read-only · Enter browse/view · F3 view · F9 info".into();
-            app.show_viewer(crate::viewer::Viewer::from_contents(path, contents));
+            let foreground = browser.preview_epoch == app.desktop.activation_revision()
+                && app
+                    .modal_top()
+                    .is_some_and(|m| m.focus == crate::focus::Focus::Archive);
+            let viewer = crate::viewer::Viewer::from_contents(path, contents);
+            let result = if foreground {
+                app.desktop.open_viewer(viewer)
+            } else {
+                app.desktop.open_viewer_background(viewer)
+            };
+            if let Err(error) = result {
+                app.error(error.to_string());
+            }
         }
         Err(e) => {
             browser.status = format!("Archive: {e}");
@@ -184,10 +201,11 @@ pub fn poll(app: &mut App) -> bool {
 }
 pub fn action(app: &mut App, action: Action) {
     if action == Action::Close {
-        app.archive = None;
+        app.modals.set_archive(None);
         return;
     }
-    let Some(browser) = &mut app.archive else {
+    let epoch = app.desktop.activation_revision();
+    let Some(browser) = app.modals.archive_mut() else {
         return;
     };
     match action {
@@ -205,7 +223,7 @@ pub fn action(app: &mut App, action: Action) {
         Action::PageDown => browser.step(browser.rows as isize),
         Action::Parent => {
             if browser.parent() {
-                app.archive = None;
+                app.modals.set_archive(None);
             }
         }
         Action::Row(row) => {
@@ -230,7 +248,7 @@ pub fn action(app: &mut App, action: Action) {
             }
             let Some(id) = browser.selected() else {
                 if action == Action::Open && browser.parent() {
-                    app.archive = None;
+                    app.modals.set_archive(None);
                 }
                 return;
             };
@@ -245,7 +263,8 @@ pub fn action(app: &mut App, action: Action) {
                 return;
             }
             if action == Action::Info || node.kind != Kind::File || node.locked {
-                app.dialogs.push(crate::dialog::Dialog{title:" Archive member information ",message:format!("{}\nType: {:?}{}\nSize: {} bytes\nModified: {}\nRead-only. Links and special entries are never followed.\nEncrypted members cannot be previewed.",crate::filesystem::display_name(&String::from_utf8_lossy(&node.path)),node.kind,if node.locked{" (encrypted)"}else{""},node.size,app.config.datetime.archive(node.modified.as_deref().unwrap_or("Unavailable")))});
+                let dialog=crate::dialog::Dialog{title:" Archive member information ",message:format!("{}\nType: {:?}{}\nSize: {} bytes\nModified: {}\nRead-only. Links and special entries are never followed.\nEncrypted members cannot be previewed.",crate::filesystem::display_name(&String::from_utf8_lossy(&node.path)),node.kind,if node.locked{" (encrypted)"}else{""},node.size,app.config.datetime.archive(node.modified.as_deref().unwrap_or("Unavailable")))};
+                app.push_dialog(dialog);
                 return;
             }
             let catalog = Arc::clone(catalog);
@@ -253,7 +272,8 @@ pub fn action(app: &mut App, action: Action) {
             title.push(" :: /");
             title.push(String::from_utf8_lossy(&node.path).as_ref());
             let title = PathBuf::from(title);
-            match Task::spawn("dn-archive-preview", move |cancel| {
+            browser.preview_epoch = epoch;
+            match browser.requests.spawn("dn-archive-preview", move |cancel| {
                 reader::preview(&catalog, id, &cancel).map(|c| Reply::Preview(title, c))
             }) {
                 Ok(task) => {
@@ -267,7 +287,7 @@ pub fn action(app: &mut App, action: Action) {
     }
 }
 pub fn key(app: &mut App, key: KeyEvent) {
-    let Some(browser) = &mut app.archive else {
+    let Some(browser) = app.modals.archive_mut() else {
         return;
     };
     browser.last_click = None;
@@ -279,7 +299,7 @@ pub fn key(app: &mut App, key: KeyEvent) {
   KeyCode::Esc=>action(app,Action::Close),KeyCode::Backspace|KeyCode::Left=>action(app,Action::Parent),KeyCode::Enter=>{let a=match browser.focus{1=>Action::Open,2=>Action::View,3=>Action::Info,4=>Action::Refresh,5=>Action::Stop,6=>Action::Close,_=>Action::Open};action(app,a);},
   KeyCode::Tab=>browser.focus = crate::control_focus::cycle(browser.focus, 7, false),KeyCode::BackTab=>browser.focus = crate::control_focus::cycle(browser.focus, 7, true),
   KeyCode::Up=>browser.step(-1),KeyCode::Down=>browser.step(1),KeyCode::PageUp=>browser.step(-(browser.rows as isize)),KeyCode::PageDown=>browser.step(browser.rows as isize),KeyCode::Home=>browser.step(isize::MIN),KeyCode::End=>browser.step(isize::MAX),KeyCode::Right=>{if browser.selected().is_some_and(|id|browser.catalog.as_ref().is_some_and(|c|c.nodes[id].kind==Kind::Directory)){action(app,Action::Open);}},
-  KeyCode::F(3)=>action(app,Action::View),KeyCode::F(9)=>action(app,Action::Info),KeyCode::F(1)=>app.dialogs.push(crate::dialog::Dialog{title:" Archive browser help ",message:"Read-only ZIP / TAR / TAR.GZ / TGZ browser.\nEnter/double-click opens a folder or previews a file.\nBackspace/Left goes up; Esc closes the archive.\nF3 previews; F9 shows metadata; Ctrl+R refreshes.\nStop cancels indexing or preview reads.\nLinks/special entries are never followed.\nNo extraction, editing or nested archive execution.\nIn the file manager, Ctrl+Enter uses the OS default app.".into()}),_=>{}
+  KeyCode::F(3)=>action(app,Action::View),KeyCode::F(9)=>action(app,Action::Info),KeyCode::F(1)=>app.push_dialog(crate::dialog::Dialog{title:" Archive browser help ",message:"Read-only ZIP / TAR / TAR.GZ / TGZ browser.\nEnter/double-click opens a folder or previews a file.\nBackspace/Left goes up; Esc closes the archive.\nF3 previews; F9 shows metadata; Ctrl+R refreshes.\nStop cancels indexing or preview reads.\nLinks/special entries are never followed.\nNo extraction, editing or nested archive execution.\nIn the file manager, Ctrl+Enter uses the OS default app.".into()}),_=>{}
  }
 }
 pub fn mouse(app: &mut App, event: MouseEvent, target: Option<crate::mouse::Target>) {
@@ -290,7 +310,7 @@ pub fn mouse(app: &mut App, event: MouseEvent, target: Option<crate::mouse::Targ
             }
         }
         MouseEventKind::ScrollUp | MouseEventKind::ScrollDown => {
-            if let Some(b) = &mut app.archive {
+            if let Some(b) = app.modals.archive_mut() {
                 b.step(if event.kind == MouseEventKind::ScrollUp {
                     -3
                 } else {

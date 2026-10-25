@@ -170,18 +170,20 @@ fn missing_config_is_inactive_and_bad_config_can_be_repaired() -> io::Result<()>
     temp.write("invalid")?;
     associations::reload(&mut app);
     wait(&mut app, |a| !a.associations.busy());
-    assert!(!app.dialogs.is_empty());
-    app.dialogs.clear();
+    assert!(!app.dialogs().is_empty());
+    app.clear_dialogs();
     focus(&mut app, "file.txt");
     key(&mut app, KeyCode::Enter);
-    assert!(!app.dialogs.is_empty() && app.desktop.viewer().is_none());
-    app.dialogs.clear();
+    assert!(!app.dialogs().is_empty() && app.desktop.active_viewer().is_none());
+    app.clear_dialogs();
     temp.write(".txt=@editor")?;
     associations::reload(&mut app);
     wait(&mut app, |a| !a.associations.busy());
     key(&mut app, KeyCode::Enter);
-    wait(&mut app, |a| a.desktop.editor().is_some_and(|e| !e.busy()));
-    assert!(app.dialogs.is_empty());
+    wait(&mut app, |a| {
+        a.desktop.active_editor().is_some_and(|e| !e.busy())
+    });
+    assert!(app.dialogs().is_empty());
     Ok(())
 }
 
@@ -197,26 +199,34 @@ fn enter_internal_targets_preserve_marks_and_explicit_f3_f4() -> io::Result<()> 
     focus(&mut app, "file.txt");
     let marks = app.panels[0].selected.clone();
     key(&mut app, KeyCode::Enter);
-    wait(&mut app, |a| a.desktop.editor().is_some_and(|e| !e.busy()));
+    wait(&mut app, |a| {
+        a.desktop.active_editor().is_some_and(|e| !e.busy())
+    });
     assert_eq!(app.panels[0].selected, marks);
     key(&mut app, KeyCode::Esc);
     key(&mut app, KeyCode::F(3));
     wait(&mut app, |a| {
-        a.desktop.viewer().is_some_and(|v| v.contents.is_some())
+        a.desktop
+            .active_viewer()
+            .is_some_and(|v| v.contents.is_some())
     });
-    assert!(app.desktop.editor().is_none());
+    assert!(app.desktop.active_editor().is_none());
     key(&mut app, KeyCode::Esc);
     key(&mut app, KeyCode::F(4));
-    wait(&mut app, |a| a.desktop.editor().is_some_and(|e| !e.busy()));
+    wait(&mut app, |a| {
+        a.desktop.active_editor().is_some_and(|e| !e.busy())
+    });
     key(&mut app, KeyCode::Esc);
     focus(&mut app, "raw.bin");
     key(&mut app, KeyCode::Enter);
     wait(&mut app, |a| {
-        a.desktop.viewer().is_some_and(|v| v.contents.is_some())
+        a.desktop
+            .active_viewer()
+            .is_some_and(|v| v.contents.is_some())
     });
     assert!(
         app.desktop
-            .viewer()
+            .active_viewer()
             .unwrap()
             .contents
             .as_ref()
@@ -247,7 +257,7 @@ fn directories_navigate_and_ctrl_enter_bypasses_custom_rules() -> io::Result<()>
     );
     assert!(app.launcher.loading() && !app.associations.busy());
     wait(&mut app, |a| !a.launcher.loading());
-    assert!(app.desktop.editor().is_none());
+    assert!(app.desktop.active_editor().is_none());
     Ok(())
 }
 
@@ -266,8 +276,8 @@ fn stale_launches_and_file_failures_do_not_queue_commands_or_poison_rules() -> i
     fs::remove_file(temp.0.join("b.txt"))?;
     key(&mut app, KeyCode::Enter);
     wait(&mut app, |a| !a.associations.busy());
-    assert!(app.associations.pending.is_none() && !app.dialogs.is_empty());
-    app.dialogs.clear();
+    assert!(app.associations.pending.is_none() && !app.dialogs().is_empty());
+    app.clear_dialogs();
     focus(&mut app, "a.txt");
     key(&mut app, KeyCode::Enter);
     wait(&mut app, |a| !a.associations.busy());
@@ -291,7 +301,9 @@ fn edit_creates_only_comments_and_reloads_after_guarded_editor_close() -> io::Re
     let mut app = temp.app()?;
     assert!(!temp.config().exists());
     associations::edit(&mut app);
-    wait(&mut app, |a| a.desktop.editor().is_some_and(|e| !e.busy()));
+    wait(&mut app, |a| {
+        a.desktop.active_editor().is_some_and(|e| !e.busy())
+    });
     assert_eq!(fs::read_to_string(temp.config())?, format::DEFAULT);
     assert!(app.associations.rules.is_empty());
     // Use the normal editor save path, then close and reload automatically.
@@ -300,7 +312,9 @@ fn edit_creates_only_comments_and_reloads_after_guarded_editor_close() -> io::Re
         &mut app,
         KeyEvent::new(KeyCode::Char('s'), KeyModifiers::CONTROL),
     );
-    wait(&mut app, |a| a.desktop.editor().is_some_and(|e| !e.busy()));
+    wait(&mut app, |a| {
+        a.desktop.active_editor().is_some_and(|e| !e.busy())
+    });
     key(&mut app, KeyCode::Esc);
     wait(&mut app, |a| a.associations.rules.len() == 1);
     assert_eq!(app.associations.rules[0].target, Target::Viewer);
@@ -317,10 +331,10 @@ fn symlink_and_oversized_configs_are_rejected_without_changing_targets() -> io::
     std::os::unix::fs::symlink(&original, temp.config())?;
     assert!(format::load(&temp.config()).is_err());
     let mut app = temp.app()?;
-    app.dialogs.clear();
+    app.clear_dialogs();
     associations::edit(&mut app);
     wait(&mut app, |a| !a.associations.busy());
-    assert!(app.desktop.editor().is_none() && !app.dialogs.is_empty());
+    assert!(app.desktop.active_editor().is_none() && !app.dialogs().is_empty());
     assert_eq!(fs::read_to_string(original)?, ".txt=@viewer");
     fs::remove_file(temp.config())?;
     temp.write(&" ".repeat(format::MAX_BYTES + 1))?;
@@ -343,7 +357,7 @@ fn association_menu_keyboard_mouse_targets_locales_and_resize() -> io::Result<()
                 .iter()
                 .position(|i| i.action == menu::Action::Submenu(menu::MenuId::Associations))
                 .unwrap();
-            app.menu = Some((5, row));
+            app.modals.set_menu(Some((5, row)));
             menu::key(&mut app, KeyCode::Right);
             let mut terminal = Terminal::new(TestBackend::new(w, h))?;
             terminal.draw(|f| ui::draw(f, &mut app))?;
@@ -352,7 +366,10 @@ fn association_menu_keyboard_mouse_targets_locales_and_resize() -> io::Result<()
                 .regions
                 .iter()
                 .all(|(r, _)| r.right() <= w && r.bottom() <= h));
-            assert_eq!(app.submenus.last().unwrap().0, menu::MenuId::Associations);
+            assert_eq!(
+                app.modals.submenus().last().unwrap().0,
+                menu::MenuId::Associations
+            );
             menu::close(&mut app);
         }
     }
@@ -419,7 +436,7 @@ fn mouse_reload_double_click_and_archive_override() -> io::Result<()> {
         .iter()
         .position(|i| i.action == menu::Action::Submenu(menu::MenuId::Associations))
         .unwrap();
-    app.menu = Some((5, row));
+    app.modals.set_menu(Some((5, row)));
     menu::key(&mut app, KeyCode::Right);
     let mut terminal = Terminal::new(TestBackend::new(80, 25))?;
     terminal.draw(|f| ui::draw(f, &mut app))?;
@@ -439,7 +456,7 @@ fn mouse_reload_double_click_and_archive_override() -> io::Result<()> {
             modifiers: KeyModifiers::NONE,
         },
     );
-    assert!(app.associations.busy() && app.menu.is_none());
+    assert!(app.associations.busy() & app.modals.menu().is_none());
     wait(&mut app, |a| !a.associations.busy());
     focus(&mut app, "archive.zip");
     terminal.draw(|f| ui::draw(f, &mut app))?;
@@ -460,12 +477,14 @@ fn mouse_reload_double_click_and_archive_override() -> io::Result<()> {
     mouse::handle(&mut app, event);
     mouse::handle(&mut app, event);
     wait(&mut app, |a| {
-        a.desktop.viewer().is_some_and(|v| v.contents.is_some())
+        a.desktop
+            .active_viewer()
+            .is_some_and(|v| v.contents.is_some())
     });
-    assert!(app.archive.is_none());
+    assert!(app.modals.archive().is_none());
     assert!(app
         .desktop
-        .viewer()
+        .active_viewer()
         .unwrap()
         .contents
         .as_ref()

@@ -22,7 +22,7 @@ fn popup(
 
 fn button(
     frame: &mut impl Frame,
-    app: &mut App,
+    app: &App,
     rect: Rect,
     text: &str,
     target: Target,
@@ -35,13 +35,22 @@ fn button(
         app.config.language.text(text),
         focused,
     );
-    app.mouse.regions.push((rect, target));
+    frame.regions().push((rect, target));
 }
 
-pub(super) fn draw_tools(frame: &mut impl Frame, app: &mut App, area: Rect) {
+pub(super) fn draw_tools(
+    frame: &mut impl Frame,
+    app: &App,
+    area: Rect,
+    layer: crate::focus::Focus,
+) {
     let profile = app.config.palette;
     let dos = profile.styles();
-    if let Some(pattern) = &app.pattern {
+    if let Some(pattern) = app
+        .modals
+        .pattern()
+        .filter(|_| layer == crate::focus::Focus::Pattern)
+    {
         let rect = popup(frame, app, area, 58, 8, pattern.title());
         frame.render_widget(
             Paragraph::new(app.config.language.text("Name pattern")).style(dos(0x7f)),
@@ -68,14 +77,8 @@ pub(super) fn draw_tools(frame: &mut impl Frame, app: &mut App, area: Rect) {
             .style(dos(0x70)),
             Rect::new(rect.x + 2, rect.y + 3, rect.width - 4, 2),
         );
-        app.mouse.regions.clear();
-        super::dialog_style::close_button(
-            frame,
-            profile,
-            rect,
-            &mut app.mouse.regions,
-            Target::CancelPattern,
-        );
+        frame.regions().clear();
+        super::dialog_style::close_button(frame, profile, rect, Target::CancelPattern);
         button(
             frame,
             app,
@@ -93,17 +96,15 @@ pub(super) fn draw_tools(frame: &mut impl Frame, app: &mut App, area: Rect) {
             true,
         );
     }
-    if let Some(dialog) = &app.columns_dialog {
+    if let Some(dialog) = app
+        .modals
+        .columns_dialog()
+        .filter(|_| layer == crate::focus::Focus::Columns)
+    {
         let rect = popup(frame, app, area, 74, 13, " Setup columns ");
         let cursor = dialog.cursor;
-        app.mouse.regions.clear();
-        super::dialog_style::close_button(
-            frame,
-            profile,
-            rect,
-            &mut app.mouse.regions,
-            Target::CancelColumns,
-        );
+        frame.regions().clear();
+        super::dialog_style::close_button(frame, profile, rect, Target::CancelColumns);
         for panel in 0..2 {
             let x = rect.x + 3 + panel as u16 * 35;
             frame.render_widget(
@@ -131,8 +132,8 @@ pub(super) fn draw_tools(frame: &mut impl Frame, app: &mut App, area: Rect) {
                     })),
                     choice,
                 );
-                app.mouse
-                    .regions
+                frame
+                    .regions()
                     .push((choice, Target::ColumnChoice(panel, preset)));
             }
         }
@@ -162,7 +163,11 @@ pub(super) fn draw_tools(frame: &mut impl Frame, app: &mut App, area: Rect) {
             cursor == 3,
         );
     }
-    if let Some(info) = &app.file_info {
+    if let Some(info) = app
+        .modals
+        .file_info()
+        .filter(|_| layer == crate::focus::Focus::FileInfo)
+    {
         let rect = popup(
             frame,
             app,
@@ -201,14 +206,8 @@ pub(super) fn draw_tools(frame: &mut impl Frame, app: &mut App, area: Rect) {
             .style(dos(0x70)),
             Rect::new(rect.x + 2, rect.bottom() - 3, rect.width - 4, 1),
         );
-        app.mouse.regions.clear();
-        super::dialog_style::close_button(
-            frame,
-            profile,
-            rect,
-            &mut app.mouse.regions,
-            Target::CloseFileInfo,
-        );
+        frame.regions().clear();
+        super::dialog_style::close_button(frame, profile, rect, Target::CloseFileInfo);
         button(
             frame,
             app,

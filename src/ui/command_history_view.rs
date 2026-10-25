@@ -6,8 +6,8 @@ use crate::{
     filesystem::display_name,
     mouse::Target,
 };
-pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
-    let Some(d) = &app.command_line.dialog else {
+pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
+    let Some(d) = app.command_line.modals.command_history() else {
         return;
     };
     let language = app.config.language;
@@ -22,14 +22,8 @@ pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
         rect.height,
         language.text("Commands History"),
     );
-    app.mouse.regions.clear();
-    super::dialog_style::close_button(
-        frame,
-        profile,
-        rect,
-        &mut app.mouse.regions,
-        Target::CommandHistory(Action::Cancel),
-    );
+    frame.regions().clear();
+    super::dialog_style::close_button(frame, profile, rect, Target::CommandHistory(Action::Cancel));
     let x = rect.x + 2;
     let width = rect.width - 4;
     frame.render_widget(
@@ -48,8 +42,8 @@ pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
     if d.focus == 0 {
         frame.set_cursor_position((field.x + (column - scroll) as u16, field.y));
     }
-    app.mouse
-        .regions
+    frame
+        .regions()
         .push((field, Target::CommandHistory(Action::Field)));
     if d.matches.is_empty() {
         frame.render_widget(
@@ -73,8 +67,8 @@ pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
                 })),
                 row,
             );
-            app.mouse
-                .regions
+            frame
+                .regions()
                 .push((row, Target::CommandHistory(Action::Row(i))));
         }
     }
@@ -101,7 +95,7 @@ pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
                 language.text(label),
                 d.focus == focus,
             );
-            app.mouse.regions.push((button, Target::CommandHistory(a)));
+            frame.regions().push((button, Target::CommandHistory(a)));
         }
     }
 }

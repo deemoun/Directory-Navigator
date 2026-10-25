@@ -86,29 +86,37 @@ pub fn open(app: &mut App, root: usize) {
     if !enabled(root) {
         return;
     }
-    if let Some(editor) = app.desktop.editor_mut() {
-        editor.menu = Some((root, 0));
+    if let Some(editor) = app.desktop.active_editor_mut() {
+        editor.modals.set_editor_menu(Some((root, 0)));
     }
 }
 pub fn activate(app: &mut App, row: usize) {
-    let Some((root, _)) = app.desktop.editor().and_then(|editor| editor.menu) else {
+    let Some((root, _)) = app
+        .desktop
+        .active_editor()
+        .and_then(|editor| editor.modals.editor_menu())
+    else {
         return;
     };
     if let Some(command) = items(root).get(row).and_then(|item| item.action) {
-        if let Some(editor) = app.desktop.editor_mut() {
-            editor.menu = None;
+        if let Some(editor) = app.desktop.active_editor_mut() {
+            editor.modals.set_editor_menu(None);
         }
         super::action(app, command);
     }
 }
 pub fn key(app: &mut App, code: KeyCode) {
-    let Some((root, row)) = app.desktop.editor().and_then(|editor| editor.menu) else {
+    let Some((root, row)) = app
+        .desktop
+        .active_editor()
+        .and_then(|editor| editor.modals.editor_menu())
+    else {
         return;
     };
     match code {
         KeyCode::Esc | KeyCode::F(10) => {
-            if let Some(editor) = app.desktop.editor_mut() {
-                editor.menu = None;
+            if let Some(editor) = app.desktop.active_editor_mut() {
+                editor.modals.set_editor_menu(None);
             }
         }
         KeyCode::Left | KeyCode::Right | KeyCode::Tab | KeyCode::BackTab => {
@@ -145,8 +153,8 @@ pub fn key(app: &mut App, code: KeyCode) {
                     code == KeyCode::Up,
                 )),
             };
-            if let (Some(editor), Some(next)) = (app.desktop.editor_mut(), next) {
-                editor.menu = Some((root, next));
+            if let (Some(editor), Some(next)) = (app.desktop.active_editor_mut(), next) {
+                editor.modals.set_editor_menu(Some((root, next)));
             }
         }
         _ => {}

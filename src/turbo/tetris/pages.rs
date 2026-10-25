@@ -80,20 +80,20 @@ impl Scene {
             &crate::formatting::tail(title, r.width.saturating_sub(14)),
         );
     }
-    fn close(&mut self, r: Rect, app: &mut App) {
+    fn close(&mut self, r: Rect, _app: &App) {
         self.text(r.x + 2, r.y, 1, "[", 0x7f);
         self.text(r.x + 3, r.y, 1, "■", 0x7a);
         self.text(r.x + 4, r.y, 1, "]", 0x7f);
-        app.mouse.regions.push((
+        self.regions.push((
             Rect::new(r.x + 2, r.y, 3, 1),
             Target::Game(GameAction::Back),
         ));
     }
-    fn plain_button(&mut self, app: &mut App, r: Rect, label: &str, action: GameAction) {
+    fn plain_button(&mut self, app: &App, r: Rect, label: &str, action: GameAction) {
         self.paragraph(r, app.config.language.text(label), 0x30);
-        app.mouse.regions.push((r, Target::Game(action)));
+        self.regions.push((r, Target::Game(action)));
     }
-    fn classic(&mut self, app: &mut App, r: Rect, label: &str, action: GameAction, focused: bool) {
+    fn classic(&mut self, app: &App, r: Rect, label: &str, action: GameAction, focused: bool) {
         let label = app.config.language.text(label);
         self.fill(r.x + 1, r.y + 1, r.width, 1, 0x00);
         if self.profile == PaletteProfile::Terminal {
@@ -147,17 +147,17 @@ impl Scene {
                 );
             }
         }
-        app.mouse.regions.push((r, Target::Game(action)));
+        self.regions.push((r, Target::Game(action)));
     }
 }
 
-pub(super) fn draw(scene: &mut Scene, app: &mut App, game_y: u16) {
+pub(super) fn draw(scene: &mut Scene, app: &App, game_y: u16) {
     let game = app.desktop.game().expect("selected game");
     let screen = game.screen;
     if screen == Screen::Play {
         return;
     }
-    app.mouse.regions.clear();
+    scene.regions.clear();
     let lang = app.config.language;
     match screen {
         Screen::Setup { level, preview } => {
@@ -199,7 +199,7 @@ pub(super) fn draw(scene: &mut Scene, app: &mut App, game_y: u16) {
                     &format!(" — {}", lang.text(label)),
                     if selected { 0x7f } else { 0x78 },
                 );
-                app.mouse
+                scene
                     .regions
                     .push((row, Target::Game(GameAction::SetLevel(i as u8 + 1))));
             }
@@ -224,7 +224,7 @@ pub(super) fn draw(scene: &mut Scene, app: &mut App, game_y: u16) {
                 ),
                 if focus == 1 { 0x7f } else { 0x78 },
             );
-            app.mouse
+            scene
                 .regions
                 .push((check, Target::Game(GameAction::Preview)));
             scene.paragraph(
@@ -349,7 +349,7 @@ pub(super) fn draw(scene: &mut Scene, app: &mut App, game_y: u16) {
         }
     }
 }
-fn scores(scene: &mut Scene, app: &mut App) {
+fn scores(scene: &mut Scene, app: &App) {
     let lang = app.config.language;
     let r = Rect::new((scene.width - 72) / 2, (scene.height - 20) / 2, 72, 20);
     scene.window(r, lang.text("Tetris Top Ten"));

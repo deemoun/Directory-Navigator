@@ -10,10 +10,10 @@ use crate::{
     formatting::tail,
     mouse::Target,
 };
-pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
+pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
     let profile = app.config.palette;
     let dos = profile.styles();
-    let Some(tree) = &app.directory_tree else {
+    let Some(tree) = app.modals.directory_tree() else {
         return;
     };
     let g = geometry(area);
@@ -25,14 +25,8 @@ pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
         g.height,
         app.config.language.text(" Directory tree "),
     );
-    app.mouse.regions.clear();
-    super::dialog_style::close_button(
-        frame,
-        profile,
-        rect,
-        &mut app.mouse.regions,
-        Target::Tree(Action::Close),
-    );
+    frame.regions().clear();
+    super::dialog_style::close_button(frame, profile, rect, Target::Tree(Action::Close));
     let x = rect.x + 2;
     let w = rect.width - 5;
     let top = rect.y + 3;
@@ -69,11 +63,9 @@ pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
         let marker = crate::presentation::text::Span::raw(&entry.guide).width() as u16;
         let r = Rect::new(x, top + row as u16, w, 1);
         frame.render_widget(Paragraph::new(line).style(style), r);
-        app.mouse
-            .regions
-            .push((r, Target::Tree(Action::Row(index))));
+        frame.regions().push((r, Target::Tree(Action::Row(index))));
         if marker < w {
-            app.mouse.regions.push((
+            frame.regions().push((
                 Rect::new(x + marker, r.y, 1, 1),
                 Target::Tree(Action::Toggle(index)),
             ));
@@ -101,7 +93,7 @@ pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
             };
             let r = Rect::new(rect.right() - 2, top + row, 1, 1);
             frame.render_widget(Paragraph::new(glyph).style(dos(0x70)), r);
-            app.mouse.regions.push((r, Target::Tree(command)));
+            frame.regions().push((r, Target::Tree(command)));
         }
     }
     let path = tree
@@ -149,6 +141,6 @@ pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
             app.config.language.text(&label),
             tree.focus == index,
         );
-        app.mouse.regions.push((r, Target::Tree(command)));
+        frame.regions().push((r, Target::Tree(command)));
     }
 }

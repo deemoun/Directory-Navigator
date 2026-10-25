@@ -641,10 +641,23 @@ Choose a row with the arrows, Home/End or PageUp/PageDown, then Enter or Switch.
 A double-click also switches; Esc, Cancel or the title close control leaves the
 current window active. A `*` marks an editor with unsaved changes.
 
-Switching keeps documents open, including their cursor, scroll position and undo
-history. Panel paths, marks, filters and the command draft remain in place. F4
-from the panels resumes the existing editor. Close still uses the normal
-unsaved-change guard; exiting the application also checks a background editor.
+Switching keeps every editor and viewer open, including its cursor, scroll
+position, search and undo history. Panel paths, marks, filters and the command
+draft remain in place. F4 opens the highlighted file; opening a different file
+from the editor's Open dialog creates another document. Reopening the same file
+activates its existing editor or viewer. Explicit text/hex viewer requests reload
+that viewer in the requested mode.
 
-This first step supports one editor and one viewer alongside the file manager.
-Games and modal dialogs are not switchable. Windows remain session-only.
+The manager appears first, followed by documents in creation order. New untitled
+editors have distinct numbered labels. Closing a document affects only that
+window and uses the normal unsaved-change guard. Save As cannot claim a file
+already open or being saved in another editor.
+
+Exiting reviews all unsaved editors, starting with the most recently used.
+Cancel keeps all documents, including buffers already approved for discard;
+completed saves remain saved. Buffers also survive a settings-save failure.
+Dialogs block switching until closed, and nested help returns to its parent.
+
+Several editors and viewers can coexist. Games retain one instance and are not
+listed. Windows remain full-screen and session-only; open documents are not
+restored after restarting.

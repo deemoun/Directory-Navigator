@@ -25,17 +25,17 @@ pub enum GameAction {
 
 pub fn open(app: &mut App) {
     if app.job.is_some()
-        || !app.dialogs.is_empty()
+        || !app.dialogs().is_empty()
         || crate::focus::screen(app) == crate::focus::Screen::Viewer
-        || app.settings.is_some()
-        || app.prompt.is_some()
-        || app.pattern.is_some()
-        || app.columns_dialog.is_some()
+        || app.modals.settings().is_some()
+        || app.modals.prompt().is_some()
+        || app.modals.pattern().is_some()
+        || app.modals.columns_dialog().is_some()
     {
         return;
     }
     menu::close(app);
-    app.quick_search = None;
+    app.modals.set_quick_search(None);
     if app.desktop.game().is_none() {
         let path = app
             .config_store

@@ -44,7 +44,9 @@ impl Drop for Temp {
 }
 fn wait(app: &mut App) {
     let deadline = Instant::now() + Duration::from_secs(5);
-    while app.panels.iter().any(|p| p.loading) || app.desktop.editor().is_some_and(|e| e.busy()) {
+    while app.panels.iter().any(|p| p.loading)
+        || app.desktop.active_editor().is_some_and(|e| e.busy())
+    {
         app.poll();
         assert!(Instant::now() < deadline);
         thread::sleep(Duration::from_millis(1));
@@ -92,7 +94,12 @@ fn focus(app: &mut App, name: &str) {
         .unwrap();
 }
 fn buffer(app: &App) -> &Buffer {
-    app.desktop.editor().unwrap().buffer.as_ref().unwrap()
+    app.desktop
+        .active_editor()
+        .unwrap()
+        .buffer
+        .as_ref()
+        .unwrap()
 }
 
 #[test]
@@ -313,9 +320,9 @@ fn f4_worker_edit_undo_save_and_unsaved_close_cancel_discard() -> io::Result<()>
     app.panels[0].toggle_selection();
     key(&mut app, KeyCode::F(4));
     wait(&mut app);
-    assert!(app.dialogs.is_empty());
+    assert!(app.dialogs().is_empty());
     assert_eq!(
-        app.desktop.editor().unwrap().highlight.language,
+        app.desktop.active_editor().unwrap().highlight.language,
         Language::Rust
     );
     editor::paste(&mut app, "// é終\n");
@@ -331,14 +338,20 @@ fn f4_worker_edit_undo_save_and_unsaved_close_cancel_discard() -> io::Result<()>
     key(&mut app, KeyCode::Char('x'));
     key(&mut app, KeyCode::Esc);
     assert!(matches!(
-        app.desktop.editor().unwrap().modal,
+        app.desktop.active_editor().unwrap().modals.editor_modal(),
         Some(Modal::ConfirmClose)
     ));
     key(&mut app, KeyCode::Enter);
-    assert!(app.desktop.editor().unwrap().modal.is_none());
+    assert!(app
+        .desktop
+        .active_editor()
+        .unwrap()
+        .modals
+        .editor_modal()
+        .is_none());
     key(&mut app, KeyCode::Esc);
     key(&mut app, KeyCode::Char('d'));
-    assert!(app.desktop.editor().is_none());
+    assert!(app.desktop.active_editor().is_none());
     assert!(!app.quit);
     assert_eq!(app.panels[0].selected.len(), 1);
     assert!(!fs::read(&path)?.starts_with(b"x"));
@@ -357,14 +370,15 @@ fn new_document_save_as_and_all_quit_paths_preserve_unsaved_text() -> io::Result
     editor::paste(&mut app, "new.txt");
     key(&mut app, KeyCode::Enter);
     wait(&mut app);
-    assert!(app.quit && app.desktop.editor().is_none());
+    assert!(app.quit && app.desktop.active_editor().is_some());
+    assert_eq!(buffer(&app).text, "new é\n");
     assert_eq!(fs::read(temp.0.join("new.txt"))?, "new é\n".as_bytes());
     let mut app = temp.app()?;
     editor::open(&mut app, true);
     editor::paste(&mut app, "keep");
     app.request_exit();
     key(&mut app, KeyCode::Esc);
-    assert!(!app.quit && app.desktop.editor().is_some());
+    assert!(!app.quit && app.desktop.active_editor().is_some());
     modified(&mut app, KeyCode::Char('x'), KeyModifiers::ALT);
     key(&mut app, KeyCode::Char('c'));
     assert!(!app.quit);
@@ -391,7 +405,7 @@ fn failed_save_keeps_text_open_and_cancels_pending_exit() -> io::Result<()> {
     key(&mut app, KeyCode::Char('s'));
     wait(&mut app);
     assert!(!app.quit && buffer(&app).dirty());
-    assert!(!app.dialogs.is_empty());
+    assert!(!app.dialogs().is_empty());
     assert_eq!(fs::read(&path)?, b"external");
     key(&mut app, KeyCode::Esc);
     key(&mut app, KeyCode::Char('!'));
@@ -449,7 +463,7 @@ fn selection_clipboard_search_goto_and_mouse_colored_rendering() -> io::Result<(
     click(&mut app, A::MenuRoot(6));
     render(&mut app, 80, 25)?;
     click(&mut app, A::MenuRow(1));
-    assert!(!app.desktop.editor().unwrap().colors);
+    assert!(!app.desktop.active_editor().unwrap().colors);
     render(&mut app, 80, 25)?;
     click(&mut app, A::Help);
     render(&mut app, 80, 25)?;
@@ -460,6 +474,6 @@ fn selection_clipboard_search_goto_and_mouse_colored_rendering() -> io::Result<(
         .all(|(_, target)| *target == Target::Editor(A::Cancel)));
     click(&mut app, A::Cancel);
     key(&mut app, KeyCode::Esc);
-    assert!(app.desktop.editor().is_none());
+    assert!(app.desktop.active_editor().is_none());
     Ok(())
 }

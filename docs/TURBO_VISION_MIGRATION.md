@@ -25,6 +25,15 @@ for this finishing pass. Local runtime validation targets macOS ARM64.
   features remain disabled. Turbo Vision is now mandatory; no Cargo feature
   selects a renderer. `--no-default-features` also builds the native application.
 
+## Multi-document foundations
+
+Editors and viewers now have independent session documents, resolved-path reuse,
+Save As reservations and MRU quit review. Owned modal IDs replace the independent
+focus-priority chain. Shared owner/slot/generation request scopes guard background
+results. Viewport preparation is separate from immutable painting; each rendered
+frame contains its scene, cursor and translated/clipped mouse targets.
+See [document foundations](DOCUMENT_FOUNDATIONS.md) for lifecycle and validation.
+
 ## Owned presentation support
 
 - `presentation/layout.rs` owns geometry and the small layout allocator used by
@@ -53,7 +62,7 @@ for this finishing pass. Local runtime validation targets macOS ARM64.
 
 Local macOS ARM64 validation covers:
 
-- 405 native Rust tests pass; the existing opt-in native Trash check stays ignored.
+- 423 native Rust tests pass; the existing opt-in native Trash check stays ignored.
 - Formatting, all-target Clippy, release build and a no-default-features build.
 - 2,898 layout cases check viewport bounds. Feasible allocations compare against
   frozen pre-removal geometry; 40 wrapping cases preserve narrow widths,
@@ -65,6 +74,8 @@ Local macOS ARM64 validation covers:
   check the native transport and targets; they no longer invoke a legacy renderer.
   Palettes, languages, resized layouts, overlays, nested menus, viewer/editor,
   quick view, utilities, auxiliary dialogs and screensaver remain covered.
+- Terminal checks also cover three retained editors and two viewers, independent
+  undo, editor Open, discard/quit cancellation and Save As.
 - Terminal checks cover panes, menus, Tetris, viewer search/wrap, quick view,
   calculator history/help, Unicode editor paste, unsaved-close cancel, Save As to
   disposable files, mouse actions, resize, shell input and terminal restoration.

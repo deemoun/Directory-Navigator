@@ -39,9 +39,12 @@ enum Reply {
 }
 #[derive(Default)]
 pub struct State {
-    pub modal: Option<Modal>,
+    open_epoch: u64,
+    pub(crate) requests: crate::requests::RequestScope,
+    pub modals: crate::modals::ModalStack,
     task: Option<Task<io::Result<Reply>>>,
     editing: bool,
+    editing_document: Option<crate::desktop::WindowId>,
     pub pending: Option<runner::Plan>,
 }
 pub struct Modal {
@@ -164,10 +167,11 @@ pub fn load(path: PathBuf, local: bool) -> io::Result<Data> {
 }
 
 pub fn open_file(app: &mut App, path: PathBuf, local: bool) {
+    app.user_menu.open_epoch = app.desktop.activation_revision();
     crate::menu::close(app);
-    app.quick_search = None;
-    app.user_menu.modal = Some(Modal::default());
-    match Task::spawn("dn-user-menu", move |cancel| {
+    app.modals.set_quick_search(None);
+    app.user_menu.modals.set_user_menu(Some(Modal::default()));
+    match app.user_menu.requests.spawn("dn-user-menu", move |cancel| {
         cancel.check()?;
         load(path, local).map(Reply::Loaded)
     }) {
@@ -176,6 +180,7 @@ pub fn open_file(app: &mut App, path: PathBuf, local: bool) {
     }
 }
 pub fn open(app: &mut App, source: Source) {
+    app.user_menu.open_epoch = app.desktop.activation_revision();
     let directory = app.panels[app.active].path.clone();
     let fallback = match global() {
         Ok(p) => p,
@@ -185,9 +190,9 @@ pub fn open(app: &mut App, source: Source) {
         }
     };
     crate::menu::close(app);
-    app.quick_search = None;
-    app.user_menu.modal = Some(Modal::default());
-    let result = Task::spawn("dn-user-menu", move |cancel| {
+    app.modals.set_quick_search(None);
+    app.user_menu.modals.set_user_menu(Some(Modal::default()));
+    let result = app.user_menu.requests.spawn("dn-user-menu", move |cancel| {
         if source != Source::Global {
             for ancestor in directory.ancestors() {
                 cancel.check()?;
@@ -229,14 +234,14 @@ pub fn edit_definition(app: &mut App, local: bool) {
 fn edit(app: &mut App) {
     let Some(path) = app
         .user_menu
-        .modal
-        .as_ref()
+        .modals
+        .user_menu()
         .and_then(|m| m.data.as_ref())
         .map(|d| d.path.clone())
     else {
         return;
     };
-    let task = Task::spawn("dn-menu-edit", move |cancel| {
+    let task = app.user_menu.requests.spawn("dn-menu-edit", move |cancel| {
         cancel.check()?;
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent)?;
@@ -289,7 +294,7 @@ pub fn poll(app: &mut App) -> bool {
         app.user_menu.task = None;
         match result {
             Ok(Reply::Loaded(data)) => {
-                if let Some(m) = &mut app.user_menu.modal {
+                if let Some(m) = app.user_menu.modals.user_menu_mut() {
                     m.status = data.error.clone().unwrap_or_else(|| {
                         "Enter opens/runs · F2 Global/Local · F4 Edit · Ctrl+R reload".into()
                     });
@@ -300,10 +305,18 @@ pub fn poll(app: &mut App) -> bool {
                     edit(app);
                 }
             }
-            Ok(Reply::Edit(path)) => crate::editor::open_path(app, path),
+            Ok(Reply::Edit(path)) => {
+                let foreground = app.user_menu.open_epoch == app.desktop.activation_revision()
+                    && app
+                        .modal_top()
+                        .is_none_or(|m| m.focus == crate::focus::Focus::UserMenu);
+                app.user_menu.editing_document =
+                    crate::editor::controls::open_path_with_focus(app, path, foreground);
+                app.user_menu.editing = app.user_menu.editing_document.is_some();
+            }
             Err(e) => {
                 app.user_menu.editing = false;
-                if let Some(m) = &mut app.user_menu.modal {
+                if let Some(m) = app.user_menu.modals.user_menu_mut() {
                     m.status = e.to_string();
                 }
                 app.error(format!("User menu: {e}"));
@@ -311,7 +324,13 @@ pub fn poll(app: &mut App) -> bool {
         }
         return true;
     }
-    if app.user_menu.editing && app.user_menu.task.is_none() && app.desktop.editor().is_none() {
+    if app.user_menu.editing
+        && app.user_menu.task.is_none()
+        && app
+            .user_menu
+            .editing_document
+            .is_some_and(|id| !app.desktop.contains(id))
+    {
         app.user_menu.editing = false;
         reload(app);
         return true;
@@ -321,8 +340,8 @@ pub fn poll(app: &mut App) -> bool {
 fn reload(app: &mut App) {
     if let Some((path, local)) = app
         .user_menu
-        .modal
-        .as_ref()
+        .modals
+        .user_menu()
         .and_then(|m| m.data.as_ref())
         .map(|d| (d.path.clone(), d.local))
     {
@@ -480,14 +499,14 @@ pub fn action(app: &mut App, action: Action) {
     if action == Action::Switch {
         let local = app
             .user_menu
-            .modal
-            .as_ref()
+            .modals
+            .user_menu()
             .and_then(|m| m.data.as_ref())
             .is_some_and(|d| d.local);
         open(app, if local { Source::Global } else { Source::Local });
         return;
     }
-    let Some(m) = &mut app.user_menu.modal else {
+    let Some(m) = app.user_menu.modals.user_menu_mut() else {
         return;
     };
     match action {
@@ -502,7 +521,7 @@ pub fn action(app: &mut App, action: Action) {
         Action::Run => {
             if let Some(plan) = m.review.take() {
                 app.user_menu.pending = Some(plan);
-                app.user_menu.modal = None;
+                app.user_menu.modals.set_user_menu(None);
             }
         }
         Action::Back => {
@@ -530,7 +549,7 @@ pub fn action(app: &mut App, action: Action) {
             let commands = item.commands.clone();
             match plan(app, &commands) {
                 Ok(plan) => {
-                    let Some(m) = app.user_menu.modal.as_mut() else {
+                    let Some(m) = app.user_menu.modals.user_menu_mut() else {
                         return;
                     };
                     m.return_cursor = index;
@@ -574,7 +593,7 @@ pub fn action(app: &mut App, action: Action) {
     }
 }
 pub fn key(app: &mut App, key: KeyEvent) {
-    let Some(m) = &mut app.user_menu.modal else {
+    let Some(m) = app.user_menu.modals.user_menu_mut() else {
         return;
     };
     if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('r') {
@@ -583,7 +602,7 @@ pub fn key(app: &mut App, key: KeyEvent) {
     }
     let review = m.review.is_some();
     match key.code {
-        KeyCode::F(1) => app.dialogs.push(crate::dialog::Dialog {title:" User menu help ",message:"Arrows/Page keys move; Enter activates; Right opens a submenu.\nLeft/Esc returns; ~letters~ are hotkeys.\nF2 switches local/global; F4 edits the definition.\nCtrl+R reloads after external changes.\nCommands use separate arguments, with quotes for spaces.\nWhole arguments: {file}, {name}, {dir}, {other_file},\n{other_dir}, {selected}, {shell}.\nUse an explicit shell for pipelines and scripts.\nEvery command action is reviewed before Run; arrows scroll.\nPrograms run in the normal terminal; Enter returns to DN.".into()}),
+        KeyCode::F(1) => app.push_dialog(crate::dialog::Dialog {title:" User menu help ",message:"Arrows/Page keys move; Enter activates; Right opens a submenu.\nLeft/Esc returns; ~letters~ are hotkeys.\nF2 switches local/global; F4 edits the definition.\nCtrl+R reloads after external changes.\nCommands use separate arguments, with quotes for spaces.\nWhole arguments: {file}, {name}, {dir}, {other_file},\n{other_dir}, {selected}, {shell}.\nUse an explicit shell for pipelines and scripts.\nEvery command action is reviewed before Run; arrows scroll.\nPrograms run in the normal terminal; Enter returns to DN.".into()}),
         KeyCode::Esc => action(app, if review { Action::Cancel } else { Action::Back }),
         KeyCode::Up => m.step(-1),
         KeyCode::Down => m.step(1),
@@ -646,7 +665,7 @@ pub fn mouse(app: &mut App, event: MouseEvent, target: Option<crate::mouse::Targ
             }
         }
         MouseEventKind::ScrollUp | MouseEventKind::ScrollDown => {
-            if let Some(m) = &mut app.user_menu.modal {
+            if let Some(m) = app.user_menu.modals.user_menu_mut() {
                 m.step(if event.kind == MouseEventKind::ScrollUp {
                     -3
                 } else {

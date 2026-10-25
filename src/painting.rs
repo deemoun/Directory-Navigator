@@ -4,7 +4,7 @@ use crate::presentation::{
     style::Style,
     text::{Line, Text},
 };
-use crate::{app::App, layout::Prepared};
+
 #[derive(Clone, Copy, Default, PartialEq, Eq)]
 pub enum BorderType {
     #[default]
@@ -33,8 +33,8 @@ pub trait Frame {
     fn palette(&mut self, profile: crate::palette::PaletteProfile);
     fn render_widget(&mut self, widget: impl Widget, area: Rect);
     fn set_cursor_position(&mut self, position: impl Into<crate::presentation::layout::Position>);
-    fn manager(&mut self, app: &mut App, prepared: &Prepared) -> Vec<Rect>;
-    fn game(&mut self, app: &mut App, area: Rect);
+    fn regions(&mut self) -> &mut Vec<(Rect, crate::mouse::Target)>;
+    fn compose(&mut self, scene: crate::turbo::scene::Scene);
 }
 pub trait Widget {
     fn native(self, frame: &mut NativeFrame, area: Rect);
@@ -365,8 +365,12 @@ impl NativeFrame {
                 profile,
                 cells: Default::default(),
                 cursor: None,
+                regions: Vec::new(),
             },
         }
+    }
+    pub(crate) fn replace(&mut self, scene: crate::turbo::scene::Scene) {
+        self.scene = scene;
     }
     pub(crate) fn finish(self) -> crate::turbo::scene::Scene {
         self.scene
@@ -442,17 +446,13 @@ impl Frame for NativeFrame {
         let p = position.into();
         self.scene.cursor = Some((p.x, p.y));
     }
-    fn manager(&mut self, app: &mut App, prepared: &Prepared) -> Vec<Rect> {
-        let (scene, positions) =
-            crate::turbo::manager::prepare(app, prepared, self.scene.width, self.scene.height);
-        self.scene = scene;
-
-        positions
+    fn regions(&mut self) -> &mut Vec<(Rect, crate::mouse::Target)> {
+        &mut self.scene.regions
     }
-    fn game(&mut self, app: &mut App, area: Rect) {
-        let overlay = crate::turbo::tetris::prepare(app, area.width, area.height);
-        self.scene.cells.extend(overlay.cells);
-        self.scene.cursor = overlay.cursor;
+    fn compose(&mut self, scene: crate::turbo::scene::Scene) {
+        self.scene.cells.extend(scene.cells);
+        self.scene.regions.extend(scene.regions);
+        self.scene.cursor = scene.cursor;
     }
 }
 
