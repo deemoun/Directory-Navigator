@@ -8,8 +8,9 @@ use crossterm::{
     style::{Attribute, ResetColor, SetAttribute},
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-#[cfg(not(feature = "turbo-vision"))]
+#[cfg(all(not(feature = "turbo-vision"), feature = "legacy-ui"))]
 use ratatui::backend::CrosstermBackend;
+#[cfg(all(not(feature = "turbo-vision"), feature = "legacy-ui"))]
 use ratatui::Terminal;
 use std::{
     cell::Cell,
@@ -18,8 +19,8 @@ use std::{
 };
 
 #[cfg(feature = "turbo-vision")]
-pub type Screen = Terminal<crate::turbo::TurboBackend<Stdout>>;
-#[cfg(not(feature = "turbo-vision"))]
+pub type Screen = crate::turbo::TurboBackend<Stdout>;
+#[cfg(all(not(feature = "turbo-vision"), feature = "legacy-ui"))]
 pub type Screen = Terminal<CrosstermBackend<Stdout>>;
 
 pub struct Session {
@@ -76,9 +77,9 @@ impl Session {
     pub fn poll(&self, screen: &mut Screen, timeout: Duration) -> io::Result<Option<event::Event>> {
         #[cfg(feature = "turbo-vision")]
         {
-            screen.backend_mut().poll_event(timeout)
+            screen.poll_event(timeout)
         }
-        #[cfg(not(feature = "turbo-vision"))]
+        #[cfg(all(not(feature = "turbo-vision"), feature = "legacy-ui"))]
         {
             let _ = screen;
             if event::poll(timeout)? {
@@ -144,8 +145,8 @@ impl Session {
             EnableBracketedPaste
         )?;
         #[cfg(feature = "turbo-vision")]
-        let screen = Terminal::new(crate::turbo::TurboBackend::new(io::stdout())?)?;
-        #[cfg(not(feature = "turbo-vision"))]
+        let screen = crate::turbo::TurboBackend::new(io::stdout())?;
+        #[cfg(all(not(feature = "turbo-vision"), feature = "legacy-ui"))]
         let screen = Terminal::new(CrosstermBackend::new(io::stdout()))?;
         Ok((guard, screen))
     }

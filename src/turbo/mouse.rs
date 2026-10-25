@@ -1,7 +1,7 @@
 //! Native positional routing. Targets remain domain commands; TV Group performs
 //! front-to-back hit dispatch for the current frame, including modal surfaces.
 use crate::mouse::Target;
-use ratatui::layout::Rect as HitRect;
+use crate::presentation::layout::Rect as HitRect;
 use std::{cell::RefCell, rc::Rc};
 use turbo_vision::{
     core::{

@@ -1,6 +1,6 @@
 use crate::painting::{Frame, Paragraph};
+use crate::presentation::layout::Rect;
 use crate::{app::App, mouse::Target, palette::PaletteProfile};
-use ratatui::layout::Rect;
 pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
     let Some(dialog) = &app.color_dialog else {
         return;

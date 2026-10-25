@@ -176,7 +176,7 @@ impl NativeDesktop {
     }
     pub(crate) fn mouse_target(
         &self,
-        regions: &[(ratatui::layout::Rect, crate::mouse::Target)],
+        regions: &[(crate::presentation::layout::Rect, crate::mouse::Target)],
         x: u16,
         y: u16,
     ) -> Option<crate::mouse::Target> {

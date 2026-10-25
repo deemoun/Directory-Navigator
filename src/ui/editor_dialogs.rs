@@ -1,4 +1,5 @@
 use crate::painting::{Frame, Paragraph};
+use crate::presentation::{layout::Rect, text::Span};
 use crate::{
     app::App,
     editor::{EditorAction as A, Modal, PromptKind},
@@ -6,7 +7,6 @@ use crate::{
     formatting,
     mouse::Target,
 };
-use ratatui::{layout::Rect, text::Span};
 fn button(
     frame: &mut impl Frame,
     app: &mut App,

@@ -185,7 +185,8 @@ pub fn key(app: &mut App, key: KeyEvent) {
         match key.code {
             KeyCode::Tab | KeyCode::BackTab => {
                 if let Some(game) = app.desktop.game_mut() {
-                    game.setup_focus = (focus + if key.code == KeyCode::Tab { 1 } else { 3 }) % 4;
+                    game.setup_focus =
+                        crate::control_focus::cycle(focus, 4, key.code == KeyCode::BackTab);
                 }
             }
             KeyCode::Right | KeyCode::Char('+') => action(app, GameAction::LevelUp),

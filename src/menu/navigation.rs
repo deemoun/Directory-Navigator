@@ -70,10 +70,14 @@ pub fn key(app: &mut App, code: KeyCode) {
             app.submenus.pop();
         }
         KeyCode::Esc => close(app),
-        KeyCode::Left | KeyCode::BackTab => {
-            open(app, (root + super::LABELS.len() - 1) % super::LABELS.len())
-        }
-        KeyCode::Tab => open(app, (root + 1) % super::LABELS.len()),
+        KeyCode::Left | KeyCode::BackTab => open(
+            app,
+            crate::control_focus::cycle(root, super::LABELS.len(), true),
+        ),
+        KeyCode::Tab => open(
+            app,
+            crate::control_focus::cycle(root, super::LABELS.len(), false),
+        ),
         KeyCode::Right => {
             if entries
                 .get(row)
@@ -81,27 +85,32 @@ pub fn key(app: &mut App, code: KeyCode) {
             {
                 activate(app, depth, row);
             } else if depth == 0 {
-                open(app, (root + 1) % super::LABELS.len());
+                open(
+                    app,
+                    crate::control_focus::cycle(root, super::LABELS.len(), false),
+                );
             }
         }
         KeyCode::Enter => activate(app, depth, row),
         KeyCode::Up | KeyCode::Down | KeyCode::Home | KeyCode::End => {
-            let mut candidate = match code {
-                KeyCode::Home => entries.len().saturating_sub(1),
-                KeyCode::End => 0,
-                _ => row,
+            let choices: Vec<_> = entries
+                .iter()
+                .enumerate()
+                .filter(|(_, item)| item.selectable())
+                .map(|(i, _)| i)
+                .collect();
+            let next = match code {
+                KeyCode::Home => choices.first().copied(),
+                KeyCode::End => choices.last().copied(),
+                _ if choices.is_empty() => None,
+                _ => Some(crate::control_focus::select(
+                    row,
+                    &choices,
+                    code == KeyCode::Up,
+                )),
             };
-            let backwards = matches!(code, KeyCode::Up | KeyCode::End);
-            for _ in 0..entries.len() {
-                candidate = if backwards {
-                    (candidate + entries.len() - 1) % entries.len()
-                } else {
-                    (candidate + 1) % entries.len()
-                };
-                if entries[candidate].selectable() {
-                    select(app, depth, candidate);
-                    break;
-                }
+            if let Some(next) = next {
+                select(app, depth, next);
             }
         }
         KeyCode::Char(c) => {

@@ -1,11 +1,11 @@
 use crate::painting::{Frame, Paragraph, Wrap};
+use crate::presentation::layout::Rect;
 use crate::{
     app::App,
     filesystem::display_name,
     mouse::Target,
     utilities::{characters::Page, Action, Kind},
 };
-use ratatui::layout::Rect;
 fn text(
     frame: &mut impl Frame,
     profile: crate::palette::PaletteProfile,

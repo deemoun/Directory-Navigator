@@ -1,7 +1,8 @@
 # Directory Navigator — beta
 
 ## Architecture
-- Native Rust `dn`: Ratatui/Crossterm/Chrono, Unicode segmentation, Unix libc;
+- Native Rust `dn`: Turbo Vision/Crossterm/Chrono, Unicode segmentation, Unix libc;
+  Ratatui remains behind text/style/layout and reference-renderer boundaries;
   macOS native Trash via `trash`, Windows native shell APIs; minimal ZIP/TAR/gzip
   codec features via zip/tar/flate2; TOML parser for grouped preferences.
 - Session Desktop owns editor/viewer/game content and stable WindowId values;
@@ -20,17 +21,26 @@
 Current Turbo Vision status is authoritative in docs/TURBO_VISION_MIGRATION.md;
 older increment entries below also record earlier migration stages.
 
-- All runtime surfaces now use a shared native painter, including dropdowns,
-  dialogs, quick view, editor/viewer, utilities and auxiliary windows. Screen
-  descriptions share independent native/reference primitives; native frames leave
-  the old canvas empty. A TV Group resolves mouse hits in front-to-back order,
-  retaining domain handlers for modifiers, wheel, drag and double clicks. The
-  overlay-marker bridge is retired. Editor/viewer data and filesystem guards stay
-  in the existing models/controllers. Ratatui text/geometry, the outer terminal
-  adapter, reference renderer and some per-control focus ownership remain.
-  Local ARM64: 399 tests pass (one opt-in Trash test ignored), 87 fallback checks,
-  1,876 native frame pairs, reflow/mouse tests, fmt/Clippy/release and interactive
-  viewer/quick-view/calculator/editor/Save As/terminal-restoration workflows pass.
+- Production now uses Turbo Vision's terminal directly: no Ratatui Terminal,
+  Frame, Buffer or widget rendering. Native primitives own borders/wrapping;
+  the codec owns grapheme/color cells. Reference buffers stay unallocated on the
+  runtime path, including resize and terminal clear/resume. `presentation` is
+  the sole shared Ratatui text/style/layout data boundary; reference rendering
+  and reference transport live separately. The default dependency graph enables
+  no Ratatui features. The legacy renderer requires `--no-default-features
+  --features legacy-ui`. Data/layout replacement and reference retirement remain
+  before the package can be removed completely.
+- All runtime surfaces use native painting, including dropdowns, dialogs, quick
+  view, editor/viewer, utilities and auxiliary windows. Native Groups own control
+  traversal in menus/search/settings/utilities/tools and positional mouse hits.
+  Disabled choices and external mouse/mnemonic focus are synchronized. Foreground
+  modal scopes and document z-order remain native; domain commands retain
+  save-before-close and filesystem guards. Full-screen layouts are preserved.
+  Local ARM64: 401 native tests and 382 legacy tests pass (one opt-in Trash check
+  ignored per suite); direct-host appearance comparisons (1,876 frame pairs),
+  fmt/Clippy/release and interactive pane/game/viewer/quick-view/
+  calculator/editor/Save As/resize/shell-restoration workflows pass. Windows/Linux
+  validation was excluded; native Intel Mac validation also remains outstanding.
 - Native main file-manager drawing: both panes (brief/details and all columns),
   headers, rows/type/tag/selection colors, scrollbars, filters/quick search,
   details/totals/space, menu bar/clock, command line/cursor and function bar now

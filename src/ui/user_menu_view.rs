@@ -1,10 +1,10 @@
 use crate::painting::{Frame, Paragraph};
-use crate::{
-    app::App, filesystem::display_name, formatting::tail, mouse::Target, user_menu::Action,
-};
-use ratatui::{
+use crate::presentation::{
     layout::Rect,
     text::{Line, Span},
+};
+use crate::{
+    app::App, filesystem::display_name, formatting::tail, mouse::Target, user_menu::Action,
 };
 pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
     let profile = app.config.palette;

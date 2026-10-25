@@ -1,5 +1,9 @@
 use super::theme::entry_color;
 use crate::painting::{Block, BorderType, Borders, Cell, Frame, Paragraph, Row, Table};
+use crate::presentation::{
+    layout::{Constraint, Rect},
+    text::{Line, Span},
+};
 use crate::{
     columns::ColumnPreset,
     config::Config,
@@ -8,10 +12,6 @@ use crate::{
     panel::Panel,
     panel_layout::{PanelGeometry, PanelLayout},
     quick_search::QuickSearch,
-};
-use ratatui::{
-    layout::{Constraint, Rect},
-    text::{Line, Span},
 };
 
 pub(super) fn draw_panel(
@@ -296,7 +296,7 @@ pub(super) fn draw_panel(
                 config,
                 geometry.totals.width,
             ))
-            .alignment(ratatui::layout::Alignment::Center),
+            .alignment(crate::presentation::layout::Alignment::Center),
             geometry.totals,
         );
         String::new()
@@ -313,7 +313,7 @@ pub(super) fn draw_panel(
             config,
             geometry.space.width,
         ))
-        .alignment(ratatui::layout::Alignment::Center),
+        .alignment(crate::presentation::layout::Alignment::Center),
         geometry.space,
     );
 }

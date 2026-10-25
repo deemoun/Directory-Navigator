@@ -329,7 +329,7 @@ pub fn function(
     number: u8,
     label: &str,
     enabled: bool,
-) -> ratatui::text::Line<'static> {
+) -> crate::presentation::text::Line<'static> {
     if profile.is_mac() {
         palette.function_key(
             format!("^O{} ", number % 10),

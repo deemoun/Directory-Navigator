@@ -1,11 +1,11 @@
 //! Session-only command prompt; commands share the interactive user-menu runner.
 use crate::painting::{Frame, Paragraph};
+use crate::presentation::layout::Rect;
 use crate::{
     app::App,
     user_menu::runner::{CommandSpec, Plan},
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use ratatui::layout::Rect;
 use std::{ffi::OsString, io};
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;

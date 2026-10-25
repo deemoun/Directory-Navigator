@@ -127,8 +127,8 @@ pub fn key(app: &mut App, key: KeyEvent) {
             };
             action(app, command);
         }
-        KeyCode::Tab => list.focus = (list.focus + 1) % 3,
-        KeyCode::BackTab => list.focus = (list.focus + 2) % 3,
+        KeyCode::Tab => list.focus = crate::control_focus::cycle(list.focus, 3, false),
+        KeyCode::BackTab => list.focus = crate::control_focus::cycle(list.focus, 3, true),
         KeyCode::Up => {
             list.cursor = list.cursor.saturating_sub(1);
             list.focus = 0;

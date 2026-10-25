@@ -1,10 +1,10 @@
 use crate::painting::{Block, Frame, Paragraph};
+use crate::presentation::layout::Rect;
 use crate::{
     app::App,
     mouse::Target,
     screensaver::{ACCEPT, CANCEL, DELAYS, PREVIEW},
 };
-use ratatui::layout::Rect;
 
 pub(super) fn draw_sky(frame: &mut impl Frame, app: &mut App, area: Rect) {
     let dos = app.config.palette.styles();

@@ -1,4 +1,5 @@
 use crate::painting::{Frame, Paragraph};
+use crate::presentation::layout::Rect;
 use crate::{
     app::App,
     discovery::{Action, Kind},
@@ -6,7 +7,6 @@ use crate::{
     formatting::tail,
     mouse::Target,
 };
-use ratatui::layout::Rect;
 pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
     let profile = app.config.palette;
     let dos = profile.styles();
@@ -57,7 +57,8 @@ pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
             Rect::new(x, rect.y + 3, w, 1),
         );
         let input = Rect::new(x, rect.y + 4, w, 1);
-        let column = ratatui::text::Line::from(&m.prefs.pattern[..m.input_cursor]).width();
+        let column =
+            crate::presentation::text::Line::from(&m.prefs.pattern[..m.input_cursor]).width();
         let scroll = column.saturating_sub(usize::from(w.saturating_sub(1)));
         frame.render_widget(
             Paragraph::new(display_name(&m.prefs.pattern))

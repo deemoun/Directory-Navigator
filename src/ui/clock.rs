@@ -1,6 +1,6 @@
 use crate::app::App;
 use crate::painting::{Frame, Paragraph};
-use ratatui::layout::Rect;
+use crate::presentation::layout::Rect;
 pub(super) fn visible(app: &App) -> bool {
     app.config.show_clock
         && app.desktop.game().is_none()

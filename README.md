@@ -98,11 +98,14 @@ editor/viewer, utilities and Tetris all use native painting while preserving
 existing appearance and application guards. Unicode graphemes, colors, paste,
 cursor placement and terminal cleanup remain supported.
 
-The migration is **in progress**: shared text/geometry types, the outer terminal
-adapter, the reference renderer and some control/focus ownership still need
-cleanup. Use `cargo build --release --no-default-features` for the original
-renderer. See [migration status](docs/TURBO_VISION_MIGRATION.md) for the exact
-implementation, local validation and remaining work.
+The runtime now draws directly through Turbo Vision without Ratatui's Terminal,
+Frame or screen buffer. Native groups handle control traversal and mouse hits.
+Ratatui remains only for text/style/layout data behind `presentation`, plus the
+isolated comparison renderer; its Crossterm backend is disabled in the default
+build. Build the original comparison renderer with
+`cargo build --release --no-default-features --features legacy-ui`.
+See [migration status](docs/TURBO_VISION_MIGRATION.md) for implementation,
+validation and the remaining dependency-removal work.
 
 | Platform | Current status |
 | --- | --- |

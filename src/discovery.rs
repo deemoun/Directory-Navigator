@@ -290,8 +290,8 @@ pub fn key(app: &mut App, event: KeyEvent) {
     }
     if m.kind == Kind::FindForm {
         match event.code {
-            KeyCode::Tab => m.focus = (m.focus + 1) % 5,
-            KeyCode::BackTab => m.focus = (m.focus + 4) % 5,
+            KeyCode::Tab => m.focus = crate::control_focus::cycle(m.focus, 5, false),
+            KeyCode::BackTab => m.focus = crate::control_focus::cycle(m.focus, 5, true),
             KeyCode::Enter => {
                 let command = match m.focus {
                     1 | 2 => Action::Toggle(m.focus),
@@ -326,8 +326,8 @@ pub fn key(app: &mut App, event: KeyEvent) {
     } else {
         let buttons = if m.kind == Kind::Sizes { 3 } else { 5 };
         match event.code {
-            KeyCode::Tab => m.focus = (m.focus + 1) % buttons,
-            KeyCode::BackTab => m.focus = (m.focus + buttons - 1) % buttons,
+            KeyCode::Tab => m.focus = crate::control_focus::cycle(m.focus, buttons, false),
+            KeyCode::BackTab => m.focus = crate::control_focus::cycle(m.focus, buttons, true),
             KeyCode::Up => m.step(-1),
             KeyCode::Down => m.step(1),
             KeyCode::PageUp => m.step(-(m.rows as isize)),

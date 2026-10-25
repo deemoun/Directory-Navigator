@@ -15,7 +15,7 @@ pub fn grouped_bytes(bytes: u128) -> String {
 
 /// Fit display text from the left, preserving the end of long paths/names.
 pub fn tail(text: &str, width: u16) -> String {
-    use ratatui::text::Span;
+    use crate::presentation::text::Span;
     let width = usize::from(width);
     if Span::raw(text).width() <= width {
         return text.into();

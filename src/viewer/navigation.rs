@@ -1,7 +1,7 @@
 use super::Viewer;
+use crate::presentation::text::Span;
 use crate::{app::App, dialog};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use ratatui::text::Span;
 use std::ops::Range;
 use unicode_segmentation::UnicodeSegmentation;
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -318,11 +318,11 @@ pub fn key(app: &mut App, key: KeyEvent) {
         let command = match key.code {
             KeyCode::Esc => Some(Action::Cancel),
             KeyCode::Tab => {
-                dialog.focus = (dialog.focus + 1) % 4;
+                dialog.focus = crate::control_focus::cycle(dialog.focus, 4, false);
                 None
             }
             KeyCode::BackTab => {
-                dialog.focus = (dialog.focus + 3) % 4;
+                dialog.focus = crate::control_focus::cycle(dialog.focus, 4, true);
                 None
             }
             KeyCode::Enter => Some(if dialog.focus == 3 {

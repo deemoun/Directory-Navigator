@@ -1,6 +1,6 @@
 use crate::painting::{Frame, Paragraph};
+use crate::presentation::{layout::Rect, text::Line};
 use crate::{app::App, focus::Screen, mouse::Target, shortcuts, welcome};
-use ratatui::{layout::Rect, text::Line};
 
 pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
     let Some(welcome) = &app.welcome.dialog else {

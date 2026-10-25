@@ -80,8 +80,8 @@ pub fn key(app: &mut App, code: KeyCode) {
         KeyCode::Esc => cancel(app),
         KeyCode::Enter if dialog.cursor == 3 => cancel(app),
         KeyCode::Enter => accept(app),
-        KeyCode::Tab => dialog.cursor = (dialog.cursor + 1) % 4,
-        KeyCode::BackTab => dialog.cursor = (dialog.cursor + 3) % 4,
+        KeyCode::Tab => dialog.cursor = crate::control_focus::cycle(dialog.cursor, 4, false),
+        KeyCode::BackTab => dialog.cursor = crate::control_focus::cycle(dialog.cursor, 4, true),
         KeyCode::Left | KeyCode::Right | KeyCode::Up | KeyCode::Down | KeyCode::Char(' ')
             if dialog.cursor < 2 =>
         {

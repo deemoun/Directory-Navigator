@@ -1,6 +1,6 @@
 //! Legacy text adapter; footer values are toolkit-neutral.
+use crate::presentation::text::{Line, Span};
 use crate::{config::Config, panel::Panel};
-use ratatui::text::{Line, Span};
 fn line(text: crate::panel_status::Line, config: &Config) -> Line<'static> {
     Line::from(
         text.spans

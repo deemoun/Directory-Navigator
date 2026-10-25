@@ -235,8 +235,8 @@ pub fn key(app: &mut App, key: KeyEvent) {
         Some(Kind::Calculator) => {
             let calc = &mut app.utilities.calculator;
             match key.code {
-                KeyCode::Tab => calc.focus = (calc.focus + 1) % 10,
-                KeyCode::BackTab => calc.focus = (calc.focus + 9) % 10,
+                KeyCode::Tab => calc.focus = crate::control_focus::cycle(calc.focus, 10, false),
+                KeyCode::BackTab => calc.focus = crate::control_focus::cycle(calc.focus, 10, true),
                 KeyCode::Up if calc.focus == 0 => {
                     calc.recall(true);
                     calc.result = None;
@@ -248,11 +248,11 @@ pub fn key(app: &mut App, key: KeyEvent) {
                     calc.error = None;
                 }
                 KeyCode::Up | KeyCode::Down if (1..=5).contains(&calc.focus) => {
-                    calc.focus = if key.code == KeyCode::Up {
-                        (calc.focus + 3) % 5 + 1
-                    } else {
-                        calc.focus % 5 + 1
-                    };
+                    calc.focus = crate::control_focus::select(
+                        calc.focus,
+                        &[1, 2, 3, 4, 5],
+                        key.code == KeyCode::Up,
+                    );
                     command = Some(Action::Base(calc.focus - 1));
                 }
                 KeyCode::Enter => {
@@ -291,8 +291,8 @@ pub fn key(app: &mut App, key: KeyEvent) {
             let chart = &mut app.utilities.chart;
             let byte = chart.selected();
             match key.code {
-                KeyCode::Tab => chart.focus = (chart.focus + 1) % 5,
-                KeyCode::BackTab => chart.focus = (chart.focus + 4) % 5,
+                KeyCode::Tab => chart.focus = crate::control_focus::cycle(chart.focus, 5, false),
+                KeyCode::BackTab => chart.focus = crate::control_focus::cycle(chart.focus, 5, true),
                 KeyCode::Enter | KeyCode::Char(' ') => {
                     command = Some(match chart.focus {
                         1 => Action::Page(Page::Ascii),
@@ -317,7 +317,9 @@ pub fn key(app: &mut App, key: KeyEvent) {
             }
         }
         Some(Kind::System | Kind::Memory) => match key.code {
-            KeyCode::Tab | KeyCode::BackTab => app.utilities.focus ^= 1,
+            KeyCode::Tab | KeyCode::BackTab => {
+                app.utilities.focus = crate::control_focus::cycle(app.utilities.focus, 2, false)
+            }
             KeyCode::Char('r') | KeyCode::F(5) => command = Some(Action::Refresh),
             KeyCode::Enter => {
                 command = Some(if app.utilities.focus == 0 {

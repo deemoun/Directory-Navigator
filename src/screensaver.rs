@@ -215,10 +215,10 @@ pub fn key(app: &mut App, code: KeyCode) {
     match code {
         KeyCode::Esc => command(app, CANCEL),
         KeyCode::Tab | KeyCode::Down | KeyCode::Right => {
-            setup.cursor = (setup.cursor + 1) % CONTROL_COUNT
+            setup.cursor = crate::control_focus::cycle(setup.cursor, CONTROL_COUNT, false)
         }
         KeyCode::BackTab | KeyCode::Up | KeyCode::Left => {
-            setup.cursor = (setup.cursor + CONTROL_COUNT - 1) % CONTROL_COUNT
+            setup.cursor = crate::control_focus::cycle(setup.cursor, CONTROL_COUNT, true)
         }
         KeyCode::Enter | KeyCode::Char(' ') => {
             let i = setup.cursor;

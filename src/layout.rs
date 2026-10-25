@@ -1,6 +1,6 @@
 //! Explicit viewport preparation. Painting consumes these dimensions and geometry.
+use crate::presentation::layout::{Constraint, Layout, Rect};
 use crate::{app::App, panel_layout::PanelGeometry};
-use ratatui::layout::{Constraint, Layout, Rect};
 pub struct Prepared {
     pub regions: [Rect; 4],
     pub panel_areas: [Rect; 2],
@@ -31,7 +31,7 @@ pub fn prepare(app: &mut App, area: Rect) -> Prepared {
     let panel_areas = [p[0], p[1]];
     let panels = std::array::from_fn(|i| {
         PanelGeometry::new(
-            panel_areas[i].inner(ratatui::layout::Margin::new(1, 1)),
+            panel_areas[i].inner(crate::presentation::layout::Margin::new(1, 1)),
             app.config.layouts[i],
         )
     });
@@ -164,7 +164,7 @@ pub struct MessageLayout {
     pub maximum: usize,
 }
 pub fn message_layout(area: Rect, title: &str, text: &str) -> MessageLayout {
-    use ratatui::text::Span;
+    use crate::presentation::text::Span;
     let text = text
         .lines()
         .map(crate::filesystem::display_name)
@@ -203,7 +203,7 @@ pub(crate) fn wrap(text: &str, width: u16) -> Vec<String> {
         let mut row = String::new();
         let mut cells = 0;
         for grapheme in line.graphemes(true) {
-            let size = ratatui::text::Span::raw(grapheme).width();
+            let size = crate::presentation::text::Span::raw(grapheme).width();
             if cells + size > usize::from(width) && !row.is_empty() {
                 result.push(std::mem::take(&mut row));
                 cells = 0;

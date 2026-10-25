@@ -1,12 +1,12 @@
 use crate::focus::{self, Focus};
+#[cfg(not(feature = "turbo-vision"))]
+use crate::presentation::layout::Position;
+use crate::presentation::layout::Rect;
 use crate::{
     app::App,
     menu::{self, Action},
 };
 use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
-#[cfg(not(feature = "turbo-vision"))]
-use ratatui::layout::Position;
-use ratatui::layout::Rect;
 use std::{
     path::PathBuf,
     time::{Duration, Instant},

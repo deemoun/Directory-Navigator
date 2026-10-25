@@ -1,10 +1,10 @@
 use crate::painting::{Block, Frame, Paragraph};
-use crate::{
-    app::App, editor::EditorAction as A, filesystem::display_name, formatting, mouse::Target,
-};
-use ratatui::{
+use crate::presentation::{
     layout::{Constraint, Layout, Rect},
     text::{Line, Span},
+};
+use crate::{
+    app::App, editor::EditorAction as A, filesystem::display_name, formatting, mouse::Target,
 };
 use unicode_segmentation::UnicodeSegmentation;
 

@@ -1,11 +1,11 @@
 use crate::painting::{Frame, Paragraph};
+use crate::presentation::layout::Rect;
 use crate::{
     app::App,
     focus::{self, Screen},
     mouse::Target,
     shortcuts,
 };
-use ratatui::layout::Rect;
 
 pub(super) fn draw_prefix(frame: &mut impl Frame, app: &mut App) {
     let area = frame.area();

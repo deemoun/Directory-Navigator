@@ -591,9 +591,9 @@ pub fn key(app: &mut App, key: KeyEvent) {
         KeyCode::PageDown => m.step(m.rows as isize),
         KeyCode::Home => m.step(isize::MIN),
         KeyCode::End => m.step(isize::MAX),
-        KeyCode::Tab => m.focus = (m.focus + 1) % if review { 3 } else { 4 },
+        KeyCode::Tab => m.focus = crate::control_focus::cycle(m.focus, if review { 3 } else { 4 }, false),
         KeyCode::BackTab => {
-            m.focus = (m.focus + if review { 2 } else { 3 }) % if review { 3 } else { 4 }
+            m.focus = crate::control_focus::cycle(m.focus, if review { 3 } else { 4 }, true)
         }
         KeyCode::F(2) if !review => action(app, Action::Switch),
         KeyCode::F(4) if !review => action(app, Action::Edit),

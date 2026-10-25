@@ -331,8 +331,8 @@ pub fn key(app: &mut App, key: KeyEvent) {
                 .min(paths.len().saturating_sub(1));
         }
         Some(ToolDialog::Compare { focus }) => match key.code {
-            KeyCode::Tab | KeyCode::Down => *focus = (*focus + 1) % 6,
-            KeyCode::BackTab | KeyCode::Up => *focus = (*focus + 5) % 6,
+            KeyCode::Tab | KeyCode::Down => *focus = crate::control_focus::cycle(*focus, 6, false),
+            KeyCode::BackTab | KeyCode::Up => *focus = crate::control_focus::cycle(*focus, 6, true),
             KeyCode::Char(' ') if *focus < 4 => choice = Some(*focus),
             KeyCode::Char(c) => {
                 choice = match c.to_ascii_lowercase() {
@@ -351,8 +351,8 @@ pub fn key(app: &mut App, key: KeyEvent) {
             focus,
             ..
         }) => match key.code {
-            KeyCode::Tab => *focus = (*focus + 1) % 5,
-            KeyCode::BackTab => *focus = (*focus + 4) % 5,
+            KeyCode::Tab => *focus = crate::control_focus::cycle(*focus, 5, false),
+            KeyCode::BackTab => *focus = crate::control_focus::cycle(*focus, 5, true),
             KeyCode::Char(' ') if *focus == 1 || *focus == 2 => choice = Some(*focus - 1),
             code if *focus == 0
                 && !key

@@ -1,8 +1,8 @@
 //! A view over the command prompt's session history; accepting never executes.
 use super::CommandLine;
+use crate::presentation::layout::Rect;
 use crate::{app::App, mouse::Target};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
-use ratatui::layout::Rect;
 use std::{
     io,
     time::{Duration, Instant},
@@ -187,11 +187,12 @@ pub fn key(app: &mut App, key: KeyEvent) {
         }
         KeyCode::End => d.step(isize::MAX),
         KeyCode::Tab | KeyCode::BackTab => {
-            let delta = if key.code == KeyCode::BackTab { 3 } else { 1 };
-            d.focus = (d.focus + delta) % 4;
-            if d.focus == 2 && d.matches.is_empty() {
-                d.focus = (d.focus + delta) % 4;
-            }
+            let choices: &[usize] = if d.matches.is_empty() {
+                &[0, 1, 3]
+            } else {
+                &[0, 1, 2, 3]
+            };
+            d.focus = crate::control_focus::select(d.focus, choices, key.code == KeyCode::BackTab);
         }
         KeyCode::Char(' ') if d.focus >= 2 => {
             let a = if d.focus == 3 {

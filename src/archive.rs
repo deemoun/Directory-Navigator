@@ -277,7 +277,7 @@ pub fn key(app: &mut App, key: KeyEvent) {
     }
     match key.code{
   KeyCode::Esc=>action(app,Action::Close),KeyCode::Backspace|KeyCode::Left=>action(app,Action::Parent),KeyCode::Enter=>{let a=match browser.focus{1=>Action::Open,2=>Action::View,3=>Action::Info,4=>Action::Refresh,5=>Action::Stop,6=>Action::Close,_=>Action::Open};action(app,a);},
-  KeyCode::Tab=>browser.focus=(browser.focus+1)%7,KeyCode::BackTab=>browser.focus=(browser.focus+6)%7,
+  KeyCode::Tab=>browser.focus = crate::control_focus::cycle(browser.focus, 7, false),KeyCode::BackTab=>browser.focus = crate::control_focus::cycle(browser.focus, 7, true),
   KeyCode::Up=>browser.step(-1),KeyCode::Down=>browser.step(1),KeyCode::PageUp=>browser.step(-(browser.rows as isize)),KeyCode::PageDown=>browser.step(browser.rows as isize),KeyCode::Home=>browser.step(isize::MIN),KeyCode::End=>browser.step(isize::MAX),KeyCode::Right=>{if browser.selected().is_some_and(|id|browser.catalog.as_ref().is_some_and(|c|c.nodes[id].kind==Kind::Directory)){action(app,Action::Open);}},
   KeyCode::F(3)=>action(app,Action::View),KeyCode::F(9)=>action(app,Action::Info),KeyCode::F(1)=>app.dialogs.push(crate::dialog::Dialog{title:" Archive browser help ",message:"Read-only ZIP / TAR / TAR.GZ / TGZ browser.\nEnter/double-click opens a folder or previews a file.\nBackspace/Left goes up; Esc closes the archive.\nF3 previews; F9 shows metadata; Ctrl+R refreshes.\nStop cancels indexing or preview reads.\nLinks/special entries are never followed.\nNo extraction, editing or nested archive execution.\nIn the file manager, Ctrl+Enter uses the OS default app.".into()}),_=>{}
  }

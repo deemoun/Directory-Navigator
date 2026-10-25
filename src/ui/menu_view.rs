@@ -1,13 +1,13 @@
 use crate::painting::{Block, Borders, Clear, Frame, Paragraph};
+use crate::presentation::{
+    layout::Rect,
+    style::Style,
+    text::{Line, Span},
+};
 use crate::{
     app::App,
     menu::{self, Action},
     mouse::Target,
-};
-use ratatui::{
-    layout::Rect,
-    style::Style,
-    text::{Line, Span},
 };
 
 pub(super) fn label_spans(label: &str, normal: Style, hot: Style) -> Vec<Span<'_>> {

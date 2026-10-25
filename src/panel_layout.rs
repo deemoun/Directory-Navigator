@@ -1,4 +1,4 @@
-use ratatui::layout::{Constraint, Layout, Rect};
+use crate::presentation::layout::{Constraint, Layout, Rect};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum PanelLayout {

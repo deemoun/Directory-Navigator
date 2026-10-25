@@ -1,14 +1,14 @@
 use crate::painting::{Frame, Paragraph};
+use crate::presentation::{
+    layout::Rect,
+    text::{Line, Span},
+};
 use crate::{
     app::App,
     archive::{reader::Kind, Action},
     filesystem::display_name,
     formatting::tail,
     mouse::Target,
-};
-use ratatui::{
-    layout::Rect,
-    text::{Line, Span},
 };
 pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
     let Some(b) = &app.archive else {

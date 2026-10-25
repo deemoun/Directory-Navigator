@@ -8,12 +8,10 @@ mod mouse;
 pub(crate) mod panes;
 pub(crate) mod scene;
 pub(crate) mod tetris;
+use crate::presentation::layout::{Position, Size};
+use codec::Cell;
 use codec::Codec;
-use ratatui::{
-    backend::{Backend, WindowSize},
-    buffer::Cell,
-    layout::{Position, Size},
-};
+mod reference;
 use std::{
     io::{self, Write},
     sync::{Arc, Mutex, MutexGuard},
@@ -117,11 +115,8 @@ impl<W: Write + Send + 'static> TurboBackend<W> {
                 id: crate::desktop::WindowId::MANAGER,
                 kind: crate::desktop::WindowKind::Manager,
             }),
-            pixels: vec![
-                TvCell::new(' ', turbo_vision::core::palette::Attr::from_u8(0x07));
-                usize::from(size.width) * usize::from(size.height)
-            ],
-            canvas: vec![Cell::default(); usize::from(size.width) * usize::from(size.height)],
+            pixels: Vec::new(),
+            canvas: Vec::new(),
             codec,
             dimensions,
             writer,
@@ -148,11 +143,8 @@ impl<W: Write + Send + 'static> TurboBackend<W> {
             *lock(&self.dimensions)? = size;
             lock(&self.codec)?.resize(size);
             self.terminal.resize(size.width, size.height);
-            self.canvas = vec![Cell::default(); usize::from(size.width) * usize::from(size.height)];
-            self.pixels = vec![
-                TvCell::new(' ', turbo_vision::core::palette::Attr::from_u8(0x07));
-                usize::from(size.width) * usize::from(size.height)
-            ];
+            self.canvas.clear();
+            self.pixels.clear();
         }
         Ok(())
     }
@@ -176,32 +168,33 @@ fn validate(size: Size) -> io::Result<()> {
         Ok(())
     }
 }
-impl<W: Write + Send + 'static> Backend for TurboBackend<W> {
-    fn draw<'a, I>(&mut self, content: I) -> io::Result<()>
-    where
-        I: Iterator<Item = (u16, u16, &'a Cell)>,
-    {
+impl<W: Write + Send + 'static> TurboBackend<W> {
+    /// The production frame never constructs a Ratatui Terminal, Frame or Buffer.
+    pub fn draw_app(&mut self, app: &mut crate::app::App) -> io::Result<()> {
         let size = self.current_size()?;
         self.resize(size)?;
-        // Reference frames retain their own cells; native frames are independent
-        // of this buffer and paint through the document's native scene.
-        for (x, y, cell) in content {
-            if x >= size.width || y >= size.height {
-                continue;
-            }
-            self.canvas[usize::from(y) * usize::from(size.width) + usize::from(x)] = cell.clone();
-            let width = ratatui::text::Span::raw(cell.symbol()).width().max(1);
-            for offset in 1..width.min(usize::from(size.width - x)) {
-                let mut padding = cell.clone();
-                padding.set_symbol("\0");
-                self.canvas[usize::from(y) * usize::from(size.width) + usize::from(x) + offset] =
-                    padding;
-            }
+        let scene = crate::ui::native_scene(
+            app,
+            crate::presentation::layout::Rect::new(0, 0, size.width, size.height),
+        );
+        self.cursor_visible = scene.cursor.is_some();
+        if let Some((x, y)) = scene.cursor {
+            self.cursor = Position::new(x, y);
         }
+        self.desktop.set_scene(Some(scene));
+        self.paint()?;
+        self.flush()
+    }
+    fn paint(&mut self) -> io::Result<()> {
+        let size = *lock(&self.dimensions)?;
         let scene = self.desktop.scene();
         {
             let mut codec = lock(&self.codec)?;
-            for y in 0..size.height {
+            for y in 0..if self.canvas.is_empty() {
+                0
+            } else {
+                size.height
+            } {
                 for x in 0..size.width {
                     let i = usize::from(y) * usize::from(size.width) + usize::from(x);
                     let source = &self.canvas[i];
@@ -225,22 +218,7 @@ impl<W: Write + Send + 'static> Backend for TurboBackend<W> {
         );
         Ok(())
     }
-    fn hide_cursor(&mut self) -> io::Result<()> {
-        self.cursor_visible = false;
-        Ok(())
-    }
-    fn show_cursor(&mut self) -> io::Result<()> {
-        self.cursor_visible = true;
-        Ok(())
-    }
-    fn get_cursor_position(&mut self) -> io::Result<Position> {
-        Ok(self.cursor)
-    }
-    fn set_cursor_position<P: Into<Position>>(&mut self, position: P) -> io::Result<()> {
-        self.cursor = position.into();
-        self.show_cursor()
-    }
-    fn clear(&mut self) -> io::Result<()> {
+    pub fn clear(&mut self) -> io::Result<()> {
         self.terminal.clear();
         self.terminal.force_full_redraw();
         self.canvas.fill(Cell::default());
@@ -251,16 +229,7 @@ impl<W: Write + Send + 'static> Backend for TurboBackend<W> {
         lock(&self.codec)?.resize(*lock(&self.dimensions)?);
         lock(&self.writer)?.write_all(b"\x1b[2J")
     }
-    fn size(&self) -> io::Result<Size> {
-        self.current_size()
-    }
-    fn window_size(&mut self) -> io::Result<WindowSize> {
-        Ok(WindowSize {
-            columns_rows: self.current_size()?,
-            pixels: Size::ZERO,
-        })
-    }
-    fn flush(&mut self) -> io::Result<()> {
+    pub fn flush(&mut self) -> io::Result<()> {
         if self.cursor_visible {
             self.terminal
                 .show_cursor(self.cursor.x as i16, self.cursor.y as i16)?;
@@ -269,6 +238,33 @@ impl<W: Write + Send + 'static> Backend for TurboBackend<W> {
         }
         self.terminal.flush()?;
         lock(&self.codec)?.committed();
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn production_frames_resize_and_resume_without_reference_buffers() -> io::Result<()> {
+        let mut app = crate::app::App::new(std::env::current_dir()?)?;
+        let mut host = TurboBackend::with_size(io::sink(), Size::new(80, 25))?;
+        host.bind_desktop(app.desktop.native());
+        for size in [
+            Size::new(80, 25),
+            Size::new(132, 40),
+            Size::new(50, 12),
+            Size::new(80, 25),
+        ] {
+            host.resize(size)?;
+            host.draw_app(&mut app)?;
+            assert!(host.canvas.is_empty());
+            assert!(host.pixels.is_empty());
+            assert!(host.desktop.scene().is_some());
+            host.clear()?;
+            host.draw_app(&mut app)?;
+            assert!(host.canvas.is_empty());
+        }
         Ok(())
     }
 }

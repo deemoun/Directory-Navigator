@@ -106,8 +106,8 @@ pub fn key(app: &mut App, key: KeyEvent) {
     let mut command = None;
     match &mut app.navigation_dialog {
         Some(Modal::Bookmarks { slot, focus }) => match key.code {
-            KeyCode::Tab => *focus = (*focus + 1) % 5,
-            KeyCode::BackTab => *focus = (*focus + 4) % 5,
+            KeyCode::Tab => *focus = crate::control_focus::cycle(*focus, 5, false),
+            KeyCode::BackTab => *focus = crate::control_focus::cycle(*focus, 5, true),
             KeyCode::Up => *slot = slot.saturating_sub(1),
             KeyCode::Down => *slot = (*slot + 1).min(8),
             KeyCode::Home => *slot = 0,
@@ -128,8 +128,8 @@ pub fn key(app: &mut App, key: KeyEvent) {
             cursor,
             focus,
         }) => match key.code {
-            KeyCode::Tab => *focus = (*focus + 1) % 3,
-            KeyCode::BackTab => *focus = (*focus + 2) % 3,
+            KeyCode::Tab => *focus = crate::control_focus::cycle(*focus, 3, false),
+            KeyCode::BackTab => *focus = crate::control_focus::cycle(*focus, 3, true),
             KeyCode::Enter => {
                 command = Some(if *focus == 2 {
                     Action::Close

@@ -1,9 +1,9 @@
 use crate::painting::{Block, Frame, Paragraph};
-use crate::{app::App, filesystem::display_name, formatting::tail, mouse::Target, viewer::Action};
-use ratatui::{
+use crate::presentation::{
     layout::{Constraint, Layout, Rect},
     text::{Line, Span},
 };
+use crate::{app::App, filesystem::display_name, formatting::tail, mouse::Target, viewer::Action};
 pub(super) fn draw_viewer(frame: &mut impl Frame, app: &mut App, area: Rect) {
     let profile = app.config.palette;
     let dos = profile.styles();

@@ -1,10 +1,10 @@
 use super::menu_view::label_spans;
 use crate::painting::{Frame, Paragraph};
-use crate::{app::App, mouse::Target, settings::SettingsKind};
-use ratatui::{
+use crate::presentation::{
     layout::Rect,
     text::{Line, Span},
 };
+use crate::{app::App, mouse::Target, settings::SettingsKind};
 
 pub(super) fn draw_settings(frame: &mut impl Frame, app: &mut App, area: Rect) {
     let profile = app.config.palette;

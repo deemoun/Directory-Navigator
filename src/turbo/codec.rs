@@ -1,16 +1,49 @@
 //! Lossless boundary between DN's grapheme cells/indexed colors and TV's char/RGB cells.
 //! Tokens exist only inside the TV buffer; the transport decodes them before writing.
-use ratatui::{
-    buffer::Cell,
+use crate::presentation::{
     layout::Size,
     style::{Color, Modifier},
-    text::Span,
 };
 use std::{collections::HashMap, io};
 use turbo_vision::core::{
     draw::Cell as TvCell,
     palette::{Attr, Style, TvColor},
 };
+#[derive(Clone)]
+pub(super) struct Cell {
+    symbol: String,
+    fg: Color,
+    bg: Color,
+    modifier: Modifier,
+}
+impl Default for Cell {
+    fn default() -> Self {
+        Self {
+            symbol: " ".into(),
+            fg: Color::Reset,
+            bg: Color::Reset,
+            modifier: Modifier::empty(),
+        }
+    }
+}
+impl Cell {
+    pub fn symbol(&self) -> &str {
+        &self.symbol
+    }
+    pub fn set_symbol(&mut self, symbol: &str) {
+        self.symbol = symbol.into();
+    }
+    pub fn set_style(&mut self, style: crate::presentation::style::Style) {
+        if let Some(fg) = style.fg {
+            self.fg = fg;
+        }
+        if let Some(bg) = style.bg {
+            self.bg = bg;
+        }
+        self.modifier.insert(style.add_modifier);
+        self.modifier.remove(style.sub_modifier);
+    }
+}
 #[derive(Default)]
 pub(super) struct Codec {
     glyphs: HashMap<char, (String, usize)>,
@@ -111,7 +144,10 @@ impl Codec {
                 attr.style.insert(destination);
             }
         }
-        Ok((TvCell::new(ch, attr), Span::raw(symbol).width().max(1)))
+        Ok((
+            TvCell::new(ch, attr),
+            unicode_width::UnicodeWidthStr::width(symbol).max(1),
+        ))
     }
     // Native views and the retained canvas have separate live-cell references.
     // Hiding a native view must not retire a glyph still used by its background.

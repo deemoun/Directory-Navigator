@@ -1,17 +1,38 @@
 //! Shared presentation interface. Native widgets paint TV cells directly; the
 //! reference implementation delegates to the original renderer for parity tests.
-use crate::{app::App, layout::Prepared};
-pub use ratatui::widgets::{BorderType, Borders, Wrap};
-use ratatui::{
+use crate::presentation::{
     layout::{Alignment, Constraint, Rect},
     style::Style,
     text::{Line, Text},
 };
+use crate::{app::App, layout::Prepared};
+#[derive(Clone, Copy, Default, PartialEq, Eq)]
+pub enum BorderType {
+    #[default]
+    Plain,
+    Double,
+}
+#[derive(Clone, Copy, Default)]
+pub struct Borders(u8);
+impl Borders {
+    pub const LEFT: Self = Self(1);
+    pub const RIGHT: Self = Self(2);
+    pub const TOP: Self = Self(4);
+    pub const BOTTOM: Self = Self(8);
+    pub const ALL: Self = Self(15);
+    pub fn contains(self, other: Self) -> bool {
+        self.0 & other.0 == other.0
+    }
+}
+#[derive(Clone, Copy)]
+pub struct Wrap {
+    pub trim: bool,
+}
 
 pub trait Frame {
     fn area(&self) -> Rect;
     fn render_widget(&mut self, widget: impl Widget, area: Rect);
-    fn set_cursor_position(&mut self, position: impl Into<ratatui::layout::Position>);
+    fn set_cursor_position(&mut self, position: impl Into<crate::presentation::layout::Position>);
     fn manager(&mut self, _: &mut App, _: &Prepared) -> Option<Vec<Rect>> {
         None
     }
@@ -19,32 +40,20 @@ pub trait Frame {
         false
     }
 }
-pub trait Widget {
-    fn reference(self, frame: &mut ratatui::Frame<'_>, area: Rect);
+pub trait Widget: crate::reference_ui::ReferenceWidget {
     #[cfg(feature = "turbo-vision")]
     fn native(self, frame: &mut NativeFrame, area: Rect);
-}
-impl Frame for ratatui::Frame<'_> {
-    fn area(&self) -> Rect {
-        self.area()
-    }
-    fn render_widget(&mut self, widget: impl Widget, area: Rect) {
-        widget.reference(self, area);
-    }
-    fn set_cursor_position(&mut self, position: impl Into<ratatui::layout::Position>) {
-        self.set_cursor_position(position);
-    }
 }
 
 #[derive(Default)]
 pub struct Block<'a> {
-    style: Style,
-    border_style: Style,
-    title_style: Style,
-    borders: Borders,
-    border_type: BorderType,
-    title: Option<Line<'a>>,
-    alignment: Alignment,
+    pub(crate) style: Style,
+    pub(crate) border_style: Style,
+    pub(crate) title_style: Style,
+    pub(crate) borders: Borders,
+    pub(crate) border_type: BorderType,
+    pub(crate) title: Option<Line<'a>>,
+    pub(crate) alignment: Alignment,
 }
 impl<'a> Block<'a> {
     pub fn style(mut self, style: Style) -> Self {
@@ -94,19 +103,6 @@ impl<'a> Block<'a> {
     }
 }
 impl Widget for Block<'_> {
-    fn reference(self, frame: &mut ratatui::Frame<'_>, area: Rect) {
-        let mut block = ratatui::widgets::Block::default()
-            .style(self.style)
-            .border_style(self.border_style)
-            .title_style(self.title_style)
-            .borders(self.borders)
-            .border_type(self.border_type)
-            .title_alignment(self.alignment);
-        if let Some(title) = self.title {
-            block = block.title(title);
-        }
-        frame.render_widget(block, area);
-    }
     #[cfg(feature = "turbo-vision")]
     fn native(self, f: &mut NativeFrame, area: Rect) {
         let r = area.intersection(f.area());
@@ -168,11 +164,11 @@ impl Widget for Block<'_> {
 }
 
 pub struct Paragraph<'a> {
-    text: Text<'a>,
-    style: Style,
-    alignment: Alignment,
-    scroll: (u16, u16),
-    wrap: Option<Wrap>,
+    pub(crate) text: Text<'a>,
+    pub(crate) style: Style,
+    pub(crate) alignment: Alignment,
+    pub(crate) scroll: (u16, u16),
+    pub(crate) wrap: Option<Wrap>,
 }
 impl<'a> Paragraph<'a> {
     pub fn new(text: impl Into<Text<'a>>) -> Self {
@@ -202,16 +198,6 @@ impl<'a> Paragraph<'a> {
     }
 }
 impl Widget for Paragraph<'_> {
-    fn reference(self, f: &mut ratatui::Frame<'_>, r: Rect) {
-        let mut p = ratatui::widgets::Paragraph::new(self.text)
-            .style(self.style)
-            .alignment(self.alignment)
-            .scroll(self.scroll);
-        if let Some(wrap) = self.wrap {
-            p = p.wrap(wrap);
-        }
-        f.render_widget(p, r);
-    }
     #[cfg(feature = "turbo-vision")]
     fn native(self, f: &mut NativeFrame, area: Rect) {
         use unicode_width::UnicodeWidthStr;
@@ -282,9 +268,6 @@ impl Widget for Paragraph<'_> {
 }
 pub struct Clear;
 impl Widget for Clear {
-    fn reference(self, f: &mut ratatui::Frame<'_>, r: Rect) {
-        f.render_widget(ratatui::widgets::Clear, r);
-    }
     #[cfg(feature = "turbo-vision")]
     fn native(self, f: &mut NativeFrame, area: Rect) {
         let r = area.intersection(f.area());
@@ -296,8 +279,8 @@ impl Widget for Clear {
     }
 }
 pub struct Cell<'a> {
-    text: Text<'a>,
-    style: Style,
+    pub(crate) text: Text<'a>,
+    pub(crate) style: Style,
 }
 impl<'a, T: Into<Text<'a>>> From<T> for Cell<'a> {
     fn from(text: T) -> Self {
@@ -308,8 +291,8 @@ impl<'a, T: Into<Text<'a>>> From<T> for Cell<'a> {
     }
 }
 pub struct Row<'a> {
-    cells: Vec<Cell<'a>>,
-    style: Style,
+    pub(crate) cells: Vec<Cell<'a>>,
+    pub(crate) style: Style,
 }
 impl<'a> Row<'a> {
     pub fn new<T: Into<Cell<'a>>>(cells: impl IntoIterator<Item = T>) -> Self {
@@ -324,10 +307,10 @@ impl<'a> Row<'a> {
     }
 }
 pub struct Table<'a> {
-    rows: Vec<Row<'a>>,
-    widths: Vec<Constraint>,
-    style: Style,
-    spacing: u16,
+    pub(crate) rows: Vec<Row<'a>>,
+    pub(crate) widths: Vec<Constraint>,
+    pub(crate) style: Style,
+    pub(crate) spacing: u16,
 }
 impl<'a> Table<'a> {
     pub fn new(
@@ -351,25 +334,9 @@ impl<'a> Table<'a> {
     }
 }
 impl Widget for Table<'_> {
-    fn reference(self, f: &mut ratatui::Frame<'_>, r: Rect) {
-        let rows = self.rows.into_iter().map(|row| {
-            ratatui::widgets::Row::new(
-                row.cells
-                    .into_iter()
-                    .map(|c| ratatui::widgets::Cell::new(c.text).style(c.style)),
-            )
-            .style(row.style)
-        });
-        f.render_widget(
-            ratatui::widgets::Table::new(rows, self.widths)
-                .style(self.style)
-                .column_spacing(self.spacing),
-            r,
-        );
-    }
     #[cfg(feature = "turbo-vision")]
     fn native(self, f: &mut NativeFrame, r: Rect) {
-        use ratatui::layout::{Flex, Layout};
+        use crate::presentation::layout::{Flex, Layout};
         f.style(r, self.style);
         for (i, row) in self.rows.into_iter().take(r.height as usize).enumerate() {
             let area = Rect::new(r.x, r.y + i as u16, r.width, 1);
@@ -555,7 +522,7 @@ impl Frame for NativeFrame {
     fn render_widget(&mut self, widget: impl Widget, area: Rect) {
         widget.native(self, area);
     }
-    fn set_cursor_position(&mut self, position: impl Into<ratatui::layout::Position>) {
+    fn set_cursor_position(&mut self, position: impl Into<crate::presentation::layout::Position>) {
         let p = position.into();
         self.scene.cursor = Some((p.x, p.y));
     }

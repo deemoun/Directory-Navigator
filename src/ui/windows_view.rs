@@ -1,8 +1,8 @@
 use crate::painting::{Frame, Paragraph};
+use crate::presentation::layout::Rect;
 use crate::{
     app::App, desktop::WindowKind, filesystem::display_name, mouse::Target, windowing::Action,
 };
-use ratatui::layout::Rect;
 
 pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
     let Some(list) = &app.window_list else { return };
@@ -36,8 +36,8 @@ pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
                     if editor.dirty() { "* " } else { "" },
                     language.text("Editor")
                 );
-                let available =
-                    width.saturating_sub(ratatui::text::Span::raw(&prefix).width() as u16);
+                let available = width
+                    .saturating_sub(crate::presentation::text::Span::raw(&prefix).width() as u16);
                 format!("{prefix}{}", crate::formatting::tail(&path, available))
             }
             Some(WindowKind::Viewer) => {
@@ -45,8 +45,8 @@ pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
                     continue;
                 };
                 let prefix = format!("{}: ", language.text("Viewer"));
-                let available =
-                    width.saturating_sub(ratatui::text::Span::raw(&prefix).width() as u16);
+                let available = width
+                    .saturating_sub(crate::presentation::text::Span::raw(&prefix).width() as u16);
                 format!(
                     "{prefix}{}",
                     crate::formatting::tail(

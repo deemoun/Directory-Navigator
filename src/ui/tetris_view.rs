@@ -1,10 +1,10 @@
 use crate::painting::{Block, Borders, Clear, Frame, Paragraph};
+use crate::presentation::layout::{Constraint, Layout, Rect};
 use crate::{
     app::App,
     mouse::Target,
     tetris::{GameAction, Screen, FIGURES, HEIGHT, WIDTH},
 };
-use ratatui::layout::{Constraint, Layout, Rect};
 
 fn button(frame: &mut impl Frame, app: &mut App, rect: Rect, label: &str, action: GameAction) {
     let profile = app.config.palette;
@@ -85,7 +85,7 @@ pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
             .borders(Borders::ALL)
             .border_style(dos(0x70))
             .title(app.config.language.text("Info"))
-            .title_alignment(ratatui::layout::Alignment::Center)
+            .title_alignment(crate::presentation::layout::Alignment::Center)
             .title_style(dos(0x7f)),
         Rect::new(info_x, rect.y + 1, sidebar, 5),
     );
@@ -98,12 +98,12 @@ pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
     .enumerate()
     {
         frame.render_widget(
-            Paragraph::new(ratatui::text::Line::from(vec![
-                ratatui::text::Span::styled(
+            Paragraph::new(crate::presentation::text::Line::from(vec![
+                crate::presentation::text::Span::styled(
                     format!("{}: ", app.config.language.text(label)),
                     dos(0x70),
                 ),
-                ratatui::text::Span::styled(value, dos(0x7f)),
+                crate::presentation::text::Span::styled(value, dos(0x7f)),
             ])),
             Rect::new(info_x + 1, rect.y + 2 + i as u16, sidebar - 2, 1),
         );
@@ -113,7 +113,7 @@ pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
             .borders(Borders::ALL)
             .border_style(dos(0x70))
             .title(app.config.language.text("Next"))
-            .title_alignment(ratatui::layout::Alignment::Center)
+            .title_alignment(crate::presentation::layout::Alignment::Center)
             .title_style(dos(0x7f)),
         Rect::new(info_x, rect.y + 5, sidebar, 7),
     );
@@ -135,7 +135,7 @@ pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
             .borders(Borders::ALL)
             .border_style(dos(0x7e))
             .title(app.config.language.text("Best"))
-            .title_alignment(ratatui::layout::Alignment::Center)
+            .title_alignment(crate::presentation::layout::Alignment::Center)
             .title_style(dos(0x7f)),
         Rect::new(info_x, rect.y + 13, sidebar, 4),
     );
@@ -154,12 +154,15 @@ pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
     .enumerate()
     {
         let prefix = format!("{}: ", app.config.language.text(label));
-        let available =
-            (sidebar - 2).saturating_sub(ratatui::text::Span::raw(&prefix).width() as u16);
+        let available = (sidebar - 2)
+            .saturating_sub(crate::presentation::text::Span::raw(&prefix).width() as u16);
         frame.render_widget(
-            Paragraph::new(ratatui::text::Line::from(vec![
-                ratatui::text::Span::styled(prefix, dos(0x7f)),
-                ratatui::text::Span::styled(crate::formatting::tail(&value, available), dos(0x7e)),
+            Paragraph::new(crate::presentation::text::Line::from(vec![
+                crate::presentation::text::Span::styled(prefix, dos(0x7f)),
+                crate::presentation::text::Span::styled(
+                    crate::formatting::tail(&value, available),
+                    dos(0x7e),
+                ),
             ])),
             Rect::new(info_x + 1, rect.y + 14 + i as u16, sidebar - 2, 1),
         );
@@ -260,7 +263,7 @@ fn draw_page(frame: &mut impl Frame, app: &mut App, game_rect: Rect, screen: Scr
                 Rect::new(rect.x + 3, rect.y + 6, 44, 1),
             );
             let field = Rect::new(rect.x + 3, rect.y + 7, 44, 1);
-            let col = ratatui::text::Line::from(&game.name[..game.name_cursor]).width();
+            let col = crate::presentation::text::Line::from(&game.name[..game.name_cursor]).width();
             let scroll = col.saturating_sub(43);
             frame.render_widget(
                 Paragraph::new(game.name.as_str())
@@ -351,7 +354,7 @@ fn classic_button(
         focused,
     );
     if !focused && profile == crate::palette::PaletteProfile::ClassicDn {
-        use ratatui::text::{Line, Span};
+        use crate::presentation::text::{Line, Span};
         let label = app.config.language.text(label);
         let mut chars = label.chars();
         let first = chars.next().map(|c| c.to_string()).unwrap_or_default();
@@ -390,7 +393,7 @@ fn page(frame: &mut impl Frame, app: &mut App, width: u16, height: u16, title: &
 }
 fn draw_scores(frame: &mut impl Frame, app: &mut App) {
     use crate::painting::Wrap;
-    use ratatui::{layout::Alignment, text::Span};
+    use crate::presentation::{layout::Alignment, text::Span};
     let rect = page(frame, app, 72, 20, "Tetris Top Ten");
     let language = app.config.language;
     let dos = app.config.palette.styles();
@@ -506,7 +509,7 @@ const LEVEL_NAMES: [&str; 10] = [
     "Sanitarium",
 ];
 fn draw_setup(frame: &mut impl Frame, app: &mut App, level: u8, preview: bool) {
-    use ratatui::text::{Line, Span};
+    use crate::presentation::text::{Line, Span};
     let rect = page(frame, app, 72, 18, "Setup game");
     let language = app.config.language;
     let dos = app.config.palette.styles();

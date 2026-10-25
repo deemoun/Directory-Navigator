@@ -1,6 +1,7 @@
 //! Native file-manager drawing. Directory models, workers and guarded commands
 //! are reused; no Ratatui widgets compose the panes or shell on this path.
 use super::scene::Scene;
+use crate::presentation::layout::{Constraint, Flex, Layout, Rect};
 use crate::{
     app::App,
     columns::ColumnPreset,
@@ -14,7 +15,6 @@ use crate::{
     panel_layout::{PanelGeometry, PanelLayout},
     quick_search::QuickSearch,
 };
-use ratatui::layout::{Constraint, Flex, Layout, Rect};
 use std::collections::BTreeMap;
 use unicode_width::UnicodeWidthStr;
 

@@ -1,12 +1,12 @@
 use super::dialog_style;
 use crate::painting::{Frame, Paragraph};
+use crate::presentation::{
+    layout::Rect,
+    text::{Line, Span},
+};
 use crate::{
     app::App, dialog::PromptKind, filesystem::display_name, formatting, mouse::Target,
     operations::Kind,
-};
-use ratatui::{
-    layout::Rect,
-    text::{Line, Span},
 };
 
 pub(super) fn draw_info_dialog(

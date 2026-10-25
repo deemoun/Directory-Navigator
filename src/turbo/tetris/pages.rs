@@ -1,12 +1,12 @@
 //! Game pages drawn with native cells; actions still use the guarded game controller.
 use super::Scene;
+use crate::presentation::layout::Rect;
 use crate::{
     app::App,
     mouse::Target,
     palette::PaletteProfile,
     tetris::{GameAction, Screen},
 };
-use ratatui::layout::Rect;
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
 

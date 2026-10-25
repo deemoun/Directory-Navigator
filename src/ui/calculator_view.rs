@@ -1,5 +1,9 @@
 //! Calculator-only DN dialog; other utility layouts keep their existing chrome.
 use crate::painting::{Block, Borders, Frame, Paragraph, Wrap};
+use crate::presentation::{
+    layout::{Alignment, Rect},
+    text::{Line, Span},
+};
 use crate::{
     app::App,
     filesystem::display_name,
@@ -7,16 +11,12 @@ use crate::{
     mouse::Target,
     utilities::{calculator::Value, Action},
 };
-use ratatui::{
-    layout::{Alignment, Rect},
-    text::{Line, Span},
-};
 
 fn hot(
     label: &str,
     key: char,
-    normal: ratatui::style::Style,
-    accent: ratatui::style::Style,
+    normal: crate::presentation::style::Style,
+    accent: crate::presentation::style::Style,
 ) -> Line<'static> {
     let mut marked = false;
     Line::from(

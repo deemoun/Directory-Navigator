@@ -1,14 +1,14 @@
 use super::menu_view::label_spans;
 use crate::painting::{Block, Borders, Clear, Frame, Paragraph};
+use crate::presentation::{
+    layout::Rect,
+    text::{Line, Span},
+};
 use crate::{
     app::App,
     editor::{menus, EditorAction as A},
     menu::plain,
     mouse::Target,
-};
-use ratatui::{
-    layout::Rect,
-    text::{Line, Span},
 };
 pub(super) fn draw_bar(frame: &mut impl Frame, app: &mut App, area: Rect) {
     let language = app.config.language;

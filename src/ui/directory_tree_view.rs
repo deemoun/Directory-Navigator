@@ -1,14 +1,14 @@
 use crate::painting::{Frame, Paragraph};
+use crate::presentation::{
+    layout::Rect,
+    text::{Line, Span},
+};
 use crate::{
     app::App,
     directory_tree::{geometry, Action},
     filesystem::display_name,
     formatting::tail,
     mouse::Target,
-};
-use ratatui::{
-    layout::Rect,
-    text::{Line, Span},
 };
 pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
     let profile = app.config.palette;
@@ -66,7 +66,7 @@ pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
             Span::raw(" "),
             Span::raw(display_name(&name)),
         ]);
-        let marker = ratatui::text::Span::raw(&entry.guide).width() as u16;
+        let marker = crate::presentation::text::Span::raw(&entry.guide).width() as u16;
         let r = Rect::new(x, top + row as u16, w, 1);
         frame.render_widget(Paragraph::new(line).style(style), r);
         app.mouse

@@ -1,6 +1,6 @@
 use crate::painting::{Block, Frame, Paragraph, Wrap};
+use crate::presentation::layout::{Constraint, Layout};
 use crate::{app::App, mouse::Target};
-use ratatui::layout::{Constraint, Layout};
 mod archive_view;
 mod calculator_view;
 mod clock;
@@ -46,16 +46,18 @@ pub fn draw(frame: &mut impl Frame, app: &mut App) {
 /// All runtime surfaces paint native cells through their TV document.
 /// `draw` selects the reference implementation for comparison/headless contracts.
 #[cfg(feature = "turbo-vision")]
-pub fn draw_native(frame: &mut ratatui::Frame<'_>, app: &mut App) {
-    let mut native = crate::painting::NativeFrame::new(frame.area(), app.config.palette);
+pub use crate::reference_ui::draw_native;
+#[cfg(feature = "turbo-vision")]
+pub(crate) fn native_scene(
+    app: &mut App,
+    area: crate::presentation::layout::Rect,
+) -> crate::turbo::scene::Scene {
+    let mut native = crate::painting::NativeFrame::new(area, app.config.palette);
     draw_content(&mut native, app);
     shortcuts_view::draw_prefix(&mut native, app);
-    let scene = native.finish();
-    if let Some(cursor) = scene.cursor {
-        frame.set_cursor_position(cursor);
-    }
-    app.desktop.native().set_scene(Some(scene));
+    native.finish()
 }
+
 fn draw_content(frame: &mut impl Frame, app: &mut App) {
     let profile = app.config.palette;
     let dos = profile.styles();
@@ -134,11 +136,11 @@ fn draw_content(frame: &mut impl Frame, app: &mut App) {
             let bar = geometry.scrollbar;
             app.mouse.regions.extend([
                 (
-                    ratatui::layout::Rect::new(bar.x, bar.y, 1, 1),
+                    crate::presentation::layout::Rect::new(bar.x, bar.y, 1, 1),
                     Target::Scrollbar(index, ScrollAction::Up),
                 ),
                 (
-                    ratatui::layout::Rect::new(bar.x, bar.bottom() - 1, 1, 1),
+                    crate::presentation::layout::Rect::new(bar.x, bar.bottom() - 1, 1, 1),
                     Target::Scrollbar(index, ScrollAction::Down),
                 ),
                 (

@@ -65,7 +65,7 @@ pub(crate) fn prepare(app: &mut App, width: u16, height: u16) -> Scene {
     scene.text(x + 3, y, 1, "■", 0x7a);
     scene.text(x + 4, y, 1, "]", 0x7f);
     let mut regions = vec![(
-        ratatui::layout::Rect::new(x + 2, y, 3, 1),
+        crate::presentation::layout::Rect::new(x + 2, y, 3, 1),
         Target::Game(GameAction::Close),
     )];
     let wx = x + 1;
@@ -176,14 +176,21 @@ pub(crate) fn prepare(app: &mut App, width: u16, height: u16) -> Scene {
     ] {
         scene.button(bx, by, language.text(label));
         regions.push((
-            ratatui::layout::Rect::new(bx, by, 10, 1),
+            crate::presentation::layout::Rect::new(bx, by, 10, 1),
             Target::Game(action),
         ));
     }
     // Match the established eight equal footer slots, including remainder cells.
     // Layout allocation is kept at the mouse/legacy-shell boundary.
-    let slots = ratatui::layout::Layout::horizontal([ratatui::layout::Constraint::Fill(1); 8])
-        .split(ratatui::layout::Rect::new(0, height - 1, width, 1));
+    let slots = crate::presentation::layout::Layout::horizontal(
+        [crate::presentation::layout::Constraint::Fill(1); 8],
+    )
+    .split(crate::presentation::layout::Rect::new(
+        0,
+        height - 1,
+        width,
+        1,
+    ));
     for (i, (label, action)) in [
         ("F1 Help", GameAction::Help),
         ("F2 New", GameAction::New),

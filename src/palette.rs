@@ -1,4 +1,4 @@
-use ratatui::{
+use crate::presentation::{
     style::{Color, Style},
     text::{Line, Span},
 };
@@ -99,8 +99,12 @@ pub fn key(app: &mut crate::app::App, code: crossterm::event::KeyCode) {
     };
     match code {
         KeyCode::Esc => cancel(app),
-        KeyCode::Tab | KeyCode::Down => dialog.cursor = (dialog.cursor + 1) % 4,
-        KeyCode::BackTab | KeyCode::Up => dialog.cursor = (dialog.cursor + 3) % 4,
+        KeyCode::Tab | KeyCode::Down => {
+            dialog.cursor = crate::control_focus::cycle(dialog.cursor, 4, false)
+        }
+        KeyCode::BackTab | KeyCode::Up => {
+            dialog.cursor = crate::control_focus::cycle(dialog.cursor, 4, true)
+        }
         KeyCode::Enter if dialog.cursor == 3 => cancel(app),
         KeyCode::Enter => app.color_dialog = None,
         KeyCode::Char(' ') if dialog.cursor < 2 => {

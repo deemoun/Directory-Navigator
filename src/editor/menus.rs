@@ -116,7 +116,7 @@ pub fn key(app: &mut App, code: KeyCode) {
             let reverse = matches!(code, KeyCode::Left | KeyCode::BackTab);
             open(
                 app,
-                ROOTS[(i + if reverse { ROOTS.len() - 1 } else { 1 }) % ROOTS.len()],
+                ROOTS[crate::control_focus::cycle(i, ROOTS.len(), reverse)],
             );
         }
         KeyCode::Enter => activate(app, row),
@@ -135,15 +135,18 @@ pub fn key(app: &mut App, code: KeyCode) {
                 .filter(|(_, item)| item.action.is_some())
                 .map(|(i, _)| i)
                 .collect();
-            let i = choices.iter().position(|r| *r == row).unwrap_or(0);
             let next = match code {
-                KeyCode::Home => 0,
-                KeyCode::End => choices.len() - 1,
-                KeyCode::Up => (i + choices.len() - 1) % choices.len(),
-                _ => (i + 1) % choices.len(),
+                KeyCode::Home => choices.first().copied(),
+                KeyCode::End => choices.last().copied(),
+                _ if choices.is_empty() => None,
+                _ => Some(crate::control_focus::select(
+                    row,
+                    &choices,
+                    code == KeyCode::Up,
+                )),
             };
-            if let Some(editor) = app.desktop.editor_mut() {
-                editor.menu = Some((root, choices[next]));
+            if let (Some(editor), Some(next)) = (app.desktop.editor_mut(), next) {
+                editor.menu = Some((root, next));
             }
         }
         _ => {}

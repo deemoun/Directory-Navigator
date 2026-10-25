@@ -148,7 +148,8 @@ pub fn key(app: &mut App, key: KeyEvent) {
         KeyCode::Esc => app.config_import = None,
         KeyCode::Tab | KeyCode::BackTab => {
             if preview.can_apply() {
-                preview.focus ^= 1;
+                preview.focus =
+                    crate::control_focus::cycle(preview.focus, 2, key.code == KeyCode::BackTab);
             }
         }
         KeyCode::Enter if preview.focus == 0 => apply(app),

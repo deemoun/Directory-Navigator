@@ -1,3 +1,7 @@
+#[cfg(all(not(feature = "turbo-vision"), not(feature = "legacy-ui")))]
+compile_error!(
+    "Select the default turbo-vision feature, or legacy-ui for the comparison renderer."
+);
 pub const APPLICATION_NAME: &str = "Directory Navigator";
 pub const DISPLAY_VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -23,6 +27,7 @@ pub mod pattern;
 pub mod quick_search;
 pub mod settings;
 pub mod shortcuts;
+#[cfg(any(feature = "turbo-vision", feature = "legacy-ui"))]
 pub mod terminal;
 pub mod tetris;
 pub mod ui;
@@ -75,3 +80,9 @@ pub mod panel_status;
 pub mod panel_command;
 
 pub mod painting;
+
+pub mod presentation;
+#[doc(hidden)]
+pub mod reference_ui;
+
+pub mod control_focus;

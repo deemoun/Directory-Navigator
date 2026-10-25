@@ -1,7 +1,7 @@
 //! Shared Turbo Vision dialog chrome; dimensions remain content-specific.
 use crate::painting::{Block, BorderType, Borders, Clear, Frame, Paragraph};
 use crate::palette::PaletteProfile;
-use ratatui::{
+use crate::presentation::{
     layout::{Alignment, Rect},
     text::{Line, Span},
 };
@@ -71,7 +71,10 @@ pub(super) fn button(
     ]);
     frame.render_widget(Paragraph::new(line).style(profile.dos(0x8f)), rect);
 }
-pub(super) fn input_style(profile: PaletteProfile, focused: bool) -> ratatui::style::Style {
+pub(super) fn input_style(
+    profile: PaletteProfile,
+    focused: bool,
+) -> crate::presentation::style::Style {
     profile.dos(if profile == PaletteProfile::ClassicDn {
         if focused {
             0x0f

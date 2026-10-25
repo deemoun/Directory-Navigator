@@ -1,6 +1,6 @@
 use crate::painting::{Block, Borders, Frame, Paragraph, Wrap};
+use crate::presentation::layout::{Margin, Rect};
 use crate::{app::App, filesystem::display_name, formatting::tail, mouse::Target};
-use ratatui::layout::{Margin, Rect};
 pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
     let profile = app.config.palette;
     let dos = profile.styles();

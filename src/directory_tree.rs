@@ -588,7 +588,7 @@ pub fn key(app: &mut App, key: KeyEvent) {
         return;
     }
     match key.code{
-        KeyCode::Esc=>app.directory_tree=None,KeyCode::Tab=>tree.focus=(tree.focus+1)%5,KeyCode::BackTab=>tree.focus=(tree.focus+4)%5,
+        KeyCode::Esc=>app.directory_tree=None,KeyCode::Tab=>tree.focus = crate::control_focus::cycle(tree.focus, 5, false),KeyCode::BackTab=>tree.focus = crate::control_focus::cycle(tree.focus, 5, true),
         KeyCode::Up=>tree.step(-1),KeyCode::Down=>tree.step(1),KeyCode::PageUp=>tree.step(-(tree.page_rows as isize)),KeyCode::PageDown=>tree.step(tree.page_rows as isize),KeyCode::Home=>tree.step(isize::MIN),KeyCode::End=>tree.step(isize::MAX),
         KeyCode::Left|KeyCode::Backspace|KeyCode::Char('-')=>tree.left(),KeyCode::Right|KeyCode::Char('+')=>tree.right(),
         KeyCode::Char(' ') if tree.focus==0=>tree.toggle(),
@@ -616,10 +616,10 @@ pub fn mouse(app: &mut App, event: MouseEvent, target: Option<crate::mouse::Targ
     }
 }
 
-pub fn geometry(area: ratatui::layout::Rect) -> ratatui::layout::Rect {
+pub fn geometry(area: crate::presentation::layout::Rect) -> crate::presentation::layout::Rect {
     let width = area.width.saturating_sub(4).min(90);
     let height = area.height.saturating_sub(4).min(28);
-    ratatui::layout::Rect::new(
+    crate::presentation::layout::Rect::new(
         area.x + (area.width - width) / 2,
         area.y + (area.height - height) / 2,
         width,

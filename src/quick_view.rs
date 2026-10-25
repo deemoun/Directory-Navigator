@@ -21,7 +21,7 @@ pub struct QuickView {
     pub source: usize,
     pub viewer: Option<Viewer>,
     pub lines: Vec<String>,
-    pub area: ratatui::layout::Rect,
+    pub area: crate::presentation::layout::Rect,
     signature: Option<Signature>,
     due: Option<Instant>,
     probe: Option<Task<Result<Probe, String>>>,
@@ -46,7 +46,7 @@ impl QuickView {
     pub fn path(&self) -> Option<&std::path::Path> {
         self.signature.as_ref().map(|s| s.path.as_path())
     }
-    pub fn layout(&mut self, area: ratatui::layout::Rect) {
+    pub fn layout(&mut self, area: crate::presentation::layout::Rect) {
         self.area = area;
         if let Some(v) = &mut self.viewer {
             v.layout(area.width.saturating_sub(2));

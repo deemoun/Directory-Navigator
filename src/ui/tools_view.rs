@@ -1,6 +1,6 @@
 use crate::painting::{Frame, Paragraph};
+use crate::presentation::{layout::Rect, text::Line};
 use crate::{app::App, columns::ColumnPreset, filesystem::display_name, mouse::Target};
-use ratatui::{layout::Rect, text::Line};
 
 fn popup(
     frame: &mut impl Frame,

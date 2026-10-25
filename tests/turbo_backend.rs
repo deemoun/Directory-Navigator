@@ -364,10 +364,9 @@ fn native_tetris_matches_legacy_colors_text_targets_and_transitions() -> io::Res
                 let native_output = Output::default();
                 let mut legacy =
                     Terminal::new(TurboBackend::with_size(legacy_output.clone(), size)?)?;
-                let mut native =
-                    Terminal::new(TurboBackend::with_size(native_output.clone(), size)?)?;
+                let mut native = TurboBackend::with_size(native_output.clone(), size)?;
                 legacy.backend_mut().bind_desktop(app.desktop.native());
-                native.backend_mut().bind_desktop(app.desktop.native());
+                native.bind_desktop(app.desktop.native());
                 let (mut expected, mut actual) = (String::new(), String::new());
                 for step in 0..35 {
                     if let Some(game) = app.desktop.game_mut() {
@@ -466,15 +465,15 @@ fn native_tetris_matches_legacy_colors_text_targets_and_transitions() -> io::Res
                     if step == 12 {
                         // Both native raster and legacy canvas must survive resize.
                         legacy.backend_mut().resize(Size::new(100, 30))?;
-                        native.backend_mut().resize(Size::new(100, 30))?;
+                        native.resize(Size::new(100, 30))?;
                     }
                     if step == 13 {
                         legacy.backend_mut().resize(Size::new(50, 12))?;
-                        native.backend_mut().resize(Size::new(50, 12))?;
+                        native.resize(Size::new(50, 12))?;
                     }
                     if step == 14 {
                         legacy.backend_mut().resize(size)?;
-                        native.backend_mut().resize(size)?;
+                        native.resize(size)?;
                     }
                     if step == 15 {
                         app.desktop.game_mut().unwrap().over = true;
@@ -499,35 +498,11 @@ fn native_tetris_matches_legacy_colors_text_targets_and_transitions() -> io::Res
                     legacy.draw(|frame| ui::draw(frame, &mut app))?;
                     let targets = format!("{:?}", app.mouse.regions);
                     expected.push_str(&legacy_output.take());
-                    let painted = native.draw(|frame| ui::draw_native(frame, &mut app))?;
-                    if step == 0 || (18..=26).contains(&step) {
-                        let legacy_canvas: String = painted
-                            .buffer
-                            .content
-                            .iter()
-                            .map(|cell| cell.symbol())
-                            .collect();
-                        assert!(
-                            !legacy_canvas.contains(language.text("Navigator's game")),
-                            "native game must not be rendered into the Ratatui canvas"
-                        );
-                        for title in [
-                            "Setup game",
-                            "Tetris Top Ten",
-                            "Tetris Help",
-                            "New high score",
-                            "Game over",
-                        ] {
-                            assert!(
-                                !legacy_canvas.contains(language.text(title)),
-                                "native page {title} must not be rendered into the Ratatui canvas"
-                            );
-                        }
-                    }
+                    native.draw_app(&mut app)?;
                     if app.desktop.game().is_some_and(|g| g.screen == Screen::Name) {
                         assert_eq!(
                             legacy.backend_mut().get_cursor_position()?,
-                            native.backend_mut().get_cursor_position()?,
+                            native.get_cursor_position()?,
                             "name cursor step={step}"
                         );
                     }
@@ -666,10 +641,9 @@ fn native_file_manager_matches_panes_shell_overlays_and_mouse_targets() -> io::R
                     let native_output = Output::default();
                     let mut legacy =
                         Terminal::new(TurboBackend::with_size(legacy_output.clone(), size)?)?;
-                    let mut native =
-                        Terminal::new(TurboBackend::with_size(native_output.clone(), size)?)?;
+                    let mut native = TurboBackend::with_size(native_output.clone(), size)?;
                     legacy.backend_mut().bind_desktop(app.desktop.native());
-                    native.backend_mut().bind_desktop(app.desktop.native());
+                    native.bind_desktop(app.desktop.native());
                     let (mut expected, mut actual) = (String::new(), String::new());
                     for step in 0..42 {
                         match step {
@@ -699,8 +673,8 @@ fn native_file_manager_matches_panes_shell_overlays_and_mouse_targets() -> io::R
                             24=>{app.window_list=None;app.config.shortcuts=dn::shortcuts::Profile::Mac;dn::input::handle(&mut app,crossterm::event::KeyEvent::new(crossterm::event::KeyCode::Char('o'),crossterm::event::KeyModifiers::CONTROL));}
                             25=>{app.shortcuts.clear();app.screensaver.start(Instant::now());}
                             26=>{app.screensaver.activity(Instant::now());}
-                            27=>{legacy.backend_mut().resize(Size::new(50,12))?;native.backend_mut().resize(Size::new(50,12))?;}
-                            28=>{legacy.backend_mut().resize(size)?;native.backend_mut().resize(size)?;}
+                            27=>{legacy.backend_mut().resize(Size::new(50,12))?;native.resize(Size::new(50,12))?;}
+                            28=>{legacy.backend_mut().resize(size)?;native.resize(size)?;}
                             29=>app.show_game(Game::with_seed(7,Instant::now())),
                             30=>app.desktop.close_game(),
                             31=>app.open_settings(dn::settings::SettingsKind::Keyboard),
@@ -715,8 +689,8 @@ fn native_file_manager_matches_panes_shell_overlays_and_mouse_targets() -> io::R
                                 app.clock.text = " 23:59:59 ".into();
                             }
                             34 => dn::menu::close(&mut app),
-                            35 => { legacy.backend_mut().resize(Size::new(140,42))?; native.backend_mut().resize(Size::new(140,42))?; }
-                            36 => { legacy.backend_mut().resize(size)?; native.backend_mut().resize(size)?; }
+                            35 => { legacy.backend_mut().resize(Size::new(140,42))?; native.resize(Size::new(140,42))?; }
+                            36 => { legacy.backend_mut().resize(size)?; native.resize(size)?; }
                             37 => dn::quick_view::toggle(&mut app),
                             38 => app.show_game(Game::with_seed(12,Instant::now())),
                             39 => app.desktop.game_mut().unwrap().screen = dn::tetris::Screen::Scores,
@@ -730,19 +704,7 @@ fn native_file_manager_matches_panes_shell_overlays_and_mouse_targets() -> io::R
                         legacy.draw(|frame| ui::draw(frame, &mut app))?;
                         let targets = format!("{:?}", app.mouse.regions);
                         expected.push_str(&legacy_output.take());
-                        let painted = native.draw(|frame| ui::draw_native(frame, &mut app))?;
-                        if step == 0 {
-                            let canvas: String =
-                                painted.buffer.content.iter().map(|c| c.symbol()).collect();
-                            assert!(
-                                !canvas.contains("item-"),
-                                "native panes must not enter the legacy canvas"
-                            );
-                            assert!(
-                                !canvas.contains("F1"),
-                                "native function bar must not enter the legacy canvas"
-                            );
-                        }
+                        native.draw_app(&mut app)?;
                         assert_eq!(
                             format!("{:?}", app.mouse.regions),
                             targets,
@@ -751,7 +713,7 @@ fn native_file_manager_matches_panes_shell_overlays_and_mouse_targets() -> io::R
                         if dn::focus::current(&app) == dn::focus::Focus::Manager && step != 27 {
                             assert_eq!(
                                 legacy.backend_mut().get_cursor_position()?,
-                                native.backend_mut().get_cursor_position()?,
+                                native.get_cursor_position()?,
                                 "command cursor step={step}"
                             );
                         }
@@ -1017,18 +979,14 @@ fn native_requested_surfaces_match_reference_rendering() -> io::Result<()> {
                     }
                     let output = Output::default();
                     let original = Output::default();
-                    let mut native = Terminal::new(TurboBackend::with_size(output.clone(), size)?)?;
+                    let mut native = TurboBackend::with_size(output.clone(), size)?;
                     let mut reference =
                         Terminal::new(TurboBackend::with_size(original.clone(), size)?)?;
-                    native.backend_mut().bind_desktop(app.desktop.native());
+                    native.bind_desktop(app.desktop.native());
                     reference.backend_mut().bind_desktop(app.desktop.native());
                     reference.draw(|f| ui::draw(f, &mut app))?;
                     let targets = format!("{:?}", app.mouse.regions);
-                    let painted = native.draw(|f| ui::draw_native(f, &mut app))?;
-                    assert!(
-                        painted.buffer.content.iter().all(|c| *c == Cell::default()),
-                        "native surface used legacy canvas: case={case}"
-                    );
+                    native.draw_app(&mut app)?;
                     assert_eq!(
                         targets,
                         format!("{:?}", app.mouse.regions),
@@ -1058,7 +1016,7 @@ fn native_requested_surfaces_match_reference_rendering() -> io::Result<()> {
                     }
                     assert_eq!(
                         reference.backend_mut().get_cursor_position()?,
-                        native.backend_mut().get_cursor_position()?,
+                        native.get_cursor_position()?,
                         "cursor case={case}"
                     );
                 }

@@ -8,7 +8,7 @@ use unicode_width::UnicodeWidthStr;
 pub(crate) struct Glyph {
     pub(crate) text: String,
     pub(crate) attribute: u8,
-    pub(crate) style: Option<ratatui::style::Style>,
+    pub(crate) style: Option<crate::presentation::style::Style>,
 }
 #[derive(Clone)]
 pub(crate) struct Scene {
@@ -19,7 +19,7 @@ pub(crate) struct Scene {
     pub(crate) cursor: Option<(u16, u16)>,
 }
 impl Glyph {
-    pub(crate) fn resolved(&self, profile: PaletteProfile) -> ratatui::style::Style {
+    pub(crate) fn resolved(&self, profile: PaletteProfile) -> crate::presentation::style::Style {
         profile
             .dos(self.attribute)
             .patch(self.style.unwrap_or_default())
@@ -110,8 +110,8 @@ impl Scene {
             if x >= width || y >= height || glyph.text.width() > usize::from(width - x) {
                 continue;
             }
-            // Only the transport boundary uses legacy cell/color types.
-            let mut source = ratatui::buffer::Cell::default();
+            // The transport uses an owned grapheme/color value, never a reference buffer.
+            let mut source = super::codec::Cell::default();
             source.set_symbol(if glyph.text.is_empty() {
                 " "
             } else {
