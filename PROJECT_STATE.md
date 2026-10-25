@@ -17,10 +17,25 @@
   state owns session dialogs/options/results; quick view owns debounced reads.
 
 ## Implemented
+- Native main file-manager drawing: both panes (brief/details and all columns),
+  headers, rows/type/tag/selection colors, scrollbars, filters/quick search,
+  details/totals/space, menu bar/clock, command line/cursor and function bar now
+  use a shared native scene. Existing workers, commands and mouse targets remain.
+  Menus/dialogs/quick view still use compatibility drawing above native panes;
+  style-only composition preserves inherited colors and menu shadows without
+  copying native text into the widget canvas. Footer presentation is toolkit-
+  neutral. Persistent native pane controls handle Tab focus and focused navigation,
+  paging, marking and guarded open/parent commands. Command-line/shortcut/modal
+  precedence remains. Mouse dispatch and other control ownership still need work.
+- Native Tetris page drawing: Setup, Help, Top Ten, Game Over and name entry now
+  join the play window on the native drawing path. Focused controls, score-save
+  errors/retry buttons, Unicode field scrolling and cursor position are preserved.
+  Existing game input/controllers and mouse dispatch remain. Native-vs-original
+  comparisons cover 420 frame pairs across palettes, languages and sizes.
 - Native Tetris play-window drawing: the default runtime paints the game frame,
   well/pieces, Info/Next/Best panels, pause banner, buttons and footer directly
   through Turbo Vision. Existing rules, keyboard/mouse actions and score storage
-  remain. Setup/help/scores/game-over/name-entry pages still use the old renderer.
+  remain. The subsequent native page increment also replaces the game pages.
   Native glyph references are independent of the retained canvas; differential
   comparisons cover text/colors/targets, both palettes/languages, transitions and
   resizing. This is the first game renderer slice, not a full game control port.

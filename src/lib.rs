@@ -69,3 +69,7 @@ pub mod windowing;
 
 #[cfg(feature = "turbo-vision")]
 pub mod turbo;
+
+pub mod panel_status;
+
+pub mod panel_command;

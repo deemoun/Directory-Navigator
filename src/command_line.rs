@@ -4,9 +4,10 @@ use crate::{
     user_menu::runner::{CommandSpec, Plan},
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use ratatui::{layout::Rect, text::Span, widgets::Paragraph, Frame};
+use ratatui::{layout::Rect, widgets::Paragraph, Frame};
 use std::{ffi::OsString, io};
 use unicode_segmentation::UnicodeSegmentation;
+use unicode_width::UnicodeWidthStr;
 pub mod history;
 const MAX_BYTES: usize = 16 * 1024;
 #[derive(Default)]
@@ -102,7 +103,7 @@ impl CommandLine {
         let mut width = 0;
         self.cursor = self.view_start;
         for g in self.text[self.view_start..].graphemes(true) {
-            let cells = Span::raw(g).width();
+            let cells = g.width();
             if width + cells > desired {
                 break;
             }
@@ -221,7 +222,7 @@ pub fn key(app: &mut App, key: KeyEvent) -> bool {
     }
     true
 }
-pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
+pub(crate) fn presentation(app: &mut App, area: Rect) -> (String, Option<(u16, u16)>) {
     let prefix_armed = crate::shortcuts::armed(app);
     let focused = crate::focus::current(app) == crate::focus::Focus::Manager;
     let line = &mut app.command_line;
@@ -229,9 +230,9 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
         "{}>",
         crate::filesystem::display_name(&app.panels[app.active].path.to_string_lossy())
     );
-    let reserve = Span::raw(&line.text).width().saturating_add(1).clamp(1, 20) as u16;
+    let reserve = line.text.width().saturating_add(1).clamp(1, 20) as u16;
     let prefix = crate::formatting::tail(&path, area.width.saturating_sub(reserve + 1).max(1));
-    let prefix_width = Span::raw(&prefix).width() as u16;
+    let prefix_width = prefix.width() as u16;
     line.input_x = area.x + prefix_width + 1;
     let width = area.width.saturating_sub(prefix_width + 1) as usize;
     // Recompute from the insertion point so deleting/editing combining clusters
@@ -239,7 +240,7 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
     let mut start = line.cursor;
     let mut used = 0;
     for (i, g) in line.text[..line.cursor].grapheme_indices(true).rev() {
-        let cells = Span::raw(g).width();
+        let cells = g.width();
         if used + cells >= width {
             break;
         }
@@ -250,21 +251,32 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
     let mut visible = String::new();
     let mut cells = 0;
     for g in line.text[start..].graphemes(true) {
-        let w = Span::raw(g).width();
+        let w = g.width();
         if cells + w > width {
             break;
         }
         visible.push_str(g);
         cells += w;
     }
+    (
+        format!("{prefix} {visible}"),
+        if focused && !prefix_armed {
+            Some((line.input_x + used as u16, area.y))
+        } else {
+            None
+        },
+    )
+}
+pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
+    let (text, cursor) = presentation(app, area);
     frame.render_widget(
-        Paragraph::new(format!("{prefix} {visible}")).style(app.config.palette.dos(0x07)),
+        Paragraph::new(text).style(app.config.palette.dos(0x07)),
         area,
     );
     app.mouse
         .regions
         .push((area, crate::mouse::Target::CommandLine));
-    if focused && !prefix_armed {
-        frame.set_cursor_position((line.input_x + used as u16, area.y));
+    if let Some(cursor) = cursor {
+        frame.set_cursor_position(cursor);
     }
 }

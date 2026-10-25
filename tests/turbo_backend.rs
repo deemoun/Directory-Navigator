@@ -369,7 +369,7 @@ fn native_tetris_matches_legacy_colors_text_targets_and_transitions() -> io::Res
                 legacy.backend_mut().bind_desktop(app.desktop.native());
                 native.backend_mut().bind_desktop(app.desktop.native());
                 let (mut expected, mut actual) = (String::new(), String::new());
-                for step in 0..18 {
+                for step in 0..35 {
                     if let Some(game) = app.desktop.game_mut() {
                         match step {
                             1 => {
@@ -394,8 +394,68 @@ fn native_tetris_matches_legacy_colors_text_targets_and_transitions() -> io::Res
                                 game.rotate();
                                 game.preview = true;
                             }
+                            18 => {
+                                game.screen = Screen::GameOver;
+                            }
+                            19 => {
+                                game.screen = Screen::Name;
+                                game.name = "界".repeat(29);
+                                game.name_cursor = game.name.len();
+                                game.replace_name = false;
+                                game.notice = "Cannot save scores: permission denied while opening the score configuration file in this directory. Retry save.".into();
+                            }
+                            20 => {
+                                game.screen = Screen::Scores;
+                                game.highlighted = Some(0);
+                            }
+                            21 => {
+                                game.screen = Screen::Setup {
+                                    level: 10,
+                                    preview: true,
+                                };
+                                game.setup_focus = 1;
+                            }
+                            22 => {
+                                game.setup_focus = 3;
+                            }
+                            23 => {
+                                game.screen = Screen::Scores;
+                                game.records.clear();
+                            }
+                            24 => {
+                                game.notice.clear();
+                            }
+                            25 => {
+                                game.screen = Screen::Name;
+                                game.name = "e\u{301}界👩‍💻".repeat(7);
+                                game.name_cursor = game.name.len();
+                            }
+                            26 => {
+                                game.name_cursor = 0;
+                                game.replace_name = true;
+                            }
+                            27 => {
+                                game.screen = Screen::Play;
+                            }
                             _ => {}
                         }
+                    }
+                    if step >= 28 {
+                        let game = app.desktop.game_mut().unwrap();
+                        game.screen = if step % 2 == 0 {
+                            Screen::Name
+                        } else {
+                            Screen::Scores
+                        };
+                        game.notice = match step {
+                            28 => "Cannot save: /tmp/a-very-long-directory-name/another-directory/tetris.conf: permission denied".into(),
+                            29 => "  Cannot save scores:  multiple   spaces and a missing destination directory".into(),
+                            30 => "保存先がありません 界 e\u{301} 👩‍💻 permission denied for this configuration directory".into(),
+                            31 => "x".repeat(150),
+                            32 => "First line\n\nThird line".into(),
+                            33 => "one ".repeat(30),
+                            _ => String::new(),
+                        };
                     }
                     if step == 10 {
                         app.desktop.close_game();
@@ -425,11 +485,22 @@ fn native_tetris_matches_legacy_colors_text_targets_and_transitions() -> io::Res
                     if step == 17 {
                         app.screensaver.activity(std::time::Instant::now());
                     }
+                    if step == 20 {
+                        let record = Record {
+                            name: "界 e\u{301}".into(),
+                            start_level: 1,
+                            level: 4,
+                            lines: Some(12),
+                            score: 1234,
+                        };
+                        app.game_scores.add(record.clone())?;
+                        app.desktop.game_mut().unwrap().records = vec![record];
+                    }
                     legacy.draw(|frame| ui::draw(frame, &mut app))?;
                     let targets = format!("{:?}", app.mouse.regions);
                     expected.push_str(&legacy_output.take());
                     let painted = native.draw(|frame| ui::draw_native(frame, &mut app))?;
-                    if step == 0 {
+                    if step == 0 || (18..=26).contains(&step) {
                         let legacy_canvas: String = painted
                             .buffer
                             .content
@@ -440,13 +511,37 @@ fn native_tetris_matches_legacy_colors_text_targets_and_transitions() -> io::Res
                             !legacy_canvas.contains(language.text("Navigator's game")),
                             "native game must not be rendered into the Ratatui canvas"
                         );
+                        for title in [
+                            "Setup game",
+                            "Tetris Top Ten",
+                            "Tetris Help",
+                            "New high score",
+                            "Game over",
+                        ] {
+                            assert!(
+                                !legacy_canvas.contains(language.text(title)),
+                                "native page {title} must not be rendered into the Ratatui canvas"
+                            );
+                        }
+                    }
+                    if app.desktop.game().is_some_and(|g| g.screen == Screen::Name) {
+                        assert_eq!(
+                            legacy.backend_mut().get_cursor_position()?,
+                            native.backend_mut().get_cursor_position()?,
+                            "name cursor step={step}"
+                        );
                     }
                     assert_eq!(
                         format!("{:?}", app.mouse.regions),
                         targets,
                         "mouse targets step={step}"
                     );
-                    actual.push_str(&native_output.take());
+                    let native_frame = native_output.take();
+                    assert!(
+                        !native_frame.contains('\u{1}'),
+                        "overlay marker leaked to terminal"
+                    );
+                    actual.push_str(&native_frame);
                     let dimensions = match step {
                         12 => Size::new(100, 30),
                         13 => Size::new(50, 12),
@@ -459,6 +554,23 @@ fn native_tetris_matches_legacy_colors_text_targets_and_transitions() -> io::Res
                         .zip(&actual_cells)
                         .position(|(a, b)| a != b)
                     {
+                        let row = index / usize::from(dimensions.width);
+                        eprintln!(
+                            "expected row {:?}",
+                            expected_cells[row * usize::from(dimensions.width)
+                                ..(row + 1) * usize::from(dimensions.width)]
+                                .iter()
+                                .map(|c| c.0.as_str())
+                                .collect::<String>()
+                        );
+                        eprintln!(
+                            "actual row {:?}",
+                            actual_cells[row * usize::from(dimensions.width)
+                                ..(row + 1) * usize::from(dimensions.width)]
+                                .iter()
+                                .map(|c| c.0.as_str())
+                                .collect::<String>()
+                        );
                         panic!("palette={palette:?},language={language:?},size={size:?},step={step},x={},y={}: expected {:?}, actual {:?}",index%usize::from(dimensions.width),index/usize::from(dimensions.width),expected_cells[index],actual_cells[index]);
                     }
                 }
@@ -486,5 +598,204 @@ fn native_tetris_clips_a_scene_prepared_before_terminal_shrink() -> io::Result<(
     canvas.draw(|frame| ui::draw_native(frame, &mut app))?;
     native.draw(std::iter::empty())?;
     native.flush()?;
+    Ok(())
+}
+
+#[test]
+fn native_file_manager_matches_panes_shell_overlays_and_mouse_targets() -> io::Result<()> {
+    use dn::{
+        app::App, columns::ColumnPreset, localization::Language, palette::PaletteProfile,
+        panel_layout::PanelLayout, tetris::Game, ui, volume_space::Space,
+    };
+    use ratatui::Terminal;
+    use std::{
+        fs, thread,
+        time::{Duration, Instant},
+    };
+    struct Temp(std::path::PathBuf);
+    impl Drop for Temp {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+    let fixture =
+        Temp(std::env::temp_dir().join(format!("dn-native-panes-{}", std::process::id())));
+    fs::create_dir(&fixture.0)?;
+    for n in 0..85 {
+        fs::write(
+            fixture.0.join(format!("item-{n:03}.txt")),
+            format!("line {n}\n"),
+        )?;
+    }
+    for name in [
+        "e\u{301}.txt",
+        "界.txt",
+        "👩‍💻.rs",
+        "\u{f0000}.zip",
+        "long filename with spaces and multiple words.md",
+    ] {
+        fs::write(fixture.0.join(name), "hello")?;
+    }
+    fs::create_dir(fixture.0.join("folder"))?;
+    #[cfg(unix)]
+    std::os::unix::fs::symlink("item-000.txt", fixture.0.join("link"))?;
+    for palette in [PaletteProfile::ClassicDn, PaletteProfile::Terminal] {
+        for language in [Language::English, Language::Russian] {
+            for size in [Size::new(80, 25), Size::new(132, 40), Size::new(83, 27)] {
+                for layout in [PanelLayout::Brief, PanelLayout::Details] {
+                    let mut app = App::new(fixture.0.clone())?;
+                    let deadline = Instant::now() + Duration::from_secs(5);
+                    while app.panels.iter().any(|p| p.loading) {
+                        app.poll();
+                        assert!(Instant::now() < deadline);
+                        thread::sleep(Duration::from_millis(1));
+                    }
+                    app.config.palette = palette;
+                    app.config.language = language;
+                    app.config.layouts = [layout; 2];
+                    app.config.columns = [ColumnPreset::NameSizeModified; 2];
+                    app.config.show_clock = true;
+                    app.clock.text = " 12:34:56 ".into();
+                    for panel in &mut app.panels {
+                        panel.space.result = Some(Ok(Space {
+                            available: 123456789,
+                            total: 987654321,
+                        }));
+                    }
+                    let legacy_output = Output::default();
+                    let native_output = Output::default();
+                    let mut legacy =
+                        Terminal::new(TurboBackend::with_size(legacy_output.clone(), size)?)?;
+                    let mut native =
+                        Terminal::new(TurboBackend::with_size(native_output.clone(), size)?)?;
+                    legacy.backend_mut().bind_desktop(app.desktop.native());
+                    native.backend_mut().bind_desktop(app.desktop.native());
+                    let (mut expected, mut actual) = (String::new(), String::new());
+                    for step in 0..42 {
+                        match step {
+                            1=>app.active=1,
+                            2=> {app.panels[1].selected.insert("item-000.txt".into()); app.panels[1].selected.insert("folder".into());}
+                            3=>app.panels[1].cursor=app.panels[1].entries.len()-1,
+                            4=>app.config.columns=[ColumnPreset::Name;2],
+                            5=>app.config.columns=[ColumnPreset::NameSize;2],
+                            6=>app.config.columns=[ColumnPreset::NameSizeModified;2],
+                            7=>app.config.layouts=[if layout==PanelLayout::Brief {PanelLayout::Details} else {PanelLayout::Brief};2],
+                            8=>{app.config.show_tags=false;app.config.highlight_files=false;}
+                            9=>{dn::quick_search::open(&mut app); let q=app.quick_search.as_mut().unwrap();q.query="missing界".into();q.no_match=true;}
+                            10=>{app.quick_search.as_mut().unwrap().query="item".into();app.quick_search.as_mut().unwrap().no_match=false;}
+                            11=>{app.quick_search=None;app.panels[1].set_filter("*.txt".into());}
+                            12=>app.panels[1].set_filter(String::new()),
+                            13=>app.panels[0].loading=true,
+                            14=>{app.panels[0].loading=false;app.panels[0].entries.clear();}
+                            15=>{app.panels[0].entries=dn::filesystem::scan(&fixture.0,false)?;app.panels[0].entries[1].size=None;app.panels[0].space.result=Some(Err("unavailable".into()));}
+                            16=>app.command_line.insert("echo 界 e\u{301} 👩‍💻 and a rather long command to exercise scrolling")?,
+                            17=>app.menu=Some((0,0)),
+                            18=>{dn::menu::close(&mut app);app.prompt_operation(dn::operations::Kind::Mkdir,false);}
+                            19=>{app.prompt=None;dn::welcome::open(&mut app);}
+                            20=>{app.welcome.dialog=None;dn::dialog::keyboard_help(&mut app);}
+                            21=>{app.dialogs.clear();dn::quick_view::toggle(&mut app);}
+                            22=>{dn::quick_view::toggle(&mut app);dn::palette::open(&mut app);}
+                            23=>{app.color_dialog=None;dn::windowing::open(&mut app);}
+                            24=>{app.window_list=None;app.config.shortcuts=dn::shortcuts::Profile::Mac;dn::input::handle(&mut app,crossterm::event::KeyEvent::new(crossterm::event::KeyCode::Char('o'),crossterm::event::KeyModifiers::CONTROL));}
+                            25=>{app.shortcuts.clear();app.screensaver.start(Instant::now());}
+                            26=>{app.screensaver.activity(Instant::now());}
+                            27=>{legacy.backend_mut().resize(Size::new(50,12))?;native.backend_mut().resize(Size::new(50,12))?;}
+                            28=>{legacy.backend_mut().resize(size)?;native.backend_mut().resize(size)?;}
+                            29=>app.show_game(Game::with_seed(7,Instant::now())),
+                            30=>app.desktop.close_game(),
+                            31=>app.open_settings(dn::settings::SettingsKind::Keyboard),
+                            32 => {
+                                app.settings = None;
+                                dn::menu::open(&mut app, 1);
+                                let row = dn::menu::level_items(&app,0).iter().position(|item| matches!(item.action,dn::menu::Action::Submenu(_))).unwrap();
+                                dn::menu::activate(&mut app,0,row);
+                            }
+                            33 => {
+                                if let Some(entry) = app.panels[0].entries.get_mut(1) { entry.name = "changed e\u{301} 界 👩‍💻.txt".into(); }
+                                app.clock.text = " 23:59:59 ".into();
+                            }
+                            34 => dn::menu::close(&mut app),
+                            35 => { legacy.backend_mut().resize(Size::new(140,42))?; native.backend_mut().resize(Size::new(140,42))?; }
+                            36 => { legacy.backend_mut().resize(size)?; native.backend_mut().resize(size)?; }
+                            37 => dn::quick_view::toggle(&mut app),
+                            38 => app.show_game(Game::with_seed(12,Instant::now())),
+                            39 => app.desktop.game_mut().unwrap().screen = dn::tetris::Screen::Scores,
+                            40 => app.desktop.close_game(),
+                            41 => dn::quick_view::toggle(&mut app),
+                            _=>{}
+                        }
+                        app.desktop
+                            .native()
+                            .set_scope(dn::turbo::desktop::Scope::for_app(&app));
+                        legacy.draw(|frame| ui::draw(frame, &mut app))?;
+                        let targets = format!("{:?}", app.mouse.regions);
+                        expected.push_str(&legacy_output.take());
+                        let painted = native.draw(|frame| ui::draw_native(frame, &mut app))?;
+                        if step == 0 {
+                            let canvas: String =
+                                painted.buffer.content.iter().map(|c| c.symbol()).collect();
+                            assert!(
+                                !canvas.contains("item-"),
+                                "native panes must not enter the legacy canvas"
+                            );
+                            assert!(
+                                !canvas.contains("F1"),
+                                "native function bar must not enter the legacy canvas"
+                            );
+                        }
+                        assert_eq!(
+                            format!("{:?}", app.mouse.regions),
+                            targets,
+                            "targets: step={step}"
+                        );
+                        if dn::focus::current(&app) == dn::focus::Focus::Manager && step != 27 {
+                            assert_eq!(
+                                legacy.backend_mut().get_cursor_position()?,
+                                native.backend_mut().get_cursor_position()?,
+                                "command cursor step={step}"
+                            );
+                        }
+                        let native_frame = native_output.take();
+                        assert!(
+                            !native_frame.contains('\u{1}'),
+                            "overlay marker leaked to terminal"
+                        );
+                        actual.push_str(&native_frame);
+                        let dimensions = match step {
+                            27 => Size::new(50, 12),
+                            35 => Size::new(140, 42),
+                            _ => size,
+                        };
+                        let expected_cells = colored_screen(&expected, dimensions);
+                        let actual_cells = colored_screen(&actual, dimensions);
+                        if let Some(index) = expected_cells
+                            .iter()
+                            .zip(&actual_cells)
+                            .position(|(a, b)| a != b)
+                        {
+                            let row = index / usize::from(dimensions.width);
+                            eprintln!(
+                                "expected {:?}",
+                                expected_cells[row * usize::from(dimensions.width)
+                                    ..(row + 1) * usize::from(dimensions.width)]
+                                    .iter()
+                                    .map(|c| c.0.as_str())
+                                    .collect::<String>()
+                            );
+                            eprintln!(
+                                "actual {:?}",
+                                actual_cells[row * usize::from(dimensions.width)
+                                    ..(row + 1) * usize::from(dimensions.width)]
+                                    .iter()
+                                    .map(|c| c.0.as_str())
+                                    .collect::<String>()
+                            );
+                            panic!("palette={palette:?},language={language:?},size={size:?},layout={layout:?},step={step},x={},y={row}: expected {:?}, actual {:?}",index%usize::from(dimensions.width),expected_cells[index],actual_cells[index]);
+                        }
+                    }
+                }
+            }
+        }
+    }
     Ok(())
 }

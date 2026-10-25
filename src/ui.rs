@@ -42,21 +42,19 @@ use viewer_view::draw_viewer;
 
 pub fn draw(frame: &mut Frame, app: &mut App) {
     #[cfg(feature = "turbo-vision")]
-    app.desktop.native().set_game_scene(None);
+    app.desktop.native().set_scene(None);
     draw_content(frame, app, false);
     shortcuts_view::draw_prefix(frame, app);
 }
-/// Runtime composition: native game content is painted by its TV document.
+/// Native manager and game content is painted by its TV document.
 /// `draw` remains the legacy renderer for comparison and headless contracts.
 #[cfg(feature = "turbo-vision")]
 pub fn draw_native(frame: &mut Frame, app: &mut App) {
-    app.desktop.native().set_game_scene(None);
-    draw_content(frame, app, !crate::shortcuts::armed(app));
+    app.desktop.native().set_scene(None);
+    draw_content(frame, app, true);
     shortcuts_view::draw_prefix(frame, app);
 }
-fn draw_content(frame: &mut Frame, app: &mut App, native_game: bool) {
-    #[cfg(not(feature = "turbo-vision"))]
-    let _ = native_game;
+fn draw_content(frame: &mut Frame, app: &mut App, native_drawing: bool) {
     let profile = app.config.palette;
     let dos = profile.styles();
     let area = frame.area();
@@ -67,7 +65,16 @@ fn draw_content(frame: &mut Frame, app: &mut App, native_game: bool) {
         screensaver_view::draw_sky(frame, app, area);
         return;
     }
-    frame.render_widget(Block::default().style(dos(0x87)), area);
+    let native_shell = native_drawing
+        && matches!(
+            screen,
+            crate::desktop::WindowKind::Manager | crate::desktop::WindowKind::Game
+        )
+        && area.width >= 80
+        && area.height >= 25;
+    if !native_shell {
+        frame.render_widget(Block::default().style(dos(0x87)), area);
+    }
     if area.width < 80 || area.height < 25 {
         frame.render_widget(
             Paragraph::new(
@@ -95,6 +102,20 @@ fn draw_content(frame: &mut Frame, app: &mut App, native_game: bool) {
         return;
     }
     let regions = &prepared.regions;
+    #[cfg(feature = "turbo-vision")]
+    let menu_positions = if native_shell {
+        let (scene, positions) =
+            crate::turbo::manager::prepare(app, &prepared, area.width, area.height);
+        if let Some(cursor) = scene.cursor {
+            frame.set_cursor_position(cursor);
+        }
+        scene.seed_overlay_styles(frame.buffer_mut());
+        app.desktop.native().set_scene(Some(scene));
+        positions
+    } else {
+        menu_view::draw_bar(frame, app, regions[0])
+    };
+    #[cfg(not(feature = "turbo-vision"))]
     let menu_positions = menu_view::draw_bar(frame, app, regions[0]);
     let panels = &prepared.panel_areas;
     for (index, area) in panels.iter().enumerate() {
@@ -107,17 +128,19 @@ fn draw_content(frame: &mut Frame, app: &mut App, native_game: bool) {
             continue;
         }
         let geometry = &prepared.panels[index];
-        draw_panel(
-            frame,
-            &app.panels[index],
-            *area,
-            (index, index == app.active),
-            &app.config,
-            app.quick_search
-                .as_ref()
-                .filter(|search| search.panel == index),
-            geometry,
-        );
+        if !native_shell {
+            draw_panel(
+                frame,
+                &app.panels[index],
+                *area,
+                (index, index == app.active),
+                &app.config,
+                app.quick_search
+                    .as_ref()
+                    .filter(|search| search.panel == index),
+                geometry,
+            );
+        }
         app.mouse.regions.push((*area, Target::Panel(index)));
         let panel = &app.panels[index];
         for entry in panel.offset..panel.entries.len().min(panel.offset + geometry.capacity()) {
@@ -149,7 +172,11 @@ fn draw_content(frame: &mut Frame, app: &mut App, native_game: bool) {
             }
         }
     }
-    crate::command_line::draw(frame, app, regions[2]);
+    if !native_shell {
+        crate::command_line::draw(frame, app, regions[2]);
+    } else {
+        app.mouse.regions.push((regions[2], Target::CommandLine));
+    }
     let buttons = Layout::horizontal([Constraint::Percentage(10); 10]).split(regions[3]);
     for (index, label) in [
         "Help", "User", "View", "Edit", "Copy", "Move", "MkDir", "Delete", "Menu", "Quit",
@@ -168,28 +195,31 @@ fn draw_content(frame: &mut Frame, app: &mut App, native_game: bool) {
         } else {
             label
         };
-        frame.render_widget(
-            Paragraph::new(crate::shortcuts::function(
-                app.config.shortcuts,
-                profile,
-                index as u8 + 1,
-                app.config.language.text(label),
-                enabled,
-            ))
-            .style(profile.bar(enabled)),
-            buttons[index],
-        );
+        if !native_shell {
+            frame.render_widget(
+                Paragraph::new(crate::shortcuts::function(
+                    app.config.shortcuts,
+                    profile,
+                    index as u8 + 1,
+                    app.config.language.text(label),
+                    enabled,
+                ))
+                .style(profile.bar(enabled)),
+                buttons[index],
+            );
+        }
     }
     if screen == crate::desktop::WindowKind::Game {
         #[cfg(feature = "turbo-vision")]
-        if native_game
-            && app
-                .desktop
-                .game()
-                .is_some_and(|g| g.screen == crate::tetris::Screen::Play)
-        {
+        if native_drawing {
             let scene = crate::turbo::tetris::prepare(app, area.width, area.height);
-            app.desktop.native().set_game_scene(Some(scene));
+            if let Some(cursor) = scene.cursor {
+                frame.set_cursor_position(cursor);
+            }
+            // Only replace cells covered by the game; compatibility quick-view
+            // content outside it must keep its overlay and hit-target behavior.
+            scene.seed_overlay_styles(frame.buffer_mut());
+            app.desktop.native().compose_scene(scene);
             return;
         }
         tetris_view::draw(frame, app, area);

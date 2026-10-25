@@ -3,6 +3,9 @@
 mod codec;
 pub mod desktop;
 pub mod forms;
+pub(crate) mod manager;
+pub(crate) mod panes;
+pub(crate) mod scene;
 pub(crate) mod tetris;
 use codec::Codec;
 use ratatui::{
@@ -75,6 +78,8 @@ pub struct TurboBackend<W: Write + Send + 'static> {
     terminal: TvTerminal,
     desktop: desktop::NativeDesktop,
     pixels: Vec<TvCell>,
+    opaque: Vec<bool>,
+    canvas: Vec<Cell>,
     codec: Arc<Mutex<Codec>>,
     dimensions: Arc<Mutex<Size>>,
     writer: Arc<Mutex<W>>,
@@ -116,6 +121,8 @@ impl<W: Write + Send + 'static> TurboBackend<W> {
                 TvCell::new(' ', turbo_vision::core::palette::Attr::from_u8(0x07));
                 usize::from(size.width) * usize::from(size.height)
             ],
+            opaque: vec![false; usize::from(size.width) * usize::from(size.height)],
+            canvas: vec![Cell::default(); usize::from(size.width) * usize::from(size.height)],
             codec,
             dimensions,
             writer,
@@ -142,6 +149,8 @@ impl<W: Write + Send + 'static> TurboBackend<W> {
             *lock(&self.dimensions)? = size;
             lock(&self.codec)?.resize(size);
             self.terminal.resize(size.width, size.height);
+            self.opaque = vec![false; usize::from(size.width) * usize::from(size.height)];
+            self.canvas = vec![Cell::default(); usize::from(size.width) * usize::from(size.height)];
             self.pixels = vec![
                 TvCell::new(' ', turbo_vision::core::palette::Attr::from_u8(0x07));
                 usize::from(size.width) * usize::from(size.height)
@@ -176,23 +185,48 @@ impl<W: Write + Send + 'static> Backend for TurboBackend<W> {
     {
         let size = self.current_size()?;
         self.resize(size)?;
+        // Cache the legacy overlay, including style-only markers. Native text
+        // can change without a canvas diff, so resolve markers on every frame.
+        for (x, y, cell) in content {
+            if x >= size.width || y >= size.height {
+                continue;
+            }
+            self.canvas[usize::from(y) * usize::from(size.width) + usize::from(x)] = cell.clone();
+            let width = ratatui::text::Span::raw(cell.symbol()).width().max(1);
+            for offset in 1..width.min(usize::from(size.width - x)) {
+                let mut padding = cell.clone();
+                padding.set_symbol("\0");
+                self.canvas[usize::from(y) * usize::from(size.width) + usize::from(x) + offset] =
+                    padding;
+            }
+        }
+        let scene = self.desktop.scene();
         {
             let mut codec = lock(&self.codec)?;
-            for (x, y, cell) in content {
-                if x >= size.width || y >= size.height {
-                    continue;
-                }
-                let (cell, width) = codec.cell(x, y, cell)?;
-                self.pixels[usize::from(y) * usize::from(size.width) + usize::from(x)] = cell;
-                for offset in 1..width.min(usize::from(size.width - x)) {
-                    let px = x + offset as u16;
-                    codec.continuation(px, y);
-                    self.pixels[usize::from(y) * usize::from(size.width) + usize::from(px)] =
-                        TvCell::new('\0', cell.attr);
+            for y in 0..size.height {
+                for x in 0..size.width {
+                    let i = usize::from(y) * usize::from(size.width) + usize::from(x);
+                    let source = &self.canvas[i];
+                    let overlay = if let Some(scene) = scene.as_ref().filter(|s| s.underlay) {
+                        scene.overlay_cell(x, y, source)
+                    } else if source.symbol() == scene::UNDERLAY {
+                        let mut cell = source.clone();
+                        cell.set_symbol(" ");
+                        Some(cell)
+                    } else {
+                        Some(source.clone())
+                    };
+                    self.opaque[i] = overlay
+                        .as_ref()
+                        .is_some_and(|cell| *cell != Cell::default());
+                    if let Some(cell) = overlay {
+                        self.pixels[i] = codec.cell(x, y, &cell)?.0;
+                    } else {
+                        codec.continuation(x, y);
+                    }
                 }
             }
         }
-        let scene = self.desktop.game_scene();
         let native = {
             let mut codec = lock(&self.codec)?;
             codec.clear_native();
@@ -206,6 +240,8 @@ impl<W: Write + Send + 'static> Backend for TurboBackend<W> {
             TvRect::new(0, 0, size.width as i16, size.height as i16),
             &self.pixels,
             native.as_deref().unwrap_or_default(),
+            &self.opaque,
+            scene.as_ref().is_some_and(|s| s.underlay),
         );
         Ok(())
     }
@@ -227,6 +263,8 @@ impl<W: Write + Send + 'static> Backend for TurboBackend<W> {
     fn clear(&mut self) -> io::Result<()> {
         self.terminal.clear();
         self.terminal.force_full_redraw();
+        self.opaque.fill(false);
+        self.canvas.fill(Cell::default());
         self.pixels.fill(TvCell::new(
             ' ',
             turbo_vision::core::palette::Attr::from_u8(0x07),

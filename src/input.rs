@@ -281,30 +281,49 @@ fn handle_key(app: &mut App, key: KeyEvent) {
         }
         return;
     }
+    #[cfg(feature = "turbo-vision")]
+    if crate::turbo::panes::key(app, key) {
+        return;
+    }
+    #[cfg(not(feature = "turbo-vision"))]
     let brief = app.config.layouts[app.active] == crate::panel_layout::PanelLayout::Brief;
     let panel = &mut app.panels[app.active];
+    #[cfg(not(feature = "turbo-vision"))]
     let capacity = panel.viewport_rows * if brief { 3 } else { 1 };
     match key.code {
+        #[cfg(not(feature = "turbo-vision"))]
         KeyCode::Tab | KeyCode::BackTab => {
             app.quick_view = None;
             app.active ^= 1;
         }
         KeyCode::Char('+') => app.open_pattern(true),
         KeyCode::Char('-') => app.open_pattern(false),
+        #[cfg(not(feature = "turbo-vision"))]
         KeyCode::Up => panel.step(-1),
+        #[cfg(not(feature = "turbo-vision"))]
         KeyCode::Down => panel.step(1),
+        #[cfg(not(feature = "turbo-vision"))]
         KeyCode::Left if brief => panel.move_column(false),
+        #[cfg(not(feature = "turbo-vision"))]
         KeyCode::Right if brief => panel.move_column(true),
+        #[cfg(not(feature = "turbo-vision"))]
         KeyCode::PageUp => panel.step(-(capacity as isize)),
+        #[cfg(not(feature = "turbo-vision"))]
         KeyCode::PageDown => panel.step(capacity as isize),
+        #[cfg(not(feature = "turbo-vision"))]
         KeyCode::Home => panel.cursor = 0,
+        #[cfg(not(feature = "turbo-vision"))]
         KeyCode::End => panel.cursor = panel.entries.len().saturating_sub(1),
+        #[cfg(not(feature = "turbo-vision"))]
         KeyCode::Enter => app.open_current(),
+        #[cfg(not(feature = "turbo-vision"))]
         KeyCode::Backspace if app.config.backspace_parent => panel.parent(app.config.show_hidden),
+        #[cfg(not(feature = "turbo-vision"))]
         KeyCode::Insert => {
             panel.toggle_selection();
             panel.step(1);
         }
+        #[cfg(not(feature = "turbo-vision"))]
         KeyCode::Char(' ') if app.config.space_select => {
             panel.toggle_selection();
             panel.step(1);

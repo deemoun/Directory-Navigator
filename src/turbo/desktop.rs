@@ -55,6 +55,8 @@ struct Document {
     mailbox: Mailbox,
     pixels: Vec<Cell>,
     native: Vec<(u16, u16, Cell)>,
+    opaque: Vec<bool>,
+    underlay: bool,
 }
 impl Document {
     fn new(bounds: Rect, info: WindowInfo, scope: Scope, mailbox: Mailbox) -> Self {
@@ -70,6 +72,8 @@ impl Document {
             mailbox,
             pixels: Vec::new(),
             native: Vec::new(),
+            opaque: Vec::new(),
+            underlay: false,
         }
     }
 }
@@ -104,12 +108,20 @@ impl View for Document {
         if width == 0 {
             return;
         }
-        for (i, cell) in self.pixels.iter().copied().enumerate() {
-            terminal.write_cell((i % width) as i16, (i / width) as i16, cell);
+        if self.underlay {
+            for &(x, y, cell) in &self.native {
+                terminal.write_cell(x as i16, y as i16, cell);
+            }
         }
-        // Native game cells are produced from the game model, not Ratatui widgets.
-        for &(x, y, cell) in &self.native {
-            terminal.write_cell(x as i16, y as i16, cell);
+        for (i, cell) in self.pixels.iter().copied().enumerate() {
+            if !self.underlay || self.opaque.get(i).copied().unwrap_or(false) {
+                terminal.write_cell((i % width) as i16, (i / width) as i16, cell);
+            }
+        }
+        if !self.underlay {
+            for &(x, y, cell) in &self.native {
+                terminal.write_cell(x as i16, y as i16, cell);
+            }
         }
     }
     fn handle_event(&mut self, event: &mut Event) {
@@ -132,7 +144,8 @@ struct Host {
     modal: Option<(Scope, ViewId)>,
     mailbox: Mailbox,
     bounds: Rect,
-    game_scene: Option<Rc<super::tetris::Scene>>,
+    scene: Option<Rc<super::scene::Scene>>,
+    panes: super::panes::Controls,
 }
 impl NativeDesktop {
     pub fn new(manager: WindowInfo) -> Self {
@@ -151,14 +164,36 @@ impl NativeDesktop {
             modal: None,
             mailbox,
             bounds,
-            game_scene: None,
+            scene: None,
+            panes: super::panes::Controls::default(),
         })))
     }
-    pub(crate) fn set_game_scene(&self, scene: Option<super::tetris::Scene>) {
-        self.0.borrow_mut().game_scene = scene.map(Rc::new);
+    pub(crate) fn set_scene(&self, scene: Option<super::scene::Scene>) {
+        self.0.borrow_mut().scene = scene.map(Rc::new);
     }
-    pub(super) fn game_scene(&self) -> Option<Rc<super::tetris::Scene>> {
-        self.0.borrow().game_scene.clone()
+    pub(crate) fn compose_scene(&self, overlay: super::scene::Scene) {
+        let mut host = self.0.borrow_mut();
+        if let Some(scene) = host.scene.as_mut() {
+            let scene = Rc::make_mut(scene);
+            scene.cells.extend(overlay.cells);
+            scene.cursor = overlay.cursor;
+        } else {
+            host.scene = Some(Rc::new(overlay));
+        }
+    }
+    pub(super) fn scene(&self) -> Option<Rc<super::scene::Scene>> {
+        self.0.borrow().scene.clone()
+    }
+    pub(crate) fn sync_panes(&self, active: usize, size: (u16, u16)) {
+        self.0.borrow_mut().panes.sync(active, size);
+    }
+    pub(crate) fn pane_key(
+        &self,
+        active: usize,
+        size: (u16, u16),
+        key: crossterm::event::KeyEvent,
+    ) -> Option<(usize, crate::panel_command::Command)> {
+        self.0.borrow_mut().panes.key(active, size, key)
     }
     pub fn active(&self) -> WindowInfo {
         self.0.borrow().active()
@@ -230,6 +265,8 @@ impl NativeDesktop {
         bounds: Rect,
         pixels: &[Cell],
         native: &[(u16, u16, Cell)],
+        opaque: &[bool],
+        underlay: bool,
     ) {
         let mut host = self.0.borrow_mut();
         if host.bounds != bounds {
@@ -248,9 +285,12 @@ impl NativeDesktop {
                 .expect("DN native window");
             document.pixels.clear();
             document.native.clear();
+            document.opaque.clear();
+            document.underlay = underlay;
             if i + 1 == count {
                 document.pixels.extend_from_slice(pixels);
                 document.native.extend_from_slice(native);
+                document.opaque.extend_from_slice(opaque);
             }
         }
         terminal.draw_view(&mut host.desktop);
