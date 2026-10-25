@@ -1,16 +1,15 @@
+use crate::painting::{Frame, Paragraph};
+use crate::presentation::{
+    layout::Rect,
+    text::{Line, Span},
+};
 use crate::{
     app::App, filesystem::display_name, formatting::tail, mouse::Target, user_menu::Action,
 };
-use ratatui::{
-    layout::Rect,
-    text::{Line, Span},
-    widgets::Paragraph,
-    Frame,
-};
-pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
+pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
     let profile = app.config.palette;
     let dos = profile.styles();
-    let Some(m) = &app.user_menu.modal else {
+    let Some(m) = app.user_menu.modals.user_menu() else {
         return;
     };
     let review = m.review.is_some();
@@ -43,12 +42,11 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
             " User menu "
         }),
     );
-    app.mouse.regions.clear();
+    frame.regions().clear();
     super::dialog_style::close_button(
         frame,
         profile,
         rect,
-        &mut app.mouse.regions,
         Target::UserMenu(if review {
             Action::Cancel
         } else {
@@ -122,8 +120,8 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
                 Paragraph::new(Line::from(spans)).style(dos(if selected { 0x20 } else { 0x70 })),
                 r,
             );
-            app.mouse
-                .regions
+            frame
+                .regions()
                 .push((r, Target::UserMenu(Action::Choose(index))));
         }
     }
@@ -162,6 +160,6 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
             translated.to_owned()
         };
         super::dialog_style::button(frame, profile, r, &caption, m.focus == i + 1);
-        app.mouse.regions.push((r, Target::UserMenu(action)));
+        frame.regions().push((r, Target::UserMenu(action)));
     }
 }

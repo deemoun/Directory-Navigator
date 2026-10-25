@@ -1,16 +1,13 @@
+use crate::painting::{Frame, Paragraph, Wrap};
+use crate::presentation::layout::Rect;
 use crate::{
     app::App,
     filesystem::display_name,
     mouse::Target,
     utilities::{characters::Page, Action, Kind},
 };
-use ratatui::{
-    layout::Rect,
-    widgets::{Paragraph, Wrap},
-    Frame,
-};
 fn text(
-    frame: &mut Frame,
+    frame: &mut impl Frame,
     profile: crate::palette::PaletteProfile,
     rect: Rect,
     value: &str,
@@ -25,8 +22,8 @@ fn text(
     );
 }
 fn button(
-    frame: &mut Frame,
-    app: &mut App,
+    frame: &mut impl Frame,
+    app: &App,
     rect: Rect,
     label: &str,
     action: Action,
@@ -40,12 +37,12 @@ fn button(
         app.config.language.text(label),
         focused,
     );
-    app.mouse.regions.push((rect, Target::Utility(action)));
+    frame.regions().push((rect, Target::Utility(action)));
 }
-pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
+pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
     let profile = app.config.palette;
     let dos = profile.styles();
-    let Some(kind) = app.utilities.dialog else {
+    let Some(kind) = app.utilities.modals.utility_dialog() else {
         return;
     };
     if kind == Kind::Calculator {
@@ -78,14 +75,8 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
         rect.height,
         app.config.language.text(title),
     );
-    app.mouse.regions.clear();
-    super::dialog_style::close_button(
-        frame,
-        profile,
-        rect,
-        &mut app.mouse.regions,
-        Target::Utility(Action::Close),
-    );
+    frame.regions().clear();
+    super::dialog_style::close_button(frame, profile, rect, Target::Utility(Action::Close));
     let x = rect.x + 2;
     let w = rect.width - 4;
     match kind {
@@ -119,7 +110,6 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
                 );
             }
             let chart = &app.utilities.chart;
-            let selected = chart.selected();
             for row in 0..if page == Page::Ascii { 8 } else { 16 } {
                 text(
                     frame,
@@ -128,20 +118,18 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
                     &format!("{row:X}_"),
                     false,
                 );
-                for col in 0..16u16 {
-                    let byte = (row * 16 + col) as u8;
-                    let c = chart.mapped(byte);
-                    let cell = Rect::new(x + 4 + col * 4, rect.y + 3 + row, 4, 1);
-                    frame.render_widget(
-                        Paragraph::new(format!(" {} ", if c.is_control() { '·' } else { c }))
-                            .style(dos(if selected == byte { 0x30 } else { 0x1f })),
-                        cell,
-                    );
-                    app.mouse
-                        .regions
-                        .push((cell, Target::Utility(Action::Cell(byte))));
-                }
             }
+            frame.compose(crate::turbo::characters::draw(
+                chart,
+                Rect::new(
+                    x + 4,
+                    rect.y + 3,
+                    64,
+                    if page == Page::Ascii { 8 } else { 16 },
+                ),
+                crate::presentation::layout::Size::new(area.width, area.height),
+                profile,
+            ));
             let detail = chart.details();
             let copyable = chart.copy_text().is_some();
             text(

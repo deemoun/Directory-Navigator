@@ -1,4 +1,5 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+use dn::testing::{backend::TestBackend, layout::Rect, Terminal};
 use dn::{
     app::App,
     input,
@@ -6,7 +7,6 @@ use dn::{
     operations::Kind,
     ui,
 };
-use ratatui::{backend::TestBackend, layout::Rect, Terminal};
 use std::{
     fs, io,
     path::PathBuf,
@@ -129,8 +129,8 @@ fn prompt_tab_cancel_help_mouse_and_unicode_creation() -> io::Result<()> {
     let temp = Temp::new()?;
     let mut app = temp.app()?;
     app.prompt_operation(Kind::Mkdir, false);
-    app.prompt
-        .as_mut()
+    app.modals
+        .prompt_mut()
         .expect("prompt")
         .paste("新しい e\u{301}");
     key(&mut app, KeyCode::F(1), KeyModifiers::NONE);
@@ -142,25 +142,25 @@ fn prompt_tab_cancel_help_mouse_and_unicode_creation() -> io::Result<()> {
         .all(|(_, t)| *t == Target::CloseDialog));
     key(&mut app, KeyCode::Esc, KeyModifiers::NONE);
     assert_eq!(
-        app.prompt.as_ref().expect("prompt").field,
+        app.modals.prompt().expect("prompt").field,
         "新しい e\u{301}"
     );
     key(&mut app, KeyCode::Tab, KeyModifiers::NONE);
     key(&mut app, KeyCode::Tab, KeyModifiers::NONE);
-    assert_eq!(app.prompt.as_ref().expect("prompt").focus, 2);
+    assert_eq!(app.modals.prompt().expect("prompt").focus, 2);
     key(&mut app, KeyCode::Enter, KeyModifiers::NONE);
-    assert!(app.prompt.is_none());
+    assert!(app.modals.prompt().is_none());
     assert!(!temp.0.join("新しい e\u{301}").exists());
     app.prompt_operation(Kind::Mkdir, false);
     key(&mut app, KeyCode::BackTab, KeyModifiers::SHIFT);
-    assert_eq!(app.prompt.as_ref().expect("prompt").focus, 3);
+    assert_eq!(app.modals.prompt().expect("prompt").focus, 3);
     key(&mut app, KeyCode::Enter, KeyModifiers::NONE);
     draw(&mut app, 80, 25)?;
     click(&mut app, Target::CloseDialog);
     draw(&mut app, 80, 25)?;
     click(&mut app, Target::PromptField);
-    app.prompt
-        .as_mut()
+    app.modals
+        .prompt_mut()
         .expect("prompt")
         .paste("新しい e\u{301}");
     click(&mut app, Target::PromptHelp);
@@ -172,7 +172,7 @@ fn prompt_tab_cancel_help_mouse_and_unicode_creation() -> io::Result<()> {
         a.job.is_none() && a.panels.iter().all(|p| !p.loading)
     });
     assert!(temp.0.join("新しい e\u{301}").is_dir());
-    assert!(app.dialogs.is_empty());
+    assert!(app.dialogs().is_empty());
     Ok(())
 }
 #[test]
@@ -210,11 +210,11 @@ fn compact_messages_scroll_and_restore_underlying_prompt() -> io::Result<()> {
             modifiers: KeyModifiers::NONE,
         },
     );
-    assert_eq!(app.message_offset, 3);
+    assert_eq!(app.message_offset(), 3);
     draw(&mut app, 80, 25)?;
     click(&mut app, Target::CloseDialog);
-    assert_eq!(app.message_offset, 0);
-    assert!(app.prompt.is_some());
+    assert_eq!(app.message_offset(), 0);
+    assert!(app.modals.prompt().is_some());
     Ok(())
 }
 #[test]
@@ -270,7 +270,10 @@ fn green_title_close_matches_dn_and_cancels_without_creating_directory() -> io::
     let temp = Temp::new()?;
     let mut app = temp.app()?;
     app.prompt_operation(Kind::Mkdir, false);
-    app.prompt.as_mut().expect("prompt").paste("must-not-exist");
+    app.modals
+        .prompt_mut()
+        .expect("prompt")
+        .paste("must-not-exist");
     for (w, h) in [(80, 25), (132, 40), (80, 25)] {
         let mut terminal = Terminal::new(TestBackend::new(w, h))?;
         terminal.draw(|f| ui::draw(f, &mut app))?;
@@ -293,11 +296,11 @@ fn green_title_close_matches_dn_and_cancels_without_creating_directory() -> io::
     app.error("A message above the directory prompt.");
     draw(&mut app, 80, 25)?;
     title_close(&mut app, Target::CloseDialog)?;
-    assert!(app.dialogs.is_empty());
-    assert!(app.prompt.is_some());
+    assert!(app.dialogs().is_empty());
+    assert!(app.modals.prompt().is_some());
     draw(&mut app, 80, 25)?;
     title_close(&mut app, Target::CancelPrompt)?;
-    assert!(app.prompt.is_none());
+    assert!(app.modals.prompt().is_none());
     assert!(!temp.0.join("must-not-exist").exists());
     Ok(())
 }
@@ -311,7 +314,7 @@ fn title_close_restores_previews_and_keeps_unsaved_document() -> io::Result<()> 
     draw(&mut app, 80, 25)?;
     title_close(&mut app, Target::CancelColors)?;
     assert_eq!(app.config.palette, original);
-    assert!(app.color_dialog.is_none());
+    assert!(app.modals.color_dialog().is_none());
     app.open_columns();
     let original = app.config.columns;
     dn::columns::choose(&mut app, 0, dn::columns::ColumnPreset::NameSizeModified);
@@ -324,7 +327,10 @@ fn title_close_restores_previews_and_keeps_unsaved_document() -> io::Result<()> 
     key(&mut app, KeyCode::Esc, KeyModifiers::NONE);
     draw(&mut app, 80, 25)?;
     title_close(&mut app, Target::Editor(dn::editor::EditorAction::Cancel))?;
-    assert!(app.desktop.editor().is_some_and(|e| e.modal.is_none()));
+    assert!(app
+        .desktop
+        .active_editor()
+        .is_some_and(|e| e.modals.editor_modal().is_none()));
     assert!(draw(&mut app, 80, 25)?.contains("unsaved content"));
     Ok(())
 }

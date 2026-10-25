@@ -1,7 +1,7 @@
 use super::Viewer;
+use crate::presentation::text::Span;
 use crate::{app::App, dialog};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use ratatui::text::Span;
 use std::ops::Range;
 use unicode_segmentation::UnicodeSegmentation;
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -252,41 +252,41 @@ pub fn action(app: &mut App, action: Action) {
         app.desktop.close_viewer();
         return;
     }
-    let Some(viewer) = app.desktop.viewer_mut() else {
+    let Some(viewer) = app.desktop.active_viewer_mut() else {
         return;
     };
     match action {
         Action::Wrap => viewer.toggle_wrap(),
         Action::Find => {
             if viewer.text_ready() {
-                viewer.search_dialog = Some(SearchDialog {
+                viewer.modals.set_viewer_search(Some(SearchDialog {
                     cursor: app.viewer_search.query.len(),
                     memory: app.viewer_search.clone(),
                     focus: 0,
-                });
+                }));
             } else {
                 viewer.notice = "Text search unavailable in Hex view or while loading".into();
             }
         }
-        Action::Cancel => viewer.search_dialog = None,
+        Action::Cancel => viewer.modals.set_viewer_search(None),
         Action::Case => {
-            if let Some(dialog) = &mut viewer.search_dialog {
+            if let Some(dialog) = viewer.modals.viewer_search_mut() {
                 dialog.memory.case_sensitive ^= true;
                 dialog.focus = 1;
             }
         }
         Action::Field => {
-            if let Some(dialog) = &mut viewer.search_dialog {
+            if let Some(dialog) = viewer.modals.viewer_search_mut() {
                 dialog.focus = 0;
             }
         }
         Action::Submit => {
-            if let Some(dialog) = viewer.search_dialog.take() {
+            if let Some(dialog) = viewer.modals.take_viewer_search() {
                 match viewer.find(&dialog.memory, false, false) {
                     Ok(_) => app.viewer_search = dialog.memory,
                     Err(error) => {
                         viewer.notice = error;
-                        viewer.search_dialog = Some(dialog);
+                        viewer.modals.set_viewer_search(Some(dialog));
                     }
                 }
             }
@@ -302,8 +302,8 @@ pub fn action(app: &mut App, action: Action) {
 pub fn paste(app: &mut App, text: &str) {
     if let Some(dialog) = app
         .desktop
-        .viewer_mut()
-        .and_then(|v| v.search_dialog.as_mut())
+        .active_viewer_mut()
+        .and_then(|v| v.modals.viewer_search_mut())
     {
         if dialog.focus == 0 {
             dialog::paste_input(&mut dialog.memory.query, &mut dialog.cursor, text);
@@ -311,18 +311,18 @@ pub fn paste(app: &mut App, text: &str) {
     }
 }
 pub fn key(app: &mut App, key: KeyEvent) {
-    let Some(viewer) = app.desktop.viewer_mut() else {
+    let Some(viewer) = app.desktop.active_viewer_mut() else {
         return;
     };
-    if let Some(dialog) = &mut viewer.search_dialog {
+    if let Some(dialog) = viewer.modals.viewer_search_mut() {
         let command = match key.code {
             KeyCode::Esc => Some(Action::Cancel),
             KeyCode::Tab => {
-                dialog.focus = (dialog.focus + 1) % 4;
+                dialog.focus = crate::control_focus::cycle(dialog.focus, 4, false);
                 None
             }
             KeyCode::BackTab => {
-                dialog.focus = (dialog.focus + 3) % 4;
+                dialog.focus = crate::control_focus::cycle(dialog.focus, 4, true);
                 None
             }
             KeyCode::Enter => Some(if dialog.focus == 3 {

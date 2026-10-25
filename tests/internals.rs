@@ -1,4 +1,5 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+use dn::testing::{backend::TestBackend, layout::Rect, Terminal};
 use dn::{
     app::App,
     editor::buffer::Buffer,
@@ -10,7 +11,6 @@ use dn::{
     task::{Cancellation, Task},
     ui,
 };
-use ratatui::{backend::TestBackend, layout::Rect, Terminal};
 use std::{
     fs, io,
     path::PathBuf,
@@ -97,15 +97,15 @@ fn one_focus_policy_for_nested_errors_keyboard_mouse_and_paste() -> io::Result<(
     app.error("topmost error");
     assert_eq!(focus::current(&app), Focus::Message);
     input::paste(&mut app, "must not leak");
-    assert_eq!(app.prompt.as_ref().expect("prompt").field, "unchanged");
+    assert_eq!(app.modals.prompt().expect("prompt").field, "unchanged");
     key(&mut app, KeyCode::Esc, KeyModifiers::NONE);
-    assert!(app.dialogs.is_empty());
-    assert!(app.screensaver.setup.is_some());
+    assert!(app.dialogs().is_empty());
+    assert!(app.screensaver.modals.screensaver().is_some());
     app.error("topmost error");
     draw(&mut app, 80, 25)?;
     click(&mut app, Target::CloseDialog);
-    assert!(app.dialogs.is_empty());
-    assert!(app.screensaver.setup.is_some());
+    assert!(app.dialogs().is_empty());
+    assert!(app.screensaver.modals.screensaver().is_some());
     key(&mut app, KeyCode::Esc, KeyModifiers::NONE);
     assert_eq!(focus::current(&app), Focus::Prompt);
     Ok(())
@@ -117,7 +117,7 @@ fn layout_is_available_to_commands_without_painting() -> io::Result<()> {
     dn::layout::prepare(&mut app, Rect::new(0, 0, 80, 25));
     key(&mut app, KeyCode::F(4), KeyModifiers::SHIFT);
     input::paste(&mut app, "text\nsecond");
-    let editor = app.desktop.editor().expect("editor");
+    let editor = app.desktop.active_editor().expect("editor");
     assert!(editor.columns > 60);
     assert_eq!(editor.rows, 21);
     assert_eq!(editor.scroll_column, 0);

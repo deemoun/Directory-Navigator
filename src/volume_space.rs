@@ -84,6 +84,7 @@ pub fn read(path: &Path) -> io::Result<Space> {
 }
 #[derive(Default)]
 pub struct Snapshot {
+    pub(crate) requests: crate::requests::RequestScope,
     pub result: Option<Result<Space, String>>,
     path: Option<PathBuf>,
     attempted: Option<Instant>,
@@ -122,7 +123,7 @@ impl Snapshot {
         {
             self.attempted = Some(now);
             let path = path.to_owned();
-            match crate::task::Task::spawn("dn-volume-space", move |_| read(&path)) {
+            match self.requests.spawn("dn-volume-space", move |_| read(&path)) {
                 Ok(worker) => self.worker = Some(worker),
                 Err(error) => {
                     let result = Err(error.to_string());

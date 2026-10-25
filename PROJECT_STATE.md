@@ -1,11 +1,16 @@
 # Directory Navigator — beta
 
 ## Architecture
-- Native Rust `dn`: Ratatui/Crossterm/Chrono, Unicode segmentation, Unix libc;
+- Native Rust `dn`: Turbo Vision/Crossterm/Chrono, Unicode segmentation, Unix libc;
+  owned presentation geometry/styles/text and native headless test captures;
   macOS native Trash via `trash`, Windows native shell APIs; minimal ZIP/TAR/gzip
   codec features via zip/tar/flate2; TOML parser for grouped preferences.
-- Session Desktop owns editor/viewer/game content, stable WindowId values and
-  explicit active-screen identity; file panels remain the permanent base.
+- Session Desktop owns editor/viewer/game content and stable WindowId values;
+  default Turbo Vision build reads selection from the native Desktop/Window
+  registry. Multiple full-screen editors/viewers use ID-targeted access; the
+  permanent manager remains the base. Owned modal IDs gate native dispatch.
+  Request scopes reject retired owners and replaced generations. Viewport
+  preparation produces immutable layout snapshots; painting is read-only.
 - Modular app/input/panels, operations, dialogs, configuration, editor, viewer
   and utilities. Shared focus policy and explicit viewport preparation.
 - Cancellable panel scanners; bounded short-task pool; dedicated file-operation
@@ -14,6 +19,104 @@
   state owns session dialogs/options/results; quick view owns debounced reads.
 
 ## Implemented
+Current Turbo Vision status is authoritative in docs/TURBO_VISION_MIGRATION.md;
+older increment entries below also record earlier migration stages.
+
+- Editor Open/Save As now use Turbo Vision's actual FileDialog and its native
+  input/list/buttons, directory browsing, wildcard filtering and hidden-file
+  control. The existing event loop and owned modal stack drive the widget;
+  preparation captures an immutable scene. Document reuse, safe background I/O,
+  destination reservations and quit cancellation remain guarded by DN. Unicode
+  filename typing/paste, translated controls, mouse release routing, nested help
+  and failure recovery have regression coverage. Native directory enumeration
+  remains synchronous upstream; picker names use UTF-8. macOS ARM64: 434 tests
+  pass (one existing opt-in Trash check ignored), formatting, all-target Clippy,
+  release/no-default-features checks and a native file-dialog terminal workflow.
+- ASCII/CP437 character grid now uses Turbo Vision's reusable Table for drawing,
+  keyboard navigation and mouse selection, retaining DN styling, byte details
+  and internal clipboard behavior. The showcase's ASCII table is not exported.
+  Tests cover every byte, both palettes, page ownership, immutable rendering and
+  clipping; a native terminal check covers copying a CP437 glyph into the editor,
+  retained selection, resizing and terminal restoration.
+- Multi-document foundations: distinct non-reusable WindowId values, resolved-path
+  reuse and pending-open coalescing, per-document buffers/history/search/scroll,
+  Save As destination reservations, targeted close and MRU quit review. Discarded
+  buffers survive cancellation/settings failure. Modal entries own their payloads,
+  parent and return focus; native receipts carry modal/owner identity. Shared
+  request scopes gate all worker results. Immutable render results carry the
+  scene, cursor and translated/clipped hit regions; stale frames are rejected.
+  macOS ARM64: 423 tests pass (one existing opt-in native Trash check ignored),
+  formatting, all-target Clippy, release and no-default-features checks pass.
+  Native terminal checks cover three editors/two viewers, independent undo,
+  discard/quit cancellation, Save As, resize, shell handoff and restoration.
+  See docs/DOCUMENT_FOUNDATIONS.md for invariants and validation.
+- Turbo Vision is now the sole renderer and a mandatory dependency. Ratatui,
+  its text/style/layout aliases, legacy renderer/transport, feature gates and
+  duplicate pane/Tetris painters are removed. The lockfile and resolved dependency
+  graph contain no Ratatui. `--no-default-features` still builds the native UI.
+- Owned presentation types handle bounded layout allocation, styles and full
+  Unicode text. The native codec has one glyph-reference plane and no retained
+  legacy pixels. Existing behavioral tests use a native headless snapshot sink;
+  frozen geometry/wrapping and a 40-scene before/after capture preserve appearance.
+  Independent ANSI decoding checks 1,876 native frames and mouse/cursor behavior.
+  Native Desktop/modal input/focus and existing editing/filesystem guards remain.
+  Local ARM64: 405 tests pass (one opt-in native Trash check ignored),
+  fmt/Clippy/release/no-default-features builds and interactive pane/game/viewer/
+  quick-view/calculator/editor/Save As/resize/shell-restoration checks pass.
+  Windows/Linux validation stays excluded; Intel Mac execution is also unvalidated.
+- Native main file-manager drawing: both panes (brief/details and all columns),
+  headers, rows/type/tag/selection colors, scrollbars, filters/quick search,
+  details/totals/space, menu bar/clock, command line/cursor and function bar now
+  use a shared native scene. Existing workers, commands and mouse targets remain.
+  Menus/dialogs/quick view now share native drawing with the panes; the later
+  shared-painter increment preserves inherited colors and menu shadows directly. Footer presentation is toolkit-
+  neutral. Persistent native pane controls handle Tab focus and focused navigation,
+  paging, marking and guarded open/parent commands. Command-line/shortcut/modal
+  precedence remains. Mouse dispatch and other control ownership still need work.
+- Native Tetris page drawing: Setup, Help, Top Ten, Game Over and name entry now
+  join the play window on the native drawing path. Focused controls, score-save
+  errors/retry buttons, Unicode field scrolling and cursor position are preserved.
+  Existing game input/controllers and mouse dispatch remain. Native-vs-original
+  comparisons cover 420 frame pairs across palettes, languages and sizes.
+- Native Tetris play-window drawing: the default runtime paints the game frame,
+  well/pieces, Info/Next/Best panels, pause banner, buttons and footer directly
+  through Turbo Vision. Existing rules, keyboard/mouse actions and score storage
+  remain. The subsequent native page increment also replaces the game pages.
+  Native glyph references are independent of the retained canvas; differential
+  comparisons cover text/colors/targets, both palettes/languages, transitions and
+  resizing. This is the first game renderer slice, not a full game control port.
+- Native Turbo Vision desktop/control increment: stable document identities map
+  to native views; TV owns selection/z-order, with no second active-screen cache.
+  Full-screen native documents paint the retained skin and a native foreground
+  modal scope gates input. Native close cannot bypass application save/exit
+  guards. Welcome and path/operation prompts use native Dialog/Group focus and
+  Button commands plus a Unicode custom field. Existing mouse targets and
+  Ratatui visual composition remain; other controls/menus still require porting.
+  Full migration is NOT complete. No workflow runs, UI redesign, configuration
+  changes or filesystem-policy changes belong to this increment.
+  macOS ARM64: fmt, all-target Clippy, 391 passing Rust tests (one existing
+  opt-in native Trash test ignored), release build and 36 decoded visual scene
+  comparisons pass. Original-backend desktop/welcome/dialog/terminal/workflow
+  checks: 36 pass. Native PTYs pass Welcome/settings/help return, Unicode mkdir
+  cancel/submit, resize, editor/window/unsaved guards, calculator, Tetris and
+  shell handoff/restoration. Windows-target Clippy is blocked by Cargo's
+  windows-numerics path-source/cache error; native Intel/Windows/Linux untested.
+- Turbo Vision migration IN PROGRESS on feature/turbo-vision: pinned 4.1.0 core,
+  real TV custom View/diff buffer and event transport enabled by default. The
+  existing Ratatui canvas/control/focus layers remain; this is NOT a full native
+  widget/window migration. See docs/TURBO_VISION_MIGRATION.md for required work.
+  Transport preserves indexed palette semantics, complete graphemes, wide-cell
+  continuations and cursor order. One Session keeps paste and exit/suspend guards.
+  Original backend builds with --no-default-features. Dependency notice included
+  in release archives; no workflow triggers or external runs changed.
+  Transport: 36 independently decoded screen/palette/size comparisons pass;
+  glyph/color/cursor/resize and bounded-token tests pass. Mac ARM64 native PTY
+  editor/window-list, calculator, Tetris and shell suspend/resume workflows pass.
+  Fallback terminal/welcome/workflow checks (19) and packaging helpers (11) pass.
+  Native Intel/Windows/Linux are not validated.
+  Final transport increment: fmt/all-target Clippy/386 Rust tests/release pass
+  on macOS ARM64 (one existing opt-in native Trash test ignored). Full native
+  remaining control/renderer migration is outstanding; do not call it complete.
 - Tetris presentation follows the DN game/setup/Top Ten references: framed
   Info/Next/Best sidebar, New/Setup/Top 10/Pause shadowed buttons and title close;
   Name/Start/End/Score dotted leaders, centered OK and conditional Retry save;
@@ -420,9 +523,10 @@
   Linux/Windows remain untested locally.
 
 ## Limitations and next steps
-- Desktop is an ownership foundation only: multiple documents, window switching,
-  geometry, Cascade/Tile and desktop-window persistence remain future stages.
-  Next: multiple full-screen documents and a window list before overlapping layouts.
+- Multiple full-screen documents and the window list are implemented. Overlapping
+  or movable windows, Cascade/Tile, shared-buffer views and workspace persistence
+  remain deferred. Command-routing redesign, panel-source abstraction and
+  large-file storage are outside this foundation.
 - Ancestor/entry snapshots detect replacements between operation stages, but
   path-based recursion still has check-to-use races; full descriptor-relative
   traversal remains future hardening. Nesting beyond 512 in discovery is

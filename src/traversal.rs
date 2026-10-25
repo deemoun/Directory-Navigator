@@ -58,18 +58,38 @@ pub enum Event {
     },
 }
 pub struct Job {
+    pub(crate) requests: crate::requests::RequestScope,
+    token: crate::requests::RequestToken,
     pub events: Receiver<Event>,
     cancel: Cancellation,
 }
 impl Job {
+    pub fn try_recv(&self) -> Result<Event, std::sync::mpsc::TryRecvError> {
+        if !self.requests.accepts(self.token) {
+            return Err(std::sync::mpsc::TryRecvError::Disconnected);
+        }
+        self.events.try_recv()
+    }
+
     pub fn start(request: Request) -> io::Result<Self> {
+        let requests = crate::requests::RequestScope::default();
+        let token = requests.start("traversal");
         let (send, events) = mpsc::sync_channel(8);
         let cancel = Cancellation::default();
-        let token = cancel.clone();
+        let worker_cancel = cancel.clone();
         thread::Builder::new()
             .name("dn-traversal".into())
-            .spawn(move || run(request, &token, &send))?;
-        Ok(Self { events, cancel })
+            .spawn(move || run(request, &worker_cancel, &send))?;
+        Ok(Self {
+            events,
+            cancel,
+            requests,
+            token,
+        })
+    }
+    pub fn bind(&mut self, owner: crate::requests::Owner) {
+        self.requests.bind(owner);
+        self.token = self.requests.start("traversal");
     }
     pub fn stop(&self) {
         self.cancel.cancel();

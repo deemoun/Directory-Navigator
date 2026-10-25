@@ -73,20 +73,21 @@ impl QuickSearch {
 pub fn open(app: &mut App) {
     if !app.panels[app.active].loading
         && app.job.is_none()
-        && app.dialogs.is_empty()
+        && app.dialogs().is_empty()
         && crate::focus::screen(app) == crate::focus::Screen::Manager
-        && app.prompt.is_none()
-        && app.settings.is_none()
-        && app.columns_dialog.is_none()
-        && app.pattern.is_none()
+        && app.modals.prompt().is_none()
+            & app.modals.settings().is_none()
+            & app.modals.columns_dialog().is_none()
+            & app.modals.pattern().is_none()
     {
-        app.quick_search = Some(QuickSearch::new(app.active, &app.panels[app.active]));
+        app.modals
+            .set_quick_search(Some(QuickSearch::new(app.active, &app.panels[app.active])));
     }
 }
 
 /// Return false to hand a non-search command back to the normal input handler.
 pub fn key(app: &mut App, key: KeyEvent) -> bool {
-    let Some(mut search) = app.quick_search.take() else {
+    let Some(mut search) = app.modals.take_quick_search() else {
         return false;
     };
     let panel = &mut app.panels[search.panel];
@@ -123,6 +124,6 @@ pub fn key(app: &mut App, key: KeyEvent) -> bool {
         }
         _ => return false,
     }
-    app.quick_search = Some(search);
+    app.modals.set_quick_search(Some(search));
     true
 }

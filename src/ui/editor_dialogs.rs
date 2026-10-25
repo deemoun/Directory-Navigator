@@ -1,3 +1,5 @@
+use crate::painting::{Frame, Paragraph};
+use crate::presentation::{layout::Rect, text::Span};
 use crate::{
     app::App,
     editor::{EditorAction as A, Modal, PromptKind},
@@ -5,8 +7,7 @@ use crate::{
     formatting,
     mouse::Target,
 };
-use ratatui::{layout::Rect, text::Span, widgets::Paragraph, Frame};
-fn button(frame: &mut Frame, app: &mut App, rect: Rect, label: &str, command: A, focused: bool) {
+fn button(frame: &mut impl Frame, app: &App, rect: Rect, label: &str, command: A, focused: bool) {
     super::dialog_style::button(
         frame,
         app.config.palette,
@@ -14,10 +15,10 @@ fn button(frame: &mut Frame, app: &mut App, rect: Rect, label: &str, command: A,
         app.config.language.text(label),
         focused,
     );
-    app.mouse.regions.push((rect, Target::Editor(command)));
+    frame.regions().push((rect, Target::Editor(command)));
 }
 fn input(
-    frame: &mut Frame,
+    frame: &mut impl Frame,
     profile: crate::palette::PaletteProfile,
     rect: Rect,
     field: &str,
@@ -35,16 +36,31 @@ fn input(
         frame.set_cursor_position((rect.x + col, rect.y));
     }
 }
-pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
+pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
     let profile = app.config.palette;
     let dos = profile.styles();
-    let Some(editor) = app.desktop.editor() else {
+    let Some(editor) = app.desktop.active_editor() else {
         return;
     };
-    let Some(modal) = &editor.modal else {
+    let Some(modal) = editor.modals.editor_modal() else {
         return;
     };
+    if let Modal::File(picker) = modal {
+        frame.regions().clear();
+        if let Some(scene) = picker.scene() {
+            let mut scene = scene.clone();
+            if app
+                .modal_top()
+                .is_none_or(|m| m.focus != crate::focus::Focus::EditorModal)
+            {
+                scene.cursor = None;
+            }
+            frame.compose(scene);
+        }
+        return;
+    }
     let title = match modal {
+        Modal::File(_) => unreachable!(),
         Modal::ConfirmClose => " Unsaved changes ",
         Modal::Help => " Editor Help ",
         Modal::Search(dialog) => {
@@ -56,8 +72,6 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
         }
         Modal::Replace(_) => " Confirm replacement ",
         Modal::Prompt { kind, .. } => match kind {
-            PromptKind::Open => " Open file ",
-            PromptKind::SaveAs => " Save As — new destination ",
             PromptKind::GoTo => " Go to line ",
             PromptKind::TabWidth => " Tab width ",
         },
@@ -76,15 +90,10 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
         height,
         app.config.language.text(title),
     );
-    app.mouse.regions.clear();
-    super::dialog_style::close_button(
-        frame,
-        profile,
-        rect,
-        &mut app.mouse.regions,
-        Target::Editor(A::Cancel),
-    );
+    frame.regions().clear();
+    super::dialog_style::close_button(frame, profile, rect, Target::Editor(A::Cancel));
     match modal {
+        Modal::File(_) => unreachable!(),
         Modal::Search(dialog) => {
             let replacing = dialog.replacing;
             let focus = dialog.focus;
@@ -108,10 +117,10 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
                     field_rect,
                     field,
                     cursor,
-                    focus == choice && app.dialogs.is_empty(),
+                    focus == choice && app.dialogs().is_empty(),
                 );
-                app.mouse
-                    .regions
+                frame
+                    .regions()
                     .push((field_rect, Target::Editor(A::SearchChoice(choice))));
             }
             let checks = [
@@ -210,8 +219,8 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
                     row,
                 );
                 if enabled {
-                    app.mouse
-                        .regions
+                    frame
+                        .regions()
                         .push((row, Target::Editor(A::SearchChoice(choice))));
                 }
             }
@@ -312,8 +321,6 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
             cursor,
         } => {
             let label = match kind {
-                PromptKind::SaveAs => "New file name (existing files are refused)",
-                PromptKind::Open => "File name (absolute or relative path)",
                 PromptKind::GoTo => "Line number (starting at 1)",
                 PromptKind::TabWidth => "Tab columns (1–16); Ctrl+A clears",
             };
@@ -327,7 +334,7 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
                 Rect::new(rect.x + 2, rect.y + 2, rect.width - 4, 1),
                 field,
                 *cursor,
-                app.dialogs.is_empty(),
+                app.dialogs().is_empty(),
             );
             button(
                 frame,

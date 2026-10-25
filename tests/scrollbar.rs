@@ -1,4 +1,5 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+use dn::testing::{backend::TestBackend, layout::Rect, Terminal};
 use dn::{
     app::App,
     input,
@@ -7,7 +8,6 @@ use dn::{
     panel_layout::{scroll_position, PanelGeometry, PanelLayout, ScrollAction},
     ui,
 };
-use ratatui::{backend::TestBackend, layout::Rect, Terminal};
 use std::{
     fs, io,
     path::PathBuf,
@@ -303,7 +303,7 @@ fn dragging_cancels_on_key_resize_and_modal_controls_stay_on_top() -> io::Result
     let cursor = app.panels[0].cursor;
     mouse_event(&mut app, MouseEventKind::Down(MouseButton::Left), 38, 3);
     assert_eq!(app.panels[0].cursor, cursor);
-    app.prompt = None;
+    app.modals.set_prompt(None);
     app.screensaver.start(Instant::now());
     draw(&mut app, 80, 25)?;
     mouse_event(&mut app, MouseEventKind::Up(MouseButton::Left), 38, 3);

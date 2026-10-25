@@ -1,20 +1,21 @@
 //! Session-only command prompt; commands share the interactive user-menu runner.
+use crate::presentation::layout::Rect;
 use crate::{
     app::App,
     user_menu::runner::{CommandSpec, Plan},
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use ratatui::{layout::Rect, text::Span, widgets::Paragraph, Frame};
 use std::{ffi::OsString, io};
 use unicode_segmentation::UnicodeSegmentation;
+use unicode_width::UnicodeWidthStr;
 pub mod history;
 const MAX_BYTES: usize = 16 * 1024;
 #[derive(Default)]
 pub struct CommandLine {
+    pub modals: crate::modals::ModalStack,
     pub text: String,
     pub cursor: usize,
     pub pending: Option<Plan>,
-    pub dialog: Option<history::HistoryDialog>,
     history: Vec<String>,
     recalled: Option<usize>,
     draft: String,
@@ -22,6 +23,9 @@ pub struct CommandLine {
     input_x: u16,
 }
 impl CommandLine {
+    pub(crate) fn translate_input(&mut self, x: u16) {
+        self.input_x = self.input_x.saturating_add(x);
+    }
     pub fn history(&self) -> &[String] {
         &self.history
     }
@@ -102,7 +106,7 @@ impl CommandLine {
         let mut width = 0;
         self.cursor = self.view_start;
         for g in self.text[self.view_start..].graphemes(true) {
-            let cells = Span::raw(g).width();
+            let cells = g.width();
             if width + cells > desired {
                 break;
             }
@@ -221,50 +225,58 @@ pub fn key(app: &mut App, key: KeyEvent) -> bool {
     }
     true
 }
-pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
+pub(crate) fn presentation(app: &App, area: Rect) -> (String, Option<(u16, u16)>) {
+    let (text, cursor, _, _) = presentation_data(app, area);
+    (text, cursor)
+}
+pub(crate) fn prepare(app: &mut App, area: Rect) {
+    let (_, _, x, start) = presentation_data(app, area);
+    app.command_line.input_x = x;
+    app.command_line.view_start = start;
+}
+fn presentation_data(app: &App, area: Rect) -> (String, Option<(u16, u16)>, u16, usize) {
     let prefix_armed = crate::shortcuts::armed(app);
     let focused = crate::focus::current(app) == crate::focus::Focus::Manager;
-    let line = &mut app.command_line;
+    let line = &app.command_line;
     let path = format!(
         "{}>",
         crate::filesystem::display_name(&app.panels[app.active].path.to_string_lossy())
     );
-    let reserve = Span::raw(&line.text).width().saturating_add(1).clamp(1, 20) as u16;
+    let reserve = line.text.width().saturating_add(1).clamp(1, 20) as u16;
     let prefix = crate::formatting::tail(&path, area.width.saturating_sub(reserve + 1).max(1));
-    let prefix_width = Span::raw(&prefix).width() as u16;
-    line.input_x = area.x + prefix_width + 1;
+    let prefix_width = prefix.width() as u16;
+    let input_x = area.x + prefix_width + 1;
     let width = area.width.saturating_sub(prefix_width + 1) as usize;
     // Recompute from the insertion point so deleting/editing combining clusters
     // can never leave a stale byte offset or split a displayed grapheme.
     let mut start = line.cursor;
     let mut used = 0;
     for (i, g) in line.text[..line.cursor].grapheme_indices(true).rev() {
-        let cells = Span::raw(g).width();
+        let cells = g.width();
         if used + cells >= width {
             break;
         }
         used += cells;
         start = i;
     }
-    line.view_start = start;
     let mut visible = String::new();
     let mut cells = 0;
     for g in line.text[start..].graphemes(true) {
-        let w = Span::raw(g).width();
+        let w = g.width();
         if cells + w > width {
             break;
         }
         visible.push_str(g);
         cells += w;
     }
-    frame.render_widget(
-        Paragraph::new(format!("{prefix} {visible}")).style(app.config.palette.dos(0x07)),
-        area,
-    );
-    app.mouse
-        .regions
-        .push((area, crate::mouse::Target::CommandLine));
-    if focused && !prefix_armed {
-        frame.set_cursor_position((line.input_x + used as u16, area.y));
-    }
+    (
+        format!("{prefix} {visible}"),
+        if focused && !prefix_armed {
+            Some((input_x + used as u16, area.y))
+        } else {
+            None
+        },
+        input_x,
+        start,
+    )
 }

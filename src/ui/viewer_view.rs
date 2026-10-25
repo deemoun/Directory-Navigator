@@ -1,11 +1,10 @@
-use crate::{app::App, filesystem::display_name, formatting::tail, mouse::Target, viewer::Action};
-use ratatui::{
+use crate::painting::{Block, Frame, Paragraph};
+use crate::presentation::{
     layout::{Constraint, Layout, Rect},
     text::{Line, Span},
-    widgets::{Block, Paragraph},
-    Frame,
 };
-pub(super) fn draw_viewer(frame: &mut Frame, app: &mut App, area: Rect) {
+use crate::{app::App, filesystem::display_name, formatting::tail, mouse::Target, viewer::Action};
+pub(super) fn draw_viewer(frame: &mut impl Frame, app: &App, area: Rect) {
     let profile = app.config.palette;
     let dos = profile.styles();
     let header = super::clock::header(app, Rect::new(area.x, area.y, area.width, 1));
@@ -14,7 +13,7 @@ pub(super) fn draw_viewer(frame: &mut Frame, app: &mut App, area: Rect) {
     } else {
         None
     };
-    let Some(viewer) = app.desktop.viewer_mut() else {
+    let Some(viewer) = app.desktop.active_viewer() else {
         return;
     };
     let regions = Layout::vertical([
@@ -40,14 +39,7 @@ pub(super) fn draw_viewer(frame: &mut Frame, app: &mut App, area: Rect) {
             )
         )
     );
-    super::dialog_style::document_header(
-        frame,
-        profile,
-        header,
-        &title,
-        &mut app.mouse.regions,
-        Target::CloseViewer,
-    );
+    super::dialog_style::document_header(frame, profile, header, &title, Target::CloseViewer);
     if let Some(text) = clock_text {
         frame.render_widget(
             Paragraph::new(text).style(dos(0x71)),
@@ -130,10 +122,17 @@ pub(super) fn draw_viewer(frame: &mut Frame, app: &mut App, area: Rect) {
         };
         frame.render_widget(Paragraph::new(line).style(profile.bar(enabled)), cells[i]);
         if enabled {
-            app.mouse.regions.push((cells[i], Target::Viewer(action)));
+            frame.regions().push((cells[i], Target::Viewer(action)));
         }
     }
-    if let Some(dialog) = &viewer.search_dialog {
+}
+pub(super) fn draw_search(frame: &mut impl Frame, app: &App, area: Rect) {
+    let profile = app.config.palette;
+    let dos = profile.styles();
+    let Some(viewer) = app.desktop.active_viewer() else {
+        return;
+    };
+    if let Some(dialog) = viewer.modals.viewer_search() {
         let width = 58;
         let rect = super::dialog_style::window(
             frame,
@@ -143,14 +142,8 @@ pub(super) fn draw_viewer(frame: &mut Frame, app: &mut App, area: Rect) {
             10,
             app.config.language.text(" Viewer search — loaded text "),
         );
-        app.mouse.regions.clear();
-        super::dialog_style::close_button(
-            frame,
-            profile,
-            rect,
-            &mut app.mouse.regions,
-            Target::Viewer(Action::Cancel),
-        );
+        frame.regions().clear();
+        super::dialog_style::close_button(frame, profile, rect, Target::Viewer(Action::Cancel));
         let x = rect.x + 2;
         let w = width - 4;
         let input = Rect::new(x, rect.y + 2, w, 1);
@@ -162,10 +155,8 @@ pub(super) fn draw_viewer(frame: &mut Frame, app: &mut App, area: Rect) {
                 .style(super::dialog_style::input_style(profile, dialog.focus == 0)),
             input,
         );
-        app.mouse
-            .regions
-            .push((input, Target::Viewer(Action::Field)));
-        if dialog.focus == 0 && app.dialogs.is_empty() {
+        frame.regions().push((input, Target::Viewer(Action::Field)));
+        if dialog.focus == 0 && app.dialogs().is_empty() {
             frame.set_cursor_position((input.x + (column - scroll) as u16, input.y));
         }
         let case = Rect::new(x, rect.y + 4, w, 1);
@@ -181,7 +172,7 @@ pub(super) fn draw_viewer(frame: &mut Frame, app: &mut App, area: Rect) {
             .style(dos(if dialog.focus == 1 { 0x30 } else { 0x70 })),
             case,
         );
-        app.mouse.regions.push((case, Target::Viewer(Action::Case)));
+        frame.regions().push((case, Target::Viewer(Action::Case)));
         frame.render_widget(
             Paragraph::new(display_name(&viewer.notice)).style(dos(0x70)),
             Rect::new(x, rect.y + 6, w, 2),
@@ -198,13 +189,13 @@ pub(super) fn draw_viewer(frame: &mut Frame, app: &mut App, area: Rect) {
                 app.config.language.text(label),
                 dialog.focus == focus,
             );
-            app.mouse.regions.push((row, Target::Viewer(action)));
+            frame.regions().push((row, Target::Viewer(action)));
         }
     }
 }
 
 pub(super) fn draw_text(
-    frame: &mut Frame,
+    frame: &mut impl Frame,
     viewer: &crate::viewer::Viewer,
     area: Rect,
     profile: crate::palette::PaletteProfile,

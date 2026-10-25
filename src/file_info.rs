@@ -100,6 +100,7 @@ pub fn inspect(path: &Path) -> io::Result<FileInfo> {
 }
 
 pub struct InfoDialog {
+    pub(crate) requests: crate::requests::RequestScope,
     pub path: PathBuf,
     pub contents: Option<Result<FileInfo, String>>,
     pub offset: usize,
@@ -109,10 +110,12 @@ pub struct InfoDialog {
 impl InfoDialog {
     pub fn open(path: PathBuf) -> io::Result<Self> {
         let source = path.clone();
-        let pending = crate::task::Task::spawn("dn-file-info", move |_| {
+        let requests = crate::requests::RequestScope::default();
+        let pending = requests.spawn("dn-file-info", move |_| {
             inspect(&source).map_err(|e| e.to_string())
         })?;
         Ok(Self {
+            requests,
             path,
             contents: None,
             offset: 0,

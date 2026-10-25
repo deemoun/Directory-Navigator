@@ -119,7 +119,7 @@ impl PatternDialog {
 }
 
 pub fn accept(app: &mut App) {
-    if let Some(prompt) = app.pattern.take() {
+    if let Some(prompt) = app.modals.take_pattern() {
         let panel = &mut app.panels[prompt.panel];
         if panel.loading || panel.path != prompt.path {
             app.error("Directory changed; reopen group selection.");
@@ -138,11 +138,11 @@ pub fn accept(app: &mut App) {
 }
 
 pub fn key(app: &mut App, key: KeyEvent) {
-    let Some(prompt) = &mut app.pattern else {
+    let Some(prompt) = app.modals.pattern_mut() else {
         return;
     };
     match key.code {
-        KeyCode::Esc => app.pattern = None,
+        KeyCode::Esc => app.modals.set_pattern(None),
         KeyCode::Enter => accept(app),
         KeyCode::Char('a') if key.modifiers.contains(KeyModifiers::CONTROL) => {
             prompt.replace_on_type = true

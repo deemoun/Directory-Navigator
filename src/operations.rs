@@ -61,6 +61,8 @@ pub enum MoveStrategy {
     Copy,
 }
 pub struct Job {
+    pub(crate) requests: crate::requests::RequestScope,
+    token: crate::requests::RequestToken,
     pub events: Receiver<Event>,
     pub cancel: Arc<AtomicBool>,
     pub progress: Progress,
@@ -69,7 +71,16 @@ pub struct Job {
 }
 
 impl Job {
+    pub fn try_recv(&self) -> Result<Event, std::sync::mpsc::TryRecvError> {
+        if !self.requests.accepts(self.token) {
+            return Err(std::sync::mpsc::TryRecvError::Disconnected);
+        }
+        self.events.try_recv()
+    }
+
     pub fn start(plan: Plan) -> io::Result<Self> {
+        let requests = crate::requests::RequestScope::new(crate::requests::Owner::Workspace);
+        let token = requests.start("file-operation");
         let (sender, events) = mpsc::sync_channel(8);
         let cancel = Arc::new(AtomicBool::new(false));
         let worker_cancel = cancel.clone();
@@ -105,6 +116,8 @@ impl Job {
                 let _ = sender.send(Event::Done(result));
             })?;
         Ok(Self {
+            requests,
+            token,
             events,
             cancel,
             progress: Progress::default(),

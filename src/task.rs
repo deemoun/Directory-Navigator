@@ -58,12 +58,26 @@ impl Pool {
 pub struct Task<T> {
     reply: Receiver<T>,
     cancel: Cancellation,
+    request: crate::requests::RequestLease,
+    scope: Option<crate::requests::RequestScope>,
 }
 impl<T: Send + 'static> Task<T> {
     pub fn spawn(
-        _name: &str,
+        _name: &'static str,
         run: impl FnOnce(Cancellation) -> T + Send + 'static,
     ) -> io::Result<Self> {
+        let scope = crate::requests::RequestScope::new(crate::requests::Owner::Workspace);
+        let mut task = Self::spawn_owned(&scope, _name, run)?;
+        task.scope = Some(scope);
+        Ok(task)
+    }
+    pub(crate) fn spawn_owned(
+        scope: &crate::requests::RequestScope,
+        name: &'static str,
+        run: impl FnOnce(Cancellation) -> T + Send + 'static,
+    ) -> io::Result<Self> {
+        let request = scope.lease(name);
+        let work_request = request.clone();
         static POOL: OnceLock<Result<Pool, String>> = OnceLock::new();
         let pool = POOL
             .get_or_init(|| Pool::new().map_err(|e| e.to_string()))
@@ -74,7 +88,7 @@ impl<T: Send + 'static> Task<T> {
         let token = cancel.clone();
         pool.send
             .try_send(Box::new(move || {
-                if !token.cancelled() {
+                if !token.cancelled() && work_request.current() {
                     let value = run(token.clone());
                     if !token.cancelled() {
                         let _ = send.send(value);
@@ -84,10 +98,23 @@ impl<T: Send + 'static> Task<T> {
             .map_err(|_| {
                 io::Error::new(io::ErrorKind::WouldBlock, "Background task queue is full")
             })?;
-        Ok(Self { reply, cancel })
+        Ok(Self {
+            reply,
+            cancel,
+            request,
+            scope: None,
+        })
+    }
+    pub fn token(&self) -> Option<crate::requests::RequestToken> {
+        self.request.token()
     }
     pub fn try_recv(&self) -> Result<T, TryRecvError> {
-        self.reply.try_recv()
+        if !self.request.current() {
+            return Err(TryRecvError::Disconnected);
+        }
+        let value = self.reply.try_recv()?;
+        self.request.finish();
+        Ok(value)
     }
 }
 impl<T> Drop for Task<T> {

@@ -1,11 +1,11 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+use dn::testing::{backend::TestBackend, Terminal};
 use dn::{
     config::Config,
     config_import::{self, dos},
     panel::SortMode,
     task::Cancellation,
 };
-use ratatui::{backend::TestBackend, Terminal};
 use std::{
     fs, io,
     path::PathBuf,
@@ -59,7 +59,7 @@ fn all_blocks() -> Vec<(u16, Vec<u8>)> {
 }
 fn wait(app: &mut dn::app::App) {
     let end = Instant::now() + Duration::from_secs(5);
-    while app.config_import.as_ref().is_some_and(|p| p.loading()) {
+    while app.modals.config_import().is_some_and(|p| p.loading()) {
         app.poll();
         assert!(Instant::now() < end);
         thread::sleep(Duration::from_millis(2));
@@ -272,19 +272,19 @@ fn menu_prompt_preview_cancel_apply_and_mouse_preserve_source_and_unrelated_sett
     }
     draw(&mut app, 80, 25)?;
     click(&mut app, dn::mouse::Target::CancelImport);
-    assert!(app.config_import.is_none());
+    assert!(app.modals.config_import().is_none());
     assert_eq!(app.config, original);
     config_import::start(&mut app, path.clone())?;
     wait(&mut app);
     app.error("topmost");
     key(&mut app, KeyCode::Enter);
-    assert!(app.config_import.is_some());
+    assert!(app.modals.config_import().is_some());
     key(&mut app, KeyCode::End);
     draw(&mut app, 80, 25)?;
     key(&mut app, KeyCode::Home);
     draw(&mut app, 80, 25)?;
     click(&mut app, dn::mouse::Target::ApplyImport);
-    assert!(app.config_import.is_none());
+    assert!(app.modals.config_import().is_none());
     assert!(!app.config.show_clock);
     assert!(app.config.use_trash);
     assert_eq!(app.config.datetime, original.datetime);
@@ -300,13 +300,13 @@ fn closing_loading_no_change_and_errors_disable_apply_and_reject_stale_results()
     let mut app = dn::app::App::new(t.0.clone())?;
     config_import::start(&mut app, path)?;
     key(&mut app, KeyCode::Esc);
-    assert!(app.config_import.is_none());
+    assert!(app.modals.config_import().is_none());
     let empty = t.0.join("empty");
     fs::write(&empty, cfg(&[]))?;
     config_import::start(&mut app, empty.clone())?;
     wait(&mut app);
-    assert_eq!(app.config_import.as_ref().unwrap().path, empty);
-    assert!(!app.config_import.as_ref().unwrap().can_apply());
+    assert_eq!(app.modals.config_import().unwrap().path, empty);
+    assert!(!app.modals.config_import().unwrap().can_apply());
     for lang in [
         dn::localization::Language::English,
         dn::localization::Language::Russian,
@@ -320,22 +320,22 @@ fn closing_loading_no_change_and_errors_disable_apply_and_reject_stale_results()
             .any(|(_, t)| *t == dn::mouse::Target::ApplyImport));
     }
     key(&mut app, KeyCode::Enter);
-    assert!(app.config_import.is_none());
+    assert!(app.modals.config_import().is_none());
     config_import::start(&mut app, t.0.join("missing"))?;
     wait(&mut app);
     assert!(app
-        .config_import
-        .as_ref()
+        .modals
+        .config_import()
         .unwrap()
         .result
         .as_ref()
         .unwrap()
         .is_err());
     config_import::apply(&mut app);
-    assert!(app.config_import.is_some());
+    assert!(app.modals.config_import().is_some());
     draw(&mut app, 80, 25)?;
     click(&mut app, dn::mouse::Target::CancelImport);
-    assert!(app.config_import.is_none());
+    assert!(app.modals.config_import().is_none());
     Ok(())
 }
 

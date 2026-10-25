@@ -66,3 +66,21 @@ pub mod regional;
 pub mod volume_space;
 
 pub mod windowing;
+
+pub mod turbo;
+
+pub mod panel_status;
+
+pub mod panel_command;
+
+pub mod painting;
+
+pub mod presentation;
+#[doc(hidden)]
+pub mod testing;
+
+pub mod control_focus;
+
+pub mod requests;
+
+pub mod modals;

@@ -11,8 +11,21 @@ use std::time::{Duration, Instant};
 pub struct WindowList {
     pub ids: Vec<WindowId>,
     pub cursor: usize,
+    pub offset: usize,
+    pub rows: usize,
     pub focus: usize,
     last_click: Option<(WindowId, Instant)>,
+}
+impl WindowList {
+    pub fn keep_visible(&mut self) {
+        self.cursor = self.cursor.min(self.ids.len().saturating_sub(1));
+        if self.cursor < self.offset {
+            self.offset = self.cursor;
+        }
+        if self.cursor >= self.offset + self.rows.max(1) {
+            self.offset = self.cursor + 1 - self.rows.max(1);
+        }
+    }
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Action {
@@ -21,10 +34,14 @@ pub enum Action {
     Cancel,
 }
 fn ids(app: &App) -> Vec<WindowId> {
-    [WindowKind::Manager, WindowKind::Editor, WindowKind::Viewer]
-        .into_iter()
-        .filter_map(|kind| app.desktop.id(kind))
-        .collect()
+    let mut windows = app
+        .desktop
+        .windows()
+        .filter(|w| w.kind != WindowKind::Game)
+        .map(|w| w.id)
+        .collect::<Vec<_>>();
+    windows.sort();
+    windows
 }
 pub fn open(app: &mut App) {
     if app.exit_pending
@@ -41,10 +58,10 @@ pub fn open(app: &mut App) {
         return;
     }
     crate::menu::close(app);
-    if let Some(editor) = app.desktop.editor_mut() {
-        editor.menu = None;
+    if let Some(editor) = app.desktop.active_editor_mut() {
+        editor.modals.set_editor_menu(None);
     }
-    app.quick_search = None;
+    app.modals.set_quick_search(None);
     app.shortcuts.clear();
     app.mouse.reset_click();
     let ids = ids(app);
@@ -52,20 +69,22 @@ pub fn open(app: &mut App) {
         .iter()
         .position(|id| *id == app.desktop.active().id)
         .unwrap_or(0);
-    app.window_list = Some(WindowList {
+    app.modals.set_window_list(Some(WindowList {
         ids,
         cursor,
+        offset: 0,
+        rows: 6,
         focus: 0,
         last_click: None,
-    });
+    }));
 }
 /// A load can fail while the list is open. Never reuse its old row target.
 pub fn poll(app: &mut App) -> bool {
-    if app.window_list.is_none() {
+    if app.modals.window_list().is_none() {
         return false;
     }
     let current = ids(app);
-    let Some(list) = &mut app.window_list else {
+    let Some(list) = app.modals.window_list_mut() else {
         return false;
     };
     if list.ids == current {
@@ -77,22 +96,23 @@ pub fn poll(app: &mut App) -> bool {
         .unwrap_or(0);
     list.ids = current;
     list.last_click = None;
+    list.keep_visible();
     true
 }
 pub fn action(app: &mut App, action: Action) {
     match action {
         Action::Cancel => {
-            app.window_list = None;
+            app.modals.set_window_list(None);
         }
         Action::Switch => {
             let selected = app
-                .window_list
-                .as_ref()
+                .modals
+                .window_list()
                 .and_then(|l| l.ids.get(l.cursor))
                 .copied();
             if let Some(id) = selected.filter(|id| app.desktop.contains(*id)) {
                 app.desktop.activate(id);
-                app.window_list = None;
+                app.modals.set_window_list(None);
             } else {
                 poll(app);
             }
@@ -101,7 +121,7 @@ pub fn action(app: &mut App, action: Action) {
             if !app.desktop.contains(id) {
                 return;
             }
-            if let Some(list) = &mut app.window_list {
+            if let Some(list) = app.modals.window_list_mut() {
                 if let Some(row) = list.ids.iter().position(|i| *i == id) {
                     list.cursor = row;
                     list.focus = 0;
@@ -109,11 +129,14 @@ pub fn action(app: &mut App, action: Action) {
             }
         }
     }
+    if let Some(list) = app.modals.window_list_mut() {
+        list.keep_visible();
+    }
     app.shortcuts.clear();
     app.mouse.reset_click();
 }
 pub fn key(app: &mut App, key: KeyEvent) {
-    let Some(list) = &mut app.window_list else {
+    let Some(list) = app.modals.window_list_mut() else {
         return;
     };
     list.last_click = None;
@@ -127,8 +150,8 @@ pub fn key(app: &mut App, key: KeyEvent) {
             };
             action(app, command);
         }
-        KeyCode::Tab => list.focus = (list.focus + 1) % 3,
-        KeyCode::BackTab => list.focus = (list.focus + 2) % 3,
+        KeyCode::Tab => list.focus = crate::control_focus::cycle(list.focus, 3, false),
+        KeyCode::BackTab => list.focus = crate::control_focus::cycle(list.focus, 3, true),
         KeyCode::Up => {
             list.cursor = list.cursor.saturating_sub(1);
             list.focus = 0;
@@ -147,6 +170,9 @@ pub fn key(app: &mut App, key: KeyEvent) {
         }
         _ => {}
     }
+    if let Some(list) = app.modals.window_list_mut() {
+        list.keep_visible();
+    }
 }
 pub fn mouse(app: &mut App, event: MouseEvent, target: Option<Target>) {
     if event.kind != MouseEventKind::Down(MouseButton::Left) {
@@ -159,7 +185,7 @@ pub fn mouse(app: &mut App, event: MouseEvent, target: Option<Target>) {
         if !app.desktop.contains(id) {
             return;
         }
-        let Some(list) = &mut app.window_list else {
+        let Some(list) = app.modals.window_list_mut() else {
             return;
         };
         let now = Instant::now();

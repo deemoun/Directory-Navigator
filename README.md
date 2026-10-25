@@ -1,9 +1,11 @@
 # Directory Navigator
 
-A modern, native terminal file manager inspired by **DOS Navigator**.
-Directory Navigator is a DOS Navigator–inspired clone: familiar two-panel browsing,
-classic colors, keyboard shortcuts and mouse controls, rebuilt in Rust for modern
-computers. It runs directly in your terminal—no DOS emulator or graphical frontend.
+A modern terminal file manager built in **Rust with Turbo Vision**, inspired by
+**DOS Navigator**.
+
+Familiar two-panel browsing, classic colors, keyboard shortcuts and mouse controls,
+rebuilt for modern computers. It runs directly in your terminal—no DOS emulator or
+graphical frontend.
 
 <table>
   <tr>
@@ -15,12 +17,21 @@ computers. It runs directly in your terminal—no DOS emulator or graphical fron
   </tr>
 </table>
 
+## Built on Turbo Vision
+
+[Turbo Vision for Rust](https://github.com/aovestdipaperino/turbo-vision-4-rust)
+powers the file panes, menus, dialogs, editors, viewers, utilities and Tetris.
+Its desktop and control system handles window selection, focus and input routing,
+while Directory Navigator keeps the classic DN appearance and adds Unicode text
+and modern filesystem handling.
+
 ## What you can do
 
 - Browse two folders side by side, mark files, and copy, move or rename them.
 - Create directories and send files to Trash with confirmation.
 - Find files, compare directories, calculate folder sizes and use bookmarks.
 - Preview text or hex, edit UTF-8 files, and search or replace text.
+- Keep multiple editors and viewers open, and switch between them with **Alt+0**.
 - Browse ZIP, TAR and TAR.GZ archives without extracting them.
 - Type shell commands directly into the bottom command prompt.
 - Customize the layout, colors, clock and screensaver; settings save on exit.
@@ -130,9 +141,12 @@ Automatic remains optional: it selects Mac-friendly on macOS and Classic DN else
 Click to select, double-click to open, and Ctrl+click to mark. Inside the viewer
 or editor, use F1 for that screen's controls. macOS may require Fn with function keys.
 
-**Manager → Windows…** (Alt+0) switches between the file panels, editor and viewer
-without closing documents. The Mac-friendly profile also offers **Ctrl+O, then U**.
-F4 returns to an already open editor, preserving unsaved text and undo history.
+**Manager → Windows…** (Alt+0) switches between the file panels and open editors
+and viewers. The Mac-friendly profile also offers **Ctrl+O, then U**. Each document
+keeps its own edits, undo history, search and scroll position. F4 opens the
+highlighted file; reopening a file activates its existing document. Close and quit
+check unsaved changes across the relevant editors. Windows remain full-screen and
+session-only.
 
 The bottom row is a command prompt. Type a command and press **Enter** to run it
 in the active panel's directory; **Esc** clears it. **Ctrl+E / Ctrl+X** recall command
@@ -198,6 +212,8 @@ choice is remembered in the Tetris file. Unicode names remain supported for new
 scores; unavailable original line counts display “—”.
 
 ## Development
+
+See [document foundations](docs/DOCUMENT_FOUNDATIONS.md) for implementation details.
 
 ```sh
 cargo fmt --check

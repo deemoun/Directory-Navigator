@@ -8,14 +8,14 @@ use crossterm::{
     style::{Attribute, ResetColor, SetAttribute},
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use ratatui::{backend::CrosstermBackend, Terminal};
+
 use std::{
     cell::Cell,
     io::{self, IsTerminal, Stdout},
     time::{Duration, Instant},
 };
 
-pub type Screen = Terminal<CrosstermBackend<Stdout>>;
+pub type Screen = crate::turbo::TurboBackend<Stdout>;
 
 pub struct Session {
     mouse_down: Cell<bool>,
@@ -68,6 +68,10 @@ fn restore_input(mouse_down: bool) {
 }
 
 impl Session {
+    pub fn poll(&self, screen: &mut Screen, timeout: Duration) -> io::Result<Option<event::Event>> {
+        screen.poll_event(timeout)
+    }
+
     pub fn mouse_event(&self, kind: MouseEventKind) {
         match kind {
             MouseEventKind::Down(_) => self.mouse_down.set(true),
@@ -122,7 +126,8 @@ impl Session {
             EnableMouseCapture,
             EnableBracketedPaste
         )?;
-        let screen = Terminal::new(CrosstermBackend::new(io::stdout()))?;
+        let screen = crate::turbo::TurboBackend::new(io::stdout())?;
+
         Ok((guard, screen))
     }
 }

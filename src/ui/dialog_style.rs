@@ -1,14 +1,13 @@
 //! Shared Turbo Vision dialog chrome; dimensions remain content-specific.
+use crate::painting::{Block, BorderType, Borders, Clear, Frame, Paragraph};
 use crate::palette::PaletteProfile;
-use ratatui::{
+use crate::presentation::{
     layout::{Alignment, Rect},
     text::{Line, Span},
-    widgets::{Block, BorderType, Borders, Clear, Paragraph},
-    Frame,
 };
 
 pub(super) fn window(
-    frame: &mut Frame,
+    frame: &mut impl Frame,
     profile: PaletteProfile,
     area: Rect,
     width: u16,
@@ -39,7 +38,7 @@ pub(super) fn window(
     rect
 }
 pub(super) fn button(
-    frame: &mut Frame,
+    frame: &mut impl Frame,
     profile: PaletteProfile,
     rect: Rect,
     label: &str,
@@ -72,7 +71,10 @@ pub(super) fn button(
     ]);
     frame.render_widget(Paragraph::new(line).style(profile.dos(0x8f)), rect);
 }
-pub(super) fn input_style(profile: PaletteProfile, focused: bool) -> ratatui::style::Style {
+pub(super) fn input_style(
+    profile: PaletteProfile,
+    focused: bool,
+) -> crate::presentation::style::Style {
     profile.dos(if profile == PaletteProfile::ClassicDn {
         if focused {
             0x0f
@@ -88,20 +90,18 @@ pub(super) fn input_style(profile: PaletteProfile, focused: bool) -> ratatui::st
 
 /// Attach the border control to the modal's existing Cancel/Close action.
 pub(super) fn close_button(
-    frame: &mut Frame,
+    frame: &mut impl Frame,
     profile: PaletteProfile,
     rect: Rect,
-    regions: &mut Vec<(Rect, crate::mouse::Target)>,
     target: crate::mouse::Target,
 ) {
-    close_control(frame, profile, rect, regions, target, 0x7a);
+    close_control(frame, profile, rect, target, 0x7a);
 }
 
 fn close_control(
-    frame: &mut Frame,
+    frame: &mut impl Frame,
     profile: PaletteProfile,
     rect: Rect,
-    regions: &mut Vec<(Rect, crate::mouse::Target)>,
     target: crate::mouse::Target,
     color: u8,
 ) {
@@ -117,16 +117,15 @@ fn close_control(
         ])),
         close,
     );
-    regions.push((close, target));
+    frame.regions().push((close, target));
 }
 
 /// Document windows use DN's cyan close marker; modal dialogs use green.
 pub(super) fn document_header(
-    frame: &mut Frame,
+    frame: &mut impl Frame,
     profile: PaletteProfile,
     rect: Rect,
     title: &str,
-    regions: &mut Vec<(Rect, crate::mouse::Target)>,
     target: crate::mouse::Target,
 ) {
     let title = crate::formatting::tail(title, rect.width.saturating_sub(14));
@@ -141,5 +140,5 @@ pub(super) fn document_header(
             .style(profile.dos(0x70)),
         rect,
     );
-    close_control(frame, profile, rect, regions, target, 0x7b);
+    close_control(frame, profile, rect, target, 0x7b);
 }

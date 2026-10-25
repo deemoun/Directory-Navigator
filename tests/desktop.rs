@@ -40,8 +40,11 @@ impl Drop for Temp {
 fn ready(app: &mut App) {
     let deadline = Instant::now() + Duration::from_secs(5);
     while app.panels.iter().any(|p| p.loading)
-        || app.desktop.editor().is_some_and(|e| e.busy())
-        || app.desktop.viewer().is_some_and(|v| v.contents.is_none())
+        || app.desktop.active_editor().is_some_and(|e| e.busy())
+        || app
+            .desktop
+            .active_viewer()
+            .is_some_and(|v| v.contents.is_none())
     {
         app.poll();
         assert!(Instant::now() < deadline, "background load did not finish");
@@ -56,7 +59,7 @@ fn preview(path: PathBuf) -> Viewer {
 }
 
 #[test]
-fn stable_identities_keep_existing_screen_precedence_and_one_content_per_kind() -> io::Result<()> {
+fn stable_identities_activate_new_documents_and_keep_multiple_instances() -> io::Result<()> {
     let temp = Temp::new()?;
     let mut app = temp.app()?;
     assert_eq!(app.desktop.active().id, WindowId::MANAGER);
@@ -68,9 +71,9 @@ fn stable_identities_keep_existing_screen_precedence_and_one_content_per_kind() 
     app.show_viewer(preview(temp.0.join("preview")));
     let viewer = app.desktop.id(WindowKind::Viewer).unwrap();
     assert_eq!(app.desktop.windows().count(), 4);
-    assert_eq!(app.desktop.active(), editor);
-    assert_eq!(focus::current(&app), Focus::Editor);
-    app.desktop.close_editor();
+    assert_eq!(app.desktop.active().id, viewer);
+    assert_eq!(focus::current(&app), Focus::Viewer);
+    app.desktop.close(editor.id);
     assert!(!app.desktop.contains(editor.id));
     assert_eq!(app.desktop.active().id, viewer);
     app.desktop.close_viewer();
@@ -82,8 +85,8 @@ fn stable_identities_keep_existing_screen_precedence_and_one_content_per_kind() 
     assert_ne!(new, viewer);
     app.show_viewer(preview(temp.0.join("replacement")));
     assert_ne!(app.desktop.active().id, new);
-    assert!(!app.desktop.contains(new));
-    assert_eq!(app.desktop.windows().count(), 2);
+    assert!(app.desktop.contains(new));
+    assert_eq!(app.desktop.windows().count(), 3);
     Ok(())
 }
 
@@ -97,23 +100,30 @@ fn modal_focus_close_cancel_and_quit_guards_retain_window_identity() -> io::Resu
     let mut viewer = preview(temp.0.join("preview"));
     viewer.offset = 1;
     app.show_viewer(viewer);
+    app.desktop.activate(owner.id);
     editor::request_close(&mut app, CloseIntent::Panel);
     assert_eq!(focus::current(&app), Focus::EditorModal);
     assert_eq!(app.desktop.active(), owner);
     app.error("nested background error");
     input::paste(&mut app, "must not enter the document");
     assert_eq!(focus::current(&app), Focus::Message);
-    app.dialogs.clear();
+    app.clear_dialogs();
     editor::action(&mut app, EditorAction::Cancel);
     assert_eq!(app.desktop.active(), owner);
     assert_eq!(
-        app.desktop.editor().unwrap().buffer.as_ref().unwrap().text,
+        app.desktop
+            .active_editor()
+            .unwrap()
+            .buffer
+            .as_ref()
+            .unwrap()
+            .text,
         "unsaved 界é"
     );
     app.request_exit();
     assert!(!app.quit);
     assert!(matches!(
-        app.desktop.editor().unwrap().modal,
+        app.desktop.active_editor().unwrap().modals.editor_modal(),
         Some(Modal::ConfirmClose)
     ));
     editor::action(&mut app, EditorAction::Cancel);
@@ -123,12 +133,13 @@ fn modal_focus_close_cancel_and_quit_guards_retain_window_identity() -> io::Resu
     editor::action(&mut app, EditorAction::Discard);
     assert!(!app.desktop.contains(owner.id));
     assert_eq!(app.desktop.active().kind, WindowKind::Viewer);
-    assert_eq!(app.desktop.viewer().unwrap().offset, 1);
+    assert_eq!(app.desktop.active_viewer().unwrap().offset, 1);
     Ok(())
 }
 
 #[test]
-fn switching_files_and_failed_loads_keep_the_same_editor_and_buffer() -> io::Result<()> {
+fn opening_files_creates_documents_and_failed_load_preserves_the_previous_buffer() -> io::Result<()>
+{
     let temp = Temp::new()?;
     let path = temp.0.join("document.txt");
     fs::write(&path, "loaded document")?;
@@ -137,14 +148,25 @@ fn switching_files_and_failed_loads_keep_the_same_editor_and_buffer() -> io::Res
     let owner = app.desktop.active();
     editor::open_path(&mut app, path.clone());
     ready(&mut app);
-    assert_eq!(app.desktop.active(), owner);
-    assert_eq!(app.desktop.editor().unwrap().path.as_ref(), Some(&path));
+    assert_ne!(app.desktop.active(), owner);
+    assert!(app.desktop.contains(owner.id));
+    let loaded = app.desktop.active();
+    assert_eq!(
+        app.desktop.active_editor().unwrap().path.as_ref(),
+        Some(&path)
+    );
     editor::open_path(&mut app, temp.0.join("missing"));
     ready(&mut app);
-    assert!(!app.dialogs.is_empty());
-    assert_eq!(app.desktop.active(), owner);
+    assert!(!app.dialogs().is_empty());
+    assert_eq!(app.desktop.active(), loaded);
     assert_eq!(
-        app.desktop.editor().unwrap().buffer.as_ref().unwrap().text,
+        app.desktop
+            .active_editor()
+            .unwrap()
+            .buffer
+            .as_ref()
+            .unwrap()
+            .text,
         "loaded document"
     );
     Ok(())
@@ -158,14 +180,15 @@ fn closed_or_replaced_content_cannot_receive_old_background_results() -> io::Res
     let mut app = temp.app()?;
     app.show_viewer(Viewer::open(temp.0.join("missing-viewer"))?);
     let previous = app.desktop.active().id;
+    app.desktop.close(previous);
     app.show_viewer(Viewer::open(path.clone())?);
     assert!(!app.desktop.contains(previous));
     ready(&mut app);
-    assert!(app.dialogs.is_empty());
-    assert_eq!(app.desktop.viewer().unwrap().path, path);
+    assert!(app.dialogs().is_empty());
+    assert_eq!(app.desktop.active_viewer().unwrap().path, path);
     assert_eq!(
         app.desktop
-            .viewer()
+            .active_viewer()
             .unwrap()
             .contents
             .as_ref()
@@ -185,10 +208,16 @@ fn closed_or_replaced_content_cannot_receive_old_background_results() -> io::Res
         app.poll();
         thread::sleep(Duration::from_millis(1));
     }
-    assert!(app.dialogs.is_empty());
+    assert!(app.dialogs().is_empty());
     assert_eq!(app.desktop.active(), owner);
     assert_eq!(
-        app.desktop.editor().unwrap().buffer.as_ref().unwrap().text,
+        app.desktop
+            .active_editor()
+            .unwrap()
+            .buffer
+            .as_ref()
+            .unwrap()
+            .text,
         "fresh unsaved document"
     );
     Ok(())
@@ -215,11 +244,10 @@ fn switch(app: &mut App, kind: WindowKind) {
     dn::windowing::action(app, dn::windowing::Action::Row(id));
     key(app, crossterm::event::KeyCode::Enter);
     assert_eq!(app.desktop.active().id, id);
-    assert!(app.window_list.is_none());
+    assert!(app.modals.window_list().is_none());
 }
 #[test]
-fn switching_retains_documents_prompt_panels_and_undo_and_resumes_existing_editor() -> io::Result<()>
-{
+fn switching_retains_documents_prompt_panels_and_independent_undo() -> io::Result<()> {
     use crossterm::event::KeyCode as K;
     let temp = Temp::new()?;
     let mut app = temp.app()?;
@@ -240,19 +268,33 @@ fn switching_retains_documents_prompt_panels_and_undo_and_resumes_existing_edito
     app.show_viewer(viewer);
     assert_eq!(focus::screen(&app), WindowKind::Viewer);
     switch(&mut app, WindowKind::Manager);
-    key(&mut app, K::F(4));
+    windows(&mut app);
+    dn::windowing::action(&mut app, dn::windowing::Action::Row(id));
+    key(&mut app, K::Enter);
     assert_eq!(app.desktop.active().id, id);
     assert_eq!(
-        app.desktop.editor().unwrap().buffer.as_ref().unwrap().text,
+        app.desktop
+            .active_editor()
+            .unwrap()
+            .buffer
+            .as_ref()
+            .unwrap()
+            .text,
         "unsaved 界é"
     );
     editor::action(&mut app, EditorAction::Undo);
     assert_eq!(
-        app.desktop.editor().unwrap().buffer.as_ref().unwrap().text,
+        app.desktop
+            .active_editor()
+            .unwrap()
+            .buffer
+            .as_ref()
+            .unwrap()
+            .text,
         ""
     );
     switch(&mut app, WindowKind::Viewer);
-    assert_eq!(app.desktop.viewer().unwrap().offset, 1);
+    assert_eq!(app.desktop.active_viewer().unwrap().offset, 1);
     app.desktop.close_viewer();
     assert_eq!(app.desktop.active().id, id);
     assert_eq!(
@@ -277,9 +319,11 @@ fn hidden_dirty_editor_quit_and_open_path_keep_unsaved_guards() -> io::Result<()
     let next = temp.0.join("next");
     fs::write(&next, "next")?;
     editor::open_path(&mut app, next);
-    assert_eq!(app.desktop.active().id, id);
-    assert_eq!(focus::current(&app), Focus::EditorModal);
-    editor::action(&mut app, EditorAction::Cancel);
+    let next_id = app.desktop.active().id;
+    assert_ne!(next_id, id);
+    ready(&mut app);
+    assert!(app.desktop.editor(id).unwrap().dirty());
+    assert_eq!(focus::current(&app), Focus::Editor);
     switch(&mut app, WindowKind::Manager);
     app.request_exit();
     assert_eq!(app.desktop.active().id, id);
@@ -288,7 +332,13 @@ fn hidden_dirty_editor_quit_and_open_path_keep_unsaved_guards() -> io::Result<()
     editor::action(&mut app, EditorAction::Cancel);
     assert!(!app.quit);
     assert_eq!(
-        app.desktop.editor().unwrap().buffer.as_ref().unwrap().text,
+        app.desktop
+            .active_editor()
+            .unwrap()
+            .buffer
+            .as_ref()
+            .unwrap()
+            .text,
         "keep me"
     );
     switch(&mut app, WindowKind::Manager);
@@ -312,28 +362,40 @@ fn list_consumes_input_and_cancels_without_changing_focus_and_modals_take_preced
     key(&mut app, K::Char('x'));
     key(&mut app, K::F(10));
     assert!(!app.quit);
-    assert!(app.desktop.editor().unwrap().modal.is_none());
+    assert!(app
+        .desktop
+        .active_editor()
+        .unwrap()
+        .modals
+        .editor_modal()
+        .is_none());
     assert_eq!(
-        app.desktop.editor().unwrap().buffer.as_ref().unwrap().text,
+        app.desktop
+            .active_editor()
+            .unwrap()
+            .buffer
+            .as_ref()
+            .unwrap()
+            .text,
         "original"
     );
     key(&mut app, K::Home);
     key(&mut app, K::Tab);
     key(&mut app, K::Tab);
     key(&mut app, K::Enter);
-    assert!(app.window_list.is_none());
+    assert!(app.modals.window_list().is_none());
     assert_eq!(app.desktop.active().id, id);
     editor::request_close(&mut app, CloseIntent::Panel);
     windows(&mut app);
-    assert!(app.window_list.is_none());
+    assert!(app.modals.window_list().is_none());
     editor::action(&mut app, EditorAction::Cancel);
     windows(&mut app);
     app.error("higher priority");
     key(&mut app, K::Esc);
-    assert!(app.dialogs.is_empty());
-    assert!(app.window_list.is_some());
+    assert!(app.dialogs().is_empty());
+    assert!(app.modals.window_list().is_some());
     key(&mut app, K::Esc);
-    assert!(app.window_list.is_none());
+    assert!(app.modals.window_list().is_none());
     Ok(())
 }
 #[test]
@@ -345,20 +407,21 @@ fn stale_rows_cannot_activate_replacements_and_inactive_close_preserves_focus() 
     switch(&mut app, WindowKind::Manager);
     windows(&mut app);
     dn::windowing::action(&mut app, dn::windowing::Action::Row(old));
-    app.desktop.close_viewer();
+    app.desktop.close(old);
     assert_eq!(app.desktop.active().id, WindowId::MANAGER);
     app.show_viewer(preview(temp.0.join("replacement")));
+    let replacement = app.desktop.active().id;
     app.desktop.activate(WindowId::MANAGER);
     dn::windowing::action(&mut app, dn::windowing::Action::Switch);
-    assert!(app.window_list.is_some());
+    assert!(app.modals.window_list().is_some());
     assert_eq!(app.desktop.active().id, WindowId::MANAGER);
     assert!(!app.desktop.activate(old));
     dn::windowing::action(&mut app, dn::windowing::Action::Row(old));
-    assert_eq!(app.window_list.as_ref().unwrap().cursor, 0);
-    app.desktop.close_viewer();
+    assert_eq!(app.modals.window_list().unwrap().cursor, 0);
+    app.desktop.close(replacement);
     assert_eq!(app.desktop.active().id, WindowId::MANAGER);
     assert!(dn::windowing::poll(&mut app));
-    assert_eq!(app.window_list.as_ref().unwrap().ids, [WindowId::MANAGER]);
+    assert_eq!(app.modals.window_list().unwrap().ids, [WindowId::MANAGER]);
     Ok(())
 }
 #[test]
@@ -366,6 +429,7 @@ fn window_list_profiles_languages_resize_mouse_and_background_tools() -> io::Res
     use crossterm::event::{
         KeyCode as K, KeyEvent, KeyModifiers as M, MouseButton, MouseEvent, MouseEventKind,
     };
+    use dn::testing::{backend::TestBackend, Terminal};
     use dn::{
         localization::Language,
         mouse::{self, Target},
@@ -373,7 +437,6 @@ fn window_list_profiles_languages_resize_mouse_and_background_tools() -> io::Res
         shortcuts::Profile,
         windowing::Action,
     };
-    use ratatui::{backend::TestBackend, Terminal};
     let temp = Temp::new()?;
     for language in [Language::English, Language::Russian] {
         for profile in [Profile::ClassicDn, Profile::Mac] {
@@ -395,7 +458,7 @@ fn window_list_profiles_languages_resize_mouse_and_background_tools() -> io::Res
                 for (w, h) in [(80, 25), (132, 40), (50, 15), (80, 25)] {
                     let mut terminal = Terminal::new(TestBackend::new(w, h))?;
                     terminal.draw(|f| dn::ui::draw(f, &mut app))?;
-                    assert!(app.window_list.is_some());
+                    assert!(app.modals.window_list().is_some());
                     assert!(app
                         .mouse
                         .regions
@@ -431,13 +494,13 @@ fn window_list_profiles_languages_resize_mouse_and_background_tools() -> io::Res
                     modifiers: M::NONE,
                 };
                 mouse::handle(&mut app, click);
-                assert!(app.window_list.is_some());
+                assert!(app.modals.window_list().is_some());
                 mouse::handle(&mut app, click);
-                assert!(app.window_list.is_none());
+                assert!(app.modals.window_list().is_none());
                 assert_eq!(app.desktop.active().id, WindowId::MANAGER);
                 dn::quick_search::open(&mut app);
-                assert!(app.quick_search.is_some());
-                app.quick_search = None;
+                assert!(app.modals.quick_search().is_some());
+                app.modals.set_quick_search(None);
                 dn::quick_view::toggle(&mut app);
                 dn::quick_view::poll(&mut app);
                 assert!(app.quick_view.is_some());
@@ -491,7 +554,7 @@ fn editor_quit_waits_for_operation_and_cancelled_exit_never_rearms_itself() -> i
     }
     assert!(!app.quit);
     assert!(!app.exit_pending);
-    app.dialogs.clear();
+    app.clear_dialogs();
     app.job = Some(Job::start(Plan {
         kind: Kind::Copy,
         sources: vec![source.clone()],
@@ -515,12 +578,12 @@ fn editor_quit_waits_for_operation_and_cancelled_exit_never_rearms_itself() -> i
 #[test]
 fn window_menu_actions_and_modal_title_close_preserve_existing_shortcuts() -> io::Result<()> {
     use crossterm::event::{KeyCode as K, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+    use dn::testing::{backend::TestBackend, Terminal};
     use dn::{
         menu,
         mouse::{self, Target},
         windowing::Action,
     };
-    use ratatui::{backend::TestBackend, Terminal};
     let temp = Temp::new()?;
     let mut app = temp.app()?;
     assert!(menu::items(4)
@@ -549,16 +612,16 @@ fn window_menu_actions_and_modal_title_close_preserve_existing_shortcuts() -> io
     );
     assert_eq!(focus::current(&app), Focus::Manager);
     key(&mut app, K::F(9));
-    assert!(app.menu.is_some());
+    assert!(app.modals.menu().is_some());
     windows(&mut app);
     assert_eq!(focus::current(&app), Focus::WindowList);
-    assert!(app.menu.is_none());
+    assert!(app.modals.menu().is_none());
     key(&mut app, K::Esc);
     app.prompt_operation(dn::operations::Kind::Mkdir, false);
     windows(&mut app);
-    assert!(app.window_list.is_none());
-    assert!(app.prompt.is_some());
-    app.prompt = None;
+    assert!(app.modals.window_list().is_none());
+    assert!(app.modals.prompt().is_some());
+    app.modals.set_prompt(None);
     editor::open(&mut app, true);
     editor::menus::open(&mut app, 0);
     let row = editor::menus::items(0)
@@ -568,7 +631,13 @@ fn window_menu_actions_and_modal_title_close_preserve_existing_shortcuts() -> io
     editor::menus::activate(&mut app, row);
     assert_eq!(focus::current(&app), Focus::WindowList);
     key(&mut app, K::Esc);
-    assert!(app.desktop.editor().unwrap().menu.is_none());
+    assert!(app
+        .desktop
+        .active_editor()
+        .unwrap()
+        .modals
+        .editor_menu()
+        .is_none());
     editor::menus::open(&mut app, 0);
     windows(&mut app);
     assert_eq!(focus::current(&app), Focus::WindowList);
@@ -576,7 +645,7 @@ fn window_menu_actions_and_modal_title_close_preserve_existing_shortcuts() -> io
     app.desktop.close_editor();
     app.show_game(dn::tetris::Game::default());
     windows(&mut app);
-    assert!(app.window_list.is_none());
+    assert!(app.modals.window_list().is_none());
     assert_eq!(focus::current(&app), Focus::Game);
     Ok(())
 }

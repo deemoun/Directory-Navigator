@@ -1,4 +1,5 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+use dn::testing::{backend::TestBackend, Terminal};
 use dn::{
     app::App,
     discovery::{self, Action},
@@ -10,7 +11,6 @@ use dn::{
     traversal::{Event, Job, Request},
     ui,
 };
-use ratatui::{backend::TestBackend, Terminal};
 use std::{
     fs, io,
     path::PathBuf,
@@ -51,7 +51,10 @@ fn wait(a: &mut App, ready: impl Fn(&App) -> bool) {
 }
 fn finish(a: &mut App) {
     wait(a, |a| {
-        a.discovery.modal.as_ref().is_some_and(|m| m.job.is_none())
+        a.discovery
+            .modals
+            .discovery()
+            .is_some_and(|m| m.job.is_none())
     });
 }
 fn key(a: &mut App, code: KeyCode, modifiers: KeyModifiers) {
@@ -292,7 +295,7 @@ fn find_dialog_shortcuts_memory_modal_precedence_and_result_jump() -> io::Result
     fs::write(t.0.join("nested/文.txt"), "hello")?;
     let mut a = t.app()?;
     key(&mut a, KeyCode::F(7), KeyModifiers::ALT);
-    assert!(a.quick_search.is_some());
+    assert!(a.modals.quick_search().is_some());
     key(&mut a, KeyCode::Esc, KeyModifiers::NONE);
     key(&mut a, KeyCode::F(7), KeyModifiers::CONTROL);
     assert_eq!(focus::current(&a), Focus::Discovery);
@@ -302,19 +305,24 @@ fn find_dialog_shortcuts_memory_modal_precedence_and_result_jump() -> io::Result
     input::paste(&mut a, "*.txt");
     a.error("top");
     input::paste(&mut a, "must not leak");
-    assert_eq!(a.discovery.modal.as_ref().unwrap().prefs.pattern, "*.txt");
+    assert_eq!(
+        a.discovery.modals.discovery().unwrap().prefs.pattern,
+        "*.txt"
+    );
     key(&mut a, KeyCode::Enter, KeyModifiers::NONE);
     key(&mut a, KeyCode::Enter, KeyModifiers::NONE);
     finish(&mut a);
-    assert_eq!(a.discovery.modal.as_ref().unwrap().hits.len(), 1);
+    assert_eq!(a.discovery.modals.discovery().unwrap().hits.len(), 1);
     for (w, h) in [(80, 25), (132, 40)] {
         assert!(draw(&mut a, w, h)?.contains("Find results"));
     }
     key(&mut a, KeyCode::F(3), KeyModifiers::NONE);
     wait(&mut a, |a| {
-        a.desktop.viewer().is_some_and(|v| v.contents.is_some())
+        a.desktop
+            .active_viewer()
+            .is_some_and(|v| v.contents.is_some())
     });
-    assert!(a.discovery.modal.is_some());
+    assert!(a.discovery.modals.discovery().is_some());
     key(&mut a, KeyCode::Esc, KeyModifiers::NONE);
     draw(&mut a, 80, 25)?;
     click(&mut a, Target::Discovery(Action::Jump));
@@ -322,9 +330,12 @@ fn find_dialog_shortcuts_memory_modal_precedence_and_result_jump() -> io::Result
     assert_eq!(a.panels[0].path, t.0.join("nested"));
     assert_eq!(a.panels[0].entries[a.panels[0].cursor].name, "文.txt");
     discovery::open_find(&mut a);
-    assert_eq!(a.discovery.modal.as_ref().unwrap().prefs.pattern, "*.txt");
+    assert_eq!(
+        a.discovery.modals.discovery().unwrap().prefs.pattern,
+        "*.txt"
+    );
     key(&mut a, KeyCode::Esc, KeyModifiers::NONE);
-    assert!(a.discovery.modal.is_none());
+    assert!(a.discovery.modals.discovery().is_none());
     Ok(())
 }
 
@@ -337,8 +348,8 @@ fn size_dialog_selects_visible_directories_retains_listing_and_recalculates() ->
     let mut a = t.app()?;
     focus(&mut a, "file");
     discovery::open_sizes(&mut a);
-    assert!(a.discovery.modal.is_none());
-    a.dialogs.clear();
+    assert!(a.discovery.modals.discovery().is_none());
+    a.clear_dialogs();
     focus(&mut a, "dir");
     a.panels[0].toggle_selection();
     let cursor = a.panels[0].cursor;
@@ -353,7 +364,7 @@ fn size_dialog_selects_visible_directories_retains_listing_and_recalculates() ->
         .unwrap();
     click(&mut a, Target::MenuItem(0, row));
     finish(&mut a);
-    assert_eq!(a.discovery.modal.as_ref().unwrap().sizes[0].bytes, 5);
+    assert_eq!(a.discovery.modals.discovery().unwrap().sizes[0].bytes, 5);
     for (w, h) in [(80, 25), (132, 40)] {
         assert!(draw(&mut a, w, h)?.contains("Directory sizes"));
     }
@@ -361,7 +372,7 @@ fn size_dialog_selects_visible_directories_retains_listing_and_recalculates() ->
     draw(&mut a, 80, 25)?;
     click(&mut a, Target::Discovery(Action::Recalculate));
     finish(&mut a);
-    assert_eq!(a.discovery.modal.as_ref().unwrap().sizes[0].bytes, 9);
+    assert_eq!(a.discovery.modals.discovery().unwrap().sizes[0].bytes, 9);
     discovery::action(&mut a, Action::Close);
     assert_eq!(a.panels[0].cursor, cursor);
     assert_eq!(a.panels[0].selected, selected);
@@ -505,10 +516,10 @@ fn hidden_results_jump_clears_filter_and_reveals_the_result() -> io::Result<()> 
     wait(&mut a, |a| !a.panels[0].loading);
     a.panels[0].set_filter("*.rs".into());
     discovery::open_find(&mut a);
-    a.discovery.modal.as_mut().unwrap().prefs.hidden = true;
+    a.discovery.modals.discovery_mut().unwrap().prefs.hidden = true;
     discovery::action(&mut a, Action::Start);
     finish(&mut a);
-    let m = a.discovery.modal.as_mut().unwrap();
+    let m = a.discovery.modals.discovery_mut().unwrap();
     m.cursor = m
         .hits
         .iter()
@@ -593,7 +604,9 @@ fn quick_view_modal_precedence_full_viewer_and_disappearing_file() -> io::Result
     });
     key(&mut a, KeyCode::F(3), KeyModifiers::NONE);
     wait(&mut a, |a| {
-        a.desktop.viewer().is_some_and(|v| v.contents.is_some())
+        a.desktop
+            .active_viewer()
+            .is_some_and(|v| v.contents.is_some())
     });
     assert!(a.quick_view.is_some());
     key(&mut a, KeyCode::Esc, KeyModifiers::NONE);
@@ -610,6 +623,6 @@ fn quick_view_modal_precedence_full_viewer_and_disappearing_file() -> io::Result
             .as_ref()
             .is_some_and(|q| q.lines.iter().any(|l| l.contains("Preview unavailable")))
     });
-    assert!(a.dialogs.is_empty());
+    assert!(a.dialogs().is_empty());
     Ok(())
 }

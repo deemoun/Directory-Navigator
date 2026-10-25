@@ -1,13 +1,10 @@
+use crate::painting::{Block, Borders, Frame, Paragraph, Wrap};
+use crate::presentation::layout::{Margin, Rect};
 use crate::{app::App, filesystem::display_name, formatting::tail, mouse::Target};
-use ratatui::{
-    layout::{Margin, Rect},
-    widgets::{Block, Borders, Paragraph, Wrap},
-    Frame,
-};
-pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
+pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
     let profile = app.config.palette;
     let dos = profile.styles();
-    let Some(q) = &mut app.quick_view else {
+    let Some(q) = &app.quick_view else {
         return;
     };
     frame.render_widget(
@@ -29,7 +26,6 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
         profile,
         Rect::new(area.x, area.y, area.width, 1),
         &title,
-        &mut app.mouse.regions,
         Target::CloseQuickView,
     );
     let inner = area.inner(Margin::new(1, 1));
@@ -39,7 +35,7 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
         inner.width,
         inner.height.saturating_sub(1),
     );
-    app.mouse.regions.push((body, Target::QuickPreview));
+    frame.regions().push((body, Target::QuickPreview));
     if let Some(viewer) = &q.viewer {
         super::viewer_view::draw_text(frame, viewer, body, profile, app.config.language);
         let status = viewer

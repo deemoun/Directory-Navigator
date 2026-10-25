@@ -1,6 +1,7 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 #[cfg(unix)]
 use dn::pattern;
+use dn::testing::{backend::TestBackend, Terminal};
 use dn::{
     app::App,
     columns::ColumnPreset,
@@ -11,7 +12,6 @@ use dn::{
     pattern::Wildcard,
     ui,
 };
-use ratatui::{backend::TestBackend, Terminal};
 use std::{
     ffi::OsStr,
     fs, io,
@@ -36,7 +36,7 @@ impl Temp {
     fn app(&self) -> io::Result<App> {
         let mut app = App::new(self.0.clone())?;
         wait(&mut app, |a| a.panels.iter().all(|p| !p.loading));
-        assert!(app.dialogs.is_empty());
+        assert!(app.dialogs().is_empty());
         Ok(app)
     }
 }
@@ -158,8 +158,8 @@ fn pattern_selection_uses_visible_cached_entries_and_preserves_other_marks() -> 
     // Remove a listed file: pattern application must not stat or re-scan it.
     fs::remove_file(temp.0.join("two.rs"))?;
     key(&mut app, KeyCode::Char('+'));
-    assert_eq!(app.pattern.as_ref().unwrap().field, "*");
-    app.pattern.as_mut().unwrap().paste("*.rs");
+    assert_eq!(app.modals.pattern().unwrap().field, "*");
+    app.modals.pattern_mut().unwrap().paste("*.rs");
     render(&mut app, 80, 25)?;
     click(&mut app, Target::AcceptPattern);
     assert!(app.panels[0].selected.contains(OsStr::new("two.rs")));
@@ -172,7 +172,7 @@ fn pattern_selection_uses_visible_cached_entries_and_preserves_other_marks() -> 
     assert_eq!(app.panels[0].cursor, cursor);
     assert!(!app.panels[0].loading);
     key(&mut app, KeyCode::Char('-'));
-    app.pattern.as_mut().unwrap().paste("*.rs");
+    app.modals.pattern_mut().unwrap().paste("*.rs");
     key(&mut app, KeyCode::Enter);
     assert_eq!(
         app.panels[0].selected.iter().collect::<Vec<_>>(),
@@ -235,11 +235,11 @@ fn information_is_fresh_readonly_and_reports_missing_entries() -> io::Result<()>
         KeyEvent::new(KeyCode::Char('e'), KeyModifiers::ALT),
     );
     wait(&mut app, |a| {
-        a.file_info.as_ref().unwrap().contents.is_some()
+        a.modals.file_info().unwrap().contents.is_some()
     });
     let contents = app
-        .file_info
-        .as_ref()
+        .modals
+        .file_info()
         .unwrap()
         .contents
         .as_ref()
@@ -263,7 +263,7 @@ fn information_is_fresh_readonly_and_reports_missing_entries() -> io::Result<()>
         .iter()
         .all(|(_, t)| *t == Target::CloseFileInfo));
     click(&mut app, Target::CloseFileInfo);
-    assert!(app.file_info.is_none());
+    assert!(app.modals.file_info().is_none());
     assert_eq!(fs::metadata(temp.0.join("file"))?.modified()?, original);
     assert_eq!(fs::read(temp.0.join("file"))?, b"new contents");
     let directory = file_info::inspect(&temp.0.join("directory"))?;
@@ -274,11 +274,11 @@ fn information_is_fresh_readonly_and_reports_missing_entries() -> io::Result<()>
     fs::remove_file(temp.0.join("file"))?;
     app.open_file_info();
     wait(&mut app, |a| {
-        a.file_info.as_ref().unwrap().contents.is_some()
+        a.modals.file_info().unwrap().contents.is_some()
     });
     assert!(app
-        .file_info
-        .as_ref()
+        .modals
+        .file_info()
         .unwrap()
         .contents
         .as_ref()
@@ -294,7 +294,7 @@ fn information_is_fresh_readonly_and_reports_missing_entries() -> io::Result<()>
         .collect::<String>();
     assert!(text.contains("Cannot read file information"));
     key(&mut app, KeyCode::Enter);
-    assert!(app.file_info.is_none());
+    assert!(app.modals.file_info().is_none());
     Ok(())
 }
 
@@ -342,25 +342,27 @@ fn info_long_paths_scroll_and_can_close_during_loading() -> io::Result<()> {
     let path = directory.join("file.txt");
     fs::write(&path, b"x")?;
     let mut app = temp.app()?;
-    app.file_info = Some(file_info::InfoDialog::open(path.clone())?);
+    app.modals
+        .set_file_info(Some(file_info::InfoDialog::open(path.clone())?));
     wait(&mut app, |a| {
-        a.file_info.as_ref().unwrap().contents.is_some()
+        a.modals.file_info().unwrap().contents.is_some()
     });
     for _ in 0..20 {
         key(&mut app, KeyCode::Right);
     }
     key(&mut app, KeyCode::PageDown);
-    assert!(app.file_info.as_ref().unwrap().offset > 0);
-    assert!(app.file_info.as_ref().unwrap().horizontal > 0);
+    assert!(app.modals.file_info().unwrap().offset > 0);
+    assert!(app.modals.file_info().unwrap().horizontal > 0);
     render(&mut app, 80, 25)?;
     key(&mut app, KeyCode::Home);
-    assert_eq!(app.file_info.as_ref().unwrap().horizontal, 0);
-    assert_eq!(app.file_info.as_ref().unwrap().offset, 0);
+    assert_eq!(app.modals.file_info().unwrap().horizontal, 0);
+    assert_eq!(app.modals.file_info().unwrap().offset, 0);
     key(&mut app, KeyCode::Esc);
-    app.file_info = Some(file_info::InfoDialog::open(path)?);
+    app.modals
+        .set_file_info(Some(file_info::InfoDialog::open(path)?));
     key(&mut app, KeyCode::Esc);
     app.poll();
-    assert!(app.file_info.is_none());
+    assert!(app.modals.file_info().is_none());
     Ok(())
 }
 
@@ -378,7 +380,7 @@ fn column_presets_live_preview_cancel_persistence_and_no_rescan() -> io::Result<
         &mut app,
         KeyEvent::new(KeyCode::Char('k'), KeyModifiers::ALT),
     );
-    assert_eq!(app.columns_dialog.as_ref().unwrap().cursor, 1);
+    assert_eq!(app.modals.columns_dialog().unwrap().cursor, 1);
     render(&mut app, 80, 25)?;
     click(&mut app, Target::ColumnChoice(0, ColumnPreset::Name));
     click(
@@ -498,7 +500,7 @@ fn new_menu_entries_open_their_mouse_dialogs() -> io::Result<()> {
                 Action::UnselectGroup
             },
         );
-        assert_eq!(app.pattern.as_ref().unwrap().selecting, selecting);
+        assert_eq!(app.modals.pattern().unwrap().selecting, selecting);
         key(&mut app, KeyCode::Esc);
     }
     menu::open(&mut app, 5);
@@ -506,20 +508,20 @@ fn new_menu_entries_open_their_mouse_dialogs() -> io::Result<()> {
     menu_action(&mut app, Action::Submenu(MenuId::FileManager));
     render(&mut app, 80, 25)?;
     menu_action(&mut app, Action::Columns);
-    assert!(app.columns_dialog.is_some());
+    assert!(app.modals.columns_dialog().is_some());
     key(&mut app, KeyCode::Esc);
     menu::open(&mut app, 1);
     render(&mut app, 80, 25)?;
     menu_action(&mut app, Action::FileInfo);
-    assert!(app.file_info.is_some());
-    assert!(app.menu.is_none());
+    assert!(app.modals.file_info().is_some());
+    assert!(app.modals.menu().is_none());
     key(&mut app, KeyCode::Esc);
     Ok(())
 }
 
 #[test]
 fn function_bar_has_continuous_label_background_after_resize() -> io::Result<()> {
-    use ratatui::style::Color;
+    use dn::testing::style::Color;
     let temp = Temp::new()?;
     let mut app = temp.app()?;
     app.config.shortcuts = dn::shortcuts::Profile::ClassicDn;
@@ -588,7 +590,7 @@ fn panel_footer_sizes_totals_paths_and_resized_mouse_rows() -> io::Result<()> {
         .collect();
     assert!(path.starts_with('…'));
     assert!(path.replace(' ', "").ends_with("終点>"));
-    assert!(ratatui::text::Span::raw(formatting::tail("abc終点>", 6)).width() <= 6);
+    assert!(dn::testing::text::Span::raw(formatting::tail("abc終点>", 6)).width() <= 6);
     assert_eq!(formatting::grouped_bytes(0), "0");
     assert_eq!(formatting::grouped_bytes(1_234_567_890), "1,234,567,890");
     Ok(())

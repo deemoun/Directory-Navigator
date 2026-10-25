@@ -15,19 +15,22 @@ pub enum Launched {
     Submitted,
 }
 pub struct Completion {
+    pub token: Option<crate::requests::RequestToken>,
     pub panel: usize,
     pub path: PathBuf,
     pub result: io::Result<Launched>,
 }
 struct Pending {
+    token: Option<crate::requests::RequestToken>,
     panel: usize,
     path: PathBuf,
     task: Task<io::Result<Launched>>,
 }
 #[derive(Default)]
 pub struct Launcher {
+    pub(crate) requests: crate::requests::RequestScope,
     pending: Option<Pending>,
-    children: Vec<(usize, PathBuf, Child)>,
+    children: Vec<(usize, PathBuf, Child, Option<crate::requests::RequestToken>)>,
 }
 impl Launcher {
     pub fn loading(&self) -> bool {
@@ -36,10 +39,27 @@ impl Launcher {
     pub fn request(&mut self, panel: usize, path: PathBuf) -> io::Result<()> {
         self.request_with(panel, path, launch)
     }
+    pub fn request_owned(
+        &mut self,
+        panel: usize,
+        path: PathBuf,
+        token: crate::requests::RequestToken,
+    ) -> io::Result<()> {
+        self.request_scoped(panel, path, Some(token), launch)
+    }
     pub fn request_with(
         &mut self,
         panel: usize,
         path: PathBuf,
+        start: impl FnOnce(&Path) -> io::Result<Launched> + Send + 'static,
+    ) -> io::Result<()> {
+        self.request_scoped(panel, path, None, start)
+    }
+    fn request_scoped(
+        &mut self,
+        panel: usize,
+        path: PathBuf,
+        token: Option<crate::requests::RequestToken>,
         start: impl FnOnce(&Path) -> io::Result<Launched> + Send + 'static,
     ) -> io::Result<()> {
         if self.pending.is_some() || self.children.len() >= 32 {
@@ -49,11 +69,16 @@ impl Launcher {
             ));
         }
         let source = path.clone();
-        let task = Task::spawn("dn-open", move |cancel| {
+        let task = self.requests.spawn("dn-open", move |cancel| {
             cancel.check()?;
             start(&source)
         })?;
-        self.pending = Some(Pending { panel, path, task });
+        self.pending = Some(Pending {
+            token,
+            panel,
+            path,
+            task,
+        });
         Ok(())
     }
     pub fn poll(&mut self) -> Vec<Completion> {
@@ -71,13 +96,16 @@ impl Launcher {
                     match result {
                         Ok(Launched::Process(child)) => {
                             replies.push(Completion {
+                                token: pending.token,
                                 panel: pending.panel,
                                 path: pending.path.clone(),
                                 result: Ok(Launched::Submitted),
                             });
-                            self.children.push((pending.panel, pending.path, child));
+                            self.children
+                                .push((pending.panel, pending.path, child, pending.token));
                         }
                         result => replies.push(Completion {
+                            token: pending.token,
                             panel: pending.panel,
                             path: pending.path,
                             result,
@@ -94,8 +122,9 @@ impl Launcher {
                 Ok(Some(status))=>Err(io::Error::other(format!("The system opener failed ({status}). Check that a default application is configured for this file type."))),
                 Err(error)=>Err(error),
             };
-            let (panel, path, _) = self.children.swap_remove(index);
+            let (panel, path, _, token) = self.children.swap_remove(index);
             replies.push(Completion {
+                token,
                 panel,
                 path,
                 result,
@@ -200,6 +229,42 @@ fn windows_open(path: &Path) -> io::Result<()> {
             "Windows could not open the file (Shell error {code}); check its default application"
         )))
     } else {
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn navigation_retires_delayed_panel_effect_without_losing_the_worker() -> io::Result<()> {
+        let root = std::env::temp_dir().join(format!("dn-launch-owner-{}", std::process::id()));
+        fs::create_dir_all(root.join("new"))?;
+        let mut app = crate::app::App::new(root.clone())?;
+        let end = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while app.panels.iter().any(|p| p.loading) {
+            app.poll();
+            assert!(std::time::Instant::now() < end);
+            std::thread::sleep(std::time::Duration::from_millis(1));
+        }
+        let token = app.panels[0].scope.start("external-open");
+        let (send, recv) = std::sync::mpsc::channel();
+        app.launcher
+            .request_scoped(0, root.join("obsolete"), Some(token), move |_| {
+                recv.recv().unwrap();
+                Ok(Launched::Directory)
+            })?;
+        app.panels[0].go_to(root.join("new"), false);
+        send.send(()).unwrap();
+        while app.launcher.loading() || app.panels[0].loading {
+            app.poll();
+            assert!(std::time::Instant::now() < end);
+            std::thread::sleep(std::time::Duration::from_millis(1));
+        }
+        assert_eq!(app.panels[0].path, root.join("new"));
+        assert!(app.dialogs().is_empty());
+        drop(app);
+        fs::remove_dir_all(root)?;
         Ok(())
     }
 }

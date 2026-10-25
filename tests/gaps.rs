@@ -1,4 +1,5 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+use dn::testing::{backend::TestBackend, Terminal};
 use dn::{
     app::App,
     bookmarks,
@@ -10,7 +11,6 @@ use dn::{
     pattern, ui,
     viewer::{self, Action as View, Contents, SearchMemory, Viewer},
 };
-use ratatui::{backend::TestBackend, Terminal};
 use std::{
     fs, io,
     path::PathBuf,
@@ -160,13 +160,13 @@ fn bookmark_shortcuts_dialog_mouse_and_missing_directory() -> io::Result<()> {
     navigation_tools::go(&mut app, 0);
     wait(&mut app, |a| !a.panels[0].loading);
     assert_eq!(app.panels[0].path, t.0);
-    assert!(!app.dialogs.is_empty());
-    app.dialogs.clear();
+    assert!(!app.dialogs().is_empty());
+    app.clear_dialogs();
     navigation_tools::open_bookmarks(&mut app);
     key(&mut app, KeyCode::End, KeyModifiers::NONE);
     key(&mut app, KeyCode::Tab, KeyModifiers::NONE);
     assert!(matches!(
-        app.navigation_dialog,
+        app.modals.navigation_dialog(),
         Some(Modal::Bookmarks { slot: 8, .. })
     ));
     draw(&mut app, 80, 25)?;
@@ -226,12 +226,12 @@ fn filtering_moves_cached_paths_preserves_marks_and_visible_targets() -> io::Res
     assert!(app.panels[0].only_filtered_marks());
     assert!(app.panels[0].targets().is_empty());
     app.prompt_operation(dn::operations::Kind::Delete, false);
-    assert!(app.prompt.is_none());
-    assert!(app.dialogs.last().unwrap().message.contains("filtered out"));
-    app.dialogs.clear();
+    assert!(app.modals.prompt().is_none());
+    assert!(app.last_dialog().unwrap().message.contains("filtered out"));
+    app.clear_dialogs();
     dn::file_tools::open_export(&mut app);
-    assert!(app.file_tools.dialog.is_none());
-    assert!(app.dialogs.last().unwrap().message.contains("filtered out"));
+    assert!(app.file_tools.modals.file_tools().is_none());
+    assert!(app.last_dialog().unwrap().message.contains("filtered out"));
     app.panels[0].set_filter(String::new());
     assert!(app.panels[0]
         .selected
@@ -271,7 +271,7 @@ fn filter_cancel_sort_refresh_hidden_files_native_names_and_navigation() -> io::
     app.panels[0].go_to(t.0.join("missing"), false);
     wait(&mut app, |a| !a.panels[0].loading);
     assert_eq!(app.panels[0].filter, "*.rs");
-    app.dialogs.clear();
+    app.clear_dialogs();
     app.panels[0].go_to(t.0.join("child"), false);
     wait(&mut app, |a| !a.panels[0].loading);
     assert!(app.panels[0].filter.is_empty());
@@ -380,7 +380,7 @@ fn viewer_wrapping_graphemes_visual_rows_and_anchor_resizing() -> io::Result<()>
     assert!(v.rows.len() > 3);
     for row in &v.rows {
         let text = &v.contents.as_ref().unwrap().lines[row.line][row.range.clone()];
-        assert!(ratatui::text::Span::raw(text).width() <= 10);
+        assert!(dn::testing::text::Span::raw(text).width() <= 10);
         assert!(!text.starts_with('\u{200d}'));
         assert!(!text.starts_with('\u{301}'));
     }
@@ -413,43 +413,55 @@ fn viewer_modal_cancel_mouse_controls_hex_and_session_query() -> io::Result<()> 
     app.show_viewer(loaded_viewer(path.clone())?);
     draw(&mut app, 80, 25)?;
     click(&mut app, Target::Viewer(View::Wrap));
-    assert!(app.desktop.viewer().unwrap().wrap);
+    assert!(app.desktop.active_viewer().unwrap().wrap);
     key(&mut app, KeyCode::F(7), KeyModifiers::NONE);
     viewer::paste(&mut app, "find");
     draw(&mut app, 80, 25)?;
     click(&mut app, Target::Viewer(View::Submit));
     draw(&mut app, 80, 25)?;
-    assert!(app.desktop.viewer().unwrap().current.is_some());
+    assert!(app.desktop.active_viewer().unwrap().current.is_some());
     assert_eq!(app.viewer_search.query, "find");
     key(&mut app, KeyCode::F(7), KeyModifiers::SHIFT);
     assert_eq!(
-        app.desktop.viewer().unwrap().current.as_ref().unwrap().line,
+        app.desktop
+            .active_viewer()
+            .unwrap()
+            .current
+            .as_ref()
+            .unwrap()
+            .line,
         1
     );
     key(&mut app, KeyCode::F(7), KeyModifiers::CONTROL);
     assert_eq!(
-        app.desktop.viewer().unwrap().current.as_ref().unwrap().line,
+        app.desktop
+            .active_viewer()
+            .unwrap()
+            .current
+            .as_ref()
+            .unwrap()
+            .line,
         0
     );
-    let offset = app.desktop.viewer().unwrap().offset;
-    let current = app.desktop.viewer().unwrap().current.clone();
+    let offset = app.desktop.active_viewer().unwrap().offset;
+    let current = app.desktop.active_viewer().unwrap().current.clone();
     key(&mut app, KeyCode::F(7), KeyModifiers::NONE);
     viewer::paste(&mut app, "bad");
     key(&mut app, KeyCode::Esc, KeyModifiers::NONE);
-    assert_eq!(app.desktop.viewer().unwrap().offset, offset);
-    assert_eq!(app.desktop.viewer().unwrap().current, current);
+    assert_eq!(app.desktop.active_viewer().unwrap().offset, offset);
+    assert_eq!(app.desktop.active_viewer().unwrap().current, current);
     assert_eq!(app.viewer_search.query, "find");
     draw(&mut app, 120, 40)?;
     app.desktop.close_viewer();
     app.show_viewer(loaded_viewer(path)?);
-    assert!(!app.desktop.viewer().unwrap().wrap);
+    assert!(!app.desktop.active_viewer().unwrap().wrap);
     key(&mut app, KeyCode::F(7), KeyModifiers::NONE);
     assert_eq!(
         app.desktop
-            .viewer()
+            .active_viewer()
             .unwrap()
-            .search_dialog
-            .as_ref()
+            .modals
+            .viewer_search()
             .unwrap()
             .memory
             .query,
@@ -457,16 +469,22 @@ fn viewer_modal_cancel_mouse_controls_hex_and_session_query() -> io::Result<()> 
     );
     key(&mut app, KeyCode::Esc, KeyModifiers::NONE);
     app.desktop
-        .viewer_mut()
+        .active_viewer_mut()
         .unwrap()
         .contents
         .as_mut()
         .unwrap()
         .binary = true;
     viewer::action(&mut app, View::Wrap);
-    assert!(!app.desktop.viewer().unwrap().wrap);
+    assert!(!app.desktop.active_viewer().unwrap().wrap);
     viewer::action(&mut app, View::Find);
-    assert!(app.desktop.viewer().unwrap().search_dialog.is_none());
+    assert!(app
+        .desktop
+        .active_viewer()
+        .unwrap()
+        .modals
+        .viewer_search()
+        .is_none());
     draw(&mut app, 80, 25)?;
     assert!(!app
         .mouse
@@ -530,18 +548,20 @@ fn filtered_copy_and_list_export_never_touch_excluded_entries() -> io::Result<()
         .extend(["a.rs".into(), "b.txt".into()]);
     app.panels[0].set_filter("*.rs".into());
     app.prompt_operation(dn::operations::Kind::Copy, false);
-    assert_eq!(app.prompt.as_ref().unwrap().sources, [t.0.join("a.rs")]);
+    assert_eq!(app.modals.prompt().unwrap().sources, [t.0.join("a.rs")]);
     app.submit_prompt();
     wait(&mut app, |a| {
         a.job.is_none() && a.panels.iter().all(|p| !p.loading)
     });
-    assert!(app.dialogs.is_empty());
+    assert!(app.dialogs().is_empty());
     assert_eq!(fs::read_to_string(t.0.join("out/a.rs"))?, "a");
     assert!(!t.0.join("out/b.txt").exists());
     assert_eq!(app.panels[0].filtered_marks(), 1);
     app.panels[0].selected.insert("a.rs".into());
     dn::file_tools::open_export(&mut app);
-    if let Some(dn::file_tools::ToolDialog::Export { paths, .. }) = &app.file_tools.dialog {
+    if let Some(dn::file_tools::ToolDialog::Export { paths, .. }) =
+        app.file_tools.modals.file_tools()
+    {
         assert_eq!(paths, &[t.0.join("a.rs")]);
     } else {
         panic!("export dialog")
@@ -568,15 +588,15 @@ fn viewer_search_case_checkbox_modal_scroll_and_match_highlighting() -> io::Resu
     click(&mut app, Target::Viewer(View::Case));
     assert!(
         !app.desktop
-            .viewer()
+            .active_viewer()
             .unwrap()
-            .search_dialog
-            .as_ref()
+            .modals
+            .viewer_search()
             .unwrap()
             .memory
             .case_sensitive
     );
-    let offset = app.desktop.viewer().unwrap().offset;
+    let offset = app.desktop.active_viewer().unwrap().offset;
     mouse::handle(
         &mut app,
         MouseEvent {
@@ -586,10 +606,16 @@ fn viewer_search_case_checkbox_modal_scroll_and_match_highlighting() -> io::Resu
             modifiers: KeyModifiers::NONE,
         },
     );
-    assert_eq!(app.desktop.viewer().unwrap().offset, offset);
+    assert_eq!(app.desktop.active_viewer().unwrap().offset, offset);
     click(&mut app, Target::Viewer(View::Submit));
     assert_eq!(
-        app.desktop.viewer().unwrap().current.as_ref().unwrap().line,
+        app.desktop
+            .active_viewer()
+            .unwrap()
+            .current
+            .as_ref()
+            .unwrap()
+            .line,
         0
     );
     let mut terminal = Terminal::new(TestBackend::new(80, 25))?;

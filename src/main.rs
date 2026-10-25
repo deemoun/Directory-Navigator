@@ -1,5 +1,6 @@
-use crossterm::event::{self, Event, MouseEventKind};
-use dn::{app::App, input, mouse, terminal::Session, ui};
+use crossterm::event::{Event, MouseEventKind};
+
+use dn::{app::App, input, mouse, terminal::Session};
 use std::io;
 
 fn run() -> io::Result<()> {
@@ -24,12 +25,17 @@ fn run() -> io::Result<()> {
     let mut app = App::new(std::env::current_dir()?)?;
     app.load_initial_config();
     let (session, mut terminal) = Session::start()?;
+    terminal.bind_desktop(app.desktop.native());
     let mut dirty = true;
     loop {
         dirty |= app.poll();
+        app.desktop
+            .native()
+            .set_scope(dn::turbo::desktop::Scope::for_app(&app));
         if dirty {
             session.cursor_style(dn::focus::current(&app) == dn::focus::Focus::Manager)?;
-            terminal.draw(|frame| ui::draw(frame, &mut app))?;
+            terminal.draw_app(&mut app)?;
+
             dirty = false;
         }
         if app.quit {
@@ -64,14 +70,19 @@ fn run() -> io::Result<()> {
             continue;
         }
         let timeout = app.wait_duration(std::time::Instant::now());
-        if event::poll(timeout)? {
-            let event = event::read()?;
+        if let Some(event) = session.poll(&mut terminal, timeout)? {
             if dn::screensaver::event(&mut app, &event, std::time::Instant::now()) {
                 dirty = true;
                 continue;
             }
             if let Event::Mouse(mouse) = &event {
                 session.mouse_event(mouse.kind);
+            }
+            if app.desktop.native().dispatch().is_none_or(|receipt| {
+                receipt.window != app.desktop.active()
+                    || receipt.scope != dn::turbo::desktop::Scope::for_app(&app)
+            }) {
+                continue;
             }
             match event {
                 Event::Key(key) => {

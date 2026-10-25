@@ -1,14 +1,13 @@
+use crate::painting::{Block, Borders, Clear, Frame, Paragraph};
+use crate::presentation::{
+    layout::Rect,
+    style::Style,
+    text::{Line, Span},
+};
 use crate::{
     app::App,
     menu::{self, Action},
     mouse::Target,
-};
-use ratatui::{
-    layout::Rect,
-    style::Style,
-    text::{Line, Span},
-    widgets::{Block, Borders, Clear, Paragraph},
-    Frame,
 };
 
 pub(super) fn label_spans(label: &str, normal: Style, hot: Style) -> Vec<Span<'_>> {
@@ -17,33 +16,6 @@ pub(super) fn label_spans(label: &str, normal: Style, hot: Style) -> Vec<Span<'_
         .enumerate()
         .map(|(index, part)| Span::styled(part, if index % 2 == 1 { hot } else { normal }))
         .collect()
-}
-
-pub(super) fn draw_bar(frame: &mut Frame, app: &mut App, area: Rect) -> Vec<Rect> {
-    let language = app.config.language;
-    let profile = app.config.palette;
-    let dos = profile.styles();
-    frame.render_widget(Block::default().style(dos(0x70)), area);
-    let header = super::clock::header(app, area);
-    let mut x = area.x;
-    let mut positions = Vec::new();
-    for (index, label) in menu::LABELS.iter().enumerate() {
-        let label = language.text(label);
-        let width = Line::from(menu::plain(label)).width() as u16 + 3;
-        let rect = Rect::new(x, area.y, width, 1).intersection(header);
-        let selected = app.menu.is_some_and(|(root, _)| root == index);
-        let normal = dos(if selected { 0x30 } else { 0x70 });
-        let hot = dos(if selected { 0x3e } else { 0x74 });
-        let mut spans = vec![Span::styled(" ", normal)];
-        spans.extend(label_spans(label, normal, hot));
-        spans.push(Span::styled("  ", normal));
-        frame.render_widget(Paragraph::new(Line::from(spans)), rect);
-        positions.push(rect);
-        app.mouse.regions.push((rect, Target::Menu(index)));
-        x += width;
-    }
-    super::clock::draw(frame, app, area);
-    positions
 }
 
 fn menu_width(
@@ -66,15 +38,15 @@ fn menu_width(
     (names + keys + 8).max(18) as u16
 }
 
-pub(super) fn draw_dropdowns(frame: &mut Frame, app: &mut App, bar: &[Rect], area: Rect) {
+pub(super) fn draw_dropdowns(frame: &mut impl Frame, app: &App, bar: &[Rect], area: Rect) {
     let language = app.config.language;
     let profile = app.config.palette;
     let dos = profile.styles();
-    let Some((root, _)) = app.menu else {
+    let Some((root, _)) = app.modals.menu() else {
         return;
     };
     let mut parent: Option<Rect> = None;
-    for depth in 0..=app.submenus.len() {
+    for depth in 0..=app.modals.submenus().len() {
         let entries = menu::level_items(app, depth);
         let width = menu_width(&entries, language, app.config.shortcuts).min(area.width);
         let height = (entries.len() as u16 + 2).min(area.height - 1);
@@ -101,7 +73,7 @@ pub(super) fn draw_dropdowns(frame: &mut Frame, app: &mut App, bar: &[Rect], are
             Block::default().borders(Borders::ALL).style(dos(0x70)),
             rect,
         );
-        app.mouse.regions.push((rect, Target::MenuSurface));
+        frame.regions().push((rect, Target::MenuSurface));
         for (row, item) in entries
             .iter()
             .enumerate()
@@ -159,8 +131,8 @@ pub(super) fn draw_dropdowns(frame: &mut Frame, app: &mut App, bar: &[Rect], are
                 normal,
             ));
             frame.render_widget(Paragraph::new(Line::from(spans)), row_rect);
-            app.mouse
-                .regions
+            frame
+                .regions()
                 .push((row_rect, Target::MenuItem(depth, row)));
         }
         parent = Some(rect);

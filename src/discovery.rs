@@ -44,6 +44,7 @@ pub enum Action {
     Edit,
 }
 pub struct Modal {
+    pub(crate) requests: crate::requests::RequestScope,
     pub kind: Kind,
     pub root: PathBuf,
     pub panel: usize,
@@ -64,14 +65,15 @@ pub struct Modal {
 }
 #[derive(Default)]
 pub struct Discovery {
+    pub modals: crate::modals::ModalStack,
     pub prefs: Preferences,
     pub initialized: bool,
-    pub modal: Option<Modal>,
 }
 impl Modal {
     fn new(app: &App, kind: Kind) -> Self {
         let prefs = app.discovery.prefs.clone();
         Self {
+            requests: Default::default(),
             kind,
             root: app.panels[app.active].path.clone(),
             panel: app.active,
@@ -119,7 +121,7 @@ impl Modal {
 }
 fn prepare(app: &mut App) {
     crate::menu::close(app);
-    app.quick_search = None;
+    app.modals.set_quick_search(None);
 }
 pub fn open_find(app: &mut App) {
     if app.panels[app.active].loading {
@@ -130,7 +132,9 @@ pub fn open_find(app: &mut App) {
         app.discovery.prefs.hidden = app.config.show_hidden;
         app.discovery.initialized = true;
     }
-    app.discovery.modal = Some(Modal::new(app, Kind::FindForm));
+    app.discovery
+        .modals
+        .set_discovery(Some(Modal::new(app, Kind::FindForm)));
 }
 pub fn open_sizes(app: &mut App) {
     prepare(app);
@@ -155,11 +159,11 @@ pub fn open_sizes(app: &mut App) {
     }
     let mut modal = Modal::new(app, Kind::Sizes);
     modal.sources = sources;
-    app.discovery.modal = Some(modal);
+    app.discovery.modals.set_discovery(Some(modal));
     action(app, Action::Recalculate);
 }
 pub fn paste(app: &mut App, text: &str) {
-    if let Some(m) = &mut app.discovery.modal {
+    if let Some(m) = app.discovery.modals.discovery_mut() {
         if m.kind == Kind::FindForm && m.focus == 0 {
             if m.replace_input {
                 m.prefs.pattern.clear();
@@ -172,10 +176,10 @@ pub fn paste(app: &mut App, text: &str) {
 }
 pub fn action(app: &mut App, command: Action) {
     if command == Action::Close {
-        app.discovery.modal = None;
+        app.discovery.modals.set_discovery(None);
         return;
     }
-    let Some(m) = &mut app.discovery.modal else {
+    let Some(m) = app.discovery.modals.discovery_mut() else {
         return;
     };
     match command {
@@ -200,7 +204,8 @@ pub fn action(app: &mut App, command: Action) {
                 recursive: m.prefs.recursive,
                 hidden: m.prefs.hidden,
             }) {
-                Ok(job) => {
+                Ok(mut job) => {
+                    job.bind(m.requests.owner());
                     m.job = Some(job);
                     m.kind = Kind::FindResults;
                     m.focus = 0;
@@ -216,7 +221,8 @@ pub fn action(app: &mut App, command: Action) {
             m.cursor = 0;
             m.offset = 0;
             match Job::start(Request::Sizes(m.sources.clone())) {
-                Ok(job) => {
+                Ok(mut job) => {
+                    job.bind(m.requests.owner());
                     m.job = Some(job);
                     m.status = "Calculating…".into();
                 }
@@ -254,7 +260,7 @@ pub fn action(app: &mut App, command: Action) {
                     return;
                 };
                 let parent = parent.to_owned();
-                app.discovery.modal = None;
+                app.discovery.modals.set_discovery(None);
                 app.panels[panel].set_filter(String::new());
                 if path
                     .file_name()
@@ -280,7 +286,7 @@ pub fn action(app: &mut App, command: Action) {
     }
 }
 pub fn key(app: &mut App, event: KeyEvent) {
-    let Some(m) = &mut app.discovery.modal else {
+    let Some(m) = app.discovery.modals.discovery_mut() else {
         return;
     };
     m.last_click = None;
@@ -290,8 +296,8 @@ pub fn key(app: &mut App, event: KeyEvent) {
     }
     if m.kind == Kind::FindForm {
         match event.code {
-            KeyCode::Tab => m.focus = (m.focus + 1) % 5,
-            KeyCode::BackTab => m.focus = (m.focus + 4) % 5,
+            KeyCode::Tab => m.focus = crate::control_focus::cycle(m.focus, 5, false),
+            KeyCode::BackTab => m.focus = crate::control_focus::cycle(m.focus, 5, true),
             KeyCode::Enter => {
                 let command = match m.focus {
                     1 | 2 => Action::Toggle(m.focus),
@@ -326,8 +332,8 @@ pub fn key(app: &mut App, event: KeyEvent) {
     } else {
         let buttons = if m.kind == Kind::Sizes { 3 } else { 5 };
         match event.code {
-            KeyCode::Tab => m.focus = (m.focus + 1) % buttons,
-            KeyCode::BackTab => m.focus = (m.focus + buttons - 1) % buttons,
+            KeyCode::Tab => m.focus = crate::control_focus::cycle(m.focus, buttons, false),
+            KeyCode::BackTab => m.focus = crate::control_focus::cycle(m.focus, buttons, true),
             KeyCode::Up => m.step(-1),
             KeyCode::Down => m.step(1),
             KeyCode::PageUp => m.step(-(m.rows as isize)),
@@ -366,7 +372,7 @@ pub fn mouse(app: &mut App, event: MouseEvent, target: Option<crate::mouse::Targ
             }
         }
         MouseEventKind::ScrollUp | MouseEventKind::ScrollDown => {
-            if let Some(m) = &mut app.discovery.modal {
+            if let Some(m) = app.discovery.modals.discovery_mut() {
                 m.step(if event.kind == MouseEventKind::ScrollUp {
                     -3
                 } else {
@@ -378,14 +384,14 @@ pub fn mouse(app: &mut App, event: MouseEvent, target: Option<crate::mouse::Targ
     }
 }
 pub fn poll(app: &mut App) -> bool {
-    let Some(m) = &mut app.discovery.modal else {
+    let Some(m) = app.discovery.modals.discovery_mut() else {
         return false;
     };
     let mut changed = false;
     let mut done = false;
     if let Some(job) = &m.job {
         for _ in 0..16 {
-            match job.events.try_recv() {
+            match job.try_recv() {
                 Ok(Event::Found(mut hits)) => {
                     m.hits.append(&mut hits);
                     changed = true;

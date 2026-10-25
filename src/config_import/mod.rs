@@ -10,6 +10,7 @@ use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKin
 use std::{io, path::PathBuf, sync::mpsc};
 
 pub struct Preview {
+    pub(crate) requests: crate::requests::RequestScope,
     pub path: PathBuf,
     baseline: crate::config::Config,
     pub result: Option<Result<dos::Report, String>>,
@@ -78,23 +79,25 @@ impl Preview {
     }
 }
 pub fn open(app: &mut App) {
-    app.prompt = Some(Prompt {
+    app.modals.set_prompt(Some(Prompt {
         kind: PromptKind::ImportDos,
         sources: Vec::new(),
         base: app.panels[app.active].path.clone(),
         field: "DN.CFG".into(),
         cursor: 6,
         focus: 0,
-    });
+    }));
 }
 pub fn start(app: &mut App, path: PathBuf) -> io::Result<()> {
     let source = path.clone();
-    let pending = Task::spawn("dn-import-settings", move |cancel| {
+    let requests = crate::requests::RequestScope::default();
+    let pending = requests.spawn("dn-import-settings", move |cancel| {
         dos::read(&source, &cancel).map_err(|e| e.to_string())
     })?;
     let mut baseline = app.config.clone();
     baseline.sorts = [app.panels[0].sort, app.panels[1].sort];
-    app.config_import = Some(Preview {
+    app.modals.set_config_import(Some(Preview {
+        requests,
         baseline,
         path,
         result: None,
@@ -102,11 +105,11 @@ pub fn start(app: &mut App, path: PathBuf) -> io::Result<()> {
         horizontal: 0,
         focus: 1,
         pending: Some(pending),
-    });
+    }));
     Ok(())
 }
 pub fn poll(app: &mut App) -> bool {
-    let Some(preview) = &mut app.config_import else {
+    let Some(preview) = app.modals.config_import_mut() else {
         return false;
     };
     let Some(task) = &preview.pending else {
@@ -123,13 +126,13 @@ pub fn poll(app: &mut App) -> bool {
     true
 }
 pub fn apply(app: &mut App) {
-    if !app.config_import.as_ref().is_some_and(|p| p.can_apply()) {
+    if !app.modals.config_import().is_some_and(|p| p.can_apply()) {
         return;
     }
     if let Some(Preview {
         result: Some(Ok(report)),
         ..
-    }) = app.config_import.take()
+    }) = app.modals.take_config_import()
     {
         let mut current = app.config.clone();
         current.sorts = [app.panels[0].sort, app.panels[1].sort];
@@ -141,18 +144,19 @@ pub fn apply(app: &mut App) {
     }
 }
 pub fn key(app: &mut App, key: KeyEvent) {
-    let Some(preview) = &mut app.config_import else {
+    let Some(preview) = app.modals.config_import_mut() else {
         return;
     };
     match key.code {
-        KeyCode::Esc => app.config_import = None,
+        KeyCode::Esc => app.modals.set_config_import(None),
         KeyCode::Tab | KeyCode::BackTab => {
             if preview.can_apply() {
-                preview.focus ^= 1;
+                preview.focus =
+                    crate::control_focus::cycle(preview.focus, 2, key.code == KeyCode::BackTab);
             }
         }
         KeyCode::Enter if preview.focus == 0 => apply(app),
-        KeyCode::Enter => app.config_import = None,
+        KeyCode::Enter => app.modals.set_config_import(None),
         KeyCode::Up => preview.step(&app.config, -1),
         KeyCode::Down => preview.step(&app.config, 1),
         KeyCode::PageUp => preview.step(&app.config, -8),
@@ -171,11 +175,11 @@ pub fn mouse(app: &mut App, event: MouseEvent, target: Option<Target>) {
     match event.kind {
         MouseEventKind::Down(MouseButton::Left) => match target {
             Some(Target::ApplyImport) => apply(app),
-            Some(Target::CancelImport) => app.config_import = None,
+            Some(Target::CancelImport) => app.modals.set_config_import(None),
             _ => {}
         },
         MouseEventKind::ScrollUp | MouseEventKind::ScrollDown => {
-            if let Some(preview) = &mut app.config_import {
+            if let Some(preview) = app.modals.config_import_mut() {
                 preview.step(
                     &app.config,
                     if event.kind == MouseEventKind::ScrollUp {

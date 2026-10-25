@@ -1,4 +1,5 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use dn::testing::{backend::TestBackend, Terminal};
 use dn::{
     app::App,
     config::Config,
@@ -8,7 +9,6 @@ use dn::{
     settings::{self, Setting, Settings, SettingsKind},
     trash_support, ui,
 };
-use ratatui::{backend::TestBackend, Terminal};
 use std::{
     fs, io,
     path::PathBuf,
@@ -88,7 +88,7 @@ fn deletion_defaults_strict_settings_roundtrip_and_cancel() -> io::Result<()> {
     for code in [KeyCode::F(8), KeyCode::Delete] {
         input::handle(&mut app, KeyEvent::new(code, KeyModifiers::NONE));
         assert!(matches!(
-            app.prompt.as_ref().unwrap().kind,
+            app.modals.prompt().unwrap().kind,
             PromptKind::Operation(Kind::Trash)
         ));
         let text = draw(&mut app, 80, 25)?;
@@ -98,20 +98,22 @@ fn deletion_defaults_strict_settings_roundtrip_and_cancel() -> io::Result<()> {
         assert!(app.job.is_none());
     }
     assert!(temp.0.join("file.txt").exists());
-    app.settings = Some(Settings::new(SettingsKind::FileManager, &app.config));
+    app.modals
+        .set_settings(Some(Settings::new(SettingsKind::FileManager, &app.config)));
     let index = app
-        .settings
-        .as_ref()
+        .modals
+        .settings()
         .unwrap()
         .rows()
         .iter()
         .position(|s| matches!(s, Setting::Trash))
         .unwrap();
-    app.settings.as_mut().unwrap().toggle(index);
+    app.modals.settings_mut().unwrap().toggle(index);
     settings::key(&mut app, KeyCode::Esc);
     assert!(app.config.use_trash);
-    app.settings = Some(Settings::new(SettingsKind::FileManager, &app.config));
-    app.settings.as_mut().unwrap().toggle(index);
+    app.modals
+        .set_settings(Some(Settings::new(SettingsKind::FileManager, &app.config)));
+    app.modals.settings_mut().unwrap().toggle(index);
     for (w, h) in [(80, 25), (132, 40)] {
         let text = draw(&mut app, w, h)?;
         assert!(text.contains("Move deleted files to Trash"));
@@ -120,7 +122,7 @@ fn deletion_defaults_strict_settings_roundtrip_and_cancel() -> io::Result<()> {
     assert!(!app.config.use_trash);
     app.prompt_operation(Kind::Delete, false);
     assert!(matches!(
-        app.prompt.as_ref().unwrap().kind,
+        app.modals.prompt().unwrap().kind,
         PromptKind::Operation(Kind::Delete)
     ));
     assert!(draw(&mut app, 80, 25)?.contains("This cannot be undone"));

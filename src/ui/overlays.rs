@@ -1,22 +1,21 @@
 use super::dialog_style;
+use crate::painting::{Frame, Paragraph};
+use crate::presentation::{
+    layout::Rect,
+    text::{Line, Span},
+};
 use crate::{
     app::App, dialog::PromptKind, filesystem::display_name, formatting, mouse::Target,
     operations::Kind,
 };
-use ratatui::{
-    layout::Rect,
-    text::{Line, Span},
-    widgets::Paragraph,
-    Frame,
-};
 
 pub(super) fn draw_info_dialog(
-    frame: &mut Frame,
-    app: &mut App,
+    frame: &mut impl Frame,
+    app: &App,
     message: Option<&crate::layout::MessageLayout>,
 ) {
     let profile = app.config.palette;
-    if let Some(dialog) = app.dialogs.last() {
+    if let Some(dialog) = app.last_dialog() {
         let Some(message) = message else {
             return;
         };
@@ -34,7 +33,7 @@ pub(super) fn draw_info_dialog(
         let body = Paragraph::new(
             lines
                 .iter()
-                .skip(app.message_offset)
+                .skip(app.message_offset())
                 .take(visible)
                 .cloned()
                 .collect::<Vec<_>>()
@@ -65,22 +64,25 @@ pub(super) fn draw_info_dialog(
             app.config.language.text("[ Close ]"),
             true,
         );
-        app.mouse.regions.clear();
-        super::dialog_style::close_button(
-            frame,
-            profile,
-            rect,
-            &mut app.mouse.regions,
-            Target::CloseDialog,
-        );
-        app.mouse.regions.push((close, Target::CloseDialog));
+        frame.regions().clear();
+        super::dialog_style::close_button(frame, profile, rect, Target::CloseDialog);
+        frame.regions().push((close, Target::CloseDialog));
     }
 }
 
-pub(super) fn draw_operation_overlays(frame: &mut Frame, app: &mut App, area: Rect) {
+pub(super) fn draw_operation_overlays(
+    frame: &mut impl Frame,
+    app: &App,
+    area: Rect,
+    layer: crate::focus::Focus,
+) {
     let profile = app.config.palette;
     let dos = profile.styles();
-    if let Some(prompt) = &app.prompt {
+    if let Some(prompt) = app
+        .modals
+        .prompt()
+        .filter(|_| layer == crate::focus::Focus::Prompt)
+    {
         let deleting = matches!(
             prompt.kind,
             PromptKind::Operation(Kind::Delete | Kind::Trash)
@@ -103,14 +105,8 @@ pub(super) fn draw_operation_overlays(frame: &mut Frame, app: &mut App, area: Re
             if simple { 7 } else { 11 },
             app.config.language.text(prompt.title()),
         );
-        app.mouse.regions.clear();
-        super::dialog_style::close_button(
-            frame,
-            profile,
-            rect,
-            &mut app.mouse.regions,
-            Target::CancelPrompt,
-        );
+        frame.regions().clear();
+        super::dialog_style::close_button(frame, profile, rect, Target::CancelPrompt);
         if deleting {
             let mut lines = if matches!(prompt.kind, PromptKind::Operation(Kind::Trash)) {
                 vec![
@@ -176,8 +172,8 @@ pub(super) fn draw_operation_overlays(frame: &mut Frame, app: &mut App, area: Re
                     .style(dialog_style::input_style(profile, prompt.focus == 0)),
                 input,
             );
-            app.mouse.regions.push((input, Target::PromptField));
-            if prompt.focus == 0 && app.dialogs.is_empty() {
+            frame.regions().push((input, Target::PromptField));
+            if prompt.focus == 0 && app.dialogs().is_empty() {
                 frame.set_cursor_position((input.x + cursor, input.y));
             }
             if !simple {
@@ -220,10 +216,14 @@ pub(super) fn draw_operation_overlays(frame: &mut Frame, app: &mut App, area: Re
                 app.config.language.text(label),
                 prompt.focus == i as usize || (i == 1 && prompt.focus == 0),
             );
-            app.mouse.regions.push((button, target));
+            frame.regions().push((button, target));
         }
     }
-    if let Some(job) = &app.job {
+    if let Some(job) = app
+        .job
+        .as_ref()
+        .filter(|_| layer == crate::focus::Focus::Job)
+    {
         let rect = dialog_style::window(
             frame,
             profile,
@@ -245,14 +245,8 @@ pub(super) fn draw_operation_overlays(frame: &mut Frame, app: &mut App, area: Re
             app.config.language.text("[ Cancel ]"),
             true,
         );
-        app.mouse.regions.clear();
-        super::dialog_style::close_button(
-            frame,
-            profile,
-            rect,
-            &mut app.mouse.regions,
-            Target::CancelJob,
-        );
-        app.mouse.regions.push((cancel, Target::CancelJob));
+        frame.regions().clear();
+        super::dialog_style::close_button(frame, profile, rect, Target::CancelJob);
+        frame.regions().push((cancel, Target::CancelJob));
     }
 }

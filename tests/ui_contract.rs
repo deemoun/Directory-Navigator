@@ -1,9 +1,9 @@
 //! Optional before/after cell-and-hit-target captures for internal refactors.
+use dn::testing::{backend::TestBackend, Terminal};
 use dn::{
     app::App, columns::ColumnPreset, operations::Kind, palette::PaletteProfile,
     panel_layout::PanelLayout, ui,
 };
-use ratatui::{backend::TestBackend, Terminal};
 use std::{
     fs, io,
     path::PathBuf,
@@ -13,7 +13,10 @@ use std::{
 fn ready(app: &mut App) {
     let end = Instant::now() + Duration::from_secs(5);
     while app.panels.iter().any(|p| p.loading)
-        || app.desktop.viewer().is_some_and(|v| v.contents.is_none())
+        || app
+            .desktop
+            .active_viewer()
+            .is_some_and(|v| v.contents.is_none())
     {
         app.poll();
         assert!(Instant::now() < end);
@@ -66,23 +69,23 @@ fn unchanged_cells_styles_and_mouse_targets() -> io::Result<()> {
                     }
                     2 => app.prompt_operation(Kind::Mkdir, false),
                     3 => {
-                        app.prompt = None;
+                        app.modals.set_prompt(None);
                         app.error("A sample error.\nNo files changed.");
                     }
                     4 => {
-                        app.dialogs.clear();
+                        app.clear_dialogs();
                         app.open_pattern(true);
                     }
                     5 => {
-                        app.pattern = None;
+                        app.modals.set_pattern(None);
                         app.open_columns();
                     }
                     6 => {
-                        app.columns_dialog = None;
+                        app.modals.set_columns_dialog(None);
                         dn::palette::open(&mut app);
                     }
                     7 => {
-                        app.color_dialog = None;
+                        app.modals.set_color_dialog(None);
                         app.show_viewer(dn::viewer::Viewer::open(path.join("alpha.rs"))?);
                         ready(&mut app);
                     }
@@ -104,7 +107,13 @@ fn unchanged_cells_styles_and_mouse_targets() -> io::Result<()> {
                 terminal.draw(|f| ui::draw(f, &mut app))?;
                 captures.push_str(&format!(
                     "{profile:?} {w} {h} {scene}\n{:?}\n{:?}\n",
-                    terminal.backend().buffer(),
+                    terminal
+                        .backend()
+                        .buffer()
+                        .content
+                        .iter()
+                        .map(|c| (c.symbol(), c.fg, c.bg, c.modifier.bits()))
+                        .collect::<Vec<_>>(),
                     app.mouse.regions
                 ));
             }

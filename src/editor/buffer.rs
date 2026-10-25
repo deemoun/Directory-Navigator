@@ -261,14 +261,14 @@ impl Buffer {
         if g == "\t" {
             8 - column % 8
         } else {
-            ratatui::text::Span::raw(g).width()
+            crate::presentation::text::Span::raw(g).width()
         }
     }
     pub fn cell_width(&self, g: &str, column: usize) -> usize {
         if g == "\t" {
             self.tab_size - column % self.tab_size
         } else {
-            ratatui::text::Span::raw(g).width()
+            crate::presentation::text::Span::raw(g).width()
         }
     }
     pub fn text_width(&self, text: &str) -> usize {

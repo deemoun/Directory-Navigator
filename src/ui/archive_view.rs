@@ -1,3 +1,8 @@
+use crate::painting::{Frame, Paragraph};
+use crate::presentation::{
+    layout::Rect,
+    text::{Line, Span},
+};
 use crate::{
     app::App,
     archive::{reader::Kind, Action},
@@ -5,14 +10,8 @@ use crate::{
     formatting::tail,
     mouse::Target,
 };
-use ratatui::{
-    layout::Rect,
-    text::{Line, Span},
-    widgets::Paragraph,
-    Frame,
-};
-pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
-    let Some(b) = &app.archive else {
+pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
+    let Some(b) = app.modals.archive() else {
         return;
     };
     let profile = app.config.palette;
@@ -25,14 +24,8 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
         area.height.saturating_sub(4).min(30),
         app.config.language.text(" Archive browser — read-only "),
     );
-    app.mouse.regions.clear();
-    super::dialog_style::close_button(
-        frame,
-        profile,
-        rect,
-        &mut app.mouse.regions,
-        Target::Archive(Action::Close),
-    );
+    frame.regions().clear();
+    super::dialog_style::close_button(frame, profile, rect, Target::Archive(Action::Close));
     let x = rect.x + 2;
     let w = rect.width - 5;
     frame.render_widget(
@@ -111,8 +104,8 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
         ]);
         let r = Rect::new(x, rect.y + 4 + row as u16, w, 1);
         frame.render_widget(Paragraph::new(line).style(dos(color)), r);
-        app.mouse
-            .regions
+        frame
+            .regions()
             .push((r, Target::Archive(Action::Row(index))));
     }
     let rows = b.rows as u16;
@@ -136,7 +129,7 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
         let r = Rect::new(rect.right() - 2, rect.y + 4 + row, 1, 1);
         frame.render_widget(Paragraph::new(glyph).style(dos(0x70)), r);
         if glyph != "■" {
-            app.mouse.regions.push((r, Target::Archive(a)));
+            frame.regions().push((r, Target::Archive(a)));
         }
     }
     let details = b
@@ -192,7 +185,7 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
                 app.config.language.text(label),
                 b.focus == i,
             );
-            app.mouse.regions.push((r, Target::Archive(a)));
+            frame.regions().push((r, Target::Archive(a)));
         } else {
             frame.render_widget(Paragraph::new(label).style(dos(0x78)), r);
         }

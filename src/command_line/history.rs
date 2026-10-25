@@ -1,8 +1,8 @@
 //! A view over the command prompt's session history; accepting never executes.
 use super::CommandLine;
+use crate::presentation::layout::Rect;
 use crate::{app::App, mouse::Target};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
-use ratatui::layout::Rect;
 use std::{
     io,
     time::{Duration, Instant},
@@ -113,25 +113,27 @@ pub fn geometry(area: Rect) -> (Rect, usize) {
 }
 pub fn open(app: &mut App) {
     crate::menu::close(app);
-    app.quick_search = None;
-    app.command_line.dialog = Some(HistoryDialog::new(&app.command_line.history));
+    app.modals.set_quick_search(None);
+    app.command_line
+        .modals
+        .set_command_history(Some(HistoryDialog::new(&app.command_line.history)));
 }
 pub fn action(app: &mut App, action: Action) {
     if action == Action::Cancel {
-        app.command_line.dialog = None;
+        app.command_line.modals.set_command_history(None);
         return;
     }
     if action == Action::Use {
         let selected = app
             .command_line
-            .dialog
-            .as_ref()
+            .modals
+            .command_history()
             .and_then(|d| d.matches.get(d.cursor))
             .and_then(|i| app.command_line.history.get(*i))
             .cloned();
         if let Some(text) = selected {
             let line = &mut app.command_line;
-            line.dialog = None;
+            line.modals.set_command_history(None);
             line.text = text;
             line.cursor = line.text.len();
             line.view_start = 0;
@@ -139,7 +141,7 @@ pub fn action(app: &mut App, action: Action) {
         }
         return;
     }
-    if let Some(d) = &mut app.command_line.dialog {
+    if let Some(d) = app.command_line.modals.command_history_mut() {
         match action {
             Action::Field => d.focus = 0,
             Action::Row(i) if i < d.matches.len() => {
@@ -154,8 +156,8 @@ pub fn action(app: &mut App, action: Action) {
 pub fn paste(app: &mut App, text: &str) {
     let line = &mut app.command_line;
     let error = line
-        .dialog
-        .as_mut()
+        .modals
+        .command_history_mut()
         .filter(|d| d.focus == 0)
         .and_then(|d| d.edit(KeyCode::Null, Some(text), &line.history).err());
     if let Some(e) = error {
@@ -163,7 +165,7 @@ pub fn paste(app: &mut App, text: &str) {
     }
 }
 pub fn key(app: &mut App, key: KeyEvent) {
-    let Some(d) = &mut app.command_line.dialog else {
+    let Some(d) = app.command_line.modals.command_history_mut() else {
         return;
     };
     d.last_click = None;
@@ -187,11 +189,12 @@ pub fn key(app: &mut App, key: KeyEvent) {
         }
         KeyCode::End => d.step(isize::MAX),
         KeyCode::Tab | KeyCode::BackTab => {
-            let delta = if key.code == KeyCode::BackTab { 3 } else { 1 };
-            d.focus = (d.focus + delta) % 4;
-            if d.focus == 2 && d.matches.is_empty() {
-                d.focus = (d.focus + delta) % 4;
-            }
+            let choices: &[usize] = if d.matches.is_empty() {
+                &[0, 1, 3]
+            } else {
+                &[0, 1, 2, 3]
+            };
+            d.focus = crate::control_focus::select(d.focus, choices, key.code == KeyCode::BackTab);
         }
         KeyCode::Char(' ') if d.focus >= 2 => {
             let a = if d.focus == 3 {
@@ -220,7 +223,7 @@ pub fn key(app: &mut App, key: KeyEvent) {
 pub fn mouse(app: &mut App, event: MouseEvent, target: Option<Target>) {
     match event.kind {
         MouseEventKind::ScrollUp | MouseEventKind::ScrollDown => {
-            if let Some(d) = &mut app.command_line.dialog {
+            if let Some(d) = app.command_line.modals.command_history_mut() {
                 d.last_click = None;
                 d.step(if event.kind == MouseEventKind::ScrollUp {
                     -3
@@ -232,7 +235,7 @@ pub fn mouse(app: &mut App, event: MouseEvent, target: Option<Target>) {
         MouseEventKind::Down(MouseButton::Left) => {
             if let Some(Target::CommandHistory(a)) = target {
                 let double = if let Action::Row(i) = a {
-                    if let Some(d) = &mut app.command_line.dialog {
+                    if let Some(d) = app.command_line.modals.command_history_mut() {
                         let now = Instant::now();
                         let double = d.last_click.is_some_and(|(last, t)| {
                             last == i && now.duration_since(t) < Duration::from_millis(400)
@@ -243,13 +246,13 @@ pub fn mouse(app: &mut App, event: MouseEvent, target: Option<Target>) {
                         false
                     }
                 } else {
-                    if let Some(d) = &mut app.command_line.dialog {
+                    if let Some(d) = app.command_line.modals.command_history_mut() {
                         d.last_click = None;
                     }
                     false
                 };
                 action(app, if double { Action::Use } else { a });
-            } else if let Some(d) = &mut app.command_line.dialog {
+            } else if let Some(d) = app.command_line.modals.command_history_mut() {
                 d.last_click = None;
             }
         }

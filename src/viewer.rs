@@ -130,6 +130,9 @@ pub fn from_bytes(mut bytes: Vec<u8>, mode: ViewMode) -> Contents {
 }
 
 pub struct Viewer {
+    pub(crate) requests: crate::requests::RequestScope,
+    pub modals: crate::modals::ModalStack,
+    pub requested_mode: ViewMode,
     pub path: PathBuf,
     pub contents: Option<Contents>,
     pub offset: usize,
@@ -140,7 +143,6 @@ pub struct Viewer {
     mapped_wrap: bool,
     pub current: Option<Match>,
     last_search: SearchMemory,
-    pub search_dialog: Option<SearchDialog>,
     pub notice: String,
     pending: Option<crate::task::Task<Result<Contents, String>>>,
 }
@@ -158,20 +160,32 @@ impl Viewer {
     }
     fn open_internal(path: PathBuf, mode: ViewMode, resolve_link: bool) -> io::Result<Self> {
         let source = path.clone();
-        let pending = crate::task::Task::spawn("dn-viewer", move |cancel| {
+        let requests = crate::requests::RequestScope::default();
+        let pending = requests.spawn("dn-viewer", move |cancel| {
             load_mode_cancelled(&source, mode, &cancel, resolve_link)
                 .map_err(|e| format!("{}: {e}", source.display()))
         })?;
-        Ok(Self::empty(path, Some(pending)))
+        let mut viewer = Self::empty(path, Some(pending));
+        viewer.requests = requests;
+        viewer.requested_mode = mode;
+        Ok(viewer)
     }
     pub fn from_contents(path: PathBuf, contents: Contents) -> Self {
         let mut viewer = Self::empty(path, None);
+        viewer.requested_mode = if contents.binary {
+            ViewMode::Hex
+        } else {
+            ViewMode::Text
+        };
         viewer.contents = Some(contents);
         viewer
     }
     fn empty(path: PathBuf, pending: Option<crate::task::Task<Result<Contents, String>>>) -> Self {
         Self {
             path,
+            modals: Default::default(),
+            requested_mode: ViewMode::Auto,
+            requests: Default::default(),
             contents: None,
             offset: 0,
             horizontal: 0,
@@ -181,7 +195,6 @@ impl Viewer {
             mapped_wrap: false,
             current: None,
             last_search: SearchMemory::default(),
-            search_dialog: None,
             notice: String::new(),
             pending,
         }

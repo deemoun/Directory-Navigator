@@ -1,6 +1,7 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 #[cfg(unix)]
 use dn::panel;
+use dn::testing::{backend::TestBackend, layout::Rect, Terminal};
 use dn::{
     app::App,
     columns::ColumnPreset,
@@ -12,7 +13,6 @@ use dn::{
     panel_layout::{PanelGeometry, PanelLayout},
     ui,
 };
-use ratatui::{backend::TestBackend, layout::Rect, Terminal};
 use std::{
     fs, io,
     path::PathBuf,
@@ -51,7 +51,7 @@ fn loaded(app: &mut App) {
         assert!(Instant::now() < deadline);
         thread::sleep(Duration::from_millis(1));
     }
-    assert!(app.dialogs.is_empty());
+    assert!(app.dialogs().is_empty());
 }
 fn key(app: &mut App, code: KeyCode) {
     input::handle(app, KeyEvent::new(code, KeyModifiers::NONE));
@@ -60,7 +60,7 @@ fn alt_search(app: &mut App) {
     input::handle(app, KeyEvent::new(KeyCode::F(7), KeyModifiers::ALT));
 }
 fn paste(app: &mut App, text: &str) {
-    let search = app.quick_search.as_mut().unwrap();
+    let search = app.modals.quick_search_mut().unwrap();
     search.paste(&mut app.panels[search.panel], text);
 }
 fn focus(app: &mut App, name: &str) {
@@ -106,7 +106,7 @@ fn click(app: &mut App, target: Target, modifiers: KeyModifiers) {
     );
 }
 fn activate(app: &mut App, action: Action) {
-    let depth = app.submenus.len();
+    let depth = app.modals.submenus().len();
     let row = menu::level_items(app, depth)
         .iter()
         .position(|item| item.action == action)
@@ -234,7 +234,7 @@ fn layout_menu_marks_choice_and_keeps_cursor_selection_and_columns() -> io::Resu
     assert_eq!(app.config.columns[0], ColumnPreset::NameSizeModified);
     menu::open(&mut app, 3);
     activate(&mut app, Action::QuickSearch);
-    assert!(app.quick_search.is_some());
+    assert!(app.modals.quick_search().is_some());
     key(&mut app, KeyCode::Esc);
     menu::open(&mut app, 3);
     activate(&mut app, Action::Submenu(MenuId::Sort));
@@ -265,7 +265,7 @@ fn quick_search_unicode_edit_cycle_cancel_and_no_match() -> io::Result<()> {
     key(&mut app, KeyCode::Up);
     assert_eq!(highlighted(&app), "alphabet");
     key(&mut app, KeyCode::Char('z'));
-    assert!(app.quick_search.as_ref().unwrap().no_match);
+    assert!(app.modals.quick_search().unwrap().no_match);
     assert_eq!(highlighted(&app), "alphabet");
     let terminal = render(&mut app, 80, 25)?;
     let footer: String = (0..40)
@@ -283,10 +283,10 @@ fn quick_search_unicode_edit_cycle_cancel_and_no_match() -> io::Result<()> {
     key(&mut app, KeyCode::Down);
     assert_eq!(highlighted(&app), "école");
     key(&mut app, KeyCode::Backspace);
-    assert!(app.quick_search.as_ref().unwrap().query.is_empty());
+    assert!(app.modals.quick_search().unwrap().query.is_empty());
     assert_eq!(highlighted(&app), "école");
     key(&mut app, KeyCode::Enter);
-    assert!(app.quick_search.is_none());
+    assert!(app.modals.quick_search().is_none());
     assert_eq!(highlighted(&app), "école");
     assert!(app.panels.iter().all(|panel| !panel.loading));
     Ok(())
@@ -302,35 +302,35 @@ fn quick_search_cached_visibility_command_and_mouse_handoff() -> io::Result<()> 
     loaded(&mut app);
     alt_search(&mut app);
     paste(&mut app, ".");
-    assert!(app.quick_search.as_ref().unwrap().no_match); // excludes parent and hidden entry
+    assert!(app.modals.quick_search().unwrap().no_match); // excludes parent and hidden entry
     key(&mut app, KeyCode::Esc);
     fs::write(temp.0.join("new-file"), b"new")?;
     alt_search(&mut app);
     paste(&mut app, "new");
-    assert!(app.quick_search.as_ref().unwrap().no_match); // no new scan
+    assert!(app.modals.quick_search().unwrap().no_match); // no new scan
     key(&mut app, KeyCode::Esc);
     alt_search(&mut app);
     paste(&mut app, "alpha");
     key(&mut app, KeyCode::F(3));
-    assert!(app.quick_search.is_none() && app.desktop.viewer().is_some());
+    assert!(app.modals.quick_search().is_none() && app.desktop.active_viewer().is_some());
     key(&mut app, KeyCode::Esc);
     alt_search(&mut app);
     paste(&mut app, "alpha");
     key(&mut app, KeyCode::Tab);
-    assert!(app.quick_search.is_none());
+    assert!(app.modals.quick_search().is_none());
     assert_eq!(app.active, 1);
     alt_search(&mut app);
     paste(&mut app, "alpha");
     render(&mut app, 80, 25)?;
     click(&mut app, Target::Entry(0, 0), KeyModifiers::NONE);
-    assert!(app.quick_search.is_none());
+    assert!(app.modals.quick_search().is_none());
     assert_eq!(app.active, 0);
     assert_eq!(app.panels[0].cursor, 0);
     alt_search(&mut app);
     paste(&mut app, "alpha");
     app.panels[0].parent(app.config.show_hidden);
     app.poll();
-    assert!(app.quick_search.is_none());
+    assert!(app.modals.quick_search().is_none());
     Ok(())
 }
 
@@ -354,7 +354,7 @@ fn search_handles_disappearing_original_and_native_names() -> io::Result<()> {
         let native = app.panels[0].entries[index].name.clone();
         alt_search(&mut app);
         paste(&mut app, "a");
-        assert!(app.quick_search.as_ref().unwrap().no_match);
+        assert!(app.modals.quick_search().unwrap().no_match);
         key(&mut app, KeyCode::Esc);
         assert_eq!(app.panels[0].entries[index].name, native);
     }
@@ -364,7 +364,7 @@ fn search_handles_disappearing_original_and_native_names() -> io::Result<()> {
     paste(&mut app, "missing");
     key(&mut app, KeyCode::Up);
     key(&mut app, KeyCode::Down);
-    assert!(app.quick_search.as_ref().unwrap().no_match);
+    assert!(app.modals.quick_search().unwrap().no_match);
     key(&mut app, KeyCode::Esc);
     render(&mut app, 80, 25)?;
     Ok(())

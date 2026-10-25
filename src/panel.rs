@@ -10,6 +10,7 @@ use std::{
 };
 
 struct Request {
+    token: crate::requests::RequestToken,
     path: PathBuf,
     restore: Option<OsString>,
     show_hidden: bool,
@@ -26,6 +27,7 @@ struct Response {
 }
 
 pub struct Panel {
+    pub scope: crate::requests::RequestScope,
     pub space: crate::volume_space::Snapshot,
     pub path: PathBuf,
     pub entries: Vec<Entry>,
@@ -54,6 +56,9 @@ pub struct Panel {
 
 impl Panel {
     pub fn new(path: PathBuf, show_hidden: bool) -> io::Result<Self> {
+        Self::new_for(0, path, show_hidden)
+    }
+    pub fn new_for(index: usize, path: PathBuf, show_hidden: bool) -> io::Result<Self> {
         let (requests, jobs) = mpsc::channel::<Request>();
         let (results, responses) = mpsc::channel();
         thread::Builder::new()
@@ -101,6 +106,7 @@ impl Panel {
                 }
             })?;
         let mut panel = Self {
+            scope: crate::requests::RequestScope::new(crate::requests::Owner::Panel(index)),
             space: Default::default(),
             path: path.clone(),
             entries: Vec::new(),
@@ -126,6 +132,10 @@ impl Panel {
             requests,
             results: responses,
         };
+        panel
+            .space
+            .requests
+            .bind(crate::requests::Owner::Panel(index));
         panel.request(path, None, show_hidden);
         Ok(panel)
     }
@@ -141,11 +151,15 @@ impl Panel {
         show_hidden: bool,
         background: bool,
     ) {
+        if path != self.path {
+            self.scope.start("external-open");
+        }
         self.scan_cancel.cancel();
         self.scan_cancel = Default::default();
         if self
             .requests
             .send(Request {
+                token: self.scope.start("directory-scan"),
                 recover: path == self.path,
                 path,
                 restore,
@@ -164,9 +178,12 @@ impl Panel {
     pub fn poll(&mut self) -> Option<String> {
         match self.results.try_recv() {
             Ok(response) => {
-                if response.request.cancel.cancelled() {
+                if !self.scope.accepts(response.request.token)
+                    || response.request.cancel.cancelled()
+                {
                     return None;
                 }
+                self.scope.finish(response.request.token);
                 self.loading = false;
                 self.refreshing = false;
                 self.last_refresh = Instant::now();

@@ -1,4 +1,4 @@
-use ratatui::{
+use crate::presentation::{
     style::{Color, Style},
     text::{Line, Span},
 };
@@ -76,33 +76,37 @@ pub struct ColorDialog {
 }
 pub fn open(app: &mut crate::app::App) {
     crate::menu::close(app);
-    app.color_dialog = Some(ColorDialog {
+    app.modals.set_color_dialog(Some(ColorDialog {
         original: app.config.palette,
         cursor: usize::from(app.config.palette == PaletteProfile::Terminal),
-    });
+    }));
 }
 pub fn choose(app: &mut crate::app::App, profile: PaletteProfile) {
     app.config.palette = profile;
-    if let Some(dialog) = &mut app.color_dialog {
+    if let Some(dialog) = app.modals.color_dialog_mut() {
         dialog.cursor = usize::from(profile == PaletteProfile::Terminal);
     }
 }
 pub fn cancel(app: &mut crate::app::App) {
-    if let Some(dialog) = app.color_dialog.take() {
+    if let Some(dialog) = app.modals.take_color_dialog() {
         app.config.palette = dialog.original;
     }
 }
 pub fn key(app: &mut crate::app::App, code: crossterm::event::KeyCode) {
     use crossterm::event::KeyCode;
-    let Some(dialog) = &mut app.color_dialog else {
+    let Some(dialog) = app.modals.color_dialog_mut() else {
         return;
     };
     match code {
         KeyCode::Esc => cancel(app),
-        KeyCode::Tab | KeyCode::Down => dialog.cursor = (dialog.cursor + 1) % 4,
-        KeyCode::BackTab | KeyCode::Up => dialog.cursor = (dialog.cursor + 3) % 4,
+        KeyCode::Tab | KeyCode::Down => {
+            dialog.cursor = crate::control_focus::cycle(dialog.cursor, 4, false)
+        }
+        KeyCode::BackTab | KeyCode::Up => {
+            dialog.cursor = crate::control_focus::cycle(dialog.cursor, 4, true)
+        }
         KeyCode::Enter if dialog.cursor == 3 => cancel(app),
-        KeyCode::Enter => app.color_dialog = None,
+        KeyCode::Enter => app.modals.set_color_dialog(None),
         KeyCode::Char(' ') if dialog.cursor < 2 => {
             let profile = if dialog.cursor == 0 {
                 PaletteProfile::ClassicDn

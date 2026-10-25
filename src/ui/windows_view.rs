@@ -1,51 +1,62 @@
+use crate::painting::{Frame, Paragraph};
+use crate::presentation::layout::Rect;
 use crate::{
     app::App, desktop::WindowKind, filesystem::display_name, mouse::Target, windowing::Action,
 };
-use ratatui::{layout::Rect, widgets::Paragraph, Frame};
 
-pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
-    let Some(list) = &app.window_list else { return };
+pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
+    let Some(list) = app.modals.window_list() else {
+        return;
+    };
     let profile = app.config.palette;
     let language = app.config.language;
-    let rect =
-        super::dialog_style::window(frame, profile, area, 72, 12, language.text("Open windows"));
-    super::dialog_style::close_button(
+    let rect = super::dialog_style::window(
         frame,
         profile,
-        rect,
-        &mut app.mouse.regions,
-        Target::Window(Action::Cancel),
+        area,
+        72,
+        (list.ids.len() + 6)
+            .max(12)
+            .min(usize::from(area.height.saturating_sub(2))) as u16,
+        language.text("Open windows"),
     );
-    for (row, id) in list.ids.iter().enumerate() {
+    super::dialog_style::close_button(frame, profile, rect, Target::Window(Action::Cancel));
+    for (row, id) in list
+        .ids
+        .iter()
+        .enumerate()
+        .skip(list.offset)
+        .take(list.rows)
+    {
         let kind = app.desktop.windows().find(|w| w.id == *id).map(|w| w.kind);
         let width = rect.width - 6;
         let name = match kind {
             Some(WindowKind::Manager) => language.text("File manager").to_owned(),
             Some(WindowKind::Editor) => {
-                let Some(editor) = app.desktop.editor() else {
+                let Some(editor) = app.desktop.editor(*id) else {
                     continue;
                 };
                 let path = editor
                     .path
                     .as_ref()
                     .map(|p| display_name(&p.to_string_lossy()))
-                    .unwrap_or_else(|| language.text("New file").into());
+                    .unwrap_or_else(|| format!("{} {}", language.text("New file"), id));
                 let prefix = format!(
                     "{}{}: ",
                     if editor.dirty() { "* " } else { "" },
                     language.text("Editor")
                 );
-                let available =
-                    width.saturating_sub(ratatui::text::Span::raw(&prefix).width() as u16);
+                let available = width
+                    .saturating_sub(crate::presentation::text::Span::raw(&prefix).width() as u16);
                 format!("{prefix}{}", crate::formatting::tail(&path, available))
             }
             Some(WindowKind::Viewer) => {
-                let Some(viewer) = app.desktop.viewer() else {
+                let Some(viewer) = app.desktop.viewer(*id) else {
                     continue;
                 };
                 let prefix = format!("{}: ", language.text("Viewer"));
-                let available =
-                    width.saturating_sub(ratatui::text::Span::raw(&prefix).width() as u16);
+                let available = width
+                    .saturating_sub(crate::presentation::text::Span::raw(&prefix).width() as u16);
                 format!(
                     "{prefix}{}",
                     crate::formatting::tail(
@@ -56,7 +67,12 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
             }
             _ => continue,
         };
-        let row_area = Rect::new(rect.x + 2, rect.y + 2 + row as u16, rect.width - 4, 1);
+        let row_area = Rect::new(
+            rect.x + 2,
+            rect.y + 2 + (row - list.offset) as u16,
+            rect.width - 4,
+            1,
+        );
         let label = format!(
             "{} {}",
             if *id == app.desktop.active().id {
@@ -70,8 +86,8 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
             Paragraph::new(label).style(profile.dos(if row == list.cursor { 0x30 } else { 0x70 })),
             row_area,
         );
-        app.mouse
-            .regions
+        frame
+            .regions()
             .push((row_area, Target::Window(Action::Row(*id))));
     }
     frame.render_widget(
@@ -90,6 +106,6 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
             language.text(label),
             list.focus == focus,
         );
-        app.mouse.regions.push((button, Target::Window(command)));
+        frame.regions().push((button, Target::Window(command)));
     }
 }

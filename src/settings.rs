@@ -166,13 +166,13 @@ impl Settings {
 }
 
 pub fn accept(app: &mut App) {
-    if let Some(settings) = app.settings.take() {
+    if let Some(settings) = app.modals.take_settings() {
         app.apply_config(settings.draft);
         app.notice = "Options applied · Saved on exit when enabled; Save desktop saves now".into();
     }
 }
 pub fn key(app: &mut App, code: KeyCode) {
-    let Some(settings) = &mut app.settings else {
+    let Some(settings) = app.modals.settings_mut() else {
         return;
     };
     let count = settings.control_count();
@@ -196,16 +196,24 @@ pub fn key(app: &mut App, code: KeyCode) {
         }
     }
     match code {
-        KeyCode::Esc => app.settings = None,
-        KeyCode::Enter if settings.cursor == count + 1 => app.settings = None,
+        KeyCode::Esc => app.modals.set_settings(None),
+        KeyCode::Enter if settings.cursor == count + 1 => app.modals.set_settings(None),
         KeyCode::Enter => accept(app),
-        KeyCode::Tab => settings.cursor = (settings.cursor + 1) % (count + 2),
-        KeyCode::BackTab => settings.cursor = (settings.cursor + count + 1) % (count + 2),
-        KeyCode::Up => settings.cursor = (settings.cursor + count + 1) % (count + 2),
-        KeyCode::Down => settings.cursor = (settings.cursor + 1) % (count + 2),
+        KeyCode::Tab => {
+            settings.cursor = crate::control_focus::cycle(settings.cursor, count + 2, false)
+        }
+        KeyCode::BackTab => {
+            settings.cursor = crate::control_focus::cycle(settings.cursor, count + 2, true)
+        }
+        KeyCode::Up => {
+            settings.cursor = crate::control_focus::cycle(settings.cursor, count + 2, true)
+        }
+        KeyCode::Down => {
+            settings.cursor = crate::control_focus::cycle(settings.cursor, count + 2, false)
+        }
         KeyCode::Char(' ') if settings.cursor < count => settings.toggle(settings.cursor),
         KeyCode::Char(' ') if settings.cursor == count => accept(app),
-        KeyCode::Char(' ') => app.settings = None,
+        KeyCode::Char(' ') => app.modals.set_settings(None),
         KeyCode::Char(c) => {
             if let Some(index) = settings
                 .rows()

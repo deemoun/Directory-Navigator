@@ -1,6 +1,6 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use dn::testing::{backend::TestBackend, Terminal};
 use dn::{app::App, input};
-use ratatui::{backend::TestBackend, Terminal};
 use std::{
     fs, io,
     path::PathBuf,
@@ -65,7 +65,7 @@ fn typing_editing_and_paste_preserve_graphemes_and_limits() -> io::Result<()> {
     input::paste(&mut app, "\nrm something");
     assert_eq!(app.command_line.text, "safe");
     assert!(app.command_line.pending.is_none());
-    app.dialogs.clear();
+    app.clear_dialogs();
     input::paste(&mut app, &"x".repeat(16 * 1024));
     assert_eq!(app.command_line.text, "safe");
     key(&mut app, KeyCode::Esc);
@@ -127,7 +127,7 @@ fn cd_navigates_and_missing_directories_preserve_panel() -> io::Result<()> {
     key(&mut app, KeyCode::Enter);
     ready(&mut app);
     assert_eq!(app.panels[0].path, t.0.join("child space"));
-    assert!(!app.dialogs.is_empty());
+    assert!(!app.dialogs().is_empty());
     Ok(())
 }
 #[test]
@@ -135,8 +135,8 @@ fn empty_prompt_keeps_panel_shortcuts_and_nonempty_prompt_keeps_navigation() -> 
     let t = Temp::new()?;
     let mut app = t.app()?;
     key(&mut app, KeyCode::Char('+'));
-    assert!(app.pattern.is_some());
-    app.pattern = None;
+    assert!(app.modals.pattern().is_some());
+    app.modals.set_pattern(None);
     input::paste(&mut app, "echo ");
     key(&mut app, KeyCode::Char('*'));
     assert_eq!(app.command_line.text, "echo *");
@@ -146,7 +146,7 @@ fn empty_prompt_keeps_panel_shortcuts_and_nonempty_prompt_keeps_navigation() -> 
     assert_eq!(app.active, 1);
     assert_eq!(app.command_line.text, "echo *");
     key(&mut app, KeyCode::F(7));
-    assert!(app.prompt.is_some());
+    assert!(app.modals.prompt().is_some());
     input::paste(&mut app, "directory");
     assert_eq!(app.command_line.text, "echo *");
     Ok(())

@@ -1,12 +1,13 @@
+use crate::painting::{Frame, Paragraph};
+use crate::presentation::layout::Rect;
 use crate::{
     app::App,
     focus::{self, Screen},
     mouse::Target,
     shortcuts,
 };
-use ratatui::{layout::Rect, widgets::Paragraph, Frame};
 
-pub(super) fn draw_prefix(frame: &mut Frame, app: &mut App) {
+pub(super) fn draw_prefix(frame: &mut impl Frame, app: &App) {
     let area = frame.area();
     if area.width < 80 || area.height < 25 || !shortcuts::armed(app) {
         return;
@@ -32,22 +33,16 @@ pub(super) fn draw_prefix(frame: &mut Frame, app: &mut App) {
         height,
         app.config.language.text(" Keyboard commands "),
     );
-    app.mouse.regions.clear();
-    super::dialog_style::close_button(
-        frame,
-        app.config.palette,
-        rect,
-        &mut app.mouse.regions,
-        Target::CloseDialog,
-    );
+    frame.regions().clear();
+    super::dialog_style::close_button(frame, app.config.palette, rect, Target::CloseDialog);
     frame.render_widget(
         Paragraph::new(text).style(app.config.palette.dos(0x70)),
         Rect::new(rect.x + 2, rect.y + 2, rect.width - 4, rect.height - 4),
     );
 }
 
-pub(super) fn draw_settings(frame: &mut Frame, app: &mut App, area: Rect) {
-    let Some(settings) = &app.settings else {
+pub(super) fn draw_settings(frame: &mut impl Frame, app: &App, area: Rect) {
+    let Some(settings) = app.modals.settings() else {
         return;
     };
     let profile = app.config.palette;
@@ -60,14 +55,8 @@ pub(super) fn draw_settings(frame: &mut Frame, app: &mut App, area: Rect) {
         20,
         language.text(" Keyboard shortcuts "),
     );
-    app.mouse.regions.clear();
-    super::dialog_style::close_button(
-        frame,
-        profile,
-        rect,
-        &mut app.mouse.regions,
-        Target::CancelSettings,
-    );
+    frame.regions().clear();
+    super::dialog_style::close_button(frame, profile, rect, Target::CancelSettings);
     let choice = Rect::new(rect.x + 3, rect.y + 2, rect.width - 6, 1);
     frame.render_widget(
         Paragraph::new(format!(
@@ -78,7 +67,7 @@ pub(super) fn draw_settings(frame: &mut Frame, app: &mut App, area: Rect) {
         .style(profile.dos(if settings.cursor == 0 { 0x30 } else { 0x70 })),
         choice,
     );
-    app.mouse.regions.push((choice, Target::ShortcutProfile));
+    frame.regions().push((choice, Target::ShortcutProfile));
     let text = if settings.draft.shortcuts.is_mac() {
         "^O means Ctrl+O, release, then the next key.\n1 Help · 2 User · 3 View · 4 Edit · 5 Copy\n6 Move · 7 MkDir · 8 Trash · 9 Menu · 0 Quit\ns Quick search · f Find · i Info · z Sort\nb Bookmarks · l Filter · h Commands · k Keyboard\nEditor: a Save As · w Close · r Replace · x Quit\nViewer: 2 Wrap · n Next · p Reverse · w Close\nThe prefix displays a guide for the current screen.\nClassic DN shortcuts remain available."
     } else {
@@ -108,6 +97,6 @@ pub(super) fn draw_settings(frame: &mut Frame, app: &mut App, area: Rect) {
             language.text(label),
             settings.cursor == 1 + i,
         );
-        app.mouse.regions.push((button, target));
+        frame.regions().push((button, target));
     }
 }

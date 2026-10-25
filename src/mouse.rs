@@ -1,10 +1,11 @@
 use crate::focus::{self, Focus};
+
+use crate::presentation::layout::Rect;
 use crate::{
     app::App,
     menu::{self, Action},
 };
 use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
-use ratatui::layout::{Position, Rect};
 use std::{
     path::PathBuf,
     time::{Duration, Instant},
@@ -63,6 +64,7 @@ pub enum Target {
 
 #[derive(Default)]
 pub struct MouseState {
+    pub frame: Option<crate::layout::FrameContext>,
     pub regions: Vec<(Rect, Target)>,
     last_click: Option<(usize, PathBuf, Instant)>,
     pub scrollbar_drag: Option<(usize, Rect)>,
@@ -76,6 +78,26 @@ impl MouseState {
 }
 
 pub fn handle(app: &mut App, event: MouseEvent) {
+    if app.screensaver.active {
+        if matches!(event.kind, MouseEventKind::Up(_)) {
+            return;
+        }
+        app.screensaver.activity(Instant::now());
+        app.mouse.reset_click();
+        crate::layout::update(app);
+        return;
+    }
+    if app.exit_pending && app.quit_review.is_some() {
+        return;
+    }
+    if app.mouse.frame.is_some_and(|frame| {
+        frame.owner != app.desktop.active().id
+            || frame.revision != app.layout_revision
+            || frame.modal != app.modal_top().map(|m| m.id)
+    }) {
+        app.mouse.reset_click();
+        return;
+    }
     handle_mouse(app, event);
     crate::layout::update(app);
 }
@@ -91,7 +113,18 @@ fn handle_mouse(app: &mut App, event: MouseEvent) {
     }
     if event.kind == MouseEventKind::Up(MouseButton::Left) {
         app.mouse.scrollbar_drag = None;
-        return;
+        // Native file-dialog buttons activate on release, unlike DN's
+        // immediate command targets. Keep the release inside its live scope.
+        if !(focus::current(app) == Focus::EditorModal
+            && matches!(
+                app.desktop
+                    .active_editor()
+                    .and_then(|e| e.modals.editor_modal()),
+                Some(crate::editor::Modal::File(_))
+            ))
+        {
+            return;
+        }
     }
     if matches!(event.kind, MouseEventKind::Down(_)) {
         app.mouse.scrollbar_drag = None;
@@ -101,16 +134,14 @@ fn handle_mouse(app: &mut App, event: MouseEvent) {
         return;
     }
     if focus::current(app) == Focus::QuickSearch {
-        app.quick_search = None;
+        app.modals.set_quick_search(None);
     }
     let focus = focus::current(app);
     let target = app
-        .mouse
-        .regions
-        .iter()
-        .rev()
-        .find(|(rect, _)| rect.contains(Position::new(event.column, event.row)))
-        .map(|(_, target)| *target);
+        .desktop
+        .native()
+        .mouse_target(&app.mouse.regions, event.column, event.row);
+
     if focus == Focus::WindowList {
         crate::windowing::mouse(app, event, target);
         return;
@@ -168,8 +199,12 @@ fn handle_mouse(app: &mut App, event: MouseEvent) {
             MouseEventKind::Down(MouseButton::Left) if target == Some(Target::CloseDialog) => {
                 crate::dialog::message_key(app, crossterm::event::KeyCode::Enter)
             }
-            MouseEventKind::ScrollUp => app.message_offset = app.message_offset.saturating_sub(3),
-            MouseEventKind::ScrollDown => app.message_offset = app.message_offset.saturating_add(3),
+            MouseEventKind::ScrollUp => {
+                app.set_message_offset(app.message_offset().saturating_sub(3))
+            }
+            MouseEventKind::ScrollDown => {
+                app.set_message_offset(app.message_offset().saturating_add(3))
+            }
             _ => {}
         }
         return;
@@ -180,6 +215,17 @@ fn handle_mouse(app: &mut App, event: MouseEvent) {
                 crate::screensaver::command(app, i);
             }
         }
+        return;
+    }
+    if focus == Focus::EditorModal
+        && matches!(
+            app.desktop
+                .active_editor()
+                .and_then(|e| e.modals.editor_modal()),
+            Some(crate::editor::Modal::File(_))
+        )
+    {
+        crate::editor::file_mouse(app, event);
         return;
     }
     if matches!(
@@ -198,7 +244,7 @@ fn handle_mouse(app: &mut App, event: MouseEvent) {
                 }
                 crate::editor::action(app, command);
             }
-        } else if let Some(editor) = app.desktop.editor_mut() {
+        } else if let Some(editor) = app.desktop.active_editor_mut() {
             if focus == Focus::Editor {
                 if let Some(buffer) = &mut editor.buffer {
                     match event.kind {
@@ -224,7 +270,7 @@ fn handle_mouse(app: &mut App, event: MouseEvent) {
         if event.kind == MouseEventKind::Down(MouseButton::Left) {
             match target {
                 Some(Target::ColorChoice(profile)) => crate::palette::choose(app, profile),
-                Some(Target::AcceptColors) => app.color_dialog = None,
+                Some(Target::AcceptColors) => app.modals.set_color_dialog(None),
                 Some(Target::CancelColors) => crate::palette::cancel(app),
                 _ => {}
             }
@@ -247,7 +293,7 @@ fn handle_mouse(app: &mut App, event: MouseEvent) {
         if event.kind == MouseEventKind::Down(MouseButton::Left) {
             match target {
                 Some(Target::AcceptPattern) => crate::pattern::accept(app),
-                Some(Target::CancelPattern) => app.pattern = None,
+                Some(Target::CancelPattern) => app.modals.set_pattern(None),
                 _ => {}
             }
         }
@@ -266,12 +312,16 @@ fn handle_mouse(app: &mut App, event: MouseEvent) {
         }
         return;
     }
-    if let Some(info) = app.file_info.as_mut().filter(|_| focus == Focus::FileInfo) {
+    if let Some(info) = app
+        .modals
+        .file_info_mut()
+        .filter(|_| focus == Focus::FileInfo)
+    {
         match event.kind {
             MouseEventKind::ScrollUp => info.step(-3),
             MouseEventKind::ScrollDown => info.step(3),
             MouseEventKind::Down(MouseButton::Left) if target == Some(Target::CloseFileInfo) => {
-                app.file_info = None
+                app.modals.set_file_info(None)
             }
             _ => {}
         }
@@ -281,22 +331,22 @@ fn handle_mouse(app: &mut App, event: MouseEvent) {
         if event.kind == MouseEventKind::Down(MouseButton::Left) {
             match target {
                 Some(Target::ShortcutProfile) => {
-                    if let Some(settings) = &mut app.settings {
+                    if let Some(settings) = app.modals.settings_mut() {
                         settings.keyboard_choice(false);
                     }
                 }
                 Some(Target::RegionalChoice(index)) => {
-                    if let Some(settings) = &mut app.settings {
+                    if let Some(settings) = app.modals.settings_mut() {
                         settings.regional_choice(index, false);
                     }
                 }
                 Some(Target::Setting(index)) => {
-                    if let Some(settings) = &mut app.settings {
+                    if let Some(settings) = app.modals.settings_mut() {
                         settings.toggle(index);
                     }
                 }
                 Some(Target::AcceptSettings) => crate::settings::accept(app),
-                Some(Target::CancelSettings) => app.settings = None,
+                Some(Target::CancelSettings) => app.modals.set_settings(None),
                 _ => {}
             }
         }
@@ -313,12 +363,12 @@ fn handle_mouse(app: &mut App, event: MouseEvent) {
     if focus == Focus::Viewer {
         match event.kind {
             MouseEventKind::ScrollUp => {
-                if let Some(viewer) = app.desktop.viewer_mut() {
+                if let Some(viewer) = app.desktop.active_viewer_mut() {
                     viewer.step(-3);
                 }
             }
             MouseEventKind::ScrollDown => {
-                if let Some(viewer) = app.desktop.viewer_mut() {
+                if let Some(viewer) = app.desktop.active_viewer_mut() {
                     viewer.step(3);
                 }
             }
@@ -353,18 +403,18 @@ fn handle_mouse(app: &mut App, event: MouseEvent) {
                 Some(Target::SubmitPrompt) => app.submit_prompt(),
                 Some(Target::PromptHelp) => crate::dialog::prompt_help(app),
                 Some(Target::PromptField) => {
-                    if let Some(prompt) = &mut app.prompt {
+                    if let Some(prompt) = app.modals.prompt_mut() {
                         prompt.focus = 0;
                     }
                 }
-                Some(Target::CancelPrompt) => app.prompt = None,
+                Some(Target::CancelPrompt) => app.modals.set_prompt(None),
                 _ => {}
             }
         }
         return;
     }
     if event.kind == MouseEventKind::Drag(MouseButton::Left) {
-        if app.menu.is_none() {
+        if app.modals.menu().is_none() {
             if let Some((index, track)) = app.mouse.scrollbar_drag {
                 let panel = &mut app.panels[index];
                 if !panel.loading && !panel.entries.is_empty() {
@@ -380,7 +430,7 @@ fn handle_mouse(app: &mut App, event: MouseEvent) {
         event.kind,
         MouseEventKind::ScrollUp | MouseEventKind::ScrollDown
     ) {
-        if app.menu.is_none() && app.dialogs.is_empty() {
+        if app.modals.menu().is_none() && app.dialogs().is_empty() {
             if let Some(
                 Target::Panel(index) | Target::Entry(index, _) | Target::Scrollbar(index, _),
             ) = target
@@ -399,14 +449,14 @@ fn handle_mouse(app: &mut App, event: MouseEvent) {
     if event.kind != MouseEventKind::Down(MouseButton::Left) {
         return;
     }
-    if !app.dialogs.is_empty() {
+    if !app.dialogs().is_empty() {
         if target == Some(Target::CloseDialog) {
-            app.dialogs.pop();
+            app.pop_dialog();
         }
         app.mouse.last_click = None;
         return;
     }
-    if app.menu.is_some()
+    if app.modals.menu().is_some()
         && !matches!(
             target,
             Some(Target::Menu(_) | Target::MenuItem(_, _) | Target::MenuSurface)
@@ -419,7 +469,7 @@ fn handle_mouse(app: &mut App, event: MouseEvent) {
     let previous = app.mouse.last_click.take();
     match target {
         Some(Target::Menu(index)) => {
-            if app.menu.is_some_and(|(open, _)| open == index) {
+            if app.modals.menu().is_some_and(|(open, _)| open == index) {
                 menu::close(app);
             } else {
                 menu::open(app, index);

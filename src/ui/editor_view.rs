@@ -1,20 +1,19 @@
+use crate::painting::{Block, Frame, Paragraph};
+use crate::presentation::{
+    layout::{Constraint, Layout, Rect},
+    text::{Line, Span},
+};
 use crate::{
     app::App, editor::EditorAction as A, filesystem::display_name, formatting, mouse::Target,
 };
-use ratatui::{
-    layout::{Constraint, Layout, Rect},
-    text::{Line, Span},
-    widgets::{Block, Paragraph},
-    Frame,
-};
 use unicode_segmentation::UnicodeSegmentation;
 
-pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
+pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
     let prefix_armed = crate::shortcuts::armed(app);
     let profile = app.config.palette;
     let dos = profile.styles();
     super::editor_menu::draw_bar(frame, app, Rect::new(area.x, area.y, area.width, 1));
-    let Some(editor) = app.desktop.editor_mut() else {
+    let Some(editor) = app.desktop.active_editor() else {
         return;
     };
     let path = editor
@@ -44,7 +43,6 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
         profile,
         Rect::new(area.x, area.y + 1, area.width, 1),
         &title,
-        &mut app.mouse.regions,
         Target::Editor(A::Close),
     );
     let content = Rect::new(area.x, area.y + 2, area.width, area.height - 4);
@@ -93,7 +91,7 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
                 };
                 spans.push(Span::styled(text, dos(color)));
                 if visible_width > 0 {
-                    app.mouse.regions.push((
+                    frame.regions().push((
                         Rect::new(content.x + gutter + left as u16, y, visible_width as u16, 1),
                         Target::Editor(A::Position(position, false)),
                     ));
@@ -108,7 +106,7 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
                 .saturating_sub(editor.scroll_column)
                 .min(editor.columns);
             if end_col < editor.columns {
-                app.mouse.regions.push((
+                frame.regions().push((
                     Rect::new(
                         content.x + gutter + end_col as u16,
                         y,
@@ -120,10 +118,9 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
             }
         }
         if !editor.busy()
-            && editor.modal.is_none()
-            && editor.menu.is_none()
-            && app.dialogs.is_empty()
-            && app.window_list.is_none()
+            & editor.modals.editor_modal().is_none()
+            & editor.modals.editor_menu().is_none()
+            && app.dialogs().is_empty() & app.modals.window_list().is_none()
             && !prefix_armed
         {
             frame.set_cursor_position((
@@ -192,14 +189,9 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
             cells[index],
         );
         if let Some(command) = command {
-            app.mouse
-                .regions
+            frame
+                .regions()
                 .push((cells[index], Target::Editor(command)));
         }
-    }
-    if editor.modal.is_some() {
-        super::editor_dialogs::draw(frame, app, area);
-    } else if editor.menu.is_some() {
-        super::editor_menu::draw_dropdown(frame, app, area);
     }
 }

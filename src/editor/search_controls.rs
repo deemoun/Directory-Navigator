@@ -7,15 +7,17 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 pub(super) fn open(editor: &mut Editor, replacing: bool) {
     let selection = editor.buffer.as_ref().map(Buffer::selected).unwrap_or(0..0);
-    editor.modal = Some(Modal::Search(SearchDialog::new(
-        replacing,
-        &SearchMemory {
-            query: editor.search.clone(),
-            replacement: editor.replacement.clone(),
-            options: editor.search_options,
-        },
-        selection,
-    )));
+    editor
+        .modals
+        .set_editor_modal(Some(Modal::Search(SearchDialog::new(
+            replacing,
+            &SearchMemory {
+                query: editor.search.clone(),
+                replacement: editor.replacement.clone(),
+                options: editor.search_options,
+            },
+            selection,
+        ))));
 }
 fn scope(editor: &Editor) -> Result<std::ops::Range<usize>, String> {
     let Some(buffer) = &editor.buffer else {
@@ -62,14 +64,14 @@ pub(super) fn repeat(editor: &mut Editor, reverse: bool) -> Result<(), String> {
     Ok(())
 }
 pub(super) fn submit(app: &mut App, all: bool) -> Result<(), String> {
-    let Some(editor) = app.desktop.editor_mut() else {
+    let Some(editor) = app.desktop.active_editor_mut() else {
         return Ok(());
     };
-    let Some(Modal::Search(dialog)) = editor.modal.take() else {
+    let Some(Modal::Search(dialog)) = editor.modals.take_editor_modal() else {
         return Ok(());
     };
     if dialog.query.is_empty() {
-        editor.modal = Some(Modal::Search(dialog));
+        editor.modals.set_editor_modal(Some(Modal::Search(dialog)));
         return Err("Enter text to find.".into());
     }
     editor.search = dialog.query;
@@ -122,7 +124,9 @@ pub(super) fn submit(app: &mut App, all: bool) -> Result<(), String> {
                 if let Some(range) = session.current() {
                     search::select(buffer, range);
                 }
-                editor.modal = Some(Modal::Replace(session));
+                editor
+                    .modals
+                    .set_editor_modal(Some(Modal::Replace(session)));
             }
         }
     }
@@ -131,7 +135,7 @@ pub(super) fn submit(app: &mut App, all: bool) -> Result<(), String> {
     Ok(())
 }
 pub(super) fn decision(editor: &mut Editor, command: EditorAction) -> Result<(), String> {
-    let Some(Modal::Replace(mut session)) = editor.modal.take() else {
+    let Some(Modal::Replace(mut session)) = editor.modals.take_editor_modal() else {
         return Ok(());
     };
     if let Some(buffer) = &mut editor.buffer {
@@ -145,14 +149,18 @@ pub(super) fn decision(editor: &mut Editor, command: EditorAction) -> Result<(),
             _ => Ok(()),
         };
         if let Err(error) = result {
-            editor.modal = Some(Modal::Replace(session));
+            editor
+                .modals
+                .set_editor_modal(Some(Modal::Replace(session)));
             return Err(error);
         }
         editor.notice = format!("Replaced {} occurrence(s)", session.changed);
         if command != EditorAction::Cancel {
             if let Some(range) = session.current() {
                 search::select(buffer, range);
-                editor.modal = Some(Modal::Replace(session));
+                editor
+                    .modals
+                    .set_editor_modal(Some(Modal::Replace(session)));
             }
         }
     }
@@ -161,10 +169,10 @@ pub(super) fn decision(editor: &mut Editor, command: EditorAction) -> Result<(),
     Ok(())
 }
 pub(super) fn key(app: &mut App, key: KeyEvent) {
-    let Some(editor) = app.desktop.editor_mut() else {
+    let Some(editor) = app.desktop.active_editor_mut() else {
         return;
     };
-    let command = match &mut editor.modal {
+    let command = match editor.modals.editor_modal_mut() {
         Some(Modal::Search(dialog)) => match key.code {
             KeyCode::Char(c) if key.modifiers.contains(KeyModifiers::ALT) => {
                 match c.to_ascii_lowercase() {

@@ -1,10 +1,38 @@
 use crate::{
     config::Config, formatting, localization::Language, panel::Panel, volume_space::Space,
 };
-use ratatui::{
-    style::Style,
-    text::{Line, Span},
-};
+use unicode_width::UnicodeWidthStr;
+#[derive(Clone)]
+pub struct Span {
+    pub content: String,
+    pub attribute: u8,
+}
+impl Span {
+    fn styled(text: impl Into<String>, attribute: u8) -> Self {
+        Self {
+            content: text.into(),
+            attribute,
+        }
+    }
+}
+pub struct Line {
+    pub spans: Vec<Span>,
+}
+impl Line {
+    pub fn width(&self) -> usize {
+        self.spans.iter().map(|s| s.content.width()).sum()
+    }
+}
+impl From<Vec<Span>> for Line {
+    fn from(spans: Vec<Span>) -> Self {
+        Self { spans }
+    }
+}
+impl From<Span> for Line {
+    fn from(span: Span) -> Self {
+        Self { spans: vec![span] }
+    }
+}
 /// Decimal exact values when space permits; binary units with one decimal otherwise.
 fn quantity(n: u128, compact: bool) -> String {
     if !compact {
@@ -26,7 +54,7 @@ fn quantity(n: u128, compact: bool) -> String {
     }
     format!("{n} B")
 }
-pub(super) fn selection(panel: &Panel, config: &Config, width: u16) -> Line<'static> {
+pub fn selection(panel: &Panel, config: &Config, width: u16) -> Line {
     let mut files = 0;
     let mut folders = 0;
     let mut bytes = 0_u128;
@@ -50,8 +78,8 @@ pub(super) fn selection(panel: &Panel, config: &Config, width: u16) -> Line<'sta
         }
     }
     let language = config.language;
-    let labels = config.palette.dos(0x8e);
-    let numbers = config.palette.dos(0x8f);
+    let labels = 0x8e;
+    let numbers = 0x8f;
     if files + folders == 0 {
         return Line::from(Span::styled(
             language
@@ -132,13 +160,7 @@ pub(super) fn selection(panel: &Panel, config: &Config, width: u16) -> Line<'sta
         build(true)
     }
 }
-fn space_line(
-    space: Space,
-    language: Language,
-    normal: Style,
-    numbers: Style,
-    compact: bool,
-) -> Line<'static> {
+fn space_line(space: Space, language: Language, normal: u8, numbers: u8, compact: bool) -> Line {
     Line::from(vec![
         Span::styled(quantity(space.available, compact), numbers),
         Span::styled(
@@ -158,10 +180,10 @@ fn space_line(
         ),
     ])
 }
-pub(super) fn space(panel: &Panel, config: &Config, width: u16) -> Line<'static> {
+pub fn space(panel: &Panel, config: &Config, width: u16) -> Line {
     let language = config.language;
-    let normal = config.palette.dos(0x87);
-    let numbers = config.palette.dos(0x8f);
+    let normal = 0x87;
+    let numbers = 0x8f;
     match &panel.space.result {
         Some(Ok(value)) => {
             let full = space_line(*value, language, normal, numbers, false);

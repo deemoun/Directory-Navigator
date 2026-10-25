@@ -1,4 +1,5 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+use dn::testing::{backend::TestBackend, Terminal};
 #[cfg(unix)]
 use dn::user_menu::runner;
 use dn::{
@@ -13,7 +14,6 @@ use dn::{
         Action,
     },
 };
-use ratatui::{backend::TestBackend, Terminal};
 use std::{
     fs, io,
     path::PathBuf,
@@ -184,18 +184,18 @@ fn keyboard_submenus_review_cancel_run_and_resizing() -> io::Result<()> {
     }
     assert_eq!(focus::current(&a), Focus::UserMenu);
     key(&mut a, KeyCode::Char('t'));
-    assert_eq!(a.user_menu.modal.as_ref().unwrap().branch, [0]);
+    assert_eq!(a.user_menu.modals.user_menu().unwrap().branch, [0]);
     key(&mut a, KeyCode::Char('p'));
-    assert!(a.user_menu.modal.as_ref().unwrap().review.is_some());
+    assert!(a.user_menu.modals.user_menu().unwrap().review.is_some());
     assert!(a.user_menu.pending.is_none());
     draw(&mut a, 80, 25)?;
     key(&mut a, KeyCode::Esc);
-    assert!(a.user_menu.modal.as_ref().unwrap().review.is_none());
+    assert!(a.user_menu.modals.user_menu().unwrap().review.is_none());
     key(&mut a, KeyCode::Enter);
     draw(&mut a, 80, 25)?;
     click(&mut a, Target::UserMenu(Action::Run));
     assert!(a.user_menu.pending.is_some());
-    assert!(a.user_menu.modal.is_none());
+    assert!(a.user_menu.modals.user_menu().is_none());
     Ok(())
 }
 #[test]
@@ -208,25 +208,29 @@ fn edit_missing_default_reload_and_invalid_menu_repair() -> io::Result<()> {
     assert!(!path.exists());
     key(&mut a, KeyCode::F(4));
     wait(&mut a, |a| {
-        a.desktop.editor().is_some_and(|e| e.buffer.is_some())
+        a.desktop
+            .active_editor()
+            .is_some_and(|e| e.buffer.is_some())
     });
     assert!(path.exists());
     assert_eq!(fs::read_to_string(&path)?, format::DEFAULT);
     key(&mut a, KeyCode::Esc);
     wait(&mut a, |a| {
-        a.desktop.editor().is_none() && !user_menu::pending(&a.user_menu)
+        a.desktop.active_editor().is_none() && !user_menu::pending(&a.user_menu)
     });
     t.open(&mut a, ">3 Bad\n")?;
     assert!(a
         .user_menu
-        .modal
-        .as_ref()
+        .modals
+        .user_menu()
         .unwrap()
         .status
         .contains("line 1"));
     key(&mut a, KeyCode::F(4));
     wait(&mut a, |a| {
-        a.desktop.editor().is_some_and(|e| e.buffer.is_some())
+        a.desktop
+            .active_editor()
+            .is_some_and(|e| e.buffer.is_some())
     });
     assert_eq!(fs::read_to_string(&path)?, ">3 Bad\n");
     Ok(())
@@ -242,8 +246,8 @@ fn f2_local_discovery_editor_precedence_stale_close_and_menu_targets() -> io::Re
     wait(&mut a, |a| !user_menu::pending(&a.user_menu));
     assert_eq!(
         a.user_menu
-            .modal
-            .as_ref()
+            .modals
+            .user_menu()
             .unwrap()
             .data
             .as_ref()
@@ -259,13 +263,13 @@ fn f2_local_discovery_editor_precedence_stale_close_and_menu_targets() -> io::Re
         "F2 User"
     }));
     key(&mut a, KeyCode::Esc);
-    assert!(a.user_menu.modal.is_none());
+    assert!(a.user_menu.modals.user_menu().is_none());
     user_menu::open_file(&mut a, t.0.join("dn.mnu"), true);
     key(&mut a, KeyCode::Esc);
     for _ in 0..5 {
         a.poll();
     }
-    assert!(a.user_menu.modal.is_none());
+    assert!(a.user_menu.modals.user_menu().is_none());
     let item = dn::menu::items(2)
         .into_iter()
         .find(|i| i.action == dn::menu::Action::UserMenu)
@@ -286,14 +290,14 @@ fn mouse_submenu_back_review_cancel_and_modal_precedence() -> io::Result<()> {
     a.error("Keep modal precedence");
     draw(&mut a, 80, 25)?;
     key(&mut a, KeyCode::Enter);
-    assert!(a.user_menu.modal.as_ref().unwrap().review.is_some());
+    assert!(a.user_menu.modals.user_menu().unwrap().review.is_some());
     draw(&mut a, 80, 25)?;
     click(&mut a, Target::UserMenu(Action::Cancel));
     key(&mut a, KeyCode::Left);
-    assert!(a.user_menu.modal.as_ref().unwrap().branch.is_empty());
+    assert!(a.user_menu.modals.user_menu().unwrap().branch.is_empty());
     draw(&mut a, 80, 25)?;
     click(&mut a, Target::UserMenu(Action::Close));
-    assert!(a.user_menu.modal.is_none());
+    assert!(a.user_menu.modals.user_menu().is_none());
     Ok(())
 }
 #[cfg(unix)]
@@ -359,17 +363,17 @@ fn review_wraps_unicode_arguments_and_expansion_is_bounded() -> io::Result<()> {
     let mut a = t.app()?;
     t.open(&mut a, &format!(">1 Long\nprintf '{}'\n", "界".repeat(200)))?;
     key(&mut a, KeyCode::Enter);
-    let m = a.user_menu.modal.as_ref().unwrap();
+    let m = a.user_menu.modals.user_menu().unwrap();
     assert!(m.review_lines.len() > 10);
     assert!(m
         .review_lines
         .iter()
-        .all(|s| ratatui::text::Span::raw(s).width() <= 72));
+        .all(|s| dn::testing::text::Span::raw(s).width() <= 72));
     assert!(user_menu::plan(&a, &[vec!["printf".into(), "x".repeat(70 * 1024)]]).is_err());
     assert!(user_menu::plan(&a, &[vec!["{selected}".into()]]).is_err());
     key(&mut a, KeyCode::F(1));
     assert_eq!(focus::current(&a), Focus::Message);
     key(&mut a, KeyCode::Esc);
-    assert!(a.user_menu.modal.as_ref().unwrap().review.is_some());
+    assert!(a.user_menu.modals.user_menu().unwrap().review.is_some());
     Ok(())
 }

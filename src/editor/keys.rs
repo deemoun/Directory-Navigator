@@ -3,7 +3,7 @@ use crate::{app::App, dialog};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 pub fn key(app: &mut App, key: KeyEvent) {
-    let Some(editor) = app.desktop.editor_mut() else {
+    let Some(editor) = app.desktop.active_editor_mut() else {
         return;
     };
     let alt = key.modifiers.contains(KeyModifiers::ALT);
@@ -19,11 +19,18 @@ pub fn key(app: &mut App, key: KeyEvent) {
         }
         return;
     }
-    if matches!(editor.modal, Some(Modal::Search(_) | Modal::Replace(_))) {
+    if matches!(editor.modals.editor_modal(), Some(Modal::File(_))) {
+        file_key(app, key);
+        return;
+    }
+    if matches!(
+        editor.modals.editor_modal(),
+        Some(Modal::Search(_) | Modal::Replace(_))
+    ) {
         search_controls::key(app, key);
         return;
     }
-    if let Some(modal) = &mut editor.modal {
+    if let Some(modal) = editor.modals.editor_modal_mut() {
         let command = match modal {
             Modal::ConfirmClose => match key.code {
                 KeyCode::Char('s' | 'S') => Some(EditorAction::Save),
@@ -79,10 +86,10 @@ pub fn key(app: &mut App, key: KeyEvent) {
         }
         return;
     }
-    if editor.menu.is_some() {
+    if editor.modals.editor_menu().is_some() {
         let accelerator = matches!(key.code, KeyCode::F(1 | 2 | 3 | 6 | 7)) || ctrl;
         if accelerator {
-            editor.menu = None;
+            editor.modals.set_editor_menu(None);
         } else {
             menus::key(app, key.code);
             return;

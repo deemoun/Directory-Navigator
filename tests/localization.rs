@@ -1,5 +1,6 @@
 use chrono::{TimeZone, Utc};
 use crossterm::event::{KeyCode, KeyModifiers};
+use dn::testing::{backend::TestBackend, Terminal};
 use dn::{
     app::App,
     clock_view::Clock,
@@ -13,7 +14,6 @@ use dn::{
     ui,
     viewer::Viewer,
 };
-use ratatui::{backend::TestBackend, Terminal};
 use std::{
     collections::BTreeSet,
     fs, io,
@@ -210,15 +210,17 @@ fn regional_apply_cancel_navigation_and_mouse_geometry() -> io::Result<()> {
         .panels
         .each_ref()
         .map(|p| p.entries.iter().map(|e| e.name.clone()).collect::<Vec<_>>());
-    a.settings = Some(Settings::new(SettingsKind::Regional, &a.config));
+    a.modals
+        .set_settings(Some(Settings::new(SettingsKind::Regional, &a.config)));
     for (i, _) in (0..5).enumerate() {
-        a.settings.as_mut().unwrap().regional_choice(i, false);
+        a.modals.settings_mut().unwrap().regional_choice(i, false);
     }
     settings::key(&mut a, KeyCode::Esc);
     assert_eq!(a.config.language, Language::English);
-    a.settings = Some(Settings::new(SettingsKind::Regional, &a.config));
+    a.modals
+        .set_settings(Some(Settings::new(SettingsKind::Regional, &a.config)));
     for i in 0..5 {
-        a.settings.as_mut().unwrap().regional_choice(i, false);
+        a.modals.settings_mut().unwrap().regional_choice(i, false);
     }
     for (w, h) in [(80, 25), (120, 40)] {
         let s = draw(&mut a, w, h)?;
@@ -242,7 +244,7 @@ fn regional_apply_cancel_navigation_and_mouse_geometry() -> io::Result<()> {
     );
     assert!(a.panels.iter().all(|p| !p.loading));
     assert!(menu::open_mnemonic(&mut a, 'н'));
-    assert_eq!(a.menu.unwrap().0, 5);
+    assert_eq!(a.modals.menu().unwrap().0, 5);
     menu::close(&mut a);
     assert!(menu::open_mnemonic(&mut a, 'o'));
     menu::close(&mut a);
@@ -300,22 +302,22 @@ fn russian_menus_editor_modals_and_metadata_fit_without_translating_paths() -> i
             MenuId::FileManager,
         ] {
             menu::open(&mut a, 5);
-            a.submenus.push((id, 0));
+            a.modals.submenus_mut().push((id, 0));
             draw(&mut a, w, h)?;
             menu::close(&mut a);
         }
     }
     editor::open_path(&mut a, path.clone());
     let end = Instant::now() + Duration::from_secs(5);
-    while a.desktop.editor().is_some_and(|e| e.busy()) {
+    while a.desktop.active_editor().is_some_and(|e| e.busy()) {
         a.poll();
         assert!(Instant::now() < end);
         thread::sleep(Duration::from_millis(1));
     }
-    assert!(a.desktop.editor().is_some());
+    assert!(a.desktop.active_editor().is_some());
     let original = a
         .desktop
-        .editor()
+        .active_editor()
         .unwrap()
         .buffer
         .as_ref()
@@ -344,7 +346,13 @@ fn russian_menus_editor_modals_and_metadata_fit_without_translating_paths() -> i
     assert!(s.contains("Найти:"));
     editor::action(&mut a, editor::EditorAction::Cancel);
     assert_eq!(
-        a.desktop.editor().unwrap().buffer.as_ref().unwrap().text,
+        a.desktop
+            .active_editor()
+            .unwrap()
+            .buffer
+            .as_ref()
+            .unwrap()
+            .text,
         original
     );
     let info = dn::file_info::inspect(&path)?;

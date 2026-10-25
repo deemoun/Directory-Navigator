@@ -93,7 +93,7 @@ def package(root, version, target, output):
     name = archive_name(version, target)
     binary_name = "dn.exe" if target.endswith("windows-msvc") else "dn"
     binary = root / "target" / target / "release" / binary_name
-    files = [(binary, binary_name), (root / "LICENSE", "LICENSE"), (root / "README.md", "README.md"),
+    files = [(binary, binary_name), (root / "LICENSE", "LICENSE"), (root / "README.md", "README.md"), (root / "THIRD_PARTY_NOTICES.md", "THIRD_PARTY_NOTICES.md"),
              (root / "docs/USER_GUIDE.md", "docs/USER_GUIDE.md")]
     if any(p.is_symlink() or not p.is_file() for p, _ in files):
         raise ValueError("Missing or non-regular release input")

@@ -79,8 +79,7 @@ impl SearchDialog {
     }
     pub fn tab(&mut self, reverse: bool) {
         let choices = self.choices();
-        let index = choices.iter().position(|f| *f == self.focus).unwrap_or(0);
-        self.focus = choices[(index + if reverse { choices.len() - 1 } else { 1 }) % choices.len()];
+        self.focus = crate::control_focus::select(self.focus, &choices, reverse);
     }
     pub fn toggle(&mut self, choice: usize) {
         match choice {
