@@ -1,4 +1,3 @@
-#![cfg(feature = "turbo-vision")]
 use dn::{
     desktop::{Desktop, WindowId, WindowKind},
     focus::Focus,

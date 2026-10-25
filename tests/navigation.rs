@@ -1,6 +1,7 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 #[cfg(unix)]
 use dn::panel;
+use dn::testing::{backend::TestBackend, layout::Rect, Terminal};
 use dn::{
     app::App,
     columns::ColumnPreset,
@@ -12,7 +13,6 @@ use dn::{
     panel_layout::{PanelGeometry, PanelLayout},
     ui,
 };
-use ratatui::{backend::TestBackend, layout::Rect, Terminal};
 use std::{
     fs, io,
     path::PathBuf,

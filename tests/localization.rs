@@ -1,5 +1,6 @@
 use chrono::{TimeZone, Utc};
 use crossterm::event::{KeyCode, KeyModifiers};
+use dn::testing::{backend::TestBackend, Terminal};
 use dn::{
     app::App,
     clock_view::Clock,
@@ -13,7 +14,6 @@ use dn::{
     ui,
     viewer::Viewer,
 };
-use ratatui::{backend::TestBackend, Terminal};
 use std::{
     collections::BTreeSet,
     fs, io,

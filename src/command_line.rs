@@ -1,5 +1,4 @@
 //! Session-only command prompt; commands share the interactive user-menu runner.
-use crate::painting::{Frame, Paragraph};
 use crate::presentation::layout::Rect;
 use crate::{
     app::App,
@@ -267,17 +266,4 @@ pub(crate) fn presentation(app: &mut App, area: Rect) -> (String, Option<(u16, u
             None
         },
     )
-}
-pub fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
-    let (text, cursor) = presentation(app, area);
-    frame.render_widget(
-        Paragraph::new(text).style(app.config.palette.dos(0x07)),
-        area,
-    );
-    app.mouse
-        .regions
-        .push((area, crate::mouse::Target::CommandLine));
-    if let Some(cursor) = cursor {
-        frame.set_cursor_position(cursor);
-    }
 }

@@ -1,6 +1,7 @@
 use crossterm::event::{
     KeyCode as K, KeyEvent, KeyModifiers as M, MouseButton, MouseEvent, MouseEventKind,
 };
+use dn::testing::{backend::TestBackend, Terminal};
 use dn::{
     app::App,
     config::Store,
@@ -11,7 +12,6 @@ use dn::{
     ui,
     welcome::{self, Action},
 };
-use ratatui::{backend::TestBackend, Terminal};
 use std::{
     fs, io,
     path::PathBuf,

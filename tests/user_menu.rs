@@ -1,4 +1,5 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+use dn::testing::{backend::TestBackend, Terminal};
 #[cfg(unix)]
 use dn::user_menu::runner;
 use dn::{
@@ -13,7 +14,6 @@ use dn::{
         Action,
     },
 };
-use ratatui::{backend::TestBackend, Terminal};
 use std::{
     fs, io,
     path::PathBuf,
@@ -364,7 +364,7 @@ fn review_wraps_unicode_arguments_and_expansion_is_bounded() -> io::Result<()> {
     assert!(m
         .review_lines
         .iter()
-        .all(|s| ratatui::text::Span::raw(s).width() <= 72));
+        .all(|s| dn::testing::text::Span::raw(s).width() <= 72));
     assert!(user_menu::plan(&a, &[vec!["printf".into(), "x".repeat(70 * 1024)]]).is_err());
     assert!(user_menu::plan(&a, &[vec!["{selected}".into()]]).is_err());
     key(&mut a, KeyCode::F(1));

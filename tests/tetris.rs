@@ -1,4 +1,5 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+use dn::testing::{backend::TestBackend, Terminal};
 use dn::{
     app::App,
     input,
@@ -7,7 +8,6 @@ use dn::{
     tetris::{self, Game, GameAction, Piece, Record, Screen, FIGURES, HEIGHT, WIDTH},
     ui,
 };
-use ratatui::{backend::TestBackend, Terminal};
 use std::{
     fs, io,
     path::PathBuf,

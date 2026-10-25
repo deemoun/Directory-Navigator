@@ -1,5 +1,5 @@
+use dn::testing::{backend::TestBackend, Terminal};
 use dn::{app::App, panel::Panel, panel_layout::PanelLayout, ui};
-use ratatui::{backend::TestBackend, Terminal};
 use std::{
     fs, io,
     path::PathBuf,

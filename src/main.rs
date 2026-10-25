@@ -1,6 +1,5 @@
 use crossterm::event::{Event, MouseEventKind};
-#[cfg(not(feature = "turbo-vision"))]
-use dn::ui;
+
 use dn::{app::App, input, mouse, terminal::Session};
 use std::io;
 
@@ -26,21 +25,17 @@ fn run() -> io::Result<()> {
     let mut app = App::new(std::env::current_dir()?)?;
     app.load_initial_config();
     let (session, mut terminal) = Session::start()?;
-    #[cfg(feature = "turbo-vision")]
     terminal.bind_desktop(app.desktop.native());
     let mut dirty = true;
     loop {
         dirty |= app.poll();
-        #[cfg(feature = "turbo-vision")]
         app.desktop
             .native()
             .set_scope(dn::turbo::desktop::Scope::for_app(&app));
         if dirty {
             session.cursor_style(dn::focus::current(&app) == dn::focus::Focus::Manager)?;
-            #[cfg(feature = "turbo-vision")]
             terminal.draw_app(&mut app)?;
-            #[cfg(not(feature = "turbo-vision"))]
-            terminal.draw(|frame| ui::draw(frame, &mut app))?;
+
             dirty = false;
         }
         if app.quit {
@@ -83,7 +78,6 @@ fn run() -> io::Result<()> {
             if let Event::Mouse(mouse) = &event {
                 session.mouse_event(mouse.kind);
             }
-            #[cfg(feature = "turbo-vision")]
             if app.desktop.native().dispatch().is_none() {
                 continue;
             }

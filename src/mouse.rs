@@ -1,6 +1,5 @@
 use crate::focus::{self, Focus};
-#[cfg(not(feature = "turbo-vision"))]
-use crate::presentation::layout::Position;
+
 use crate::presentation::layout::Rect;
 use crate::{
     app::App,
@@ -106,19 +105,11 @@ fn handle_mouse(app: &mut App, event: MouseEvent) {
         app.quick_search = None;
     }
     let focus = focus::current(app);
-    #[cfg(feature = "turbo-vision")]
     let target = app
         .desktop
         .native()
         .mouse_target(&app.mouse.regions, event.column, event.row);
-    #[cfg(not(feature = "turbo-vision"))]
-    let target = app
-        .mouse
-        .regions
-        .iter()
-        .rev()
-        .find(|(rect, _)| rect.contains(Position::new(event.column, event.row)))
-        .map(|(_, target)| *target);
+
     if focus == Focus::WindowList {
         crate::windowing::mouse(app, event, target);
         return;

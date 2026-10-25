@@ -1,6 +1,7 @@
 use crossterm::event::{
     Event, KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
 };
+use dn::testing::{backend::TestBackend, Terminal};
 use dn::{
     app::App,
     config::Config,
@@ -9,7 +10,6 @@ use dn::{
     screensaver::{self, State},
     ui,
 };
-use ratatui::{backend::TestBackend, Terminal};
 use std::{
     fs, io,
     path::PathBuf,

@@ -366,6 +366,7 @@ fn window_list_profiles_languages_resize_mouse_and_background_tools() -> io::Res
     use crossterm::event::{
         KeyCode as K, KeyEvent, KeyModifiers as M, MouseButton, MouseEvent, MouseEventKind,
     };
+    use dn::testing::{backend::TestBackend, Terminal};
     use dn::{
         localization::Language,
         mouse::{self, Target},
@@ -373,7 +374,6 @@ fn window_list_profiles_languages_resize_mouse_and_background_tools() -> io::Res
         shortcuts::Profile,
         windowing::Action,
     };
-    use ratatui::{backend::TestBackend, Terminal};
     let temp = Temp::new()?;
     for language in [Language::English, Language::Russian] {
         for profile in [Profile::ClassicDn, Profile::Mac] {
@@ -515,12 +515,12 @@ fn editor_quit_waits_for_operation_and_cancelled_exit_never_rearms_itself() -> i
 #[test]
 fn window_menu_actions_and_modal_title_close_preserve_existing_shortcuts() -> io::Result<()> {
     use crossterm::event::{KeyCode as K, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+    use dn::testing::{backend::TestBackend, Terminal};
     use dn::{
         menu,
         mouse::{self, Target},
         windowing::Action,
     };
-    use ratatui::{backend::TestBackend, Terminal};
     let temp = Temp::new()?;
     let mut app = temp.app()?;
     assert!(menu::items(4)

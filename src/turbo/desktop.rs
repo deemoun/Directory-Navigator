@@ -53,7 +53,6 @@ struct Document {
     info: WindowInfo,
     scope: Scope,
     mailbox: Mailbox,
-    pixels: Vec<Cell>,
     native: Vec<(u16, u16, Cell)>,
 }
 impl Document {
@@ -68,7 +67,6 @@ impl Document {
             info,
             scope,
             mailbox,
-            pixels: Vec::new(),
             native: Vec::new(),
         }
     }
@@ -103,9 +101,6 @@ impl View for Document {
         let width = usize::try_from(self.bounds().width()).unwrap_or(0);
         if width == 0 {
             return;
-        }
-        for (i, cell) in self.pixels.iter().copied().enumerate() {
-            terminal.write_cell((i % width) as i16, (i / width) as i16, cell);
         }
         for &(x, y, cell) in &self.native {
             terminal.write_cell(x as i16, y as i16, cell);
@@ -246,13 +241,7 @@ impl NativeDesktop {
         let receipt = host.mailbox.borrow_mut().take();
         receipt
     }
-    pub(super) fn draw(
-        &self,
-        terminal: &mut Terminal,
-        bounds: Rect,
-        pixels: &[Cell],
-        native: &[(u16, u16, Cell)],
-    ) {
+    pub(super) fn draw(&self, terminal: &mut Terminal, bounds: Rect, native: &[(u16, u16, Cell)]) {
         let mut host = self.0.borrow_mut();
         if host.bounds != bounds {
             host.bounds = bounds;
@@ -268,10 +257,8 @@ impl NativeDesktop {
                 .as_any_mut()
                 .downcast_mut::<Document>()
                 .expect("DN native window");
-            document.pixels.clear();
             document.native.clear();
             if i + 1 == count {
-                document.pixels.extend_from_slice(pixels);
                 document.native.extend_from_slice(native);
             }
         }

@@ -1,5 +1,5 @@
 //! Native Tetris drawing. Game rules and input actions stay in `tetris`.
-//! No Ratatui widgets or frame are used here; the document paints these cells
+//! The document paints these native cells
 //! through TV. The codec boundary preserves graphemes and terminal-theme colors.
 use super::scene::Scene;
 use crate::{

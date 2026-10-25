@@ -18,33 +18,6 @@ pub(super) fn label_spans(label: &str, normal: Style, hot: Style) -> Vec<Span<'_
         .collect()
 }
 
-pub(super) fn draw_bar(frame: &mut impl Frame, app: &mut App, area: Rect) -> Vec<Rect> {
-    let language = app.config.language;
-    let profile = app.config.palette;
-    let dos = profile.styles();
-    frame.render_widget(Block::default().style(dos(0x70)), area);
-    let header = super::clock::header(app, area);
-    let mut x = area.x;
-    let mut positions = Vec::new();
-    for (index, label) in menu::LABELS.iter().enumerate() {
-        let label = language.text(label);
-        let width = Line::from(menu::plain(label)).width() as u16 + 3;
-        let rect = Rect::new(x, area.y, width, 1).intersection(header);
-        let selected = app.menu.is_some_and(|(root, _)| root == index);
-        let normal = dos(if selected { 0x30 } else { 0x70 });
-        let hot = dos(if selected { 0x3e } else { 0x74 });
-        let mut spans = vec![Span::styled(" ", normal)];
-        spans.extend(label_spans(label, normal, hot));
-        spans.push(Span::styled("  ", normal));
-        frame.render_widget(Paragraph::new(Line::from(spans)), rect);
-        positions.push(rect);
-        app.mouse.regions.push((rect, Target::Menu(index)));
-        x += width;
-    }
-    super::clock::draw(frame, app, area);
-    positions
-}
-
 fn menu_width(
     entries: &[menu::Item],
     language: crate::localization::Language,

@@ -8,17 +8,8 @@ pub fn select(current: usize, choices: &[usize], reverse: bool) -> usize {
     if choices.is_empty() {
         return current;
     }
-    #[cfg(feature = "turbo-vision")]
-    {
-        native::select(current, choices, reverse)
-    }
-    #[cfg(not(feature = "turbo-vision"))]
-    {
-        let i = choices.iter().position(|v| *v == current).unwrap_or(0);
-        choices[(i + if reverse { choices.len() - 1 } else { 1 }) % choices.len()]
-    }
+    native::select(current, choices, reverse)
 }
-#[cfg(feature = "turbo-vision")]
 mod native {
     use std::cell::RefCell;
     use turbo_vision::{

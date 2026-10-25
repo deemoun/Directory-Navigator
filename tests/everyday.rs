@@ -1,6 +1,7 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 #[cfg(unix)]
 use dn::pattern;
+use dn::testing::{backend::TestBackend, Terminal};
 use dn::{
     app::App,
     columns::ColumnPreset,
@@ -11,7 +12,6 @@ use dn::{
     pattern::Wildcard,
     ui,
 };
-use ratatui::{backend::TestBackend, Terminal};
 use std::{
     ffi::OsStr,
     fs, io,
@@ -519,7 +519,7 @@ fn new_menu_entries_open_their_mouse_dialogs() -> io::Result<()> {
 
 #[test]
 fn function_bar_has_continuous_label_background_after_resize() -> io::Result<()> {
-    use ratatui::style::Color;
+    use dn::testing::style::Color;
     let temp = Temp::new()?;
     let mut app = temp.app()?;
     app.config.shortcuts = dn::shortcuts::Profile::ClassicDn;
@@ -588,7 +588,7 @@ fn panel_footer_sizes_totals_paths_and_resized_mouse_rows() -> io::Result<()> {
         .collect();
     assert!(path.starts_with('…'));
     assert!(path.replace(' ', "").ends_with("終点>"));
-    assert!(ratatui::text::Span::raw(formatting::tail("abc終点>", 6)).width() <= 6);
+    assert!(dn::testing::text::Span::raw(formatting::tail("abc終点>", 6)).width() <= 6);
     assert_eq!(formatting::grouped_bytes(0), "0");
     assert_eq!(formatting::grouped_bytes(1_234_567_890), "1,234,567,890");
     Ok(())

@@ -61,7 +61,7 @@ impl Codec {
         self.symbols.clear();
         self.free.clear();
         self.next = 0;
-        self.positions = vec![None; 2 * usize::from(size.width) * usize::from(size.height)];
+        self.positions = vec![None; usize::from(size.width) * usize::from(size.height)];
         self.size = size;
     }
     fn release(&mut self, x: u16, y: u16) {
@@ -149,16 +149,12 @@ impl Codec {
             unicode_width::UnicodeWidthStr::width(symbol).max(1),
         ))
     }
-    // Native views and the retained canvas have separate live-cell references.
-    // Hiding a native view must not retire a glyph still used by its background.
-    pub fn clear_native(&mut self) {
-        let start = usize::from(self.size.width) * usize::from(self.size.height);
-        for token in self.positions[start..].iter_mut().filter_map(Option::take) {
-            self.glyphs.get_mut(&token).expect("live native glyph").1 -= 1;
+    // Keep old glyph identities until the terminal has committed its diff. A
+    // repeated grapheme then retains its token across consecutive native frames.
+    pub fn begin_frame(&mut self) {
+        for token in self.positions.iter_mut().filter_map(Option::take) {
+            self.glyphs.get_mut(&token).expect("live glyph").1 -= 1;
         }
-    }
-    pub fn native_cell(&mut self, x: u16, y: u16, cell: &Cell) -> io::Result<(TvCell, usize)> {
-        self.cell(x, y + self.size.height, cell)
     }
     pub fn committed(&mut self) {
         let dead: Vec<_> = self
@@ -260,29 +256,29 @@ fn color_parameters(color: Color, foreground: bool) -> String {
 mod tests {
     use super::*;
     #[test]
-    fn native_layer_retirement_preserves_background_graphemes() -> io::Result<()> {
+    fn frame_retirement_reuses_live_graphemes_and_reclaims_only_after_commit() -> io::Result<()> {
         let mut codec = Codec::default();
         codec.resize(Size::new(8, 2));
         let mut source = Cell::default();
         source.set_symbol("e\u{301}");
-        let background = codec.cell(0, 0, &source)?.0.ch;
-        let native = codec.native_cell(0, 0, &source)?.0.ch;
-        assert_eq!(background, native);
-        codec.clear_native();
-        codec.committed();
-        assert_eq!(codec.glyphs[&background].1, 1);
+        let token = codec.cell(0, 0, &source)?.0.ch;
+        assert_eq!(token, codec.cell(1, 0, &source)?.0.ch);
+        codec.begin_frame();
         assert_eq!(
-            codec.decode(background.to_string().as_bytes())?,
+            codec.decode(token.to_string().as_bytes())?,
             "e\u{301}".as_bytes()
         );
+        assert_eq!(token, codec.cell(0, 0, &source)?.0.ch);
+        codec.committed();
+        assert_eq!(codec.glyphs[&token].1, 1);
         for n in 0..1024 {
+            codec.begin_frame();
             source.set_symbol(&format!("界\u{301}{n}"));
-            codec.native_cell(1, 0, &source)?;
-            codec.clear_native();
+            codec.cell(1, 0, &source)?;
             codec.committed();
             assert_eq!(codec.glyphs.len(), 1);
         }
-        codec.cell(0, 0, &Cell::default())?;
+        codec.begin_frame();
         codec.committed();
         assert!(codec.glyphs.is_empty());
         Ok(())

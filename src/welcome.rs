@@ -1,8 +1,6 @@
 //! Session-only welcome state. Configuration existence determines first-run display.
 use crate::{app::App, settings::SettingsKind};
 use crossterm::event::KeyEvent;
-#[cfg(not(feature = "turbo-vision"))]
-use crossterm::event::{KeyCode as K, KeyModifiers as M};
 
 #[derive(Default)]
 pub struct State {
@@ -42,41 +40,6 @@ pub fn action(app: &mut App, action: Action) {
         Action::Help => crate::dialog::keyboard_help(app),
     }
 }
-#[cfg(feature = "turbo-vision")]
 pub fn key(app: &mut App, key: KeyEvent) {
     crate::turbo::forms::welcome_key(app, key);
-}
-#[cfg(not(feature = "turbo-vision"))]
-pub fn key(app: &mut App, key: KeyEvent) {
-    let (width, height) = app.utilities.size;
-    if width < 80 || height < 25 {
-        return;
-    }
-    let Some(welcome) = &mut app.welcome.dialog else {
-        return;
-    };
-    if key.modifiers.intersects(M::CONTROL | M::ALT | M::SUPER) {
-        return;
-    }
-    let selected = match key.code {
-        K::Esc => Some(Action::Start),
-        K::F(1) => Some(Action::Help),
-        K::Enter => Some(BUTTONS[welcome.focus].1),
-        K::Tab | K::Right | K::Down => {
-            welcome.focus = (welcome.focus + 1) % BUTTONS.len();
-            None
-        }
-        K::BackTab | K::Left | K::Up => {
-            welcome.focus = (welcome.focus + BUTTONS.len() - 1) % BUTTONS.len();
-            None
-        }
-        K::Char(c) => BUTTONS
-            .iter()
-            .find(|(label, _)| app.config.language.matches(label, c))
-            .map(|(_, action)| *action),
-        _ => None,
-    };
-    if let Some(selected) = selected {
-        action(app, selected);
-    }
 }

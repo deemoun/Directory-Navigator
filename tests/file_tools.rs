@@ -1,4 +1,5 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+use dn::testing::{backend::TestBackend, Terminal};
 use dn::{
     app::App,
     editor::{self, EditorAction},
@@ -14,7 +15,6 @@ use dn::{
     mouse::{self, Target},
     ui,
 };
-use ratatui::{backend::TestBackend, Terminal};
 use std::{
     collections::BTreeSet,
     ffi::OsString,

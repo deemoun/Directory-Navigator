@@ -2,7 +2,7 @@
 
 ## Architecture
 - Native Rust `dn`: Turbo Vision/Crossterm/Chrono, Unicode segmentation, Unix libc;
-  Ratatui remains behind text/style/layout and reference-renderer boundaries;
+  owned presentation geometry/styles/text and native headless test captures;
   macOS native Trash via `trash`, Windows native shell APIs; minimal ZIP/TAR/gzip
   codec features via zip/tar/flate2; TOML parser for grouped preferences.
 - Session Desktop owns editor/viewer/game content and stable WindowId values;
@@ -21,26 +21,20 @@
 Current Turbo Vision status is authoritative in docs/TURBO_VISION_MIGRATION.md;
 older increment entries below also record earlier migration stages.
 
-- Production now uses Turbo Vision's terminal directly: no Ratatui Terminal,
-  Frame, Buffer or widget rendering. Native primitives own borders/wrapping;
-  the codec owns grapheme/color cells. Reference buffers stay unallocated on the
-  runtime path, including resize and terminal clear/resume. `presentation` is
-  the sole shared Ratatui text/style/layout data boundary; reference rendering
-  and reference transport live separately. The default dependency graph enables
-  no Ratatui features. The legacy renderer requires `--no-default-features
-  --features legacy-ui`. Data/layout replacement and reference retirement remain
-  before the package can be removed completely.
-- All runtime surfaces use native painting, including dropdowns, dialogs, quick
-  view, editor/viewer, utilities and auxiliary windows. Native Groups own control
-  traversal in menus/search/settings/utilities/tools and positional mouse hits.
-  Disabled choices and external mouse/mnemonic focus are synchronized. Foreground
-  modal scopes and document z-order remain native; domain commands retain
-  save-before-close and filesystem guards. Full-screen layouts are preserved.
-  Local ARM64: 401 native tests and 382 legacy tests pass (one opt-in Trash check
-  ignored per suite); direct-host appearance comparisons (1,876 frame pairs),
-  fmt/Clippy/release and interactive pane/game/viewer/quick-view/
-  calculator/editor/Save As/resize/shell-restoration workflows pass. Windows/Linux
-  validation was excluded; native Intel Mac validation also remains outstanding.
+- Turbo Vision is now the sole renderer and a mandatory dependency. Ratatui,
+  its text/style/layout aliases, legacy renderer/transport, feature gates and
+  duplicate pane/Tetris painters are removed. The lockfile and resolved dependency
+  graph contain no Ratatui. `--no-default-features` still builds the native UI.
+- Owned presentation types handle bounded layout allocation, styles and full
+  Unicode text. The native codec has one glyph-reference plane and no retained
+  legacy pixels. Existing behavioral tests use a native headless snapshot sink;
+  frozen geometry/wrapping and a 40-scene before/after capture preserve appearance.
+  Independent ANSI decoding checks 1,876 native frames and mouse/cursor behavior.
+  Native Desktop/modal input/focus and existing editing/filesystem guards remain.
+  Local ARM64: 405 tests pass (one opt-in native Trash check ignored),
+  fmt/Clippy/release/no-default-features builds and interactive pane/game/viewer/
+  quick-view/calculator/editor/Save As/resize/shell-restoration checks pass.
+  Windows/Linux validation stays excluded; Intel Mac execution is also unvalidated.
 - Native main file-manager drawing: both panes (brief/details and all columns),
   headers, rows/type/tag/selection colors, scrollbars, filters/quick search,
   details/totals/space, menu bar/clock, command line/cursor and function bar now

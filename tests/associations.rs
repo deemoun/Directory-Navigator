@@ -1,4 +1,5 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use dn::testing::{backend::TestBackend, Terminal};
 use dn::{
     app::App,
     associations::{
@@ -8,7 +9,6 @@ use dn::{
     config::Store,
     input, menu, ui,
 };
-use ratatui::{backend::TestBackend, Terminal};
 use std::{
     ffi::OsString,
     fs, io,

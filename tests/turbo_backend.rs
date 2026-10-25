@@ -1,11 +1,9 @@
-#![cfg(feature = "turbo-vision")]
-use dn::turbo::TurboBackend;
-use ratatui::{
-    backend::Backend,
-    buffer::Cell,
+use dn::testing::{
     layout::{Position, Size},
     style::{Color, Modifier},
+    Cell,
 };
+use dn::turbo::TurboBackend;
 use std::{
     io::{self, Write},
     sync::{Arc, Mutex},
@@ -33,6 +31,29 @@ fn cell(text: &str) -> Cell {
         .set_bg(Color::Indexed(240));
     c
 }
+fn paint_cells<'a>(
+    backend: &mut TurboBackend<Output>,
+    cells: impl IntoIterator<Item = (u16, u16, &'a Cell)>,
+) -> io::Result<()> {
+    use dn::painting::{Frame, NativeFrame, Paragraph};
+    let size = backend.size()?;
+    let mut frame = NativeFrame::new(
+        dn::presentation::layout::Rect::new(0, 0, size.width, size.height),
+        dn::palette::PaletteProfile::ClassicDn,
+    );
+    for (x, y, c) in cells {
+        frame.render_widget(
+            Paragraph::new(c.symbol()).style(
+                dn::presentation::style::Style::default()
+                    .fg(c.fg)
+                    .bg(c.bg)
+                    .add_modifier(c.modifier),
+            ),
+            dn::presentation::layout::Rect::new(x, y, size.width.saturating_sub(x), 1),
+        );
+    }
+    backend.draw_frame(frame)
+}
 #[test]
 fn native_view_transport_preserves_graphemes_wide_cells_private_use_and_indexed_palette(
 ) -> io::Result<()> {
@@ -45,7 +66,7 @@ fn native_view_transport_preserves_graphemes_wide_cells_private_use_and_indexed_
         (9, 0, cell("\u{f0000}")),
         (12, 0, cell("\u{100000}")),
     ];
-    backend.draw(cells.iter().map(|(x, y, c)| (*x, *y, c)))?;
+    paint_cells(&mut backend, cells.iter().map(|(x, y, c)| (*x, *y, c)))?;
     backend.set_cursor_position(Position::new(17, 2))?;
     backend.flush()?;
     let text = output.take();
@@ -67,7 +88,7 @@ fn changed_combining_sequences_never_reuse_live_tokens_or_leave_previous_width()
     for i in 0..1000 {
         let symbol = if i % 2 == 0 { "e\u{301}" } else { "e\u{300}" };
         let c = cell(symbol);
-        backend.draw([(0, 0, &c)].into_iter())?;
+        paint_cells(&mut backend, [(0, 0, &c)])?;
         backend.flush()?;
         let text = output.take();
         assert!(
@@ -76,19 +97,19 @@ fn changed_combining_sequences_never_reuse_live_tokens_or_leave_previous_width()
         );
     }
     let wide = cell("界");
-    backend.draw([(0, 0, &wide)].into_iter())?;
+    paint_cells(&mut backend, [(0, 0, &wide)])?;
     backend.flush()?;
     output.take();
     let narrow = cell("x");
     let blank = cell(" ");
-    backend.draw([(0, 0, &narrow), (1, 0, &blank)].into_iter())?;
+    paint_cells(&mut backend, [(0, 0, &narrow), (1, 0, &blank)])?;
     backend.flush()?;
     let text = output.take();
     assert!(text.contains("x "));
     backend.resize(Size::new(80, 25))?;
     backend.clear()?;
     let c = cell("e\u{301}");
-    backend.draw([(0, 0, &c)].into_iter())?;
+    paint_cells(&mut backend, [(0, 0, &c)])?;
     backend.flush()?;
     assert!(output.take().contains("e\u{301}"));
     Ok(())
@@ -110,7 +131,10 @@ fn terminal_theme_indices_rgb_default_colors_and_styles_survive_transport() -> i
     rgb.bg = Color::Reset;
     rgb.modifier = Modifier::BOLD | Modifier::ITALIC | Modifier::UNDERLINED | Modifier::REVERSED;
     cells.push(rgb);
-    backend.draw(cells.iter().enumerate().map(|(x, c)| (x as u16, 0, c)))?;
+    paint_cells(
+        &mut backend,
+        cells.iter().enumerate().map(|(x, c)| (x as u16, 0, c)),
+    )?;
     backend.flush()?;
     let text = output.take();
     for n in 0..16 {
@@ -150,7 +174,7 @@ fn screen(bytes: &str, size: Size) -> Vec<String> {
         }
         let end = rest.find('\x1b').unwrap_or(rest.len());
         for grapheme in rest[..end].graphemes(true) {
-            let width = ratatui::text::Span::raw(grapheme).width();
+            let width = dn::testing::text::Span::raw(grapheme).width();
             if x < usize::from(size.width) && y < usize::from(size.height) {
                 cells[y * usize::from(size.width) + x] = grapheme.into();
                 for offset in 1..width {
@@ -167,8 +191,8 @@ fn screen(bytes: &str, size: Size) -> Vec<String> {
 }
 #[test]
 fn all_existing_screen_kinds_reach_turbo_vision_without_cell_changes() -> io::Result<()> {
+    use dn::testing::{backend::TestBackend, Terminal};
     use dn::{app::App, palette::PaletteProfile, utilities::Kind};
-    use ratatui::{backend::TestBackend, Terminal};
     use std::{
         fs, thread,
         time::{Duration, Instant},
@@ -222,7 +246,7 @@ fn all_existing_screen_kinds_reach_turbo_vision_without_cell_changes() -> io::Re
                         let mut x = 0;
                         while x < size.width {
                             let c = &buffer[(x, y)];
-                            let width = ratatui::text::Span::raw(c.symbol())
+                            let width = dn::testing::text::Span::raw(c.symbol())
                                 .width()
                                 .max(1)
                                 .min(usize::from(size.width - x));
@@ -244,7 +268,7 @@ fn all_existing_screen_kinds_reach_turbo_vision_without_cell_changes() -> io::Re
                     app.desktop
                         .native()
                         .set_scope(dn::turbo::desktop::Scope::for_app(&app));
-                    native.draw(painted.into_iter())?;
+                    paint_cells(&mut native, painted)?;
                     native.flush()?;
                     assert_eq!(
                         screen(&output.take(), size),
@@ -261,7 +285,7 @@ fn all_existing_screen_kinds_reach_turbo_vision_without_cell_changes() -> io::Re
 }
 
 // Track the final colored screen across multiple differential frames. This
-// catches native cells left behind when pieces move or a legacy page takes over.
+// catches native cells left behind when pieces move or a snapshot page takes over.
 fn colored_screen(bytes: &str, size: Size) -> Vec<(String, String, String)> {
     use unicode_segmentation::UnicodeSegmentation;
     let mut cells = vec![
@@ -319,7 +343,7 @@ fn colored_screen(bytes: &str, size: Size) -> Vec<(String, String, String)> {
         }
         let end = rest.find('\x1b').unwrap_or(rest.len());
         for glyph in rest[..end].graphemes(true) {
-            let width = ratatui::text::Span::raw(glyph).width();
+            let width = dn::testing::text::Span::raw(glyph).width();
             if x < usize::from(size.width) && y < usize::from(size.height) {
                 cells[y * usize::from(size.width) + x] = (glyph.into(), fg.clone(), bg.clone());
                 for offset in 1..width.min(usize::from(size.width) - x) {
@@ -334,8 +358,39 @@ fn colored_screen(bytes: &str, size: Size) -> Vec<(String, String, String)> {
     cells
 }
 
+fn snapshot_pixels(buffer: &dn::testing::Buffer) -> Vec<(String, String, String)> {
+    use unicode_width::UnicodeWidthStr;
+    fn color(c: Color) -> String {
+        match c {
+            Color::Reset => "default".into(),
+            Color::Indexed(n) => format!("[5, {n}]"),
+            Color::Rgb(r, g, b) => format!("[2, {r}, {g}, {b}]"),
+            _ => panic!("unexpected named snapshot color {c:?}"),
+        }
+    }
+    let mut pixels = Vec::with_capacity(buffer.content.len());
+    for row in buffer.content.chunks(usize::from(buffer.area.width)) {
+        let mut skip = 0;
+        let mut fg = String::new();
+        let mut bg = String::new();
+        for c in row {
+            if skip > 0 {
+                pixels.push((String::new(), fg.clone(), bg.clone()));
+                skip -= 1;
+                continue;
+            }
+            fg = color(c.fg);
+            bg = color(c.bg);
+            skip = c.symbol().width().saturating_sub(1);
+            pixels.push((c.symbol().into(), fg.clone(), bg.clone()));
+        }
+    }
+    pixels
+}
+
 #[test]
-fn native_tetris_matches_legacy_colors_text_targets_and_transitions() -> io::Result<()> {
+fn native_tetris_matches_snapshot_colors_text_targets_and_transitions() -> io::Result<()> {
+    use dn::testing::{backend::TestBackend, Terminal};
     use dn::{
         app::App,
         localization::Language,
@@ -343,7 +398,6 @@ fn native_tetris_matches_legacy_colors_text_targets_and_transitions() -> io::Res
         tetris::{Game, Record, Screen},
         ui,
     };
-    use ratatui::Terminal;
     for palette in [PaletteProfile::ClassicDn, PaletteProfile::Terminal] {
         for language in [Language::English, Language::Russian] {
             for size in [Size::new(80, 25), Size::new(132, 40), Size::new(83, 27)] {
@@ -360,14 +414,12 @@ fn native_tetris_matches_legacy_colors_text_targets_and_transitions() -> io::Res
                     score: 1234,
                 });
                 game.board[18] = [9; dn::tetris::WIDTH];
-                let legacy_output = Output::default();
                 let native_output = Output::default();
-                let mut legacy =
-                    Terminal::new(TurboBackend::with_size(legacy_output.clone(), size)?)?;
+                let mut snapshot = Terminal::new(TestBackend::new(size.width, size.height))?;
                 let mut native = TurboBackend::with_size(native_output.clone(), size)?;
-                legacy.backend_mut().bind_desktop(app.desktop.native());
+
                 native.bind_desktop(app.desktop.native());
-                let (mut expected, mut actual) = (String::new(), String::new());
+                let mut actual = String::new();
                 for step in 0..35 {
                     if let Some(game) = app.desktop.game_mut() {
                         match step {
@@ -463,16 +515,16 @@ fn native_tetris_matches_legacy_colors_text_targets_and_transitions() -> io::Res
                         app.show_game(Game::with_seed(99, std::time::Instant::now()));
                     }
                     if step == 12 {
-                        // Both native raster and legacy canvas must survive resize.
-                        legacy.backend_mut().resize(Size::new(100, 30))?;
+                        // Both native raster and snapshot canvas must survive resize.
+                        snapshot.backend_mut().resize(100, 30);
                         native.resize(Size::new(100, 30))?;
                     }
                     if step == 13 {
-                        legacy.backend_mut().resize(Size::new(50, 12))?;
+                        snapshot.backend_mut().resize(50, 12);
                         native.resize(Size::new(50, 12))?;
                     }
                     if step == 14 {
-                        legacy.backend_mut().resize(size)?;
+                        snapshot.backend_mut().resize(size.width, size.height);
                         native.resize(size)?;
                     }
                     if step == 15 {
@@ -495,13 +547,13 @@ fn native_tetris_matches_legacy_colors_text_targets_and_transitions() -> io::Res
                         app.game_scores.add(record.clone())?;
                         app.desktop.game_mut().unwrap().records = vec![record];
                     }
-                    legacy.draw(|frame| ui::draw(frame, &mut app))?;
+                    snapshot.draw(|frame| ui::draw(frame, &mut app))?;
                     let targets = format!("{:?}", app.mouse.regions);
-                    expected.push_str(&legacy_output.take());
+
                     native.draw_app(&mut app)?;
                     if app.desktop.game().is_some_and(|g| g.screen == Screen::Name) {
                         assert_eq!(
-                            legacy.backend_mut().get_cursor_position()?,
+                            snapshot.get_cursor_position()?,
                             native.get_cursor_position()?,
                             "name cursor step={step}"
                         );
@@ -522,7 +574,7 @@ fn native_tetris_matches_legacy_colors_text_targets_and_transitions() -> io::Res
                         13 => Size::new(50, 12),
                         _ => size,
                     };
-                    let expected_cells = colored_screen(&expected, dimensions);
+                    let expected_cells = snapshot_pixels(snapshot.backend().buffer());
                     let actual_cells = colored_screen(&actual, dimensions);
                     if let Some(index) = expected_cells
                         .iter()
@@ -558,31 +610,33 @@ fn native_tetris_matches_legacy_colors_text_targets_and_transitions() -> io::Res
 #[test]
 fn native_tetris_clips_a_scene_prepared_before_terminal_shrink() -> io::Result<()> {
     use dn::{app::App, tetris::Game, ui};
-    use ratatui::{backend::TestBackend, Terminal};
     let mut app = App::new(std::env::current_dir()?)?;
     app.show_game(Game::default());
-    let mut canvas = Terminal::new(TestBackend::new(132, 40))?;
-    canvas.draw(|frame| ui::draw_native(frame, &mut app))?;
+    use dn::{painting::NativeFrame, presentation::layout::Rect};
     let output = Output::default();
     let mut native = TurboBackend::with_size(output.clone(), Size::new(40, 12))?;
     native.bind_desktop(app.desktop.native());
-    native.draw(std::iter::empty())?;
-    native.flush()?;
-    // Repainting at the new dimensions drops the stale game scene entirely.
-    let mut canvas = Terminal::new(TestBackend::new(40, 12))?;
-    canvas.draw(|frame| ui::draw_native(frame, &mut app))?;
-    native.draw(std::iter::empty())?;
-    native.flush()?;
+    let mut frame = NativeFrame::new(
+        Rect::new(0, 0, 132, 40),
+        dn::palette::PaletteProfile::ClassicDn,
+    );
+    ui::draw(&mut frame, &mut app);
+    native.draw_frame(frame)?;
+    let text = output.take();
+    assert!(!text.contains("\u{1}"));
+    assert_eq!(screen(&text, Size::new(40, 12)).len(), 480);
+    native.resize(Size::new(80, 25))?;
+    native.draw_app(&mut app)?;
     Ok(())
 }
 
 #[test]
 fn native_file_manager_matches_panes_shell_overlays_and_mouse_targets() -> io::Result<()> {
+    use dn::testing::{backend::TestBackend, Terminal};
     use dn::{
         app::App, columns::ColumnPreset, localization::Language, palette::PaletteProfile,
         panel_layout::PanelLayout, tetris::Game, ui, volume_space::Space,
     };
-    use ratatui::Terminal;
     use std::{
         fs, thread,
         time::{Duration, Instant},
@@ -637,14 +691,12 @@ fn native_file_manager_matches_panes_shell_overlays_and_mouse_targets() -> io::R
                             total: 987654321,
                         }));
                     }
-                    let legacy_output = Output::default();
                     let native_output = Output::default();
-                    let mut legacy =
-                        Terminal::new(TurboBackend::with_size(legacy_output.clone(), size)?)?;
+                    let mut snapshot = Terminal::new(TestBackend::new(size.width, size.height))?;
                     let mut native = TurboBackend::with_size(native_output.clone(), size)?;
-                    legacy.backend_mut().bind_desktop(app.desktop.native());
+
                     native.bind_desktop(app.desktop.native());
-                    let (mut expected, mut actual) = (String::new(), String::new());
+                    let mut actual = String::new();
                     for step in 0..42 {
                         match step {
                             1=>app.active=1,
@@ -673,8 +725,8 @@ fn native_file_manager_matches_panes_shell_overlays_and_mouse_targets() -> io::R
                             24=>{app.window_list=None;app.config.shortcuts=dn::shortcuts::Profile::Mac;dn::input::handle(&mut app,crossterm::event::KeyEvent::new(crossterm::event::KeyCode::Char('o'),crossterm::event::KeyModifiers::CONTROL));}
                             25=>{app.shortcuts.clear();app.screensaver.start(Instant::now());}
                             26=>{app.screensaver.activity(Instant::now());}
-                            27=>{legacy.backend_mut().resize(Size::new(50,12))?;native.resize(Size::new(50,12))?;}
-                            28=>{legacy.backend_mut().resize(size)?;native.resize(size)?;}
+                            27=>{snapshot.backend_mut().resize(50,12);native.resize(Size::new(50,12))?;}
+                            28=>{snapshot.backend_mut().resize(size.width,size.height);native.resize(size)?;}
                             29=>app.show_game(Game::with_seed(7,Instant::now())),
                             30=>app.desktop.close_game(),
                             31=>app.open_settings(dn::settings::SettingsKind::Keyboard),
@@ -689,8 +741,8 @@ fn native_file_manager_matches_panes_shell_overlays_and_mouse_targets() -> io::R
                                 app.clock.text = " 23:59:59 ".into();
                             }
                             34 => dn::menu::close(&mut app),
-                            35 => { legacy.backend_mut().resize(Size::new(140,42))?; native.resize(Size::new(140,42))?; }
-                            36 => { legacy.backend_mut().resize(size)?; native.resize(size)?; }
+                            35 => { snapshot.backend_mut().resize(140,42); native.resize(Size::new(140,42))?; }
+                            36 => { snapshot.backend_mut().resize(size.width,size.height); native.resize(size)?; }
                             37 => dn::quick_view::toggle(&mut app),
                             38 => app.show_game(Game::with_seed(12,Instant::now())),
                             39 => app.desktop.game_mut().unwrap().screen = dn::tetris::Screen::Scores,
@@ -701,9 +753,9 @@ fn native_file_manager_matches_panes_shell_overlays_and_mouse_targets() -> io::R
                         app.desktop
                             .native()
                             .set_scope(dn::turbo::desktop::Scope::for_app(&app));
-                        legacy.draw(|frame| ui::draw(frame, &mut app))?;
+                        snapshot.draw(|frame| ui::draw(frame, &mut app))?;
                         let targets = format!("{:?}", app.mouse.regions);
-                        expected.push_str(&legacy_output.take());
+
                         native.draw_app(&mut app)?;
                         assert_eq!(
                             format!("{:?}", app.mouse.regions),
@@ -712,7 +764,7 @@ fn native_file_manager_matches_panes_shell_overlays_and_mouse_targets() -> io::R
                         );
                         if dn::focus::current(&app) == dn::focus::Focus::Manager && step != 27 {
                             assert_eq!(
-                                legacy.backend_mut().get_cursor_position()?,
+                                snapshot.get_cursor_position()?,
                                 native.get_cursor_position()?,
                                 "command cursor step={step}"
                             );
@@ -728,7 +780,7 @@ fn native_file_manager_matches_panes_shell_overlays_and_mouse_targets() -> io::R
                             35 => Size::new(140, 42),
                             _ => size,
                         };
-                        let expected_cells = colored_screen(&expected, dimensions);
+                        let expected_cells = snapshot_pixels(snapshot.backend().buffer());
                         let actual_cells = colored_screen(&actual, dimensions);
                         if let Some(index) = expected_cells
                             .iter()
@@ -763,7 +815,8 @@ fn native_file_manager_matches_panes_shell_overlays_and_mouse_targets() -> io::R
 }
 
 #[test]
-fn native_requested_surfaces_match_reference_rendering() -> io::Result<()> {
+fn native_requested_surfaces_match_headless_frames() -> io::Result<()> {
+    use dn::testing::{backend::TestBackend, Terminal};
     use dn::{
         app::App,
         editor::{self, EditorAction},
@@ -774,7 +827,6 @@ fn native_requested_surfaces_match_reference_rendering() -> io::Result<()> {
         utilities::{self, Kind},
         viewer::{self, ViewMode, Viewer},
     };
-    use ratatui::Terminal;
     use std::{
         fs, thread,
         time::{Duration, Instant},
@@ -978,12 +1030,11 @@ fn native_requested_surfaces_match_reference_rendering() -> io::Result<()> {
                         _ => {}
                     }
                     let output = Output::default();
-                    let original = Output::default();
+
                     let mut native = TurboBackend::with_size(output.clone(), size)?;
-                    let mut reference =
-                        Terminal::new(TurboBackend::with_size(original.clone(), size)?)?;
+                    let mut reference = Terminal::new(TestBackend::new(size.width, size.height))?;
                     native.bind_desktop(app.desktop.native());
-                    reference.backend_mut().bind_desktop(app.desktop.native());
+
                     reference.draw(|f| ui::draw(f, &mut app))?;
                     let targets = format!("{:?}", app.mouse.regions);
                     native.draw_app(&mut app)?;
@@ -992,7 +1043,7 @@ fn native_requested_surfaces_match_reference_rendering() -> io::Result<()> {
                         format!("{:?}", app.mouse.regions),
                         "native target geometry: case={case}"
                     );
-                    let expected = colored_screen(&original.take(), size);
+                    let expected = snapshot_pixels(reference.backend().buffer());
                     let actual = colored_screen(&output.take(), size);
                     if let Some(i) = expected.iter().zip(&actual).position(|(a, b)| a != b) {
                         let row = i / usize::from(size.width);
@@ -1015,7 +1066,7 @@ fn native_requested_surfaces_match_reference_rendering() -> io::Result<()> {
                         panic!("case={case},palette={palette:?},language={language:?},size={size:?},x={},y={row}: expected {:?}, actual {:?}",i%usize::from(size.width),expected[i],actual[i]);
                     }
                     assert_eq!(
-                        reference.backend_mut().get_cursor_position()?,
+                        reference.get_cursor_position()?,
                         native.get_cursor_position()?,
                         "cursor case={case}"
                     );

@@ -1,11 +1,11 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+use dn::testing::{backend::TestBackend, Terminal};
 use dn::{
     config::Config,
     config_import::{self, dos},
     panel::SortMode,
     task::Cancellation,
 };
-use ratatui::{backend::TestBackend, Terminal};
 use std::{
     fs, io,
     path::PathBuf,

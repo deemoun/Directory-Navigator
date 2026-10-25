@@ -1,7 +1,6 @@
-//! Shared presentation interface. Native widgets paint TV cells directly; the
-//! reference implementation delegates to the original renderer for parity tests.
+//! Native presentation primitives. All surfaces paint Turbo Vision scenes.
 use crate::presentation::{
-    layout::{Alignment, Constraint, Rect},
+    layout::{Alignment, Rect},
     style::Style,
     text::{Line, Text},
 };
@@ -31,29 +30,25 @@ pub struct Wrap {
 
 pub trait Frame {
     fn area(&self) -> Rect;
+    fn palette(&mut self, profile: crate::palette::PaletteProfile);
     fn render_widget(&mut self, widget: impl Widget, area: Rect);
     fn set_cursor_position(&mut self, position: impl Into<crate::presentation::layout::Position>);
-    fn manager(&mut self, _: &mut App, _: &Prepared) -> Option<Vec<Rect>> {
-        None
-    }
-    fn game(&mut self, _: &mut App, _: Rect) -> bool {
-        false
-    }
+    fn manager(&mut self, app: &mut App, prepared: &Prepared) -> Vec<Rect>;
+    fn game(&mut self, app: &mut App, area: Rect);
 }
-pub trait Widget: crate::reference_ui::ReferenceWidget {
-    #[cfg(feature = "turbo-vision")]
+pub trait Widget {
     fn native(self, frame: &mut NativeFrame, area: Rect);
 }
 
 #[derive(Default)]
 pub struct Block<'a> {
-    pub(crate) style: Style,
-    pub(crate) border_style: Style,
-    pub(crate) title_style: Style,
-    pub(crate) borders: Borders,
-    pub(crate) border_type: BorderType,
-    pub(crate) title: Option<Line<'a>>,
-    pub(crate) alignment: Alignment,
+    style: Style,
+    border_style: Style,
+    title_style: Style,
+    borders: Borders,
+    border_type: BorderType,
+    title: Option<Line<'a>>,
+    alignment: Alignment,
 }
 impl<'a> Block<'a> {
     pub fn style(mut self, style: Style) -> Self {
@@ -103,7 +98,6 @@ impl<'a> Block<'a> {
     }
 }
 impl Widget for Block<'_> {
-    #[cfg(feature = "turbo-vision")]
     fn native(self, f: &mut NativeFrame, area: Rect) {
         let r = area.intersection(f.area());
         if r.is_empty() {
@@ -164,11 +158,11 @@ impl Widget for Block<'_> {
 }
 
 pub struct Paragraph<'a> {
-    pub(crate) text: Text<'a>,
-    pub(crate) style: Style,
-    pub(crate) alignment: Alignment,
-    pub(crate) scroll: (u16, u16),
-    pub(crate) wrap: Option<Wrap>,
+    text: Text<'a>,
+    style: Style,
+    alignment: Alignment,
+    scroll: (u16, u16),
+    wrap: Option<Wrap>,
 }
 impl<'a> Paragraph<'a> {
     pub fn new(text: impl Into<Text<'a>>) -> Self {
@@ -198,7 +192,6 @@ impl<'a> Paragraph<'a> {
     }
 }
 impl Widget for Paragraph<'_> {
-    #[cfg(feature = "turbo-vision")]
     fn native(self, f: &mut NativeFrame, area: Rect) {
         use unicode_width::UnicodeWidthStr;
         let r = area.intersection(f.area());
@@ -268,7 +261,6 @@ impl Widget for Paragraph<'_> {
 }
 pub struct Clear;
 impl Widget for Clear {
-    #[cfg(feature = "turbo-vision")]
     fn native(self, f: &mut NativeFrame, area: Rect) {
         let r = area.intersection(f.area());
         for y in r.y..r.bottom() {
@@ -278,81 +270,6 @@ impl Widget for Clear {
         }
     }
 }
-pub struct Cell<'a> {
-    pub(crate) text: Text<'a>,
-    pub(crate) style: Style,
-}
-impl<'a, T: Into<Text<'a>>> From<T> for Cell<'a> {
-    fn from(text: T) -> Self {
-        Self {
-            text: text.into(),
-            style: Style::default(),
-        }
-    }
-}
-pub struct Row<'a> {
-    pub(crate) cells: Vec<Cell<'a>>,
-    pub(crate) style: Style,
-}
-impl<'a> Row<'a> {
-    pub fn new<T: Into<Cell<'a>>>(cells: impl IntoIterator<Item = T>) -> Self {
-        Self {
-            cells: cells.into_iter().map(Into::into).collect(),
-            style: Style::default(),
-        }
-    }
-    pub fn style(mut self, style: Style) -> Self {
-        self.style = style;
-        self
-    }
-}
-pub struct Table<'a> {
-    pub(crate) rows: Vec<Row<'a>>,
-    pub(crate) widths: Vec<Constraint>,
-    pub(crate) style: Style,
-    pub(crate) spacing: u16,
-}
-impl<'a> Table<'a> {
-    pub fn new(
-        rows: impl IntoIterator<Item = Row<'a>>,
-        widths: impl IntoIterator<Item = Constraint>,
-    ) -> Self {
-        Self {
-            rows: rows.into_iter().collect(),
-            widths: widths.into_iter().collect(),
-            style: Style::default(),
-            spacing: 1,
-        }
-    }
-    pub fn style(mut self, style: Style) -> Self {
-        self.style = style;
-        self
-    }
-    pub fn column_spacing(mut self, spacing: u16) -> Self {
-        self.spacing = spacing;
-        self
-    }
-}
-impl Widget for Table<'_> {
-    #[cfg(feature = "turbo-vision")]
-    fn native(self, f: &mut NativeFrame, r: Rect) {
-        use crate::presentation::layout::{Flex, Layout};
-        f.style(r, self.style);
-        for (i, row) in self.rows.into_iter().take(r.height as usize).enumerate() {
-            let area = Rect::new(r.x, r.y + i as u16, r.width, 1);
-            f.style(area, row.style);
-            let columns = Layout::horizontal(self.widths.clone())
-                .flex(Flex::Start)
-                .spacing(self.spacing)
-                .split(area);
-            for (c, area) in row.cells.into_iter().zip(columns.iter()) {
-                Paragraph::new(c.text).style(c.style).native(f, *area);
-            }
-        }
-    }
-}
-
-#[cfg(feature = "turbo-vision")]
 #[derive(Clone)]
 struct Run {
     text: String,
@@ -360,7 +277,6 @@ struct Run {
     width: u16,
     space: bool,
 }
-#[cfg(feature = "turbo-vision")]
 fn reflow(glyphs: Vec<Run>, limit: u16, trim: bool) -> Vec<Vec<Run>> {
     use std::collections::VecDeque;
     // Preserve the reference renderer's word-boundary behavior, adapted from
@@ -437,13 +353,11 @@ fn reflow(glyphs: Vec<Run>, limit: u16, trim: bool) -> Vec<Vec<Run>> {
     output
 }
 
-#[cfg(feature = "turbo-vision")]
 pub struct NativeFrame {
     scene: crate::turbo::scene::Scene,
 }
-#[cfg(feature = "turbo-vision")]
 impl NativeFrame {
-    pub(crate) fn new(area: Rect, profile: crate::palette::PaletteProfile) -> Self {
+    pub fn new(area: Rect, profile: crate::palette::PaletteProfile) -> Self {
         Self {
             scene: crate::turbo::scene::Scene {
                 width: area.width,
@@ -514,8 +428,10 @@ impl NativeFrame {
         }
     }
 }
-#[cfg(feature = "turbo-vision")]
 impl Frame for NativeFrame {
+    fn palette(&mut self, profile: crate::palette::PaletteProfile) {
+        self.scene.profile = profile;
+    }
     fn area(&self) -> Rect {
         Rect::new(0, 0, self.scene.width, self.scene.height)
     }
@@ -526,30 +442,26 @@ impl Frame for NativeFrame {
         let p = position.into();
         self.scene.cursor = Some((p.x, p.y));
     }
-    fn manager(&mut self, app: &mut App, prepared: &Prepared) -> Option<Vec<Rect>> {
+    fn manager(&mut self, app: &mut App, prepared: &Prepared) -> Vec<Rect> {
         let (scene, positions) =
             crate::turbo::manager::prepare(app, prepared, self.scene.width, self.scene.height);
         self.scene = scene;
 
-        Some(positions)
+        positions
     }
-    fn game(&mut self, app: &mut App, area: Rect) -> bool {
+    fn game(&mut self, app: &mut App, area: Rect) {
         let overlay = crate::turbo::tetris::prepare(app, area.width, area.height);
         self.scene.cells.extend(overlay.cells);
         self.scene.cursor = overlay.cursor;
-        true
     }
 }
 
-#[cfg(all(test, feature = "turbo-vision"))]
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::palette::PaletteProfile;
-    use ratatui::{backend::TestBackend, Terminal};
-    use unicode_width::UnicodeWidthStr;
     #[test]
-    fn native_wrapping_matches_reference_for_spaces_long_words_and_unicode() -> std::io::Result<()>
-    {
+    fn native_wrapping_preserves_frozen_spaces_words_and_unicode_contract() -> std::io::Result<()> {
         let samples = [
             "one two three four five".into(),
             "  one    two      three ".into(),
@@ -560,20 +472,11 @@ mod tests {
             "/path/with-segments/and-a-long-name/next: cannot open file".into(),
             "one ".repeat(30),
         ];
+        let mut expected = include_str!("../tests/fixtures/wrapping.txt").lines();
         for width in [1, 2, 5, 17, 44] {
             for sample in &samples {
                 let area = Rect::new(0, 0, width, 20);
                 let style = PaletteProfile::ClassicDn.dos(0x70);
-                let mut reference = Terminal::new(TestBackend::new(width, 20))?;
-                let reference_frame = reference.draw(|f| {
-                    Frame::render_widget(
-                        f,
-                        Paragraph::new(sample.as_str())
-                            .style(style)
-                            .wrap(Wrap { trim: false }),
-                        area,
-                    )
-                })?;
                 let mut native = NativeFrame::new(area, PaletteProfile::ClassicDn);
                 native.render_widget(
                     Paragraph::new(sample.as_str())
@@ -581,31 +484,17 @@ mod tests {
                         .wrap(Wrap { trim: false }),
                     area,
                 );
-                for y in 0..20 {
-                    let mut skip = 0;
-                    for x in 0..width {
-                        if skip > 0 {
-                            skip -= 1;
-                            continue;
-                        }
-                        let original = &reference_frame.buffer[(x, y)];
-                        let glyph = &native.scene.cells[&(x, y)];
-                        assert_eq!(
-                            glyph.text,
-                            original.symbol(),
-                            "sample={sample:?},width={width},x={x},y={y}"
-                        );
-                        assert_eq!(
-                            glyph.resolved(PaletteProfile::ClassicDn).fg,
-                            Some(original.fg)
-                        );
-                        assert_eq!(
-                            glyph.resolved(PaletteProfile::ClassicDn).bg,
-                            Some(original.bg)
-                        );
-                        skip = original.symbol().width().saturating_sub(1);
-                    }
-                }
+                let (buffer, _) = crate::testing::Buffer::capture(native);
+                let actual = format!(
+                    "{:?}",
+                    buffer
+                        .content
+                        .iter()
+                        .map(|c| c.symbol())
+                        .collect::<Vec<_>>()
+                );
+                let expected = expected.next().unwrap();
+                assert_eq!(actual, expected, "sample={sample:?},width={width}");
             }
         }
         Ok(())

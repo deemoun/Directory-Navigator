@@ -64,9 +64,7 @@ impl Window {
 
 pub struct Desktop {
     windows: Vec<Window>,
-    #[cfg(not(feature = "turbo-vision"))]
-    active: WindowInfo,
-    #[cfg(feature = "turbo-vision")]
+
     native: crate::turbo::desktop::NativeDesktop,
     next_id: u64,
 }
@@ -77,32 +75,19 @@ impl Default for Desktop {
                 id: WindowId::MANAGER,
                 content: Content::Manager,
             }],
-            #[cfg(feature = "turbo-vision")]
             native: crate::turbo::desktop::NativeDesktop::new(WindowInfo {
                 id: WindowId::MANAGER,
                 kind: WindowKind::Manager,
             }),
-            #[cfg(not(feature = "turbo-vision"))]
-            active: WindowInfo {
-                id: WindowId::MANAGER,
-                kind: WindowKind::Manager,
-            },
+
             next_id: 1,
         }
     }
 }
 impl Desktop {
     pub fn active(&self) -> WindowInfo {
-        #[cfg(feature = "turbo-vision")]
-        {
-            self.native.active()
-        }
-        #[cfg(not(feature = "turbo-vision"))]
-        {
-            self.active
-        }
+        self.native.active()
     }
-    #[cfg(feature = "turbo-vision")]
     pub fn native(&self) -> crate::turbo::desktop::NativeDesktop {
         self.native.clone()
     }
@@ -122,12 +107,8 @@ impl Desktop {
             return false;
         };
         let window = self.windows.remove(index);
-        #[cfg(feature = "turbo-vision")]
         assert!(self.native.activate(id));
-        #[cfg(not(feature = "turbo-vision"))]
-        {
-            self.active = window.info();
-        }
+
         self.windows.push(window);
         true
     }
@@ -141,13 +122,11 @@ impl Desktop {
         let id = WindowId(self.next_id);
         self.next_id = next;
         // Still one screen per kind. Dropping replaced content cancels its tasks.
-        #[cfg(feature = "turbo-vision")]
         if let Some(old) = self.id(kind) {
             self.native.remove(old);
         }
         self.windows.retain(|w| w.info().kind != kind);
         self.windows.push(Window { id, content });
-        #[cfg(feature = "turbo-vision")]
         self.native.add(WindowInfo { id, kind });
         // Keep background tool creation from stealing an active document, while
         // allowing a document explicitly opened from the manager to take focus.
@@ -162,7 +141,6 @@ impl Desktop {
     }
     fn close(&mut self, kind: WindowKind) {
         let active = self.active();
-        #[cfg(feature = "turbo-vision")]
         if let Some(id) = self.id(kind) {
             self.native.remove(id);
         }

@@ -1,4 +1,5 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+use dn::testing::{backend::TestBackend, layout::Rect, Terminal};
 use dn::{
     app::App,
     input,
@@ -7,7 +8,6 @@ use dn::{
     panel_layout::{scroll_position, PanelGeometry, PanelLayout, ScrollAction},
     ui,
 };
-use ratatui::{backend::TestBackend, layout::Rect, Terminal};
 use std::{
     fs, io,
     path::PathBuf,

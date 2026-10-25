@@ -1,5 +1,4 @@
-//! Turbo Vision output host. Runtime scenes paint directly through native views;
-//! reference frames retain a separate cell transport for fallback/parity checks.
+//! Turbo Vision terminal host. Scenes paint directly through native documents.
 mod codec;
 pub mod desktop;
 pub mod forms;
@@ -9,16 +8,14 @@ pub(crate) mod panes;
 pub(crate) mod scene;
 pub(crate) mod tetris;
 use crate::presentation::layout::{Position, Size};
-use codec::Cell;
 use codec::Codec;
-mod reference;
 use std::{
     io::{self, Write},
     sync::{Arc, Mutex, MutexGuard},
     time::Duration,
 };
 use turbo_vision::{
-    core::{draw::Cell as TvCell, event::Event, geometry::Rect as TvRect},
+    core::{event::Event, geometry::Rect as TvRect},
     terminal::{Backend as TvBackend, Terminal as TvTerminal},
 };
 fn lock<T>(value: &Mutex<T>) -> io::Result<MutexGuard<'_, T>> {
@@ -76,8 +73,6 @@ impl<W: Write + Send + 'static> TvBackend for Transport<W> {
 pub struct TurboBackend<W: Write + Send + 'static> {
     terminal: TvTerminal,
     desktop: desktop::NativeDesktop,
-    pixels: Vec<TvCell>,
-    canvas: Vec<Cell>,
     codec: Arc<Mutex<Codec>>,
     dimensions: Arc<Mutex<Size>>,
     writer: Arc<Mutex<W>>,
@@ -115,8 +110,6 @@ impl<W: Write + Send + 'static> TurboBackend<W> {
                 id: crate::desktop::WindowId::MANAGER,
                 kind: crate::desktop::WindowKind::Manager,
             }),
-            pixels: Vec::new(),
-            canvas: Vec::new(),
             codec,
             dimensions,
             writer,
@@ -125,6 +118,22 @@ impl<W: Write + Send + 'static> TurboBackend<W> {
             cursor_visible: false,
             fixed,
         })
+    }
+    pub fn get_cursor_position(&self) -> io::Result<Position> {
+        Ok(self.cursor)
+    }
+    pub fn set_cursor_position(&mut self, position: impl Into<Position>) -> io::Result<()> {
+        self.cursor = position.into();
+        self.cursor_visible = true;
+        Ok(())
+    }
+    pub fn hide_cursor(&mut self) -> io::Result<()> {
+        self.cursor_visible = false;
+        Ok(())
+    }
+    pub fn show_cursor(&mut self) -> io::Result<()> {
+        self.cursor_visible = true;
+        Ok(())
     }
     pub fn bind_desktop(&mut self, desktop: desktop::NativeDesktop) {
         self.desktop = desktop;
@@ -143,8 +152,6 @@ impl<W: Write + Send + 'static> TurboBackend<W> {
             *lock(&self.dimensions)? = size;
             lock(&self.codec)?.resize(size);
             self.terminal.resize(size.width, size.height);
-            self.canvas.clear();
-            self.pixels.clear();
         }
         Ok(())
     }
@@ -169,7 +176,7 @@ fn validate(size: Size) -> io::Result<()> {
     }
 }
 impl<W: Write + Send + 'static> TurboBackend<W> {
-    /// The production frame never constructs a Ratatui Terminal, Frame or Buffer.
+    /// Prepare and commit a complete native application frame.
     pub fn draw_app(&mut self, app: &mut crate::app::App) -> io::Result<()> {
         let size = self.current_size()?;
         self.resize(size)?;
@@ -188,23 +195,9 @@ impl<W: Write + Send + 'static> TurboBackend<W> {
     fn paint(&mut self) -> io::Result<()> {
         let size = *lock(&self.dimensions)?;
         let scene = self.desktop.scene();
-        {
-            let mut codec = lock(&self.codec)?;
-            for y in 0..if self.canvas.is_empty() {
-                0
-            } else {
-                size.height
-            } {
-                for x in 0..size.width {
-                    let i = usize::from(y) * usize::from(size.width) + usize::from(x);
-                    let source = &self.canvas[i];
-                    self.pixels[i] = codec.cell(x, y, source)?.0;
-                }
-            }
-        }
         let native = {
             let mut codec = lock(&self.codec)?;
-            codec.clear_native();
+            codec.begin_frame();
             scene
                 .as_ref()
                 .map(|scene| scene.encode(&mut codec, size.width, size.height))
@@ -213,7 +206,6 @@ impl<W: Write + Send + 'static> TurboBackend<W> {
         self.desktop.draw(
             &mut self.terminal,
             TvRect::new(0, 0, size.width as i16, size.height as i16),
-            &self.pixels,
             native.as_deref().unwrap_or_default(),
         );
         Ok(())
@@ -221,11 +213,6 @@ impl<W: Write + Send + 'static> TurboBackend<W> {
     pub fn clear(&mut self) -> io::Result<()> {
         self.terminal.clear();
         self.terminal.force_full_redraw();
-        self.canvas.fill(Cell::default());
-        self.pixels.fill(TvCell::new(
-            ' ',
-            turbo_vision::core::palette::Attr::from_u8(0x07),
-        ));
         lock(&self.codec)?.resize(*lock(&self.dimensions)?);
         lock(&self.writer)?.write_all(b"\x1b[2J")
     }
@@ -242,11 +229,30 @@ impl<W: Write + Send + 'static> TurboBackend<W> {
     }
 }
 
+impl<W: Write + Send + 'static> TurboBackend<W> {
+    pub fn size(&self) -> io::Result<Size> {
+        self.current_size()
+    }
+    /// Submit an independently composed native frame (also used by headless checks).
+    pub fn draw_frame(&mut self, frame: crate::painting::NativeFrame) -> io::Result<()> {
+        let size = self.current_size()?;
+        self.resize(size)?;
+        let scene = frame.finish();
+        self.cursor_visible = scene.cursor.is_some();
+        if let Some((x, y)) = scene.cursor {
+            self.cursor = Position::new(x, y);
+        }
+        self.desktop.set_scene(Some(scene));
+        self.paint()?;
+        self.flush()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     #[test]
-    fn production_frames_resize_and_resume_without_reference_buffers() -> io::Result<()> {
+    fn native_frames_survive_resize_and_terminal_clear() -> io::Result<()> {
         let mut app = crate::app::App::new(std::env::current_dir()?)?;
         let mut host = TurboBackend::with_size(io::sink(), Size::new(80, 25))?;
         host.bind_desktop(app.desktop.native());
@@ -258,12 +264,9 @@ mod tests {
         ] {
             host.resize(size)?;
             host.draw_app(&mut app)?;
-            assert!(host.canvas.is_empty());
-            assert!(host.pixels.is_empty());
             assert!(host.desktop.scene().is_some());
             host.clear()?;
             host.draw_app(&mut app)?;
-            assert!(host.canvas.is_empty());
         }
         Ok(())
     }

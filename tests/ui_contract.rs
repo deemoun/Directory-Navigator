@@ -1,9 +1,9 @@
 //! Optional before/after cell-and-hit-target captures for internal refactors.
+use dn::testing::{backend::TestBackend, Terminal};
 use dn::{
     app::App, columns::ColumnPreset, operations::Kind, palette::PaletteProfile,
     panel_layout::PanelLayout, ui,
 };
-use ratatui::{backend::TestBackend, Terminal};
 use std::{
     fs, io,
     path::PathBuf,
@@ -104,7 +104,13 @@ fn unchanged_cells_styles_and_mouse_targets() -> io::Result<()> {
                 terminal.draw(|f| ui::draw(f, &mut app))?;
                 captures.push_str(&format!(
                     "{profile:?} {w} {h} {scene}\n{:?}\n{:?}\n",
-                    terminal.backend().buffer(),
+                    terminal
+                        .backend()
+                        .buffer()
+                        .content
+                        .iter()
+                        .map(|c| (c.symbol(), c.fg, c.bg, c.modifier.bits()))
+                        .collect::<Vec<_>>(),
                     app.mouse.regions
                 ));
             }

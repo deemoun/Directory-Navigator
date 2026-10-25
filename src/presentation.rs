@@ -1,4 +1,4 @@
-//! Remaining Ratatui *data* compatibility boundary.
-//! No Terminal, Frame, backend or widget renderer is exported here. Replacing
-//! these layout/style/text values is the final dependency-removal step.
-pub use ratatui::{layout, style, text};
+//! Renderer-independent geometry, terminal styles and Unicode presentation text.
+pub mod layout;
+pub mod style;
+pub mod text;

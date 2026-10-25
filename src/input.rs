@@ -157,56 +157,11 @@ fn handle_key(app: &mut App, key: KeyEvent) {
         crate::menu::key(app, key.code);
         return;
     }
-    #[cfg(feature = "turbo-vision")]
     if focus == Focus::Prompt {
         crate::turbo::forms::prompt_key(app, key);
         return;
     }
-    #[cfg(not(feature = "turbo-vision"))]
-    if let Some(prompt) = app.prompt.as_mut().filter(|_| focus == Focus::Prompt) {
-        match key.code {
-            KeyCode::Esc => app.prompt = None,
-            KeyCode::F(1) => crate::dialog::prompt_help(app),
-            KeyCode::Char('d' | 'D') if key.modifiers.contains(KeyModifiers::ALT) => {
-                prompt.focus = 0
-            }
-            KeyCode::Char('k' | 'K') if key.modifiers.contains(KeyModifiers::ALT) => {
-                app.submit_prompt()
-            }
-            KeyCode::Char('c' | 'C') if key.modifiers.contains(KeyModifiers::ALT) => {
-                app.prompt = None
-            }
-            KeyCode::Char('h' | 'H') if key.modifiers.contains(KeyModifiers::ALT) => {
-                crate::dialog::prompt_help(app)
-            }
-            KeyCode::Tab | KeyCode::BackTab => {
-                let first = usize::from(matches!(
-                    prompt.kind,
-                    crate::dialog::PromptKind::Operation(Kind::Delete | Kind::Trash)
-                ));
-                let count = 4 - first;
-                let backward =
-                    key.code == KeyCode::BackTab || key.modifiers.contains(KeyModifiers::SHIFT);
-                prompt.focus = first
-                    + (prompt.focus.saturating_sub(first) + if backward { count - 1 } else { 1 })
-                        % count;
-            }
-            KeyCode::Enter => match prompt.focus {
-                2 => app.prompt = None,
-                3 => crate::dialog::prompt_help(app),
-                _ => app.submit_prompt(),
-            },
-            _ if prompt.focus == 0
-                && !key
-                    .modifiers
-                    .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) =>
-            {
-                prompt.edit(key.code)
-            }
-            _ => {}
-        }
-        return;
-    }
+
     if matches!(focus, Focus::Viewer | Focus::ViewerSearch) {
         crate::viewer::key(app, key);
         return;
@@ -281,53 +236,15 @@ fn handle_key(app: &mut App, key: KeyEvent) {
         }
         return;
     }
-    #[cfg(feature = "turbo-vision")]
     if crate::turbo::panes::key(app, key) {
         return;
     }
-    #[cfg(not(feature = "turbo-vision"))]
-    let brief = app.config.layouts[app.active] == crate::panel_layout::PanelLayout::Brief;
+
     let panel = &mut app.panels[app.active];
-    #[cfg(not(feature = "turbo-vision"))]
-    let capacity = panel.viewport_rows * if brief { 3 } else { 1 };
     match key.code {
-        #[cfg(not(feature = "turbo-vision"))]
-        KeyCode::Tab | KeyCode::BackTab => {
-            app.quick_view = None;
-            app.active ^= 1;
-        }
         KeyCode::Char('+') => app.open_pattern(true),
         KeyCode::Char('-') => app.open_pattern(false),
-        #[cfg(not(feature = "turbo-vision"))]
-        KeyCode::Up => panel.step(-1),
-        #[cfg(not(feature = "turbo-vision"))]
-        KeyCode::Down => panel.step(1),
-        #[cfg(not(feature = "turbo-vision"))]
-        KeyCode::Left if brief => panel.move_column(false),
-        #[cfg(not(feature = "turbo-vision"))]
-        KeyCode::Right if brief => panel.move_column(true),
-        #[cfg(not(feature = "turbo-vision"))]
-        KeyCode::PageUp => panel.step(-(capacity as isize)),
-        #[cfg(not(feature = "turbo-vision"))]
-        KeyCode::PageDown => panel.step(capacity as isize),
-        #[cfg(not(feature = "turbo-vision"))]
-        KeyCode::Home => panel.cursor = 0,
-        #[cfg(not(feature = "turbo-vision"))]
-        KeyCode::End => panel.cursor = panel.entries.len().saturating_sub(1),
-        #[cfg(not(feature = "turbo-vision"))]
-        KeyCode::Enter => app.open_current(),
-        #[cfg(not(feature = "turbo-vision"))]
-        KeyCode::Backspace if app.config.backspace_parent => panel.parent(app.config.show_hidden),
-        #[cfg(not(feature = "turbo-vision"))]
-        KeyCode::Insert => {
-            panel.toggle_selection();
-            panel.step(1);
-        }
-        #[cfg(not(feature = "turbo-vision"))]
-        KeyCode::Char(' ') if app.config.space_select => {
-            panel.toggle_selection();
-            panel.step(1);
-        }
+
         KeyCode::Char('*') => crate::menu::execute(app, crate::menu::Action::InvertSelection),
         KeyCode::F(2) if key.modifiers.contains(KeyModifiers::SHIFT) => {
             let next = match panel.sort {

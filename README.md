@@ -91,21 +91,18 @@ cargo build --release
 
 On Windows, the executable is `target\release\dn.exe`.
 
-On the `feature/turbo-vision` branch, the default build uses pinned Turbo Vision
-4.1.0 for desktop/window selection, terminal transport, native drawing and
-positional mouse routing. File panes, dropdown menus, dialogs, quick view,
-editor/viewer, utilities and Tetris all use native painting while preserving
-existing appearance and application guards. Unicode graphemes, colors, paste,
-cursor placement and terminal cleanup remain supported.
+Turbo Vision 4.1.0 is now the sole UI toolkit. File panes, dropdown menus,
+dialogs, quick view, editor/viewer, utilities and Tetris use native drawing,
+control traversal and mouse routing while preserving existing appearance and
+application guards. Unicode graphemes, colors, paste, cursor placement and
+terminal cleanup remain supported.
 
-The runtime now draws directly through Turbo Vision without Ratatui's Terminal,
-Frame or screen buffer. Native groups handle control traversal and mouse hits.
-Ratatui remains only for text/style/layout data behind `presentation`, plus the
-isolated comparison renderer; its Crossterm backend is disabled in the default
-build. Build the original comparison renderer with
-`cargo build --release --no-default-features --features legacy-ui`.
-See [migration status](docs/TURBO_VISION_MIGRATION.md) for implementation,
-validation and the remaining dependency-removal work.
+Ratatui and the legacy renderer have been removed, including their text/style/
+layout dependency. The application owns those presentation types and its bounded
+layout allocator. There is no backend selection feature: ordinary and
+`--no-default-features` builds both use Turbo Vision. Behavioral tests capture
+frames from the same native painter used by the runtime.
+See [migration status](docs/TURBO_VISION_MIGRATION.md) for validation details.
 
 | Platform | Current status |
 | --- | --- |

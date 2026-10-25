@@ -1,4 +1,5 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+use dn::testing::{backend::TestBackend, Terminal};
 use dn::{
     app::App,
     bookmarks,
@@ -10,7 +11,6 @@ use dn::{
     pattern, ui,
     viewer::{self, Action as View, Contents, SearchMemory, Viewer},
 };
-use ratatui::{backend::TestBackend, Terminal};
 use std::{
     fs, io,
     path::PathBuf,
@@ -380,7 +380,7 @@ fn viewer_wrapping_graphemes_visual_rows_and_anchor_resizing() -> io::Result<()>
     assert!(v.rows.len() > 3);
     for row in &v.rows {
         let text = &v.contents.as_ref().unwrap().lines[row.line][row.range.clone()];
-        assert!(ratatui::text::Span::raw(text).width() <= 10);
+        assert!(dn::testing::text::Span::raw(text).width() <= 10);
         assert!(!text.starts_with('\u{200d}'));
         assert!(!text.starts_with('\u{301}'));
     }

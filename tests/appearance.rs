@@ -1,5 +1,6 @@
 use chrono::{TimeZone, Utc};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+use dn::testing::{backend::TestBackend, style::Color, Terminal};
 use dn::{
     app::App,
     clock_view::Clock,
@@ -11,7 +12,6 @@ use dn::{
     ui,
     viewer::Viewer,
 };
-use ratatui::{backend::TestBackend, style::Color, Terminal};
 use std::{
     fs, io,
     path::PathBuf,

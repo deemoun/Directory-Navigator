@@ -118,7 +118,7 @@ impl Scene {
                 &glyph.text
             });
             source.set_style(glyph.resolved(self.profile));
-            let (mut cell, _) = codec.native_cell(x, y, &source)?;
+            let (mut cell, _) = codec.cell(x, y, &source)?;
             if glyph.text.is_empty() {
                 cell.ch = '\0';
             }

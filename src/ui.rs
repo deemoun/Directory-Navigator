@@ -17,13 +17,10 @@ mod file_tools_view;
 mod menu_view;
 mod navigation_view;
 mod overlays;
-mod panel_footer;
-mod panel_view;
 mod quick_view;
 mod screensaver_view;
 mod settings_view;
 mod shortcuts_view;
-mod tetris_view;
 mod theme;
 mod tools_view;
 mod user_menu_view;
@@ -32,22 +29,17 @@ mod viewer_view;
 mod welcome_view;
 mod windows_view;
 use overlays::{draw_info_dialog, draw_operation_overlays};
-use panel_view::draw_panel;
 
 pub use theme::entry_color;
 use viewer_view::draw_viewer;
 
 pub fn draw(frame: &mut impl Frame, app: &mut App) {
-    #[cfg(feature = "turbo-vision")]
+    frame.palette(app.config.palette);
     app.desktop.native().set_scene(None);
     draw_content(frame, app);
     shortcuts_view::draw_prefix(frame, app);
 }
 /// All runtime surfaces paint native cells through their TV document.
-/// `draw` selects the reference implementation for comparison/headless contracts.
-#[cfg(feature = "turbo-vision")]
-pub use crate::reference_ui::draw_native;
-#[cfg(feature = "turbo-vision")]
 pub(crate) fn native_scene(
     app: &mut App,
     area: crate::presentation::layout::Rect,
@@ -97,9 +89,7 @@ fn draw_content(frame: &mut impl Frame, app: &mut App) {
         return;
     }
     let regions = &prepared.regions;
-    let native_menu = frame.manager(app, &prepared);
-    let native_shell = native_menu.is_some();
-    let menu_positions = native_menu.unwrap_or_else(|| menu_view::draw_bar(frame, app, regions[0]));
+    let menu_positions = frame.manager(app, &prepared);
     let panels = &prepared.panel_areas;
     for (index, area) in panels.iter().enumerate() {
         if app
@@ -111,19 +101,6 @@ fn draw_content(frame: &mut impl Frame, app: &mut App) {
             continue;
         }
         let geometry = &prepared.panels[index];
-        if !native_shell {
-            draw_panel(
-                frame,
-                &app.panels[index],
-                *area,
-                (index, index == app.active),
-                &app.config,
-                app.quick_search
-                    .as_ref()
-                    .filter(|search| search.panel == index),
-                geometry,
-            );
-        }
         app.mouse.regions.push((*area, Target::Panel(index)));
         let panel = &app.panels[index];
         for entry in panel.offset..panel.entries.len().min(panel.offset + geometry.capacity()) {
@@ -155,48 +132,15 @@ fn draw_content(frame: &mut impl Frame, app: &mut App) {
             }
         }
     }
-    if !native_shell {
-        crate::command_line::draw(frame, app, regions[2]);
-    } else {
-        app.mouse.regions.push((regions[2], Target::CommandLine));
-    }
+    app.mouse.regions.push((regions[2], Target::CommandLine));
     let buttons = Layout::horizontal([Constraint::Percentage(10); 10]).split(regions[3]);
-    for (index, label) in [
-        "Help", "User", "View", "Edit", "Copy", "Move", "MkDir", "Delete", "Menu", "Quit",
-    ]
-    .iter()
-    .enumerate()
-    {
-        let enabled = true;
-        if enabled {
-            app.mouse
-                .regions
-                .push((buttons[index], Target::Function(index as u8 + 1)));
-        }
-        let label = if profile == crate::palette::PaletteProfile::ClassicDn && *label == "Delete" {
-            "Del"
-        } else {
-            label
-        };
-        if !native_shell {
-            frame.render_widget(
-                Paragraph::new(crate::shortcuts::function(
-                    app.config.shortcuts,
-                    profile,
-                    index as u8 + 1,
-                    app.config.language.text(label),
-                    enabled,
-                ))
-                .style(profile.bar(enabled)),
-                buttons[index],
-            );
-        }
+    for (index, rect) in buttons.iter().enumerate() {
+        app.mouse
+            .regions
+            .push((*rect, Target::Function(index as u8 + 1)));
     }
     if screen == crate::desktop::WindowKind::Game {
-        if frame.game(app, area) {
-            return;
-        }
-        tetris_view::draw(frame, app, area);
+        frame.game(app, area);
         return;
     }
     if app.welcome.dialog.is_some() {

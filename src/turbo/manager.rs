@@ -1,5 +1,5 @@
 //! Native file-manager drawing. Directory models, workers and guarded commands
-//! are reused; no Ratatui widgets compose the panes or shell on this path.
+//! are reused; the document paints the panes and shell directly.
 use super::scene::Scene;
 use crate::presentation::layout::{Constraint, Flex, Layout, Rect};
 use crate::{

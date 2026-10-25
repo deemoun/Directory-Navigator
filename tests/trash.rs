@@ -1,4 +1,5 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use dn::testing::{backend::TestBackend, Terminal};
 use dn::{
     app::App,
     config::Config,
@@ -8,7 +9,6 @@ use dn::{
     settings::{self, Setting, Settings, SettingsKind},
     trash_support, ui,
 };
-use ratatui::{backend::TestBackend, Terminal};
 use std::{
     fs, io,
     path::PathBuf,
