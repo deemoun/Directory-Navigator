@@ -1,8 +1,5 @@
 use crate::painting::{Frame, Paragraph};
-use crate::presentation::{
-    layout::Rect,
-    text::{Line, Span},
-};
+use crate::presentation::layout::Rect;
 use crate::{
     app::App,
     directory_tree::{geometry, Action},
@@ -35,38 +32,26 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
         Paragraph::new(tail(&display_name(&root.to_string_lossy()), w)).style(dos(0x70)),
         Rect::new(x, rect.y + 1, w, 1),
     );
+    frame.render_widget(
+        crate::turbo::widgets::outline(tree),
+        Rect::new(x, top, w, tree.page_rows as u16),
+    );
     for (row, index) in (tree.offset..tree.rows.len())
         .take(tree.page_rows)
         .enumerate()
     {
         let entry = &tree.rows[index];
-        let selected = index == tree.cursor;
-        let style = dos(if selected { 0x30 } else { 0x70 });
-        let name = entry
-            .path
-            .file_name()
-            .unwrap_or(entry.path.as_os_str())
-            .to_string_lossy();
-        let line = Line::from(vec![
-            Span::raw(entry.guide.clone()),
-            Span::styled(
-                tree.marker(entry),
-                if selected {
-                    style
-                } else {
-                    dos(if entry.link { 0x79 } else { 0x71 })
-                },
-            ),
-            Span::raw(" "),
-            Span::raw(display_name(&name)),
-        ]);
-        let marker = crate::presentation::text::Span::raw(&entry.guide).width() as u16;
         let r = Rect::new(x, top + row as u16, w, 1);
-        frame.render_widget(Paragraph::new(line).style(style), r);
         frame.regions().push((r, Target::Tree(Action::Row(index))));
-        if marker < w {
+        let marker = (entry.depth * 2 + if entry.depth > 0 { 2 } else { 0 }) as u16;
+        let branch = tree.marker(entry) == "+"
+            || tree
+                .rows
+                .get(index + 1)
+                .is_some_and(|next| next.depth > entry.depth);
+        if branch && !entry.link && marker < w {
             frame.regions().push((
-                Rect::new(x + marker, r.y, 1, 1),
+                Rect::new(x + marker, r.y, 3.min(w - marker), 1),
                 Target::Tree(Action::Toggle(index)),
             ));
         }
@@ -79,6 +64,14 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
         } else {
             0
         };
+        frame.render_widget(
+            crate::turbo::widgets::scrollbar(
+                tree.cursor,
+                tree.rows.len().saturating_sub(1),
+                tree.page_rows,
+            ),
+            Rect::new(rect.right() - 2, top, 1, rows),
+        );
         for row in 0..rows {
             let (glyph, command) = if row == 0 {
                 ("▲", Action::Up)
@@ -92,7 +85,7 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
                 ("░", Action::PageDown)
             };
             let r = Rect::new(rect.right() - 2, top + row, 1, 1);
-            frame.render_widget(Paragraph::new(glyph).style(dos(0x70)), r);
+            let _ = glyph;
             frame.regions().push((r, Target::Tree(command)));
         }
     }

@@ -589,9 +589,15 @@ pub fn key(app: &mut App, key: KeyEvent) {
         }
         return;
     }
+    if let Some(row) =
+        crate::turbo::widgets::list_key(tree.cursor, tree.rows.len(), tree.page_rows, key.code)
+    {
+        tree.cursor = row;
+        tree.keep_visible();
+        return;
+    }
     match key.code{
         KeyCode::Esc=>app.modals.set_directory_tree(None),KeyCode::Tab=>tree.focus = crate::control_focus::cycle(tree.focus, 5, false),KeyCode::BackTab=>tree.focus = crate::control_focus::cycle(tree.focus, 5, true),
-        KeyCode::Up=>tree.step(-1),KeyCode::Down=>tree.step(1),KeyCode::PageUp=>tree.step(-(tree.page_rows as isize)),KeyCode::PageDown=>tree.step(tree.page_rows as isize),KeyCode::Home=>tree.step(isize::MIN),KeyCode::End=>tree.step(isize::MAX),
         KeyCode::Left|KeyCode::Backspace|KeyCode::Char('-')=>tree.left(),KeyCode::Right|KeyCode::Char('+')=>tree.right(),
         KeyCode::Char(' ') if tree.focus==0=>tree.toggle(),
         KeyCode::Enter|KeyCode::Char(' ')=>{let command=match tree.focus{2=>Action::Refresh,3=>Action::Hidden,4=>Action::Close,_=>Action::Open};action(app,command);},

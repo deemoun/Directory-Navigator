@@ -60,13 +60,14 @@ pub(super) fn draw_tools(
         let cursor = Line::from(&pattern.field[..pattern.cursor]).width();
         let scroll = cursor.saturating_sub(input.width.saturating_sub(1) as usize);
         frame.render_widget(
-            Paragraph::new(pattern.field.as_str())
-                .scroll((0, scroll as u16))
-                .style(if pattern.replace_on_type {
-                    dos(0x30)
-                } else {
-                    super::dialog_style::input_style(profile, true)
-                }),
+            if pattern.replace_on_type {
+                crate::turbo::widgets::selected_input(
+                    &crate::turbo::widgets::pan(&pattern.field, scroll),
+                    true,
+                )
+            } else {
+                crate::turbo::widgets::input_scrolled(&pattern.field, scroll, true)
+            },
             input,
         );
         frame.set_cursor_position((input.x + (cursor - scroll) as u16, input.y));
@@ -120,16 +121,11 @@ pub(super) fn draw_tools(
                 let checked = app.config.columns[panel] == preset;
                 let choice = Rect::new(x, rect.y + 4 + row as u16, 31, 1);
                 frame.render_widget(
-                    Paragraph::new(format!(
-                        "({}) {}",
-                        if checked { 'x' } else { ' ' },
-                        app.config.language.text(preset.label())
-                    ))
-                    .style(dos(if cursor == panel && checked {
-                        0x30
-                    } else {
-                        0x70
-                    })),
+                    crate::turbo::widgets::radio(
+                        app.config.language.text(preset.label()),
+                        checked,
+                        cursor == panel && checked,
+                    ),
                     choice,
                 );
                 frame

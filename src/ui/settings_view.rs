@@ -1,9 +1,5 @@
-use super::menu_view::label_spans;
 use crate::painting::{Frame, Paragraph};
-use crate::presentation::{
-    layout::Rect,
-    text::{Line, Span},
-};
+use crate::presentation::layout::Rect;
 use crate::{app::App, mouse::Target, settings::SettingsKind};
 
 pub(super) fn draw_settings(frame: &mut impl Frame, app: &App, area: Rect) {
@@ -14,10 +10,12 @@ pub(super) fn draw_settings(frame: &mut impl Frame, app: &App, area: Rect) {
     };
     if settings.kind == SettingsKind::Keyboard {
         super::shortcuts_view::draw_settings(frame, app, area);
+        draw_choices(frame, app, area);
         return;
     }
     if settings.kind == SettingsKind::Regional {
         draw_regional(frame, app, area);
+        draw_choices(frame, app, area);
         return;
     }
     let width = if settings.kind == SettingsKind::FileManager {
@@ -79,22 +77,15 @@ pub(super) fn draw_settings(frame: &mut impl Frame, app: &App, area: Rect) {
             1,
         );
         let selected = settings.cursor == index;
-        let normal = dos(if selected { 0x30 } else { 0x70 });
-        let hot = dos(if selected { 0x3e } else { 0x74 });
-        let mut spans = vec![Span::styled(
-            if settings.value(*setting) {
-                "[x] "
-            } else {
-                "[ ] "
-            },
-            normal,
-        )];
-        spans.extend(label_spans(
-            app.config.language.text(setting.label()),
-            normal,
-            hot,
-        ));
-        frame.render_widget(Paragraph::new(Line::from(spans)), row);
+        frame.render_widget(
+            crate::turbo::widgets::checkbox(
+                app.config.language.text(setting.label()),
+                settings.value(*setting),
+                selected,
+                true,
+            ),
+            row,
+        );
         frame.regions().push((row, Target::Setting(index)));
     }
     if settings.kind == SettingsKind::Highlight {
@@ -175,33 +166,26 @@ fn draw_regional(frame: &mut impl Frame, app: &App, area: Rect) {
         "Time format",
         "Time separator",
     ];
-    let values = [
-        settings.draft.language.name().to_owned(),
-        language
-            .text(match format.date_order {
-                crate::regional::DateOrder::Ymd => "Year–month–day",
-                crate::regional::DateOrder::Dmy => "Day–month–year",
-                crate::regional::DateOrder::Mdy => "Month–day–year",
-            })
-            .to_owned(),
-        format.date_separator.to_string(),
-        language
-            .text(if format.twelve_hour {
-                "12 hour"
-            } else {
-                "24 hour"
-            })
-            .to_owned(),
-        format.time_separator.to_string(),
-    ];
-    for (i, (label, value)) in labels.into_iter().zip(values).enumerate() {
+    for (i, label) in labels.into_iter().enumerate() {
         let row = Rect::new(rect.x + 3, rect.y + 2 + i as u16, rect.width - 6, 1);
-        let text = format!("{:<24} ◄ {} ►", language.text(label), value);
         frame.render_widget(
-            Paragraph::new(text).style(profile.dos(if settings.cursor == i { 0x30 } else { 0x70 })),
-            row,
+            Paragraph::new(language.text(label)).style(profile.dos(0x70)),
+            Rect::new(row.x, row.y, 24, 1),
+        );
+        let field = Rect::new(row.x + 24, row.y, row.width - 24, 1);
+        frame.render_widget(
+            crate::turbo::widgets::combo(
+                &crate::settings::choice_items(settings, i, language),
+                0,
+                settings.cursor == i,
+            ),
+            field,
         );
         frame.regions().push((row, Target::RegionalChoice(i)));
+        frame.regions().push((
+            Rect::new(field.right() - 2, field.y, 2, 1),
+            Target::OpenSettingsChoice(i),
+        ));
     }
     let now = chrono::Local::now();
     frame.render_widget(
@@ -238,5 +222,51 @@ fn draw_regional(frame: &mut impl Frame, app: &App, area: Rect) {
             settings.cursor == 5 + i,
         );
         frame.regions().push((button, target));
+    }
+}
+
+fn draw_choices(frame: &mut impl Frame, app: &App, area: Rect) {
+    let Some(choice) = app.modals.settings_choice() else {
+        return;
+    };
+    let width = choice
+        .items
+        .iter()
+        .map(|s| crate::presentation::text::Span::raw(s).width())
+        .max()
+        .unwrap_or(20)
+        .clamp(24, 60) as u16
+        + 4;
+    let rect = super::dialog_style::window(
+        frame,
+        app.config.palette,
+        area,
+        width,
+        choice.items.len() as u16 + 4,
+        app.config
+            .language
+            .text(if choice.kind == SettingsKind::Keyboard {
+                "Profile"
+            } else {
+                "Options"
+            }),
+    );
+    frame.regions().clear();
+    frame.regions().push((area, Target::CancelSettingsChoice));
+    let list = Rect::new(
+        rect.x + 2,
+        rect.y + 2,
+        rect.width - 4,
+        choice.items.len() as u16,
+    );
+    frame.render_widget(
+        crate::turbo::widgets::list(choice.items.clone(), choice.cursor, 0, true),
+        list,
+    );
+    for i in 0..choice.items.len() {
+        frame.regions().push((
+            Rect::new(list.x, list.y + i as u16, list.width, 1),
+            Target::SettingsChoice(i),
+        ));
     }
 }

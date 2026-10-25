@@ -45,20 +45,24 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
     let mut buttons = Vec::new();
     match modal {
         Modal::Bookmarks { slot, focus } => {
+            let items = (0..9)
+                .map(|i| {
+                    let value = app.config.bookmarks[i]
+                        .as_ref()
+                        .map(|p| display_name(&p.to_string_lossy()))
+                        .unwrap_or_else(|| app.config.language.text("<empty>").into());
+                    format!("{}  {}", i + 1, tail(&value, w - 3))
+                })
+                .collect();
+            frame.render_widget(
+                crate::turbo::widgets::list(items, *slot, 0, *focus == 0),
+                Rect::new(x, rect.y + 1, w, 9),
+            );
             for i in 0..9 {
-                let value = app.config.bookmarks[i]
-                    .as_ref()
-                    .map(|p| display_name(&p.to_string_lossy()))
-                    .unwrap_or_else(|| app.config.language.text("<empty>").into());
-                let row = Rect::new(x, rect.y + 1 + i as u16, w, 1);
-                frame.render_widget(
-                    Paragraph::new(format!("{}  {}", i + 1, tail(&value, w - 3)))
-                        .style(dos(if *slot == i { 0x30 } else { 0x70 })),
-                    row,
-                );
-                frame
-                    .regions()
-                    .push((row, Target::Navigation(Action::Slot(i))));
+                frame.regions().push((
+                    Rect::new(x, rect.y + 1 + i as u16, w, 1),
+                    Target::Navigation(Action::Slot(i)),
+                ));
             }
             frame.render_widget(
                 Paragraph::new(
@@ -93,9 +97,7 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
             let column = Line::from(&field[..*cursor]).width();
             let scroll = column.saturating_sub(w.saturating_sub(1) as usize);
             frame.render_widget(
-                Paragraph::new(display_name(field))
-                    .scroll((0, scroll as u16))
-                    .style(super::dialog_style::input_style(profile, *focus == 0)),
+                crate::turbo::widgets::input_scrolled(&display_name(field), scroll, *focus == 0),
                 input,
             );
             frame

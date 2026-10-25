@@ -17,52 +17,27 @@ mod native {
             event::{Event, KB_SHIFT_TAB, KB_TAB},
             geometry::Rect,
         },
-        terminal::Terminal,
-        views::{group::Group, GroupLike, View, ViewCore},
+        views::{button::Button, group::Group, GroupLike, View},
     };
-    struct Control {
-        core: ViewCore,
-        value: usize,
-    }
-    impl View for Control {
-        fn core(&self) -> &ViewCore {
-            &self.core
-        }
-        fn core_mut(&mut self) -> &mut ViewCore {
-            &mut self.core
-        }
-        fn as_any(&self) -> &dyn std::any::Any {
-            self
-        }
-        fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
-            self
-        }
-        fn get_palette(&self) -> Option<turbo_vision::core::palette::Palette> {
-            None
-        }
-        fn can_focus(&self) -> bool {
-            true
-        }
-        fn draw(&mut self, _: &mut Terminal) {}
-        fn handle_event(&mut self, _: &mut Event) {}
-    }
     struct Traversal {
         choices: Vec<usize>,
         group: Group,
+        ids: Vec<turbo_vision::views::ViewId>,
     }
     impl Traversal {
         fn new(choices: &[usize]) -> Self {
             let mut group = Group::new(Rect::new(0, 0, 1, 1));
-            for &value in choices {
-                group.add(Control {
-                    core: ViewCore::new(Rect::new(0, 0, 1, 1)),
-                    value,
-                });
+            let mut ids = Vec::new();
+            for _ in choices {
+                let mut button = Button::new(Rect::new(0, 0, 4, 2), "", 0xf100, false);
+                button.set_selectable(true);
+                ids.push(group.add(button));
             }
             group.set_initial_focus();
             Self {
                 choices: choices.to_vec(),
                 group,
+                ids,
             }
         }
     }
@@ -82,11 +57,13 @@ mod native {
                 } else {
                     KB_TAB
                 }));
+            let selected = traversal.group.focused_view_id();
             traversal
-                .group
-                .focused_child()
-                .and_then(|v| v.as_any().downcast_ref::<Control>())
-                .map_or(current, |v| v.value)
+                .ids
+                .iter()
+                .position(|id| Some(*id) == selected)
+                .and_then(|i| choices.get(i).copied())
+                .unwrap_or(current)
         })
     }
 }

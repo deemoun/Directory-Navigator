@@ -20,6 +20,27 @@ for this finishing pass. Local runtime validation targets macOS ARM64.
 - Models retain filesystem policy, asynchronous workers, editing/undo/search,
   viewer navigation, game rules and save-before-close guards. Native input cannot
   bypass those guards. Existing full-screen document layouts are preserved.
+- Shared dialog frames, buttons (including disabled states), input fields,
+  checkboxes, radio buttons, choice fields, lists, read-only text, group boxes,
+  scrollbars and activity indicators now use actual toolkit widgets through
+  `turbo/widgets.rs`. This covers messages/confirmations, file-operation prompts,
+  settings, editor/viewer search and numeric prompts, histories/bookmarks/windows,
+  discovery/archive results, utilities and game pages. Dropdown menus and function
+  bars use `MenuBox`, `MenuBar` and `StatusLine`; directory trees use `OutlineViewer`
+  over DN's cancellable scan model. No toolkit directory control changes the
+  process working directory.
+- Controllers keep semantic state and guarded actions. Native controls are hydrated
+  from that state; input editing, list/menu navigation and focus traversal use
+  toolkit events. Ephemeral drawing controls do not mutate application models or
+  start nested loops. The adapter preserves complete graphemes, literal private-use
+  characters, clipping, cursor placement and existing compact control bounds.
+  Native button faces and menu check marks replace their hand-drawn counterparts.
+- Settings choice fields open an owned native dialog/list child with F4 or the
+  arrow control. Child Cancel restores the parent draft; accepting a choice still
+  requires accepting the parent to apply settings. Plain-text help uses read-only
+  `Memo` controls. Numeric fields retain existing validation rather than silently
+  clamping invalid entries. Unknown operation totals use an activity bar, not a
+  fabricated percentage.
 - The ASCII/CP437 grid reuses the library's `Table` control for cell drawing,
   keyboard navigation and mouse selection. DN supplies the byte mapping,
   single-cell highlight, details and clipboard behavior. The upstream showcase's
@@ -76,12 +97,13 @@ See [document foundations](DOCUMENT_FOUNDATIONS.md) for lifecycle and validation
 
 Local macOS ARM64 validation covers:
 
-- 434 native Rust tests pass; the existing opt-in native Trash check stays ignored.
+- 442 native Rust tests pass; the existing opt-in native Trash check stays ignored.
 - Formatting, all-target Clippy, release build and a no-default-features build.
 - 2,898 layout cases check viewport bounds. Feasible allocations compare against
   frozen pre-removal geometry; 40 wrapping cases preserve narrow widths,
   indentation, long words, blank lines, NBSP/zero-width spaces and Unicode.
-- A before/after capture of 40 fixed UI scenes matches cells/styles/mouse targets.
+- The earlier renderer-removal pass preserved 40 fixed UI scene captures. Current
+  native controls intentionally use toolkit button faces and menu check marks.
   Headless wide-cell placeholders normalize hidden continuation attributes.
 - 1,008 manager, 420 Tetris and 448 other-surface frame comparisons now compare
   native headless snapshots with independently decoded terminal output. These
@@ -95,6 +117,11 @@ Local macOS ARM64 validation covers:
   cancellation, nested help, immutable painting and translated mouse targets.
   A terminal workflow checks native browsing and mouse Cancel, Unicode Save As,
   resizing, quit cancellation, shell handoff and terminal restoration.
+- Native-control regressions cover Unicode editing/drawing and byte limits,
+  neighbour clipping, visible-row encoding, disabled menu commands, nested settings
+  choices, immutable painting, stale targets and opening leaf directories by mouse.
+  Terminal checks exercise native settings choices with keyboard/mouse, cancellation,
+  Unicode mkdir, existing-destination refusal, help scrolling and terminal restoration.
 - Terminal checks cover panes, menus, Tetris, viewer search/wrap, quick view,
   calculator history/help, Unicode editor paste, unsaved-close cancel, Save As to
   disposable files, mouse actions, resize, shell input and terminal restoration.

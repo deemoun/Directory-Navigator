@@ -1,6 +1,6 @@
 //! Native dialog focus and button commands with DN's Unicode field semantics.
-//! The existing canvas is the skin during the renderer conversion. No nested
-//! modal loop: workers and terminal restoration remain owned by the main loop.
+//! Native controls use the application's single event loop; workers and terminal
+//! restoration remain owned by the session.
 use crate::{
     app::App,
     dialog::{Prompt, PromptKind},
@@ -13,13 +13,12 @@ use turbo_vision::{
     core::{
         event::{Event, EventType, KB_ENTER, KB_SHIFT_TAB, KB_TAB},
         geometry::Rect,
-        palette::Palette,
     },
-    terminal::Terminal,
     views::{
         button::{self, Button},
         dialog::{CloseOn, Dialog},
-        GroupLike, View, ViewCore, ViewId,
+        input_line::InputLine,
+        GroupLike, View, ViewId,
     },
 };
 
@@ -29,51 +28,10 @@ struct FieldData {
     text: String,
     cursor: usize,
 }
-struct Field {
-    core: ViewCore,
-    data: Rc<RefCell<FieldData>>,
-    key: KeyEvent,
-}
-impl View for Field {
-    fn core(&self) -> &ViewCore {
-        &self.core
-    }
-    fn core_mut(&mut self) -> &mut ViewCore {
-        &mut self.core
-    }
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
-        self
-    }
-    fn get_palette(&self) -> Option<Palette> {
-        None
-    }
-    fn can_focus(&self) -> bool {
-        true
-    }
-    fn draw(&mut self, _: &mut Terminal) {}
-    fn handle_event(&mut self, event: &mut Event) {
-        if event.what != EventType::Keyboard
-            || matches!(event.key_code, KB_ENTER | KB_TAB | KB_SHIFT_TAB)
-        {
-            return;
-        }
-        if !self.key.modifiers.intersects(M::CONTROL | M::ALT) {
-            let mut field = self.data.borrow_mut();
-            let FieldData { text, cursor } = &mut *field;
-            crate::dialog::edit_input(text, cursor, self.key.code);
-            // Even a non-editing printable key belongs to the field. Never
-            // let a label mnemonic steal text from a focused path input.
-            event.clear();
-        }
-    }
-}
-
 struct Form {
     dialog: Dialog,
     ids: Vec<(usize, ViewId)>,
+    input: Option<(Rc<RefCell<FieldData>>, KeyEvent)>,
 }
 impl Form {
     fn new() -> Self {
@@ -86,14 +44,14 @@ impl Form {
         Self {
             dialog,
             ids: Vec::new(),
+            input: None,
         }
     }
     fn field(&mut self, data: Rc<RefCell<FieldData>>, key: KeyEvent) {
-        let id = self.dialog.add(Field {
-            core: ViewCore::new(Rect::new(1, 1, 60, 2)),
-            data,
-            key,
-        });
+        let mut input = InputLine::new(Rect::new(1, 1, 60, 2), 16384);
+        input.set_text(data.borrow().text.as_str());
+        let id = self.dialog.add(input);
+        self.input = Some((data, key));
         self.ids.push((0, id));
     }
     fn button(&mut self, index: usize, default: bool) {
@@ -122,6 +80,28 @@ impl Form {
         // DN buttons have immediate activation. Scope TV's optional animation
         // override to this dispatch, so no delayed command can reach a newer
         // dialog after the original one closes.
+        if self.selected() == 0
+            && event.what == EventType::Keyboard
+            && !matches!(event.key_code, KB_ENTER | KB_TAB | KB_SHIFT_TAB)
+        {
+            if let Some((data, key)) = &self.input {
+                if !key.modifiers.intersects(M::CONTROL | M::ALT) {
+                    let mut field = data.borrow_mut();
+                    let FieldData { text, cursor } = &mut *field;
+                    crate::dialog::edit_input(text, cursor, key.code);
+                    if let Some(input) = self
+                        .dialog
+                        .group_mut()
+                        .child_at_mut(0)
+                        .as_any_mut()
+                        .downcast_mut::<InputLine>()
+                    {
+                        input.set_text(text.as_str());
+                    }
+                }
+                return None;
+            }
+        }
         struct Animation(Duration);
         impl Drop for Animation {
             fn drop(&mut self) {
@@ -278,30 +258,26 @@ mod tests {
     #[test]
     fn native_field_accepts_wide_combining_private_and_non_latin_text() {
         let data = Rc::new(RefCell::new(FieldData::default()));
-        let mut field = Field {
-            core: ViewCore::new(Rect::new(0, 0, 20, 1)),
-            data: data.clone(),
-            key: KeyEvent::new(K::Null, M::NONE),
-        };
+        let mut form = Form::new();
+        form.field(data.clone(), KeyEvent::new(K::Null, M::NONE));
+        form.select(0);
         for ch in "界е\u{301}👩\u{200d}💻\u{f0000}".chars() {
-            field.key = KeyEvent::new(K::Char(ch), M::NONE);
-            let mut event = Event::text(ch);
-            field.handle_event(&mut event);
-            assert_eq!(event.what, EventType::Nothing);
+            form.input.as_mut().unwrap().1 = KeyEvent::new(K::Char(ch), M::NONE);
+            assert_eq!(form.event(Event::text(ch)), None);
         }
         assert_eq!(data.borrow().text, "界е\u{301}👩\u{200d}💻\u{f0000}");
         assert_eq!(data.borrow().cursor, data.borrow().text.len());
-        field.key = KeyEvent::new(K::Backspace, M::NONE);
-        field.handle_event(&mut Event::text('\0'));
+        form.input.as_mut().unwrap().1 = KeyEvent::new(K::Backspace, M::NONE);
+        form.event(Event::text('\0'));
         assert_eq!(data.borrow().text, "界е\u{301}👩\u{200d}💻");
-        field.key = KeyEvent::new(K::Home, M::NONE);
-        field.handle_event(&mut Event::text('\0'));
-        field.key = KeyEvent::new(K::Delete, M::NONE);
-        field.handle_event(&mut Event::text('\0'));
+        form.input.as_mut().unwrap().1 = KeyEvent::new(K::Home, M::NONE);
+        form.event(Event::text('\0'));
+        form.input.as_mut().unwrap().1 = KeyEvent::new(K::Delete, M::NONE);
+        form.event(Event::text('\0'));
         assert_eq!(data.borrow().text, "е\u{301}👩\u{200d}💻");
         assert_eq!(data.borrow().cursor, 0);
-        field.key = KeyEvent::new(K::Char('q'), M::CONTROL);
-        field.handle_event(&mut Event::text('q'));
+        form.input.as_mut().unwrap().1 = KeyEvent::new(K::Char('q'), M::CONTROL);
+        form.event(Event::text('q'));
         assert_eq!(data.borrow().cursor, 0);
     }
 }

@@ -18,6 +18,9 @@ pub enum Target {
     CancelImport,
     Welcome(crate::welcome::Action),
     ShortcutProfile,
+    OpenSettingsChoice(usize),
+    SettingsChoice(usize),
+    CancelSettingsChoice,
     CommandHistory(crate::command_line::history::Action),
     Archive(crate::archive::Action),
     UserMenu(crate::user_menu::Action),
@@ -328,8 +331,22 @@ fn handle_mouse(app: &mut App, event: MouseEvent) {
         return;
     }
     if focus == Focus::Settings {
+        if app.modals.settings_choice().is_some() {
+            if event.kind == MouseEventKind::Down(MouseButton::Left) {
+                if let Some(Target::SettingsChoice(row)) = target {
+                    if let Some(choice) = app.modals.settings_choice_mut() {
+                        choice.cursor = row.min(choice.items.len().saturating_sub(1));
+                    }
+                    crate::settings::choice_key(app, crossterm::event::KeyCode::Enter);
+                } else {
+                    app.modals.set_settings_choice(None);
+                }
+            }
+            return;
+        }
         if event.kind == MouseEventKind::Down(MouseButton::Left) {
             match target {
+                Some(Target::OpenSettingsChoice(row)) => crate::settings::open_choice(app, row),
                 Some(Target::ShortcutProfile) => {
                     if let Some(settings) = app.modals.settings_mut() {
                         settings.keyboard_choice(false);

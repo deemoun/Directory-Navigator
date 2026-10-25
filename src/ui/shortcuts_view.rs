@@ -59,15 +59,23 @@ pub(super) fn draw_settings(frame: &mut impl Frame, app: &App, area: Rect) {
     super::dialog_style::close_button(frame, profile, rect, Target::CancelSettings);
     let choice = Rect::new(rect.x + 3, rect.y + 2, rect.width - 6, 1);
     frame.render_widget(
-        Paragraph::new(format!(
-            "{}: ◄ {} ►",
-            language.text("Profile"),
-            language.text(settings.draft.shortcuts.name())
-        ))
-        .style(profile.dos(if settings.cursor == 0 { 0x30 } else { 0x70 })),
-        choice,
+        Paragraph::new(language.text("Profile")).style(profile.dos(0x70)),
+        Rect::new(choice.x, choice.y, 12, 1),
+    );
+    let field = Rect::new(choice.x + 12, choice.y, choice.width - 12, 1);
+    frame.render_widget(
+        crate::turbo::widgets::combo(
+            &crate::settings::choice_items(settings, 0, language),
+            0,
+            settings.cursor == 0,
+        ),
+        field,
     );
     frame.regions().push((choice, Target::ShortcutProfile));
+    frame.regions().push((
+        Rect::new(field.right() - 2, field.y, 2, 1),
+        Target::OpenSettingsChoice(0),
+    ));
     let text = if settings.draft.shortcuts.is_mac() {
         "^O means Ctrl+O, release, then the next key.\n1 Help · 2 User · 3 View · 4 Edit · 5 Copy\n6 Move · 7 MkDir · 8 Trash · 9 Menu · 0 Quit\ns Quick search · f Find · i Info · z Sort\nb Bookmarks · l Filter · h Commands · k Keyboard\nEditor: a Save As · w Close · r Replace · x Quit\nViewer: 2 Wrap · n Next · p Reverse · w Close\nThe prefix displays a guide for the current screen.\nClassic DN shortcuts remain available."
     } else {

@@ -169,6 +169,12 @@ pub fn key(app: &mut App, key: KeyEvent) {
         return;
     };
     d.last_click = None;
+    if let Some(row) = crate::turbo::widgets::list_key(d.cursor, d.matches.len(), d.rows, key.code)
+    {
+        d.cursor = row;
+        d.keep_visible();
+        return;
+    }
     match key.code {
         KeyCode::Esc => action(app, Action::Cancel),
         KeyCode::Enter => {
@@ -179,15 +185,6 @@ pub fn key(app: &mut App, key: KeyEvent) {
             };
             action(app, a);
         }
-        KeyCode::Up => d.step(-1),
-        KeyCode::Down => d.step(1),
-        KeyCode::PageUp => d.step(-(d.rows as isize)),
-        KeyCode::PageDown => d.step(d.rows as isize),
-        KeyCode::Home => {
-            d.cursor = 0;
-            d.keep_visible();
-        }
-        KeyCode::End => d.step(isize::MAX),
         KeyCode::Tab | KeyCode::BackTab => {
             let choices: &[usize] = if d.matches.is_empty() {
                 &[0, 1, 3]

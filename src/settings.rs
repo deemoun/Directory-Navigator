@@ -161,7 +161,7 @@ impl Settings {
             Setting::Trash => &mut self.draft.use_trash,
             Setting::Backspace => &mut self.draft.backspace_parent,
         };
-        *value = !*value;
+        *value = crate::turbo::widgets::toggle(*value);
     }
 }
 
@@ -172,6 +172,16 @@ pub fn accept(app: &mut App) {
     }
 }
 pub fn key(app: &mut App, code: KeyCode) {
+    if app.modals.settings_choice().is_some() {
+        choice_key(app, code);
+        return;
+    }
+    if code == KeyCode::F(4) {
+        if let Some(settings) = app.modals.settings() {
+            open_choice(app, settings.cursor);
+        }
+        return;
+    }
     let Some(settings) = app.modals.settings_mut() else {
         return;
     };
@@ -221,6 +231,109 @@ pub fn key(app: &mut App, code: KeyCode) {
                 .position(|setting| app.config.language.matches(setting.label(), c))
             {
                 settings.toggle(index);
+            }
+        }
+        _ => {}
+    }
+}
+
+/// A child choice list stays inside the parent's draft transaction. No setting
+/// is applied to the application until the parent dialog accepts.
+pub struct ChoiceDialog {
+    pub kind: SettingsKind,
+    pub row: usize,
+    pub items: Vec<String>,
+    pub cursor: usize,
+}
+pub fn choice_items(
+    settings: &Settings,
+    row: usize,
+    language: crate::localization::Language,
+) -> Vec<String> {
+    fn label(settings: &Settings, row: usize, language: crate::localization::Language) -> String {
+        if settings.kind == SettingsKind::Keyboard {
+            return language.text(settings.draft.shortcuts.name()).into();
+        }
+        match row {
+            0 => settings.draft.language.name().into(),
+            1 => language
+                .text(match settings.draft.datetime.date_order {
+                    crate::regional::DateOrder::Ymd => "Year–month–day",
+                    crate::regional::DateOrder::Dmy => "Day–month–year",
+                    crate::regional::DateOrder::Mdy => "Month–day–year",
+                })
+                .into(),
+            2 => settings.draft.datetime.date_separator.to_string(),
+            3 => language
+                .text(if settings.draft.datetime.twelve_hour {
+                    "12 hour"
+                } else {
+                    "24 hour"
+                })
+                .into(),
+            4 => settings.draft.datetime.time_separator.to_string(),
+            _ => String::new(),
+        }
+    }
+    let mut copy = Settings::new(settings.kind, &settings.draft);
+    let mut items = Vec::new();
+    for _ in 0..8 {
+        let value = label(&copy, row, language);
+        if items.contains(&value) {
+            break;
+        }
+        items.push(value);
+        if copy.kind == SettingsKind::Keyboard {
+            copy.keyboard_choice(false);
+        } else {
+            copy.regional_choice(row, false);
+        }
+    }
+    items
+}
+pub fn open_choice(app: &mut App, row: usize) {
+    let Some(settings) = app.modals.settings() else {
+        return;
+    };
+    if !matches!(
+        settings.kind,
+        SettingsKind::Keyboard | SettingsKind::Regional
+    ) || row >= settings.control_count()
+    {
+        return;
+    }
+    let items = choice_items(settings, row, app.config.language);
+    let kind = settings.kind;
+    app.modals.set_settings_choice(Some(ChoiceDialog {
+        kind,
+        row,
+        items,
+        cursor: 0,
+    }));
+}
+pub fn choice_key(app: &mut App, code: KeyCode) {
+    let Some(choice) = app.modals.settings_choice_mut() else {
+        return;
+    };
+    if let Some(row) =
+        crate::turbo::widgets::list_key(choice.cursor, choice.items.len(), choice.items.len(), code)
+    {
+        choice.cursor = row;
+        return;
+    }
+    match code {
+        KeyCode::Esc | KeyCode::F(4) => app.modals.set_settings_choice(None),
+        KeyCode::Enter | KeyCode::Char(' ') => {
+            let choice = app.modals.take_settings_choice().unwrap();
+            if let Some(settings) = app.modals.settings_mut().filter(|s| s.kind == choice.kind) {
+                for _ in 0..choice.cursor {
+                    if settings.kind == SettingsKind::Keyboard {
+                        settings.keyboard_choice(false);
+                    } else {
+                        settings.regional_choice(choice.row, false);
+                    }
+                }
+                settings.cursor = choice.row;
             }
         }
         _ => {}

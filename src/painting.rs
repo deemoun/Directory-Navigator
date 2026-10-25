@@ -375,6 +375,15 @@ impl NativeFrame {
     pub(crate) fn finish(self) -> crate::turbo::scene::Scene {
         self.scene
     }
+    pub(crate) fn profile(&self) -> crate::palette::PaletteProfile {
+        self.scene.profile
+    }
+    pub(crate) fn control_scene(&mut self, scene: crate::turbo::scene::Scene) {
+        for ((x, y), glyph) in scene.cells {
+            let style = Style::reset().patch(glyph.resolved(self.scene.profile));
+            self.put(x, y, &glyph.text, style);
+        }
+    }
     fn style(&mut self, area: Rect, style: Style) {
         for y in area.y..area.bottom().min(self.scene.height) {
             for x in area.x..area.right().min(self.scene.width) {

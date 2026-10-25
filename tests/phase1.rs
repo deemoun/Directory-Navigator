@@ -647,7 +647,7 @@ fn original_menu_hierarchy_cascades_alignment_and_keyboard_navigation() -> io::R
             .last()
             {
                 assert_eq!(
-                    terminal.backend().buffer()[(rect.right() - 4, rect.y + 1 + row as u16)]
+                    terminal.backend().buffer()[(rect.right() - 3, rect.y + 1 + row as u16)]
                         .symbol(),
                     last.to_string()
                 );

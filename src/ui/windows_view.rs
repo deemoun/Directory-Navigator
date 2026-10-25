@@ -21,13 +21,8 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
         language.text("Open windows"),
     );
     super::dialog_style::close_button(frame, profile, rect, Target::Window(Action::Cancel));
-    for (row, id) in list
-        .ids
-        .iter()
-        .enumerate()
-        .skip(list.offset)
-        .take(list.rows)
-    {
+    let mut labels = Vec::with_capacity(list.ids.len());
+    for (row, id) in list.ids.iter().enumerate() {
         let kind = app.desktop.windows().find(|w| w.id == *id).map(|w| w.kind);
         let width = rect.width - 6;
         let name = match kind {
@@ -69,7 +64,7 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
         };
         let row_area = Rect::new(
             rect.x + 2,
-            rect.y + 2 + (row - list.offset) as u16,
+            rect.y + 2 + row.saturating_sub(list.offset) as u16,
             rect.width - 4,
             1,
         );
@@ -82,14 +77,18 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
             },
             crate::formatting::tail(&name, row_area.width - 2)
         );
-        frame.render_widget(
-            Paragraph::new(label).style(profile.dos(if row == list.cursor { 0x30 } else { 0x70 })),
-            row_area,
-        );
+        labels.push(label);
+        if row < list.offset || row >= list.offset + list.rows {
+            continue;
+        }
         frame
             .regions()
             .push((row_area, Target::Window(Action::Row(*id))));
     }
+    frame.render_widget(
+        crate::turbo::widgets::list(labels, list.cursor, list.offset, list.focus == 0),
+        Rect::new(rect.x + 2, rect.y + 2, rect.width - 4, list.rows as u16),
+    );
     frame.render_widget(
         Paragraph::new(language.text("Switching keeps documents open")).style(profile.dos(0x70)),
         Rect::new(rect.x + 2, rect.bottom() - 4, rect.width - 4, 1),

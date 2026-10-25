@@ -1,22 +1,10 @@
-use crate::painting::{Block, Borders, Clear, Frame, Paragraph};
-use crate::presentation::{
-    layout::Rect,
-    style::Style,
-    text::{Line, Span},
-};
+use crate::painting::Frame;
+use crate::presentation::{layout::Rect, text::Line};
 use crate::{
     app::App,
     menu::{self, Action},
     mouse::Target,
 };
-
-pub(super) fn label_spans(label: &str, normal: Style, hot: Style) -> Vec<Span<'_>> {
-    label
-        .split('~')
-        .enumerate()
-        .map(|(index, part)| Span::styled(part, if index % 2 == 1 { hot } else { normal }))
-        .collect()
-}
 
 fn menu_width(
     entries: &[menu::Item],
@@ -40,8 +28,6 @@ fn menu_width(
 
 pub(super) fn draw_dropdowns(frame: &mut impl Frame, app: &App, bar: &[Rect], area: Rect) {
     let language = app.config.language;
-    let profile = app.config.palette;
-    let dos = profile.styles();
     let Some((root, _)) = app.modals.menu() else {
         return;
     };
@@ -66,11 +52,33 @@ pub(super) fn draw_dropdowns(frame: &mut impl Frame, app: &App, bar: &[Rect], ar
             (bar[root].x.min(area.right() - width), area.y + 1)
         };
         let rect = Rect::new(x, y, width, height);
-        let shadow = Rect::new(x + 1, y + 1, width, height).intersection(area);
-        frame.render_widget(Block::default().style(dos(0x08)), shadow);
-        frame.render_widget(Clear, rect);
+        let native = entries
+            .iter()
+            .map(|item| crate::turbo::widgets::MenuEntry {
+                label: if item.action == Action::Separator {
+                    String::new()
+                } else {
+                    language.text(item.label).into()
+                },
+                shortcut: crate::shortcuts::label(
+                    app.config.shortcuts,
+                    crate::focus::Screen::Manager,
+                    item.shortcut,
+                )
+                .into_owned(),
+                enabled: item.selectable(),
+                checked: match item.action {
+                    Action::Sort(mode) => app.panels[app.active].sort == mode,
+                    Action::Layout(layout) => app.config.layouts[app.active] == layout,
+                    Action::Hidden => app.config.show_hidden,
+                    Action::QuickView => app.quick_view.is_some(),
+                    _ => false,
+                },
+                submenu: matches!(item.action, Action::Submenu(_)),
+            })
+            .collect();
         frame.render_widget(
-            Block::default().borders(Borders::ALL).style(dos(0x70)),
+            crate::turbo::widgets::menu(native, menu::selected_row(app, depth)),
             rect,
         );
         frame.regions().push((rect, Target::MenuSurface));
@@ -79,61 +87,12 @@ pub(super) fn draw_dropdowns(frame: &mut impl Frame, app: &App, bar: &[Rect], ar
             .enumerate()
             .take(height.saturating_sub(2) as usize)
         {
-            let row_rect = Rect::new(x + 1, y + 1 + row as u16, width - 2, 1);
-            if item.action == Action::Separator {
-                frame.render_widget(
-                    Paragraph::new(format!(
-                        "├{}┤",
-                        "─".repeat(width.saturating_sub(2) as usize)
-                    ))
-                    .style(dos(0x70)),
-                    Rect::new(x, row_rect.y, width, 1),
-                );
-                continue;
+            if item.action != Action::Separator {
+                frame.regions().push((
+                    Rect::new(x + 1, y + 1 + row as u16, width - 2, 1),
+                    Target::MenuItem(depth, row),
+                ));
             }
-            let selected = row == menu::selected_row(app, depth);
-            let normal = dos(if !item.selectable() {
-                0x78
-            } else if selected {
-                0x30
-            } else {
-                0x70
-            });
-            let hot = if !item.selectable() {
-                normal
-            } else {
-                dos(if selected { 0x3e } else { 0x74 })
-            };
-            let checked = match item.action {
-                Action::Sort(mode) => app.panels[app.active].sort == mode,
-                Action::Layout(layout) => app.config.layouts[app.active] == layout,
-                Action::Hidden => app.config.show_hidden,
-                Action::QuickView => app.quick_view.is_some(),
-                _ => false,
-            };
-            let shortcut = crate::shortcuts::label(
-                app.config.shortcuts,
-                crate::focus::Screen::Manager,
-                item.shortcut,
-            );
-            let label_width = Line::from(menu::plain(language.text(item.label))).width();
-            let padding = (width as usize - 2).saturating_sub(2 + label_width + shortcut.len() + 2);
-            let mut spans = vec![Span::styled(if checked { "• " } else { "  " }, normal)];
-            spans.extend(label_spans(language.text(item.label), normal, hot));
-            spans.push(Span::styled(" ".repeat(padding), normal));
-            spans.push(Span::styled(shortcut.into_owned(), normal));
-            spans.push(Span::styled(
-                if matches!(item.action, Action::Submenu(_)) {
-                    " ▶"
-                } else {
-                    "  "
-                },
-                normal,
-            ));
-            frame.render_widget(Paragraph::new(Line::from(spans)), row_rect);
-            frame
-                .regions()
-                .push((row_rect, Target::MenuItem(depth, row)));
         }
         parent = Some(rect);
     }

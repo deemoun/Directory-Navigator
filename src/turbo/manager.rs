@@ -391,17 +391,7 @@ pub(crate) fn prepare(
         let width = crate::menu::plain(label).width() as u16 + 3;
         let r = Rect::new(x, bar.y, width, 1).intersection(header);
         let selected = app.modals.menu().is_some_and(|(root, _)| root == index);
-        let normal = if selected { 0x30 } else { 0x70 };
-        let hot = if selected { 0x3e } else { 0x74 };
-        let mut items = vec![(" ".into(), normal)];
-        items.extend(
-            label
-                .split('~')
-                .enumerate()
-                .map(|(i, v)| (v.into(), if i % 2 == 1 { hot } else { normal })),
-        );
-        items.push(("  ".into(), normal));
-        runs(&mut s, r, &items, 0x70, false);
+        super::widgets::paint_into(&mut s, super::widgets::menu_title(label, selected, true), r);
         positions.push(r);
         s.regions.push((r, Target::Menu(index)));
         x += width;
@@ -465,22 +455,10 @@ pub(crate) fn prepare(
         } else {
             label
         };
-        let keyattr = if app.config.palette == PaletteProfile::ClassicDn {
-            0x74
-        } else {
-            0x07
-        };
-        let attr = if app.config.palette == PaletteProfile::ClassicDn {
-            0x70
-        } else {
-            0x30
-        };
-        runs(
+        super::widgets::paint_into(
             &mut s,
+            super::widgets::status(&format!("~{key}~{label}")),
             buttons[index],
-            &[(key, keyattr), (label.into(), attr)],
-            attr,
-            false,
         );
     }
     (s, positions)

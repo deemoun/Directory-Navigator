@@ -26,9 +26,13 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
         .collect::<Vec<_>>()
         .join("\n");
     frame.render_widget(
-        Paragraph::new(body)
-            .scroll((0, preview.horizontal))
-            .style(profile.dos(0x70)),
+        crate::turbo::widgets::memo(
+            &body
+                .lines()
+                .map(|s| crate::turbo::widgets::pan(s, preview.horizontal as usize))
+                .collect::<Vec<_>>()
+                .join("\n"),
+        ),
         Rect::new(rect.x + 2, rect.y + 1, rect.width - 4, rect.height - 5),
     );
     frame.render_widget(
@@ -48,7 +52,7 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
         );
         if index == 0 && !enabled {
             frame.render_widget(
-                Paragraph::new(lang.text(label)).style(profile.dos(0x78)),
+                crate::turbo::widgets::disabled_button(lang.text(label)),
                 button,
             );
         } else {

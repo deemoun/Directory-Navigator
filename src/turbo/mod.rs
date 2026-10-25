@@ -11,6 +11,7 @@ pub(crate) mod panes;
 pub mod scene;
 mod surface;
 pub(crate) mod tetris;
+pub(crate) mod widgets;
 use crate::presentation::layout::{Position, Size};
 use codec::Codec;
 use std::{

@@ -55,9 +55,11 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
             crate::presentation::text::Line::from(&m.prefs.pattern[..m.input_cursor]).width();
         let scroll = column.saturating_sub(usize::from(w.saturating_sub(1)));
         frame.render_widget(
-            Paragraph::new(display_name(&m.prefs.pattern))
-                .scroll((0, scroll as u16))
-                .style(super::dialog_style::input_style(profile, m.focus == 0)),
+            crate::turbo::widgets::input_scrolled(
+                &display_name(&m.prefs.pattern),
+                scroll,
+                m.focus == 0,
+            ),
             input,
         );
         frame
@@ -73,8 +75,7 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
             let row = Rect::new(x, rect.y + 5 + i as u16, w, 1);
             let label = app.config.language.text(label);
             frame.render_widget(
-                Paragraph::new(format!("[{}] {label}", if on { 'x' } else { ' ' }))
-                    .style(dos(if m.focus == i { 0x30 } else { 0x70 })),
+                crate::turbo::widgets::checkbox(label, on, m.focus == i, true),
                 row,
             );
             frame
@@ -93,10 +94,10 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
             frame.regions().push((button, Target::Discovery(command)));
         }
     } else {
-        for row in 0..m.rows {
-            let index = m.offset + row;
-            let text = if m.kind == Kind::Sizes {
-                m.sizes.get(index).map(|s| {
+        let items = (0..m.count())
+            .map(|index| {
+                if m.kind == Kind::Sizes {
+                    let s = &m.sizes[index];
                     format!(
                         "{} {} B · {}f {}d {}l · {} skipped{}",
                         tail(&display_name(&s.path.to_string_lossy()), w / 3),
@@ -107,22 +108,20 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
                         s.skipped,
                         if s.partial { " [partial]" } else { "" }
                     )
-                })
-            } else {
-                m.hits
-                    .get(index)
-                    .map(|h| tail(&display_name(&h.path.to_string_lossy()), w))
-            };
-            if let Some(text) = text {
-                let r = Rect::new(x, rect.y + 3 + row as u16, w, 1);
-                frame.render_widget(
-                    Paragraph::new(text).style(dos(if index == m.cursor { 0x30 } else { 0x70 })),
-                    r,
-                );
-                frame
-                    .regions()
-                    .push((r, Target::Discovery(Action::Row(index))));
-            }
+                } else {
+                    tail(&display_name(&m.hits[index].path.to_string_lossy()), w)
+                }
+            })
+            .collect();
+        frame.render_widget(
+            crate::turbo::widgets::list(items, m.cursor, m.offset, true),
+            Rect::new(x, rect.y + 3, w, m.rows as u16),
+        );
+        for index in m.offset..m.count().min(m.offset + m.rows) {
+            frame.regions().push((
+                Rect::new(x, rect.y + 3 + (index - m.offset) as u16, w, 1),
+                Target::Discovery(Action::Row(index)),
+            ));
         }
         let summary = format!(
             "{} · {} results · {} visited · {} skipped",
@@ -146,6 +145,12 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
                     .wrap(crate::painting::Wrap { trim: false })
                     .style(dos(0x74)),
                 Rect::new(x, rect.bottom() - 5, w, 2),
+            );
+        }
+        if m.job.is_some() {
+            frame.render_widget(
+                crate::turbo::widgets::busy(),
+                Rect::new(x, rect.bottom() - 3, w, 1),
             );
         }
         let buttons: &[(&str, Action)] = if m.kind == Kind::Sizes {
@@ -188,7 +193,10 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
                 );
                 frame.regions().push((r, Target::Discovery(*command)));
             } else {
-                frame.render_widget(Paragraph::new(*label).style(dos(0x78)), r);
+                frame.render_widget(
+                    crate::turbo::widgets::disabled_button(app.config.language.text(label)),
+                    r,
+                );
             }
         }
     }

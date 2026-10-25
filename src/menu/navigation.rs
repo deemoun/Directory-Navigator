@@ -98,16 +98,7 @@ pub fn key(app: &mut App, code: KeyCode) {
                 .filter(|(_, item)| item.selectable())
                 .map(|(i, _)| i)
                 .collect();
-            let next = match code {
-                KeyCode::Home => choices.first().copied(),
-                KeyCode::End => choices.last().copied(),
-                _ if choices.is_empty() => None,
-                _ => Some(crate::control_focus::select(
-                    row,
-                    &choices,
-                    code == KeyCode::Up,
-                )),
-            };
+            let next = crate::turbo::widgets::menu_row(row, &choices, code);
             if let Some(next) = next {
                 select(app, depth, next);
             }

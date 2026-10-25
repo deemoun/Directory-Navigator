@@ -28,6 +28,12 @@ There is no startup delay or splash timer. CLI help/version bypass the interface
 
 ## Keyboard profiles
 
+Keyboard-profile and regional choice fields use native Turbo Vision controls.
+Left/Right or Space keeps the existing cycle behavior. Press F4, or click the
+field's arrow, to open a choice list; arrows select and Enter or a click accepts.
+Esc closes that list and restores focus to its parent. A choice updates the
+dialog's draft; the parent dialog's OK applies it, and Cancel discards it.
+
 **Options → Configuration → Keyboard shortcuts** selects **Automatic**, **Classic
 DN** or **Mac-friendly**. Apply changes the profile immediately; Cancel preserves
 it. Save/Load desktop and normal settings persistence include `[application]` with `shortcuts = "auto"`,

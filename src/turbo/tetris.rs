@@ -5,7 +5,6 @@ use super::scene::Scene;
 use crate::{
     app::App,
     mouse::Target,
-    palette::PaletteProfile,
     tetris::{GameAction, FIGURES, HEIGHT, WIDTH},
 };
 use std::collections::BTreeMap;
@@ -14,30 +13,11 @@ mod pages;
 
 impl Scene {
     pub(crate) fn button(&mut self, x: u16, y: u16, label: &str) {
-        self.fill(x + 1, y + 1, 10, 1, 0x00);
-        if self.profile == PaletteProfile::Terminal {
-            self.fill(x, y, 10, 1, 0x70);
-            self.text(x, y, 10, label, 0x70);
-        } else {
-            self.fill(x, y, 10, 1, 0x8f);
-            // Preserve the existing base label and mnemonic overlay, including
-            // the last column of labels that nearly fill the button.
-            let spare = 10usize.saturating_sub(label.width() + 2);
-            let start = 1 + spare / 2;
-            self.text(x + start as u16, y, 10 - start as u16, label, 0x8f);
-            let padding = 10usize.saturating_sub(label.width()) / 2;
-            let mut chars = label.chars();
-            let first = chars.next().map(|c| c.to_string()).unwrap_or_default();
-            self.text(x + padding as u16, y, 10 - padding as u16, &first, 0x8e);
-            let rest: String = chars.collect();
-            self.text(
-                x + padding as u16 + first.width() as u16,
-                y,
-                10u16.saturating_sub(padding as u16 + first.width() as u16),
-                &rest,
-                0x8f,
-            );
-        }
+        super::widgets::paint_into(
+            self,
+            super::widgets::button(label, false),
+            crate::presentation::layout::Rect::new(x, y, 10, 2),
+        );
     }
 }
 

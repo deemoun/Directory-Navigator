@@ -53,48 +53,17 @@ pub fn paste_input(field: &mut String, cursor: &mut usize, text: &str) {
         .take(4096)
         .collect();
     if field.len() + clean.len() <= 16_384 {
-        field.insert_str(*cursor, &clean);
-        *cursor += clean.len();
+        crate::turbo::widgets::edit_input(
+            field,
+            cursor,
+            crossterm::event::KeyCode::Null,
+            Some(&clean),
+        );
     }
 }
 
 pub fn edit_input(field: &mut String, cursor: &mut usize, code: crossterm::event::KeyCode) {
-    use crossterm::event::KeyCode;
-    match code {
-        KeyCode::Char(c) if !c.is_control() && field.len() < 16_384 => {
-            field.insert(*cursor, c);
-            *cursor += c.len_utf8();
-        }
-        KeyCode::Left => {
-            *cursor = field[..*cursor]
-                .char_indices()
-                .next_back()
-                .map(|(i, _)| i)
-                .unwrap_or(0)
-        }
-        KeyCode::Right => {
-            *cursor += field[*cursor..]
-                .chars()
-                .next()
-                .map(char::len_utf8)
-                .unwrap_or(0)
-        }
-        KeyCode::Home => *cursor = 0,
-        KeyCode::End => *cursor = field.len(),
-        KeyCode::Backspace if *cursor > 0 => {
-            let previous = field[..*cursor]
-                .char_indices()
-                .next_back()
-                .map(|(i, _)| i)
-                .unwrap_or(0);
-            field.drain(previous..*cursor);
-            *cursor = previous;
-        }
-        KeyCode::Delete if *cursor < field.len() => {
-            field.remove(*cursor);
-        }
-        _ => {}
-    }
+    crate::turbo::widgets::edit_input(field, cursor, code, None);
 }
 
 pub fn prompt_help(app: &mut crate::app::App) {

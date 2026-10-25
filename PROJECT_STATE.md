@@ -22,6 +22,20 @@
 Current Turbo Vision status is authoritative in docs/TURBO_VISION_MIGRATION.md;
 older increment entries below also record earlier migration stages.
 
+- Shared dialog/control replacement: actual Turbo Vision Dialog, Button,
+  InputLine, CheckBox/RadioButton, ComboBox, ListBox, Memo, GroupBox, ScrollBar,
+  ProgressBar, MenuBar/MenuBox and StatusLine replace shared hand-drawn controls.
+  Directory trees use OutlineViewer backed by existing asynchronous scans.
+  Messages, confirmations, operation prompts, settings, search/numeric dialogs,
+  histories/bookmarks/windows, discovery/archive lists, utilities and game pages
+  share the adapter. Owned settings choice children retain draft/Cancel semantics;
+  existing filesystem, save/quit and stale-result safeguards remain in controllers.
+  Unicode cell encoding, compact native button clipping and existing byte limits
+  are preserved. Local macOS ARM64: 442 tests pass (one existing opt-in Trash check
+  ignored), formatting, all-target Clippy, release and no-default-features checks.
+  Terminal workflows cover native controls, Unicode, cancellation, safe destinations,
+  multiple documents, resize, shell handoff and restoration. Windows/Linux execution
+  remains excluded. See docs/TURBO_VISION_MIGRATION.md for scope and boundaries.
 - Editor Open/Save As now use Turbo Vision's actual FileDialog and its native
   input/list/buttons, directory browsing, wildcard filtering and hidden-file
   control. The existing event loop and owned modal stack drive the widget;

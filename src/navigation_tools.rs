@@ -106,24 +106,26 @@ pub fn key(app: &mut App, key: KeyEvent) {
     }
     let mut command = None;
     match app.modals.navigation_dialog_mut() {
-        Some(Modal::Bookmarks { slot, focus }) => match key.code {
-            KeyCode::Tab => *focus = crate::control_focus::cycle(*focus, 5, false),
-            KeyCode::BackTab => *focus = crate::control_focus::cycle(*focus, 5, true),
-            KeyCode::Up => *slot = slot.saturating_sub(1),
-            KeyCode::Down => *slot = (*slot + 1).min(8),
-            KeyCode::Home => *slot = 0,
-            KeyCode::End => *slot = 8,
-            KeyCode::Char(c) if ('1'..='9').contains(&c) => *slot = c as usize - '1' as usize,
-            KeyCode::Enter => {
-                command = Some(match *focus {
-                    2 => Action::Set,
-                    3 => Action::Clear,
-                    4 => Action::Close,
-                    _ => Action::Go,
-                })
+        Some(Modal::Bookmarks { slot, focus }) => {
+            if let Some(row) = crate::turbo::widgets::list_key(*slot, 9, 9, key.code) {
+                *slot = row;
+                return;
             }
-            _ => {}
-        },
+            match key.code {
+                KeyCode::Tab => *focus = crate::control_focus::cycle(*focus, 5, false),
+                KeyCode::BackTab => *focus = crate::control_focus::cycle(*focus, 5, true),
+                KeyCode::Char(c) if ('1'..='9').contains(&c) => *slot = c as usize - '1' as usize,
+                KeyCode::Enter => {
+                    command = Some(match *focus {
+                        2 => Action::Set,
+                        3 => Action::Clear,
+                        4 => Action::Close,
+                        _ => Action::Go,
+                    })
+                }
+                _ => {}
+            }
+        }
         Some(Modal::Filter {
             field,
             cursor,

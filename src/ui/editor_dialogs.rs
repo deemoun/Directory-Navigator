@@ -25,11 +25,11 @@ fn input(
     cursor: usize,
     focused: bool,
 ) {
+    let _ = profile;
     let prefix = formatting::tail(&field[..cursor], rect.width.saturating_sub(1));
     let col = Span::raw(&prefix).width() as u16;
     frame.render_widget(
-        Paragraph::new(format!("{prefix}{}", &field[cursor..]))
-            .style(super::dialog_style::input_style(profile, focused)),
+        crate::turbo::widgets::input(&format!("{prefix}{}", &field[cursor..]), focused),
         rect,
     );
     if focused {
@@ -128,33 +128,21 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
                     2,
                     7,
                     3,
-                    format!(
-                        "[{}] {}",
-                        if opts.case_sensitive { 'x' } else { ' ' },
-                        app.config.language.text("Case sensitive")
-                    ),
+                    app.config.language.text("Case sensitive").to_owned(),
                     true,
                 ),
                 (
                     3,
                     8,
                     3,
-                    format!(
-                        "[{}] {}",
-                        if opts.whole_words { 'x' } else { ' ' },
-                        app.config.language.text("Whole words only")
-                    ),
+                    app.config.language.text("Whole words only").to_owned(),
                     true,
                 ),
                 (
                     4,
                     9,
                     3,
-                    format!(
-                        "[{}] {}",
-                        if opts.prompt { 'x' } else { ' ' },
-                        app.config.language.text("Prompt on replace")
-                    ),
+                    app.config.language.text("Prompt on replace").to_owned(),
                     replacing,
                 ),
                 (
@@ -208,14 +196,17 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
                     continue;
                 }
                 let row = Rect::new(rect.x + x, rect.y + y, 29, 1);
+                let checked = match choice {
+                    2 => opts.case_sensitive,
+                    3 => opts.whole_words,
+                    4 => opts.prompt,
+                    5 => opts.backward,
+                    6 => opts.selected_scope,
+                    7 => opts.entire_scope,
+                    _ => false,
+                };
                 frame.render_widget(
-                    Paragraph::new(label).style(dos(if !enabled {
-                        0x78
-                    } else if focus == choice {
-                        0x30
-                    } else {
-                        0x70
-                    })),
+                    crate::turbo::widgets::checkbox(&label, checked, focus == choice, enabled),
                     row,
                 );
                 if enabled {
@@ -260,7 +251,7 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
             let text = format!("Replace highlighted occurrence?\n\nCurrent: {}\nNew: {}\n\n{} replaced · {} remaining\n\nY Yes · N No · A All · Esc Cancel\nCancel keeps replacements already accepted.",
                 formatting::tail(&current, 55), formatting::tail(&session.replacement, 55), session.changed, session.remaining.len());
             frame.render_widget(
-                Paragraph::new(text).style(dos(0x70)),
+                crate::turbo::widgets::memo(&text),
                 Rect::new(rect.x + 3, rect.y + 2, 66, 9),
             );
             for (i, (label, command)) in [
@@ -283,8 +274,7 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
             }
         }
         Modal::Help => {
-            frame.render_widget(Paragraph::new(app.config.language.text(if app.config.shortcuts.is_mac() { crate::shortcuts::EDITOR_HELP } else { "F2 / Ctrl+S Save · Shift+F2 Save As · F3 Open\nF6 Duplicate line · F7 / Ctrl+F Find\nShift+F7 Search again · Alt+F7 Reverse search\nCtrl+F7 Replace · Alt+G / Ctrl+G Go to line\nCtrl+←/→ words · Ctrl+Shift+←/→ select words\nShift+arrows select · Ctrl+A select all\nAlt+Backspace / Ctrl+Z Undo · Ctrl+Y Redo\nCtrl+Ins/C Copy · Shift+Del / Ctrl+X Cut\nShift+Ins / Ctrl+V Paste · terminal paste supported\nAlt+B Block: selection/clipboard · Options: indent/colors/tabs\nF10 Menu · Alt+0 Windows · Ctrl+F4 / Esc Close · Alt+X Quit DN\nOpen/Close/Quit protect unsaved changes.\nUTF-8, 2 MiB / 100k lines. Line endings preserved.\nSave As never overwrites an existing destination." }))
-                .style(dos(0x70)), Rect::new(rect.x + 2, rect.y + 2, 68, 15));
+            frame.render_widget(crate::turbo::widgets::memo(app.config.language.text(if app.config.shortcuts.is_mac() { crate::shortcuts::EDITOR_HELP } else { "F2 / Ctrl+S Save · Shift+F2 Save As · F3 Open\nF6 Duplicate line · F7 / Ctrl+F Find\nShift+F7 Search again · Alt+F7 Reverse search\nCtrl+F7 Replace · Alt+G / Ctrl+G Go to line\nCtrl+←/→ words · Ctrl+Shift+←/→ select words\nShift+arrows select · Ctrl+A select all\nAlt+Backspace / Ctrl+Z Undo · Ctrl+Y Redo\nCtrl+Ins/C Copy · Shift+Del / Ctrl+X Cut\nShift+Ins / Ctrl+V Paste · terminal paste supported\nAlt+B Block: selection/clipboard · Options: indent/colors/tabs\nF10 Menu · Alt+0 Windows · Ctrl+F4 / Esc Close · Alt+X Quit DN\nOpen/Close/Quit protect unsaved changes.\nUTF-8, 2 MiB / 100k lines. Line endings preserved.\nSave As never overwrites an existing destination." })), Rect::new(rect.x + 2, rect.y + 2, 68, 15));
             button(
                 frame,
                 app,
@@ -295,8 +285,7 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
             );
         }
         Modal::ConfirmClose => {
-            frame.render_widget(Paragraph::new(app.config.language.text("This document has unsaved changes.\n\nSave before closing or switching files?\n\nS: Save    D: Discard    C / Esc / Enter: Cancel"))
-                .style(dos(0x70)), Rect::new(rect.x + 3, rect.y + 2, rect.width-6, 5));
+            frame.render_widget(crate::turbo::widgets::memo(app.config.language.text("This document has unsaved changes.\n\nSave before closing or switching files?\n\nS: Save    D: Discard    C / Esc / Enter: Cancel")), Rect::new(rect.x + 3, rect.y + 2, rect.width-6, 5));
             for (i, (label, command)) in [
                 (" [ Save ] ", A::Save),
                 (" [ Discard ] ", A::Discard),

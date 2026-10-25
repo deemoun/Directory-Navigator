@@ -295,26 +295,16 @@ impl Picker {
         {
             return;
         }
-        // InputLine's key path accepts single-column characters only. Its
-        // native paste path handles UTF-8 strings, including CJK/combining
-        // characters. The dependency's OS clipboard feature stays disabled.
-        static PASTE: std::sync::Mutex<()> = std::sync::Mutex::new(());
-        let _lock = PASTE.lock().unwrap_or_else(|e| e.into_inner());
-        struct Clipboard(String);
-        impl Drop for Clipboard {
-            fn drop(&mut self) {
-                turbo_vision::core::clipboard::set_clipboard(&self.0);
-            }
-        }
-        let _restore = Clipboard(turbo_vision::core::clipboard::get_clipboard());
         let clean = text
             .chars()
             .filter(|c| !c.is_control())
             .take(4096)
             .collect::<String>();
-        turbo_vision::core::clipboard::set_clipboard(&clean);
-        self.dispatch(Event::keyboard(KB_CTRL_V));
+        super::widgets::paste_native(&mut self.widget, &clean);
+        self.update_buttons();
+        self.changed();
     }
+
     pub(crate) fn mouse(&mut self, event: MouseEvent, offset: (u16, u16)) -> Option<Outcome> {
         let bounds = self.widget.bounds();
         let pos = Point::new(

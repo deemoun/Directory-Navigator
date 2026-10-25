@@ -143,16 +143,7 @@ pub fn key(app: &mut App, code: KeyCode) {
                 .filter(|(_, item)| item.action.is_some())
                 .map(|(i, _)| i)
                 .collect();
-            let next = match code {
-                KeyCode::Home => choices.first().copied(),
-                KeyCode::End => choices.last().copied(),
-                _ if choices.is_empty() => None,
-                _ => Some(crate::control_focus::select(
-                    row,
-                    &choices,
-                    code == KeyCode::Up,
-                )),
-            };
+            let next = crate::turbo::widgets::menu_row(row, &choices, code);
             if let (Some(editor), Some(next)) = (app.desktop.active_editor_mut(), next) {
                 editor.modals.set_editor_menu(Some((root, next)));
             }

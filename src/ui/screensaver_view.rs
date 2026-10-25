@@ -58,11 +58,7 @@ pub(super) fn draw_setup(frame: &mut impl Frame, app: &App, area: Rect) {
         };
         let row = Rect::new(rect.x + 4, rect.y + 6 + i as u16, 48, 1);
         frame.render_widget(
-            Paragraph::new(format!(
-                "({}) {label}",
-                if setup.delay == *minutes { '●' } else { ' ' }
-            ))
-            .style(dos(if setup.cursor == i { 0x30 } else { 0x70 })),
+            crate::turbo::widgets::radio(&label, setup.delay == *minutes, setup.cursor == i),
             row,
         );
         frame.regions().push((row, Target::Screensaver(i)));

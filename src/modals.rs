@@ -545,3 +545,12 @@ slot!(
     JobProgress,
     Job
 );
+
+slot!(
+    settings_choice,
+    settings_choice_mut,
+    take_settings_choice,
+    set_settings_choice,
+    crate::settings::ChoiceDialog,
+    Settings
+);

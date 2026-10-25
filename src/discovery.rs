@@ -331,15 +331,15 @@ pub fn key(app: &mut App, event: KeyEvent) {
         }
     } else {
         let buttons = if m.kind == Kind::Sizes { 3 } else { 5 };
+        if let Some(row) = crate::turbo::widgets::list_key(m.cursor, m.count(), m.rows, event.code)
+        {
+            m.cursor = row;
+            m.keep_visible();
+            return;
+        }
         match event.code {
             KeyCode::Tab => m.focus = crate::control_focus::cycle(m.focus, buttons, false),
             KeyCode::BackTab => m.focus = crate::control_focus::cycle(m.focus, buttons, true),
-            KeyCode::Up => m.step(-1),
-            KeyCode::Down => m.step(1),
-            KeyCode::PageUp => m.step(-(m.rows as isize)),
-            KeyCode::PageDown => m.step(m.rows as isize),
-            KeyCode::Home => m.step(isize::MIN),
-            KeyCode::End => m.step(isize::MAX),
             KeyCode::F(3) => action(app, Action::View),
             KeyCode::F(4) => action(app, Action::Edit),
             KeyCode::Enter | KeyCode::Char(' ') => {

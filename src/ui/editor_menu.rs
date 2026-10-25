@@ -1,9 +1,5 @@
-use super::menu_view::label_spans;
-use crate::painting::{Block, Borders, Clear, Frame, Paragraph};
-use crate::presentation::{
-    layout::Rect,
-    text::{Line, Span},
-};
+use crate::painting::{Block, Frame};
+use crate::presentation::{layout::Rect, text::Line};
 use crate::{
     app::App,
     editor::{menus, EditorAction as A},
@@ -30,26 +26,14 @@ pub(super) fn draw_bar(frame: &mut impl Frame, app: &App, area: Rect) {
             1,
         )
         .intersection(header);
-        let normal = dos(if !menus::enabled(root) {
-            0x78
-        } else if current.is_some_and(|(r, _)| r == root) {
-            0x30
-        } else {
-            0x70
-        });
-        let hot = if menus::enabled(root) {
-            dos(if current.is_some_and(|(r, _)| r == root) {
-                0x3e
-            } else {
-                0x74
-            })
-        } else {
-            normal
-        };
-        let mut spans = vec![Span::styled(" ", normal)];
-        spans.extend(label_spans(label, normal, hot));
-        spans.push(Span::styled("  ", normal));
-        frame.render_widget(Paragraph::new(Line::from(spans)).style(normal), rect);
+        frame.render_widget(
+            crate::turbo::widgets::menu_title(
+                label,
+                current.is_some_and(|(r, _)| r == root),
+                menus::enabled(root),
+            ),
+            rect,
+        );
         if menus::enabled(root) {
             frame
                 .regions()
@@ -61,8 +45,6 @@ pub(super) fn draw_bar(frame: &mut impl Frame, app: &App, area: Rect) {
 }
 pub(super) fn draw_dropdown(frame: &mut impl Frame, app: &App, area: Rect) {
     let language = app.config.language;
-    let profile = app.config.palette;
-    let dos = profile.styles();
     let Some(editor) = app.desktop.active_editor() else {
         return;
     };
@@ -105,66 +87,30 @@ pub(super) fn draw_dropdown(frame: &mut impl Frame, app: &App, area: Rect) {
     frame.regions().clear();
     frame.regions().push((area, Target::Editor(A::CancelMenu)));
     draw_bar(frame, app, Rect::new(area.x, area.y, area.width, 1));
-    frame.render_widget(Clear, rect);
-    frame.render_widget(
-        Block::default().borders(Borders::ALL).style(dos(0x70)),
-        rect,
-    );
-    frame.regions().push((rect, Target::Editor(A::MenuSurface)));
-    for (row, item) in entries.iter().enumerate() {
-        let row_rect = Rect::new(rect.x + 1, rect.y + 1 + row as u16, width - 2, 1);
-        if item.label.is_empty() {
-            frame.render_widget(
-                Paragraph::new(
-                    app.config
-                        .language
-                        .text("─")
-                        .repeat(row_rect.width as usize),
-                )
-                .style(dos(0x70)),
-                row_rect,
-            );
-            continue;
-        }
-        let normal = dos(if item.action.is_none() {
-            0x78
-        } else if row == selected {
-            0x30
-        } else {
-            0x70
-        });
-        let hot = if item.action.is_some() {
-            dos(if row == selected { 0x3e } else { 0x74 })
-        } else {
-            normal
-        };
-        let mut spans = vec![Span::styled(if states[row] { "• " } else { "  " }, normal)];
-        spans.extend(label_spans(language.text(item.label), normal, hot));
-        let padding = usize::from(width - 2).saturating_sub(
-            2 + Line::from(plain(language.text(item.label))).width()
-                + crate::shortcuts::label(
-                    app.config.shortcuts,
-                    crate::focus::Screen::Editor,
-                    item.shortcut,
-                )
-                .len()
-                + 1,
-        );
-        spans.push(Span::styled(" ".repeat(padding), normal));
-        spans.push(Span::styled(
-            crate::shortcuts::label(
+    let native = entries
+        .iter()
+        .enumerate()
+        .map(|(row, item)| crate::turbo::widgets::MenuEntry {
+            label: language.text(item.label).into(),
+            shortcut: crate::shortcuts::label(
                 app.config.shortcuts,
                 crate::focus::Screen::Editor,
                 item.shortcut,
             )
             .into_owned(),
-            normal,
-        ));
-        frame.render_widget(Paragraph::new(Line::from(spans)).style(normal), row_rect);
+            enabled: item.action.is_some(),
+            checked: states[row],
+            submenu: false,
+        })
+        .collect();
+    frame.render_widget(crate::turbo::widgets::menu(native, selected), rect);
+    frame.regions().push((rect, Target::Editor(A::MenuSurface)));
+    for (row, item) in entries.iter().enumerate() {
         if item.action.is_some() {
-            frame
-                .regions()
-                .push((row_rect, Target::Editor(A::MenuRow(row))));
+            frame.regions().push((
+                Rect::new(rect.x + 1, rect.y + 1 + row as u16, width - 2, 1),
+                Target::Editor(A::MenuRow(row)),
+            ));
         }
     }
 }

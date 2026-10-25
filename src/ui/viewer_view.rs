@@ -96,31 +96,19 @@ pub(super) fn draw_viewer(frame: &mut impl Frame, app: &App, area: Rect) {
         (3, "C-F7 Reverse", Action::Reverse),
     ] {
         let enabled = viewer.text_ready();
-        let line = if profile == crate::palette::PaletteProfile::ClassicDn
-            || app.config.shortcuts.is_mac()
-        {
-            let (key, description) = label.split_once(' ').unwrap_or((label, ""));
-            Line::from(vec![
-                Span::styled(
-                    format!(
-                        "{} ",
-                        crate::shortcuts::label(
-                            app.config.shortcuts,
-                            crate::focus::Screen::Viewer,
-                            key
-                        )
-                    ),
-                    dos(if enabled { 0x74 } else { 0x78 }),
-                ),
-                Span::styled(app.config.language.text(description), profile.bar(enabled)),
-            ])
-        } else {
-            Line::from(Span::styled(
-                app.config.language.text(label),
-                profile.bar(enabled),
-            ))
-        };
-        frame.render_widget(Paragraph::new(line).style(profile.bar(enabled)), cells[i]);
+        let (key, description) = label.split_once(' ').unwrap_or((label, ""));
+        let key = format!(
+            "{} ",
+            crate::shortcuts::label(app.config.shortcuts, crate::focus::Screen::Viewer, key)
+        );
+        frame.render_widget(
+            crate::turbo::widgets::function_status(
+                &key,
+                app.config.language.text(description),
+                enabled,
+            ),
+            cells[i],
+        );
         if enabled {
             frame.regions().push((cells[i], Target::Viewer(action)));
         }
@@ -150,9 +138,11 @@ pub(super) fn draw_search(frame: &mut impl Frame, app: &App, area: Rect) {
         let column = Line::from(&dialog.memory.query[..dialog.cursor]).width();
         let scroll = column.saturating_sub(w.saturating_sub(1) as usize);
         frame.render_widget(
-            Paragraph::new(display_name(&dialog.memory.query))
-                .scroll((0, scroll as u16))
-                .style(super::dialog_style::input_style(profile, dialog.focus == 0)),
+            crate::turbo::widgets::input_scrolled(
+                &display_name(&dialog.memory.query),
+                scroll,
+                dialog.focus == 0,
+            ),
             input,
         );
         frame.regions().push((input, Target::Viewer(Action::Field)));
@@ -161,15 +151,12 @@ pub(super) fn draw_search(frame: &mut impl Frame, app: &App, area: Rect) {
         }
         let case = Rect::new(x, rect.y + 4, w, 1);
         frame.render_widget(
-            Paragraph::new(format!(
-                "[{}] Case-sensitive",
-                if dialog.memory.case_sensitive {
-                    'x'
-                } else {
-                    ' '
-                }
-            ))
-            .style(dos(if dialog.focus == 1 { 0x30 } else { 0x70 })),
+            crate::turbo::widgets::checkbox(
+                app.config.language.text("Case-sensitive"),
+                dialog.memory.case_sensitive,
+                dialog.focus == 1,
+                true,
+            ),
             case,
         );
         frame.regions().push((case, Target::Viewer(Action::Case)));
