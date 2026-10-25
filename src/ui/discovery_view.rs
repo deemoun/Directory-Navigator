@@ -1,3 +1,4 @@
+use crate::painting::{Frame, Paragraph};
 use crate::{
     app::App,
     discovery::{Action, Kind},
@@ -5,8 +6,8 @@ use crate::{
     formatting::tail,
     mouse::Target,
 };
-use ratatui::{layout::Rect, widgets::Paragraph, Frame};
-pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
+use ratatui::layout::Rect;
+pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
     let profile = app.config.palette;
     let dos = profile.styles();
     let Some(m) = &mut app.discovery.modal else {
@@ -147,7 +148,7 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
         if let Some(error) = &m.stats.first_error {
             frame.render_widget(
                 Paragraph::new(format!("First error: {}", display_name(error)))
-                    .wrap(ratatui::widgets::Wrap { trim: false })
+                    .wrap(crate::painting::Wrap { trim: false })
                     .style(dos(0x74)),
                 Rect::new(x, rect.bottom() - 5, w, 2),
             );

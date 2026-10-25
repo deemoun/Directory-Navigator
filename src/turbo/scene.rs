@@ -8,6 +8,7 @@ use unicode_width::UnicodeWidthStr;
 pub(crate) struct Glyph {
     pub(crate) text: String,
     pub(crate) attribute: u8,
+    pub(crate) style: Option<ratatui::style::Style>,
 }
 #[derive(Clone)]
 pub(crate) struct Scene {
@@ -16,44 +17,15 @@ pub(crate) struct Scene {
     pub(crate) profile: PaletteProfile,
     pub(crate) cells: BTreeMap<(u16, u16), Glyph>,
     pub(crate) cursor: Option<(u16, u16)>,
-    pub(crate) underlay: bool,
 }
-// A control marker carries inherited style through unported overlays without
-// copying native text into the old widget canvas. It is resolved before output.
-pub(super) const UNDERLAY: &str = "\u{1}";
+impl Glyph {
+    pub(crate) fn resolved(&self, profile: PaletteProfile) -> ratatui::style::Style {
+        profile
+            .dos(self.attribute)
+            .patch(self.style.unwrap_or_default())
+    }
+}
 impl Scene {
-    pub(crate) fn seed_overlay_styles(&self, buffer: &mut ratatui::buffer::Buffer) {
-        for (&(x, y), glyph) in &self.cells {
-            if let Some(cell) = buffer.cell_mut((x, y)) {
-                cell.set_symbol(UNDERLAY)
-                    .set_style(self.profile.dos(glyph.attribute));
-            }
-        }
-    }
-    pub(super) fn overlay_cell(
-        &self,
-        x: u16,
-        y: u16,
-        source: &ratatui::buffer::Cell,
-    ) -> Option<ratatui::buffer::Cell> {
-        if source.symbol() != UNDERLAY {
-            return Some(source.clone());
-        }
-        let glyph = self.cells.get(&(x, y))?;
-        let style = self.profile.dos(glyph.attribute);
-        if Some(source.fg) == style.fg && Some(source.bg) == style.bg && source.modifier.is_empty()
-        {
-            return None;
-        }
-        let mut cell = source.clone();
-        cell.set_symbol(if glyph.text.is_empty() {
-            "\0"
-        } else {
-            &glyph.text
-        });
-        Some(cell)
-    }
-
     pub(crate) fn put(&mut self, x: u16, y: u16, text: &str, attribute: u8) {
         if x < self.width && y < self.height {
             self.cells.insert(
@@ -61,6 +33,7 @@ impl Scene {
                 Glyph {
                     text: text.into(),
                     attribute,
+                    style: None,
                 },
             );
         }
@@ -144,7 +117,7 @@ impl Scene {
             } else {
                 &glyph.text
             });
-            source.set_style(self.profile.dos(glyph.attribute));
+            source.set_style(glyph.resolved(self.profile));
             let (mut cell, _) = codec.native_cell(x, y, &source)?;
             if glyph.text.is_empty() {
                 cell.ch = '\0';

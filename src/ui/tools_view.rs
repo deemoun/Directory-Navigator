@@ -1,7 +1,15 @@
+use crate::painting::{Frame, Paragraph};
 use crate::{app::App, columns::ColumnPreset, filesystem::display_name, mouse::Target};
-use ratatui::{layout::Rect, text::Line, widgets::Paragraph, Frame};
+use ratatui::{layout::Rect, text::Line};
 
-fn popup(frame: &mut Frame, app: &App, area: Rect, width: u16, height: u16, title: &str) -> Rect {
+fn popup(
+    frame: &mut impl Frame,
+    app: &App,
+    area: Rect,
+    width: u16,
+    height: u16,
+    title: &str,
+) -> Rect {
     super::dialog_style::window(
         frame,
         app.config.palette,
@@ -12,7 +20,14 @@ fn popup(frame: &mut Frame, app: &App, area: Rect, width: u16, height: u16, titl
     )
 }
 
-fn button(frame: &mut Frame, app: &mut App, rect: Rect, text: &str, target: Target, focused: bool) {
+fn button(
+    frame: &mut impl Frame,
+    app: &mut App,
+    rect: Rect,
+    text: &str,
+    target: Target,
+    focused: bool,
+) {
     super::dialog_style::button(
         frame,
         app.config.palette,
@@ -23,7 +38,7 @@ fn button(frame: &mut Frame, app: &mut App, rect: Rect, text: &str, target: Targ
     app.mouse.regions.push((rect, target));
 }
 
-pub(super) fn draw_tools(frame: &mut Frame, app: &mut App, area: Rect) {
+pub(super) fn draw_tools(frame: &mut impl Frame, app: &mut App, area: Rect) {
     let profile = app.config.palette;
     let dos = profile.styles();
     if let Some(pattern) = &app.pattern {

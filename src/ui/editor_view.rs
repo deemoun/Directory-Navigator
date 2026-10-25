@@ -1,15 +1,14 @@
+use crate::painting::{Block, Frame, Paragraph};
 use crate::{
     app::App, editor::EditorAction as A, filesystem::display_name, formatting, mouse::Target,
 };
 use ratatui::{
     layout::{Constraint, Layout, Rect},
     text::{Line, Span},
-    widgets::{Block, Paragraph},
-    Frame,
 };
 use unicode_segmentation::UnicodeSegmentation;
 
-pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
+pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
     let prefix_armed = crate::shortcuts::armed(app);
     let profile = app.config.palette;
     let dos = profile.styles();

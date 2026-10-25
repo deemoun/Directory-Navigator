@@ -1,14 +1,13 @@
 //! Shared Turbo Vision dialog chrome; dimensions remain content-specific.
+use crate::painting::{Block, BorderType, Borders, Clear, Frame, Paragraph};
 use crate::palette::PaletteProfile;
 use ratatui::{
     layout::{Alignment, Rect},
     text::{Line, Span},
-    widgets::{Block, BorderType, Borders, Clear, Paragraph},
-    Frame,
 };
 
 pub(super) fn window(
-    frame: &mut Frame,
+    frame: &mut impl Frame,
     profile: PaletteProfile,
     area: Rect,
     width: u16,
@@ -39,7 +38,7 @@ pub(super) fn window(
     rect
 }
 pub(super) fn button(
-    frame: &mut Frame,
+    frame: &mut impl Frame,
     profile: PaletteProfile,
     rect: Rect,
     label: &str,
@@ -88,7 +87,7 @@ pub(super) fn input_style(profile: PaletteProfile, focused: bool) -> ratatui::st
 
 /// Attach the border control to the modal's existing Cancel/Close action.
 pub(super) fn close_button(
-    frame: &mut Frame,
+    frame: &mut impl Frame,
     profile: PaletteProfile,
     rect: Rect,
     regions: &mut Vec<(Rect, crate::mouse::Target)>,
@@ -98,7 +97,7 @@ pub(super) fn close_button(
 }
 
 fn close_control(
-    frame: &mut Frame,
+    frame: &mut impl Frame,
     profile: PaletteProfile,
     rect: Rect,
     regions: &mut Vec<(Rect, crate::mouse::Target)>,
@@ -122,7 +121,7 @@ fn close_control(
 
 /// Document windows use DN's cyan close marker; modal dialogs use green.
 pub(super) fn document_header(
-    frame: &mut Frame,
+    frame: &mut impl Frame,
     profile: PaletteProfile,
     rect: Rect,
     title: &str,

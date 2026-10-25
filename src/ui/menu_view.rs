@@ -1,3 +1,4 @@
+use crate::painting::{Block, Borders, Clear, Frame, Paragraph};
 use crate::{
     app::App,
     menu::{self, Action},
@@ -7,8 +8,6 @@ use ratatui::{
     layout::Rect,
     style::Style,
     text::{Line, Span},
-    widgets::{Block, Borders, Clear, Paragraph},
-    Frame,
 };
 
 pub(super) fn label_spans(label: &str, normal: Style, hot: Style) -> Vec<Span<'_>> {
@@ -19,7 +18,7 @@ pub(super) fn label_spans(label: &str, normal: Style, hot: Style) -> Vec<Span<'_
         .collect()
 }
 
-pub(super) fn draw_bar(frame: &mut Frame, app: &mut App, area: Rect) -> Vec<Rect> {
+pub(super) fn draw_bar(frame: &mut impl Frame, app: &mut App, area: Rect) -> Vec<Rect> {
     let language = app.config.language;
     let profile = app.config.palette;
     let dos = profile.styles();
@@ -66,7 +65,7 @@ fn menu_width(
     (names + keys + 8).max(18) as u16
 }
 
-pub(super) fn draw_dropdowns(frame: &mut Frame, app: &mut App, bar: &[Rect], area: Rect) {
+pub(super) fn draw_dropdowns(frame: &mut impl Frame, app: &mut App, bar: &[Rect], area: Rect) {
     let language = app.config.language;
     let profile = app.config.palette;
     let dos = profile.styles();

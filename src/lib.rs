@@ -73,3 +73,5 @@ pub mod turbo;
 pub mod panel_status;
 
 pub mod panel_command;
+
+pub mod painting;

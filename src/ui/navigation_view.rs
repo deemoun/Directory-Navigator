@@ -1,3 +1,4 @@
+use crate::painting::{Frame, Paragraph};
 use crate::{
     app::App,
     filesystem::display_name,
@@ -5,8 +6,8 @@ use crate::{
     mouse::Target,
     navigation_tools::{Action, Modal},
 };
-use ratatui::{layout::Rect, text::Line, widgets::Paragraph, Frame};
-pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
+use ratatui::{layout::Rect, text::Line};
+pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
     let profile = app.config.palette;
     let dos = profile.styles();
     let Some(modal) = &app.navigation_dialog else {

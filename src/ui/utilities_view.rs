@@ -1,16 +1,13 @@
+use crate::painting::{Frame, Paragraph, Wrap};
 use crate::{
     app::App,
     filesystem::display_name,
     mouse::Target,
     utilities::{characters::Page, Action, Kind},
 };
-use ratatui::{
-    layout::Rect,
-    widgets::{Paragraph, Wrap},
-    Frame,
-};
+use ratatui::layout::Rect;
 fn text(
-    frame: &mut Frame,
+    frame: &mut impl Frame,
     profile: crate::palette::PaletteProfile,
     rect: Rect,
     value: &str,
@@ -25,7 +22,7 @@ fn text(
     );
 }
 fn button(
-    frame: &mut Frame,
+    frame: &mut impl Frame,
     app: &mut App,
     rect: Rect,
     label: &str,
@@ -42,7 +39,7 @@ fn button(
     );
     app.mouse.regions.push((rect, Target::Utility(action)));
 }
-pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
+pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
     let profile = app.config.palette;
     let dos = profile.styles();
     let Some(kind) = app.utilities.dialog else {

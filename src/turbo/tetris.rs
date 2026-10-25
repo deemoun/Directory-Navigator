@@ -50,7 +50,6 @@ pub(crate) fn prepare(app: &mut App, width: u16, height: u16) -> Scene {
         profile: app.config.palette,
         cells: BTreeMap::new(),
         cursor: None,
-        underlay: false,
     };
     let x = (width - 54) / 2;
     let y = (height - 23) / 2;

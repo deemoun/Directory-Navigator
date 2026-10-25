@@ -1,10 +1,11 @@
 //! Session-only command prompt; commands share the interactive user-menu runner.
+use crate::painting::{Frame, Paragraph};
 use crate::{
     app::App,
     user_menu::runner::{CommandSpec, Plan},
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use ratatui::{layout::Rect, widgets::Paragraph, Frame};
+use ratatui::layout::Rect;
 use std::{ffi::OsString, io};
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
@@ -267,7 +268,7 @@ pub(crate) fn presentation(app: &mut App, area: Rect) -> (String, Option<(u16, u
         },
     )
 }
-pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
+pub fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
     let (text, cursor) = presentation(app, area);
     frame.render_widget(
         Paragraph::new(text).style(app.config.palette.dos(0x07)),

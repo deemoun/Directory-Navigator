@@ -1,3 +1,4 @@
+use crate::painting::{Frame, Paragraph};
 use crate::{
     app::App,
     file_tools::{ToolAction, ToolDialog},
@@ -5,9 +6,9 @@ use crate::{
     formatting::tail,
     mouse::Target,
 };
-use ratatui::{layout::Rect, text::Line, widgets::Paragraph, Frame};
+use ratatui::{layout::Rect, text::Line};
 
-pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
+pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
     let profile = app.config.palette;
     let Some(modal) = &app.file_tools.dialog else {
         return;
@@ -278,7 +279,7 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
     }
 }
 fn text(
-    frame: &mut Frame,
+    frame: &mut impl Frame,
     profile: crate::palette::PaletteProfile,
     rect: Rect,
     value: &str,

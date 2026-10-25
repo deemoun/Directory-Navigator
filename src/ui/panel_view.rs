@@ -1,4 +1,5 @@
 use super::theme::entry_color;
+use crate::painting::{Block, BorderType, Borders, Cell, Frame, Paragraph, Row, Table};
 use crate::{
     columns::ColumnPreset,
     config::Config,
@@ -11,12 +12,10 @@ use crate::{
 use ratatui::{
     layout::{Constraint, Rect},
     text::{Line, Span},
-    widgets::{Block, BorderType, Borders, Cell, Paragraph, Row, Table},
-    Frame,
 };
 
 pub(super) fn draw_panel(
-    frame: &mut Frame,
+    frame: &mut impl Frame,
     panel: &Panel,
     area: Rect,
     state: (usize, bool),

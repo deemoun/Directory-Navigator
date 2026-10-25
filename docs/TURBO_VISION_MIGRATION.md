@@ -1,190 +1,102 @@
 # Turbo Vision migration status
 
-The migration is **not complete**. Turbo Vision now owns the native desktop,
-modeless-window selection, z-order and a foreground modal input scope. Welcome
-and operation prompts use native Dialog/Group focus and Button command dispatch,
-with a custom Unicode field control. All Tetris screens and the main file-manager screen draw directly through TV;
-Ratatui still composes the other visual surfaces;
-other menus/dialogs and the application event controllers remain. This is a
-native ownership/control increment, not completion of the full widget port.
+The default runtime draws all application surfaces through native Turbo Vision
+cells and routes positional mouse hits through a TV Group. This includes the
+file panes, dropdown menus, shared dialogs, quick view, editor/viewer, utilities,
+welcome/settings, auxiliary tools and all Tetris pages. The native runtime does
+not call Ratatui widget renderers or compose these screens in a Ratatui buffer.
 
-## Implemented
+The migration is **not yet complete**: Ratatui still supplies shared text/style
+and geometry data, the outer Terminal/Frame adapter, and an explicit reference
+renderer. Existing application focus/command controllers also remain; converting
+rendering does not imply that every control now uses stock TV widget semantics.
+Native Intel Mac, Windows and Linux execution remains unvalidated.
 
-- Pin upstream 4.1.0 to commit `0f2b396a1844c59e31c4714d68ffb6815662918e`.
-- Default `turbo-vision` feature drives TV's custom View, cell buffer, differential
-  rendering and terminal event polling. Native OS clipboard/screenshot features
-  are disabled; the existing internal clipboard and shortcut behavior remain.
-- One Session retains raw mode, bracketed paste, delayed mouse-release draining,
-  shell suspend/resume and panic/exit restoration. There is one input reader.
-- A bounded live-cell grapheme codec retains combining marks, ZWJ sequences and
-  literal private-use characters despite upstream's single-char Cell. Retired
-  tokens are reclaimed only after the native diff buffer commits its frame.
-- Color transport preserves ANSI/xterm indexed colors, RGB and reset colors;
-  Terminal-profile colors continue to follow the terminal theme. Cursor requests
-  go through TV after painting, so clock ticks cannot move the prompt cursor.
-- Stable DN WindowIds map to opaque native ViewIds without u16 truncation.
-  The model reads active identity from the native desktop rather than a second
-  cached selection. Models still own buffers and workers; native windows cannot
-  bypass unsaved-document or filesystem guards by closing themselves.
-- The selected native document paints the existing full-screen skin (with native
-  Tetris content replacing that part of the canvas). A native
-  modal foreground view captures delivery ahead of background documents; closing
-  or replacing a document updates its modal owner immediately. Resize and shell
-  resume invalidate native raster state; inactive views retain no stale codec
-  tokens. Window movement/cascade are not enabled by this increment.
-- Welcome and file-operation/path prompts use native Dialog/Group focus and
-  Button command dispatch. Immediate button commands cannot be queued into a
-  later dialog. Help/mnemonics preserve previous focus. DN's field is a custom
-  TV View using existing UTF-8 byte-cursor/edit limits; stock InputLine rejects
-  wide and combining input. The current canvas remains their visual skin, and
-  their mouse targets remain in the existing dispatcher.
-- `--no-default-features` retains the original backend as a comparison/rollback
-  build. CLI help/version remain noninteractive. Formats/configuration unchanged.
+## Native rendering and input
 
-## Native Tetris renderer
+- Upstream TV 4.1.0 remains pinned to
+  `0f2b396a1844c59e31c4714d68ffb6815662918e`, enabled by default. OS clipboard
+  and screenshot features remain disabled.
+- `painting::Frame` and the shared block/styled-text/clear/list primitives have
+  independent native and reference implementations. Screen code shares layout
+  and command descriptions; the default `ui::draw_native` uses `NativeFrame` to
+  build a TV scene directly. `ui::draw` explicitly selects the reference path.
+- The native painter preserves inherited styles, dimmed menu shadows, centered
+  titles, wrapped/scrolled Unicode text, editor highlighting/selection, search
+  matches, focused controls and cursor requests. Clearing a menu over a wide
+  glyph repairs its retired continuation cell. The old overlay-marker bridge
+  has been removed.
+- Native desktop/window identity, selection and z-order remain authoritative for
+  documents. Foreground modal scopes gate delivery. Stable application WindowIds
+  map to opaque native ViewIds without narrowing to u16.
+- Persistent native pane controls handle Tab focus and focused navigation,
+  paging, marking and guarded open/parent commands. Welcome and operation/path
+  prompts retain native Dialog/Group focus and Button dispatch, with the custom
+  Unicode field used instead of stock InputLine semantics.
+- A cached native Group of hit views performs front-to-back positional dispatch
+  for each current target layout. Overlapping modal surfaces consume hits before
+  background views. The original mouse payload reaches domain controllers for
+  wheel, drag, double-click and modifier handling. The default path no longer
+  selects targets by reverse-searching the application's rectangle vector.
+- Existing editor buffers, undo/search/storage, viewer navigation, file-operation
+  guards, asynchronous workers and command controllers are reused. A native
+  button or hit view cannot bypass save-before-close or filesystem safety checks.
 
-The default runtime now draws every Tetris screen directly from the game model
-through the native document's `Terminal::write_cell` path. This includes its frame,
-well, settled/falling pieces, preview, score/level/best panels, pause/game-over
-banner, shadowed buttons and function bar, plus Setup, Help, Top Ten, Game Over
-and name-entry pages. The game is absent from the Ratatui canvas on this path; the surrounding file-manager shell also uses native cells.
-Native cells have separate codec references so removing or replacing the game
-cannot invalidate Unicode tokens still used by the retained background.
+## Transport and compatibility
 
-Game rules, keyboard actions, mouse dispatch and score persistence are unchanged.
-All game pages use native cells, including focused radio/check/button drawing,
-score-save errors and retry buttons, and horizontally scrolled Unicode name input.
-Name-entry cursor placement is submitted to TV after painting. Input still uses
-the existing game controllers and mouse targets; native control/event ownership
-remains a later increment.
-The original renderer remains available with `--no-default-features` and as a
-headless comparison oracle (`ui::draw`); the default executable uses
-`ui::draw_native`.
+One Session still owns raw mode, paste, mouse capture, delayed release draining,
+exit/panic restoration and shell suspend/resume. There is one terminal input
+reader. The native differential renderer transports complete graphemes, wide
+cells, ZWJ sequences and literal private-use characters through the bounded codec.
+ANSI/xterm indexed colors, RGB/reset colors and supported styles are preserved.
+Cursor requests are committed after painting.
 
-A differential-frame comparison checks text, foreground/background colors and
-mouse targets across both palettes, English/Russian, three terminal sizes,
-piece movement/rotation, pause, preview, all game pages, close/reopen, resize,
-undersized terminals, game-over banner and screensaver return. It also checks
-that native game content is absent from the legacy canvas. A separate check
-covers a terminal shrinking between scene preparation and native painting.
+`--no-default-features` retains the original renderer for comparison/rollback.
+Its widget rendering is isolated in `painting::Widget::reference`; native methods
+write scenes directly. Formats, configuration and filesystem policy are unchanged.
+The native reflow adaptation's MIT notice is included in THIRD_PARTY_NOTICES.md,
+which is already packaged by release workflows. No remote workflows were run.
 
-The comparison sequence includes 35 frames for each palette/language/size
-combination (420 frame pairs): setup focus changes, selected scores,
-pending/failed saves, empty scores, long Unicode names, cursor positions,
-long path errors, multiple spaces and multiline messages. It checks that game
-page titles never enter the legacy canvas.
+## Validation
 
-Current local validation: 394 Rust tests pass (one existing opt-in Trash test
-ignored). All-target Clippy, formatting, release build and 30 fallback
-desktop/Tetris/terminal checks pass. An interactive macOS ARM64 terminal
-check covers play/setup/help/scores navigation, keyboard and mouse return,
-resizing through an undersized terminal, shell input and terminal restoration.
-Native Windows, Linux and Intel Mac execution remains unvalidated.
+Local macOS ARM64 checks pass:
 
-## Native file-manager renderer
+- 399 Rust tests; one existing opt-in native Trash test remains ignored.
+- Formatting, all-target Clippy and release build.
+- 87 original-backend appearance/dialog/editor/utility/command/game/terminal checks.
+- 1,008 file-manager frame pairs, 420 Tetris frame pairs and 448 requested-surface
+  comparisons: text and foreground/background colors are decoded independently
+  from terminal output, with cursor and mouse target checks.
+- The 56 requested-surface scenes cover both palettes/languages and two sizes:
+  menus/submenus, prompts/settings, quick-view text/wrapping, viewer text/hex/wrap/
+  search, editor highlighting/selection/scrolling/search/replace/dirty guards,
+  calculator results/errors/history/help, ASCII/CP437, loaded system/memory
+  information, auxiliary dialogs and screensaver. Native frames must leave the
+  reference canvas empty.
+- Dedicated reflow comparisons cover indentation, whitespace, long words,
+  explicit blank lines, NBSP/zero-width spaces and multi-scalar glyphs at narrow
+  widths. Native mouse tests cover overlapping targets, modal surfaces, replaced
+  layouts, outside hits and coordinate bounds. Existing mouse/controller tests
+  execute through native positional routing in the default build.
+- Interactive terminal checks cover viewer search/wrap, quick view, calculator
+  history/help, Unicode editor paste, unsaved-close cancel, Save As to a disposable
+  file, mouse close actions, resizing and terminal restoration with subsequent
+  shell input. Main-pane and Tetris terminal workflows also remain covered.
 
-The default runtime draws both panes and the main browsing shell from native
-cells: active/inactive frames and path titles, brief/detail rows, all column
-presets, type colors and selection/tag colors, scrollbar/track/thumb, filter and
-quick-search lines, entry details, selection totals and volume space. The menu
-bar/mnemonics, clock, command line/cursor and function-key bar use the same native
-scene. The legacy pane/table/paragraph renderers are not invoked for these
-components by the default runtime. They remain as a comparison/fallback path.
+These checks establish the local native painting/dispatch increment. They do not
+establish native cross-platform execution or equivalence of every stock TV control.
 
-Selection/space presentation is now toolkit-neutral and shared with the old
-renderer. Command-line viewport preparation is shared without invoking a widget.
-A persistent native TV Group owns the two pane controls and Tab/Shift-Tab focus.
-The focused native pane dispatches arrows, column/page movement, Home/End,
-Enter/parent and marking as toolkit-neutral pane commands. Application models
-still own listings and selection; opening files/directories retains the existing
-filesystem and document guards. Command-line editing, shortcuts, quick search and
-modal scopes keep precedence ahead of pane navigation. Mouse targets remain in
-the existing dispatcher and synchronize through the same native focus boundary.
-This does not claim completion of all native control/event ownership.
+## Remaining transition work
 
-Shared native composition supports retained menus/dialogs above the panes.
-Style-only markers carry background styles through the overlay canvas while
-native text stays outside it. The transport resolves those markers on every
-frame, including when native text changes without an overlay diff, and never
-writes them to the terminal. This preserves dimmed menu shadows, wide/combining
-text and dialog inheritance. Quick view, dropdown menus, dialogs and other
-unported surfaces remain on the compatibility renderer; panes underneath remain
-native throughout.
-
-The file-manager comparison covers 42 frames across two palettes, two languages,
-three initial sizes and both layouts (1,008 frame pairs). It checks colors/text,
-hit targets and cursor position; layout/column changes, marking, scrolling,
-loading/empty lists, unavailable metadata/space, filters, quick search, long
-Unicode commands, modal pages, quick view, nested menus, native text changes
-under a shadow, resize, screensaver and Tetris transitions are included. Native
-panes also remain active behind Tetris, including with quick view enabled.
-
-File-manager increment validation on macOS ARM64: 396 Rust tests pass (one existing
-opt-in Trash test ignored), together with 58 original-backend pane/appearance/
-footer/navigation/scrollbar/command/dialog/terminal/game checks. Formatting,
-all-target Clippy and release build pass. Interactive terminal checks pass pane
-switching, directory entry/return, marking, menu/prompt return, mouse focus/wheel,
-resize, game/setup/help/scores, terminal restoration and subsequent shell input.
-No native Windows, Linux or Intel Mac execution is implied by these local checks.
-
-## Remaining required work for a full transition
-
-1. Extract toolkit-neutral geometry, text measurement and command/event boundaries
-   from shared models; stop exposing Ratatui/Crossterm types to domain controllers.
-2. Extend native document/modal ownership into individual controls and nested
-   modal scopes. Currently a foreground full-screen scope captures input before
-   existing controller dispatch; it does not replace the whole focus router.
-3. Finish native mouse/control ownership for the migrated panes and native game
-   input controls; port
-   remaining dialogs/menus/buttons/inputs, quick view, tree/archive/find views,
-   editor/viewer, utilities, welcome and screensaver surfaces. Keep
-   existing editor buffer/search/undo/storage and all filesystem workers.
-4. Port headless UI/input tests to native controls and retire the legacy canvas,
-   focus router, hit-region dispatcher and remaining Ratatui dependency only after
-   parity. This intermediate transport is not the end architecture.
-5. Re-run all safety, Unicode, mouse/paste, config, CLI, idle-worker and PTY
-   restoration contracts, with native validation on Mac ARM/Intel, Windows and
-   Linux before making cross-platform release claims. Workflows stay manual.
-
-The present upstream cell model does not retain multi-scalar graphemes in native
-widgets, and stock InputLine accepts only one-column typed characters. DN's custom
-field preserves existing editing behavior; the transport codec preserves display.
-Native text drawing still needs equivalent handling before retiring the canvas.
-The new native forms deliberately do not introduce stock input semantics (select
-all on focus, automatic clipboard use, or new overwrite/selection shortcuts).
-No new filesystem behavior or configuration migration belongs in this work.
-
-## Validation of the transport increment
-
-- Independent ANSI screen decoding compares 36 manager, dialog, utility, editor,
-  viewer, game/setup and window-list scenes at 80×25/132×40 in both profiles.
-- Transport tests cover combining marks, wide/ZWJ glyphs, literal private-use
-  characters, live-token reclamation, changing text, resize, ANSI/RGB/reset colors
-  and cursor placement. They do not establish native-widget equivalence.
-- Mac ARM64 PTY workflows exercise editor/window switching and unsaved guards,
-  calculator paste/history/help, Tetris setup/scores, and command execution with
-  suspend/resume. Shell input and terminal restoration pass.
-- Original-backend terminal-exit/welcome/workflow checks and release packaging
-  helper tests pass. Native Intel, Windows and Linux execution is not validated.
-
-## Native desktop/control increment
-
-- Native selection, document replacement/removal, modal receipts, repeated scope
-  replacement and stale identities have dedicated tests. Existing desktop tests
-  continue to cover dirty buffers, failed loads, worker cancellation and quit
-  guards. Native forms test Unicode input, immediate commands and focus cycling.
-- All 36 independently decoded scene comparisons bind the real application
-  desktop, including editor/viewer/game documents and foreground modal scopes.
-- Native painting still uses the established canvas as its skin. Completion
-  requires the remaining controls/menus and custom view renderers, followed by
-  retiring Ratatui and the legacy focus/hit-target layers. No cross-platform
-  native validation is implied by the local macOS ARM64 checks.
-
-Validation on macOS ARM64: formatting, all-target Clippy, 391 Rust tests and the
-release build pass (one existing opt-in native Trash test ignored). The original
-backend passes 36 desktop/welcome/dialog/terminal/workflow checks. Native PTY
-workflows cover Welcome/settings/help return, Unicode mkdir cancel/submit,
-resizing, retained documents/unsaved guards, calculator, Tetris and command shell
-handoff; terminal settings and subsequent shell input are restored. Windows
-cross-Clippy could not resolve windows-numerics from Cargo's path source/cache;
-native Intel/Windows/Linux execution remains untested. No GitHub runs dispatched.
+1. Remove Ratatui/Crossterm presentation types from shared model/controller
+   interfaces and replace the outer Ratatui Terminal/Frame adapter. Keep the
+   reference implementation explicitly isolated until its comparisons can retire.
+2. Finish toolkit ownership of per-control keyboard focus and nested modal
+   lifetimes where application controllers still own it. Retain existing input
+   semantics and guards; stock select-all/clipboard/overwrite behavior must not be
+   introduced accidentally. Native text controls must preserve full graphemes.
+3. Add the intended movable/resizable/cascaded multiwindow behavior; the present
+   document views intentionally retain the established full-screen layouts.
+4. Run native validation on Intel Mac, Windows and Linux, including Unicode,
+   mouse/paste, configuration, idle workers, shell handoff and terminal cleanup,
+   before making release claims for those platforms.

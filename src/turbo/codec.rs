@@ -124,9 +124,6 @@ impl Codec {
     pub fn native_cell(&mut self, x: u16, y: u16, cell: &Cell) -> io::Result<(TvCell, usize)> {
         self.cell(x, y + self.size.height, cell)
     }
-    pub fn continuation(&mut self, x: u16, y: u16) {
-        self.release(x, y);
-    }
     pub fn committed(&mut self) {
         let dead: Vec<_> = self
             .glyphs

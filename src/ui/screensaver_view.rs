@@ -1,15 +1,12 @@
+use crate::painting::{Block, Frame, Paragraph};
 use crate::{
     app::App,
     mouse::Target,
     screensaver::{ACCEPT, CANCEL, DELAYS, PREVIEW},
 };
-use ratatui::{
-    layout::Rect,
-    widgets::{Block, Paragraph},
-    Frame,
-};
+use ratatui::layout::Rect;
 
-pub(super) fn draw_sky(frame: &mut Frame, app: &mut App, area: Rect) {
+pub(super) fn draw_sky(frame: &mut impl Frame, app: &mut App, area: Rect) {
     let dos = app.config.palette.styles();
     frame.render_widget(Block::default().style(dos(0x07)), area);
     for (x, y, glyph, attr) in app.screensaver.cells() {
@@ -19,7 +16,7 @@ pub(super) fn draw_sky(frame: &mut Frame, app: &mut App, area: Rect) {
         );
     }
 }
-pub(super) fn draw_setup(frame: &mut Frame, app: &mut App, area: Rect) {
+pub(super) fn draw_setup(frame: &mut impl Frame, app: &mut App, area: Rect) {
     let Some(setup) = &app.screensaver.setup else {
         return;
     };

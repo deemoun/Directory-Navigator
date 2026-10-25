@@ -1,4 +1,5 @@
 //! Calculator-only DN dialog; other utility layouts keep their existing chrome.
+use crate::painting::{Block, Borders, Frame, Paragraph, Wrap};
 use crate::{
     app::App,
     filesystem::display_name,
@@ -9,8 +10,6 @@ use crate::{
 use ratatui::{
     layout::{Alignment, Rect},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph, Wrap},
-    Frame,
 };
 
 fn hot(
@@ -35,7 +34,7 @@ fn hot(
             .collect::<Vec<_>>(),
     )
 }
-pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
+pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
     let profile = app.config.palette;
     let dos = profile.styles();
     let language = app.config.language;
@@ -189,7 +188,7 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
             expression.width,
             rows as u16 + 2,
         );
-        frame.render_widget(ratatui::widgets::Clear, history);
+        frame.render_widget(crate::painting::Clear, history);
         frame.render_widget(
             Block::default()
                 .borders(Borders::ALL)

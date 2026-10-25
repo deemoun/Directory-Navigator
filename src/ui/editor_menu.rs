@@ -1,4 +1,5 @@
 use super::menu_view::label_spans;
+use crate::painting::{Block, Borders, Clear, Frame, Paragraph};
 use crate::{
     app::App,
     editor::{menus, EditorAction as A},
@@ -8,10 +9,8 @@ use crate::{
 use ratatui::{
     layout::Rect,
     text::{Line, Span},
-    widgets::{Block, Borders, Clear, Paragraph},
-    Frame,
 };
-pub(super) fn draw_bar(frame: &mut Frame, app: &mut App, area: Rect) {
+pub(super) fn draw_bar(frame: &mut impl Frame, app: &mut App, area: Rect) {
     let language = app.config.language;
     let profile = app.config.palette;
     let dos = profile.styles();
@@ -57,7 +56,7 @@ pub(super) fn draw_bar(frame: &mut Frame, app: &mut App, area: Rect) {
     }
     super::clock::draw(frame, app, area);
 }
-pub(super) fn draw_dropdown(frame: &mut Frame, app: &mut App, area: Rect) {
+pub(super) fn draw_dropdown(frame: &mut impl Frame, app: &mut App, area: Rect) {
     let language = app.config.language;
     let profile = app.config.palette;
     let dos = profile.styles();

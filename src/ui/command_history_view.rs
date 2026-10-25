@@ -1,11 +1,12 @@
+use crate::painting::{Frame, Paragraph};
 use crate::{
     app::App,
     command_line::history::{self, Action},
     filesystem::display_name,
     mouse::Target,
 };
-use ratatui::{layout::Rect, text::Line, widgets::Paragraph, Frame};
-pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
+use ratatui::{layout::Rect, text::Line};
+pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
     let Some(d) = &app.command_line.dialog else {
         return;
     };

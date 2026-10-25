@@ -1,12 +1,13 @@
+use crate::painting::{Frame, Paragraph};
 use crate::{
     app::App,
     focus::{self, Screen},
     mouse::Target,
     shortcuts,
 };
-use ratatui::{layout::Rect, widgets::Paragraph, Frame};
+use ratatui::layout::Rect;
 
-pub(super) fn draw_prefix(frame: &mut Frame, app: &mut App) {
+pub(super) fn draw_prefix(frame: &mut impl Frame, app: &mut App) {
     let area = frame.area();
     if area.width < 80 || area.height < 25 || !shortcuts::armed(app) {
         return;
@@ -46,7 +47,7 @@ pub(super) fn draw_prefix(frame: &mut Frame, app: &mut App) {
     );
 }
 
-pub(super) fn draw_settings(frame: &mut Frame, app: &mut App, area: Rect) {
+pub(super) fn draw_settings(frame: &mut impl Frame, app: &mut App, area: Rect) {
     let Some(settings) = &app.settings else {
         return;
     };

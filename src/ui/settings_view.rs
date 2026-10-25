@@ -1,13 +1,12 @@
 use super::menu_view::label_spans;
+use crate::painting::{Frame, Paragraph};
 use crate::{app::App, mouse::Target, settings::SettingsKind};
 use ratatui::{
     layout::Rect,
     text::{Line, Span},
-    widgets::Paragraph,
-    Frame,
 };
 
-pub(super) fn draw_settings(frame: &mut Frame, app: &mut App, area: Rect) {
+pub(super) fn draw_settings(frame: &mut impl Frame, app: &mut App, area: Rect) {
     let profile = app.config.palette;
     let dos = profile.styles();
     let Some(settings) = &app.settings else {
@@ -158,7 +157,7 @@ pub(super) fn draw_settings(frame: &mut Frame, app: &mut App, area: Rect) {
     }
 }
 
-fn draw_regional(frame: &mut Frame, app: &mut App, area: Rect) {
+fn draw_regional(frame: &mut impl Frame, app: &mut App, area: Rect) {
     let Some(settings) = &app.settings else {
         return;
     };

@@ -4,7 +4,9 @@ use crate::{
     menu::{self, Action},
 };
 use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
-use ratatui::layout::{Position, Rect};
+#[cfg(not(feature = "turbo-vision"))]
+use ratatui::layout::Position;
+use ratatui::layout::Rect;
 use std::{
     path::PathBuf,
     time::{Duration, Instant},
@@ -104,6 +106,12 @@ fn handle_mouse(app: &mut App, event: MouseEvent) {
         app.quick_search = None;
     }
     let focus = focus::current(app);
+    #[cfg(feature = "turbo-vision")]
+    let target = app
+        .desktop
+        .native()
+        .mouse_target(&app.mouse.regions, event.column, event.row);
+    #[cfg(not(feature = "turbo-vision"))]
     let target = app
         .mouse
         .regions

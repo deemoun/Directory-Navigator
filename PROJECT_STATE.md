@@ -17,13 +17,26 @@
   state owns session dialogs/options/results; quick view owns debounced reads.
 
 ## Implemented
+Current Turbo Vision status is authoritative in docs/TURBO_VISION_MIGRATION.md;
+older increment entries below also record earlier migration stages.
+
+- All runtime surfaces now use a shared native painter, including dropdowns,
+  dialogs, quick view, editor/viewer, utilities and auxiliary windows. Screen
+  descriptions share independent native/reference primitives; native frames leave
+  the old canvas empty. A TV Group resolves mouse hits in front-to-back order,
+  retaining domain handlers for modifiers, wheel, drag and double clicks. The
+  overlay-marker bridge is retired. Editor/viewer data and filesystem guards stay
+  in the existing models/controllers. Ratatui text/geometry, the outer terminal
+  adapter, reference renderer and some per-control focus ownership remain.
+  Local ARM64: 399 tests pass (one opt-in Trash test ignored), 87 fallback checks,
+  1,876 native frame pairs, reflow/mouse tests, fmt/Clippy/release and interactive
+  viewer/quick-view/calculator/editor/Save As/terminal-restoration workflows pass.
 - Native main file-manager drawing: both panes (brief/details and all columns),
   headers, rows/type/tag/selection colors, scrollbars, filters/quick search,
   details/totals/space, menu bar/clock, command line/cursor and function bar now
   use a shared native scene. Existing workers, commands and mouse targets remain.
-  Menus/dialogs/quick view still use compatibility drawing above native panes;
-  style-only composition preserves inherited colors and menu shadows without
-  copying native text into the widget canvas. Footer presentation is toolkit-
+  Menus/dialogs/quick view now share native drawing with the panes; the later
+  shared-painter increment preserves inherited colors and menu shadows directly. Footer presentation is toolkit-
   neutral. Persistent native pane controls handle Tab focus and focused navigation,
   paging, marking and guarded open/parent commands. Command-line/shortcut/modal
   precedence remains. Mouse dispatch and other control ownership still need work.

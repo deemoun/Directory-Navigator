@@ -1,15 +1,12 @@
+use crate::painting::{Block, Borders, Clear, Frame, Paragraph};
 use crate::{
     app::App,
     mouse::Target,
     tetris::{GameAction, Screen, FIGURES, HEIGHT, WIDTH},
 };
-use ratatui::{
-    layout::{Constraint, Layout, Rect},
-    widgets::{Block, Borders, Clear, Paragraph},
-    Frame,
-};
+use ratatui::layout::{Constraint, Layout, Rect};
 
-fn button(frame: &mut Frame, app: &mut App, rect: Rect, label: &str, action: GameAction) {
+fn button(frame: &mut impl Frame, app: &mut App, rect: Rect, label: &str, action: GameAction) {
     let profile = app.config.palette;
     let dos = profile.styles();
     frame.render_widget(Clear, rect);
@@ -20,7 +17,7 @@ fn button(frame: &mut Frame, app: &mut App, rect: Rect, label: &str, action: Gam
     app.mouse.regions.push((rect, Target::Game(action)));
 }
 
-pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
+pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
     let profile = app.config.palette;
     let dos = profile.styles();
     app.mouse.regions.clear();
@@ -209,7 +206,7 @@ pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
     }
 }
 
-fn draw_page(frame: &mut Frame, app: &mut App, game_rect: Rect, screen: Screen) {
+fn draw_page(frame: &mut impl Frame, app: &mut App, game_rect: Rect, screen: Screen) {
     if screen == Screen::Scores {
         draw_scores(frame, app);
         return;
@@ -283,7 +280,7 @@ fn draw_page(frame: &mut Frame, app: &mut App, game_rect: Rect, screen: Screen) 
             frame.render_widget(
                 Paragraph::new(crate::filesystem::display_name(language.text(&game.notice)))
                     .style(dos(0x74))
-                    .wrap(ratatui::widgets::Wrap { trim: false }),
+                    .wrap(crate::painting::Wrap { trim: false }),
                 Rect::new(rect.x + 3, rect.y + 10, 44, 3),
             );
             button(
@@ -334,7 +331,7 @@ fn draw_page(frame: &mut Frame, app: &mut App, game_rect: Rect, screen: Screen) 
 }
 
 fn classic_button(
-    frame: &mut Frame,
+    frame: &mut impl Frame,
     app: &mut App,
     rect: Rect,
     label: &str,
@@ -372,7 +369,7 @@ fn classic_button(
     }
     app.mouse.regions.push((rect, Target::Game(action)));
 }
-fn page(frame: &mut Frame, app: &mut App, width: u16, height: u16, title: &str) -> Rect {
+fn page(frame: &mut impl Frame, app: &mut App, width: u16, height: u16, title: &str) -> Rect {
     app.mouse.regions.clear();
     let rect = super::dialog_style::window(
         frame,
@@ -391,8 +388,9 @@ fn page(frame: &mut Frame, app: &mut App, width: u16, height: u16, title: &str) 
     );
     rect
 }
-fn draw_scores(frame: &mut Frame, app: &mut App) {
-    use ratatui::{layout::Alignment, text::Span, widgets::Wrap};
+fn draw_scores(frame: &mut impl Frame, app: &mut App) {
+    use crate::painting::Wrap;
+    use ratatui::{layout::Alignment, text::Span};
     let rect = page(frame, app, 72, 20, "Tetris Top Ten");
     let language = app.config.language;
     let dos = app.config.palette.styles();
@@ -507,7 +505,7 @@ const LEVEL_NAMES: [&str; 10] = [
     "Madness",
     "Sanitarium",
 ];
-fn draw_setup(frame: &mut Frame, app: &mut App, level: u8, preview: bool) {
+fn draw_setup(frame: &mut impl Frame, app: &mut App, level: u8, preview: bool) {
     use ratatui::text::{Line, Span};
     let rect = page(frame, app, 72, 18, "Setup game");
     let language = app.config.language;

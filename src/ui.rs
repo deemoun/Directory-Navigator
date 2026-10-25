@@ -1,9 +1,6 @@
+use crate::painting::{Block, Frame, Paragraph, Wrap};
 use crate::{app::App, mouse::Target};
-use ratatui::{
-    layout::{Constraint, Layout},
-    widgets::{Block, Paragraph, Wrap},
-    Frame,
-};
+use ratatui::layout::{Constraint, Layout};
 mod archive_view;
 mod calculator_view;
 mod clock;
@@ -40,21 +37,26 @@ use panel_view::draw_panel;
 pub use theme::entry_color;
 use viewer_view::draw_viewer;
 
-pub fn draw(frame: &mut Frame, app: &mut App) {
+pub fn draw(frame: &mut impl Frame, app: &mut App) {
     #[cfg(feature = "turbo-vision")]
     app.desktop.native().set_scene(None);
-    draw_content(frame, app, false);
+    draw_content(frame, app);
     shortcuts_view::draw_prefix(frame, app);
 }
-/// Native manager and game content is painted by its TV document.
-/// `draw` remains the legacy renderer for comparison and headless contracts.
+/// All runtime surfaces paint native cells through their TV document.
+/// `draw` selects the reference implementation for comparison/headless contracts.
 #[cfg(feature = "turbo-vision")]
-pub fn draw_native(frame: &mut Frame, app: &mut App) {
-    app.desktop.native().set_scene(None);
-    draw_content(frame, app, true);
-    shortcuts_view::draw_prefix(frame, app);
+pub fn draw_native(frame: &mut ratatui::Frame<'_>, app: &mut App) {
+    let mut native = crate::painting::NativeFrame::new(frame.area(), app.config.palette);
+    draw_content(&mut native, app);
+    shortcuts_view::draw_prefix(&mut native, app);
+    let scene = native.finish();
+    if let Some(cursor) = scene.cursor {
+        frame.set_cursor_position(cursor);
+    }
+    app.desktop.native().set_scene(Some(scene));
 }
-fn draw_content(frame: &mut Frame, app: &mut App, native_drawing: bool) {
+fn draw_content(frame: &mut impl Frame, app: &mut App) {
     let profile = app.config.palette;
     let dos = profile.styles();
     let area = frame.area();
@@ -65,16 +67,7 @@ fn draw_content(frame: &mut Frame, app: &mut App, native_drawing: bool) {
         screensaver_view::draw_sky(frame, app, area);
         return;
     }
-    let native_shell = native_drawing
-        && matches!(
-            screen,
-            crate::desktop::WindowKind::Manager | crate::desktop::WindowKind::Game
-        )
-        && area.width >= 80
-        && area.height >= 25;
-    if !native_shell {
-        frame.render_widget(Block::default().style(dos(0x87)), area);
-    }
+    frame.render_widget(Block::default().style(dos(0x87)), area);
     if area.width < 80 || area.height < 25 {
         frame.render_widget(
             Paragraph::new(
@@ -102,21 +95,9 @@ fn draw_content(frame: &mut Frame, app: &mut App, native_drawing: bool) {
         return;
     }
     let regions = &prepared.regions;
-    #[cfg(feature = "turbo-vision")]
-    let menu_positions = if native_shell {
-        let (scene, positions) =
-            crate::turbo::manager::prepare(app, &prepared, area.width, area.height);
-        if let Some(cursor) = scene.cursor {
-            frame.set_cursor_position(cursor);
-        }
-        scene.seed_overlay_styles(frame.buffer_mut());
-        app.desktop.native().set_scene(Some(scene));
-        positions
-    } else {
-        menu_view::draw_bar(frame, app, regions[0])
-    };
-    #[cfg(not(feature = "turbo-vision"))]
-    let menu_positions = menu_view::draw_bar(frame, app, regions[0]);
+    let native_menu = frame.manager(app, &prepared);
+    let native_shell = native_menu.is_some();
+    let menu_positions = native_menu.unwrap_or_else(|| menu_view::draw_bar(frame, app, regions[0]));
     let panels = &prepared.panel_areas;
     for (index, area) in panels.iter().enumerate() {
         if app
@@ -210,16 +191,7 @@ fn draw_content(frame: &mut Frame, app: &mut App, native_drawing: bool) {
         }
     }
     if screen == crate::desktop::WindowKind::Game {
-        #[cfg(feature = "turbo-vision")]
-        if native_drawing {
-            let scene = crate::turbo::tetris::prepare(app, area.width, area.height);
-            if let Some(cursor) = scene.cursor {
-                frame.set_cursor_position(cursor);
-            }
-            // Only replace cells covered by the game; compatibility quick-view
-            // content outside it must keep its overlay and hit-target behavior.
-            scene.seed_overlay_styles(frame.buffer_mut());
-            app.desktop.native().compose_scene(scene);
+        if frame.game(app, area) {
             return;
         }
         tetris_view::draw(frame, app, area);

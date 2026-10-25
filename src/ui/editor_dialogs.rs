@@ -1,3 +1,4 @@
+use crate::painting::{Frame, Paragraph};
 use crate::{
     app::App,
     editor::{EditorAction as A, Modal, PromptKind},
@@ -5,8 +6,15 @@ use crate::{
     formatting,
     mouse::Target,
 };
-use ratatui::{layout::Rect, text::Span, widgets::Paragraph, Frame};
-fn button(frame: &mut Frame, app: &mut App, rect: Rect, label: &str, command: A, focused: bool) {
+use ratatui::{layout::Rect, text::Span};
+fn button(
+    frame: &mut impl Frame,
+    app: &mut App,
+    rect: Rect,
+    label: &str,
+    command: A,
+    focused: bool,
+) {
     super::dialog_style::button(
         frame,
         app.config.palette,
@@ -17,7 +25,7 @@ fn button(frame: &mut Frame, app: &mut App, rect: Rect, label: &str, command: A,
     app.mouse.regions.push((rect, Target::Editor(command)));
 }
 fn input(
-    frame: &mut Frame,
+    frame: &mut impl Frame,
     profile: crate::palette::PaletteProfile,
     rect: Rect,
     field: &str,
@@ -35,7 +43,7 @@ fn input(
         frame.set_cursor_position((rect.x + col, rect.y));
     }
 }
-pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
+pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
     let profile = app.config.palette;
     let dos = profile.styles();
     let Some(editor) = app.desktop.editor() else {

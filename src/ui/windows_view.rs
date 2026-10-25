@@ -1,9 +1,10 @@
+use crate::painting::{Frame, Paragraph};
 use crate::{
     app::App, desktop::WindowKind, filesystem::display_name, mouse::Target, windowing::Action,
 };
-use ratatui::{layout::Rect, widgets::Paragraph, Frame};
+use ratatui::layout::Rect;
 
-pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
+pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
     let Some(list) = &app.window_list else { return };
     let profile = app.config.palette;
     let language = app.config.language;

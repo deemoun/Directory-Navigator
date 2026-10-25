@@ -1,3 +1,4 @@
+use crate::painting::{Frame, Paragraph};
 use crate::{
     app::App,
     directory_tree::{geometry, Action},
@@ -8,10 +9,8 @@ use crate::{
 use ratatui::{
     layout::Rect,
     text::{Line, Span},
-    widgets::Paragraph,
-    Frame,
 };
-pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
+pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
     let profile = app.config.palette;
     let dos = profile.styles();
     let Some(tree) = &app.directory_tree else {

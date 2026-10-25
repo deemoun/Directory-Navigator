@@ -1,5 +1,6 @@
 use crate::app::App;
-use ratatui::{layout::Rect, widgets::Paragraph, Frame};
+use crate::painting::{Frame, Paragraph};
+use ratatui::layout::Rect;
 pub(super) fn visible(app: &App) -> bool {
     app.config.show_clock
         && app.desktop.game().is_none()
@@ -16,7 +17,7 @@ pub(super) fn header(app: &App, area: Rect) -> Rect {
         ..area
     }
 }
-pub(super) fn draw(frame: &mut Frame, app: &App, area: Rect) {
+pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
     if visible(app) {
         frame.render_widget(
             Paragraph::new(app.clock.text.as_str()).style(app.config.palette.dos(0x71)),

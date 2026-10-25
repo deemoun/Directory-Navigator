@@ -91,21 +91,18 @@ cargo build --release
 
 On Windows, the executable is `target\release\dn.exe`.
 
-On the `feature/turbo-vision` branch, the default build uses a pinned Turbo Vision
-4.1.0 desktop, window selection and terminal transport. Welcome and operation
-prompts use native dialog focus and button commands, with a custom Unicode input
-control. All Tetris screens now draw directly through Turbo Vision, including
-setup, help, high scores, game over and Unicode name entry, while preserving the
-existing appearance and input behavior. Both file panes and the main browsing
-screen (menu bar, clock, command line and function bar) also draw natively.
-Brief/detail layouts, marks, scrolling, search, filters and footers retain their
-existing behavior. Native pane controls handle keyboard focus and navigation,
-while application models retain filesystem guards. The migration is **in
-progress**: Ratatui still composes the other visual surfaces, and other
-menus/dialogs retain their existing controllers. It is not yet a complete native widget port. Unicode graphemes,
-indexed colors, paste and terminal cleanup are preserved.
-Use `cargo build --release --no-default-features` to build the original terminal
-backend for comparison. See [migration status](docs/TURBO_VISION_MIGRATION.md).
+On the `feature/turbo-vision` branch, the default build uses pinned Turbo Vision
+4.1.0 for desktop/window selection, terminal transport, native drawing and
+positional mouse routing. File panes, dropdown menus, dialogs, quick view,
+editor/viewer, utilities and Tetris all use native painting while preserving
+existing appearance and application guards. Unicode graphemes, colors, paste,
+cursor placement and terminal cleanup remain supported.
+
+The migration is **in progress**: shared text/geometry types, the outer terminal
+adapter, the reference renderer and some control/focus ownership still need
+cleanup. Use `cargo build --release --no-default-features` for the original
+renderer. See [migration status](docs/TURBO_VISION_MIGRATION.md) for the exact
+implementation, local validation and remaining work.
 
 | Platform | Current status |
 | --- | --- |

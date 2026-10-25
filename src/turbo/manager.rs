@@ -371,7 +371,6 @@ pub(crate) fn prepare(
         profile: app.config.palette,
         cells: BTreeMap::new(),
         cursor: None,
-        underlay: true,
     };
     s.fill(0, 0, width, height, 0x87);
     let bar = prepared.regions[0];

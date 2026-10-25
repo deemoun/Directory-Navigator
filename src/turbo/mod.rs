@@ -1,9 +1,10 @@
-//! Transitional Turbo Vision output host. DN models and the tested canvas remain
-//! intact while native window/control adapters are migrated separately.
+//! Turbo Vision output host. Runtime scenes paint directly through native views;
+//! reference frames retain a separate cell transport for fallback/parity checks.
 mod codec;
 pub mod desktop;
 pub mod forms;
 pub(crate) mod manager;
+mod mouse;
 pub(crate) mod panes;
 pub(crate) mod scene;
 pub(crate) mod tetris;
@@ -78,7 +79,6 @@ pub struct TurboBackend<W: Write + Send + 'static> {
     terminal: TvTerminal,
     desktop: desktop::NativeDesktop,
     pixels: Vec<TvCell>,
-    opaque: Vec<bool>,
     canvas: Vec<Cell>,
     codec: Arc<Mutex<Codec>>,
     dimensions: Arc<Mutex<Size>>,
@@ -121,7 +121,6 @@ impl<W: Write + Send + 'static> TurboBackend<W> {
                 TvCell::new(' ', turbo_vision::core::palette::Attr::from_u8(0x07));
                 usize::from(size.width) * usize::from(size.height)
             ],
-            opaque: vec![false; usize::from(size.width) * usize::from(size.height)],
             canvas: vec![Cell::default(); usize::from(size.width) * usize::from(size.height)],
             codec,
             dimensions,
@@ -149,7 +148,6 @@ impl<W: Write + Send + 'static> TurboBackend<W> {
             *lock(&self.dimensions)? = size;
             lock(&self.codec)?.resize(size);
             self.terminal.resize(size.width, size.height);
-            self.opaque = vec![false; usize::from(size.width) * usize::from(size.height)];
             self.canvas = vec![Cell::default(); usize::from(size.width) * usize::from(size.height)];
             self.pixels = vec![
                 TvCell::new(' ', turbo_vision::core::palette::Attr::from_u8(0x07));
@@ -185,8 +183,8 @@ impl<W: Write + Send + 'static> Backend for TurboBackend<W> {
     {
         let size = self.current_size()?;
         self.resize(size)?;
-        // Cache the legacy overlay, including style-only markers. Native text
-        // can change without a canvas diff, so resolve markers on every frame.
+        // Reference frames retain their own cells; native frames are independent
+        // of this buffer and paint through the document's native scene.
         for (x, y, cell) in content {
             if x >= size.width || y >= size.height {
                 continue;
@@ -207,23 +205,7 @@ impl<W: Write + Send + 'static> Backend for TurboBackend<W> {
                 for x in 0..size.width {
                     let i = usize::from(y) * usize::from(size.width) + usize::from(x);
                     let source = &self.canvas[i];
-                    let overlay = if let Some(scene) = scene.as_ref().filter(|s| s.underlay) {
-                        scene.overlay_cell(x, y, source)
-                    } else if source.symbol() == scene::UNDERLAY {
-                        let mut cell = source.clone();
-                        cell.set_symbol(" ");
-                        Some(cell)
-                    } else {
-                        Some(source.clone())
-                    };
-                    self.opaque[i] = overlay
-                        .as_ref()
-                        .is_some_and(|cell| *cell != Cell::default());
-                    if let Some(cell) = overlay {
-                        self.pixels[i] = codec.cell(x, y, &cell)?.0;
-                    } else {
-                        codec.continuation(x, y);
-                    }
+                    self.pixels[i] = codec.cell(x, y, source)?.0;
                 }
             }
         }
@@ -240,8 +222,6 @@ impl<W: Write + Send + 'static> Backend for TurboBackend<W> {
             TvRect::new(0, 0, size.width as i16, size.height as i16),
             &self.pixels,
             native.as_deref().unwrap_or_default(),
-            &self.opaque,
-            scene.as_ref().is_some_and(|s| s.underlay),
         );
         Ok(())
     }
@@ -263,7 +243,6 @@ impl<W: Write + Send + 'static> Backend for TurboBackend<W> {
     fn clear(&mut self) -> io::Result<()> {
         self.terminal.clear();
         self.terminal.force_full_redraw();
-        self.opaque.fill(false);
         self.canvas.fill(Cell::default());
         self.pixels.fill(TvCell::new(
             ' ',

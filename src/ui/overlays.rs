@@ -1,4 +1,5 @@
 use super::dialog_style;
+use crate::painting::{Frame, Paragraph};
 use crate::{
     app::App, dialog::PromptKind, filesystem::display_name, formatting, mouse::Target,
     operations::Kind,
@@ -6,12 +7,10 @@ use crate::{
 use ratatui::{
     layout::Rect,
     text::{Line, Span},
-    widgets::Paragraph,
-    Frame,
 };
 
 pub(super) fn draw_info_dialog(
-    frame: &mut Frame,
+    frame: &mut impl Frame,
     app: &mut App,
     message: Option<&crate::layout::MessageLayout>,
 ) {
@@ -77,7 +76,7 @@ pub(super) fn draw_info_dialog(
     }
 }
 
-pub(super) fn draw_operation_overlays(frame: &mut Frame, app: &mut App, area: Rect) {
+pub(super) fn draw_operation_overlays(frame: &mut impl Frame, app: &mut App, area: Rect) {
     let profile = app.config.palette;
     let dos = profile.styles();
     if let Some(prompt) = &app.prompt {

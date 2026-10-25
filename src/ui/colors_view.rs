@@ -1,6 +1,7 @@
+use crate::painting::{Frame, Paragraph};
 use crate::{app::App, mouse::Target, palette::PaletteProfile};
-use ratatui::{layout::Rect, widgets::Paragraph, Frame};
-pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
+use ratatui::layout::Rect;
+pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
     let Some(dialog) = &app.color_dialog else {
         return;
     };

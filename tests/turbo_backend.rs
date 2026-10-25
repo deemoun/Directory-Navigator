@@ -799,3 +799,271 @@ fn native_file_manager_matches_panes_shell_overlays_and_mouse_targets() -> io::R
     }
     Ok(())
 }
+
+#[test]
+fn native_requested_surfaces_match_reference_rendering() -> io::Result<()> {
+    use dn::{
+        app::App,
+        editor::{self, EditorAction},
+        localization::Language,
+        palette::PaletteProfile,
+        settings::SettingsKind,
+        ui,
+        utilities::{self, Kind},
+        viewer::{self, ViewMode, Viewer},
+    };
+    use ratatui::Terminal;
+    use std::{
+        fs, thread,
+        time::{Duration, Instant},
+    };
+    struct Temp(std::path::PathBuf);
+    impl Drop for Temp {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+    let root =
+        Temp(std::env::temp_dir().join(format!("dn-native-surfaces-{}", std::process::id())));
+    fs::create_dir(&root.0)?;
+    fs::write(
+        root.0.join("sample.rs"),
+        "fn main() {\n\tprintln!(\"hello 界 e\u{301} 👩‍💻\");\n}\n",
+    )?;
+    let contents = "fn main() {\n\tlet value = \"界 e\u{301} 👩‍💻\"; // comment\n}\n".repeat(40);
+    for palette in [PaletteProfile::ClassicDn, PaletteProfile::Terminal] {
+        for language in [Language::English, Language::Russian] {
+            for size in [Size::new(80, 25), Size::new(132, 40)] {
+                for case in 0..56 {
+                    let mut app = App::new(root.0.clone())?;
+                    let end = Instant::now() + Duration::from_secs(5);
+                    while app.panels.iter().any(|p| p.loading) {
+                        app.poll();
+                        assert!(Instant::now() < end);
+                        thread::sleep(Duration::from_millis(1));
+                    }
+                    app.config.palette = palette;
+                    app.config.language = language;
+                    if (15..=18).contains(&case) {
+                        let mode = if case == 17 {
+                            ViewMode::Hex
+                        } else {
+                            ViewMode::Text
+                        };
+                        app.show_viewer(Viewer::from_contents(
+                            root.0.join("sample.rs"),
+                            viewer::from_bytes(contents.as_bytes().to_vec(), mode),
+                        ));
+                        if case == 16 {
+                            app.desktop.viewer_mut().unwrap().wrap = true;
+                        }
+                        if case == 18 {
+                            viewer::action(&mut app, viewer::Action::Find);
+                        }
+                    }
+                    if (19..=31).contains(&case) {
+                        editor::open(&mut app, true);
+                        editor::paste(&mut app, &contents);
+                        let e = app.desktop.editor_mut().unwrap();
+                        e.colors = true;
+                        e.buffer.as_mut().unwrap().cursor = 0;
+                        e.keep_visible();
+                        match case {
+                            20 => {
+                                let b = e.buffer.as_mut().unwrap();
+                                b.anchor = Some(0);
+                                b.cursor = contents.find(';').unwrap();
+                            }
+                            21 => {
+                                e.scroll_column = 3;
+                                e.scroll_row = 3;
+                            }
+                            22 => editor::action(&mut app, EditorAction::Open),
+                            23 => editor::action(&mut app, EditorAction::SaveAs),
+                            24 => editor::action(&mut app, EditorAction::Find),
+                            25 => editor::action(&mut app, EditorAction::Replace),
+                            26 => editor::action(&mut app, EditorAction::GoTo),
+                            27 => editor::action(&mut app, EditorAction::TabWidth),
+                            28 => editor::action(&mut app, EditorAction::Help),
+                            29 => editor::action(&mut app, EditorAction::Close),
+                            30 => editor::action(&mut app, EditorAction::MenuRoot(0)),
+                            31 => editor::action(&mut app, EditorAction::MenuRoot(2)),
+                            _ => {}
+                        }
+                    }
+                    match case {
+                        0=>{dn::menu::open(&mut app,1);let i=dn::menu::level_items(&app,0).iter().position(|i|matches!(i.action,dn::menu::Action::Submenu(_))).unwrap();dn::menu::activate(&mut app,0,i);}
+                        1=>{app.prompt_operation(dn::operations::Kind::Mkdir,false);let p=app.prompt.as_mut().unwrap();p.field="界 e\u{301} 👩‍💻".into();p.cursor=p.field.len();}
+                        2=>app.prompt_operation(dn::operations::Kind::Delete,false),
+                        3=>app.error("Cannot read 界 e\u{301} 👩‍💻: a long diagnostic with spaces and a missing configuration directory.\n\nTry another path."),
+                        4=>dn::welcome::open(&mut app),
+                        5=>app.open_settings(SettingsKind::Keyboard),6=>app.open_settings(SettingsKind::Regional),
+                        7=>app.open_settings(SettingsKind::System),8=>app.open_settings(SettingsKind::Interface),
+                        9=>app.open_settings(SettingsKind::FileManager),10=>app.open_settings(SettingsKind::Highlight),
+                        11=>app.open_pattern(true),12=>app.open_columns(),
+                        13|14=>{dn::quick_view::toggle(&mut app);let q=app.quick_view.as_mut().unwrap();q.lines=vec!["Quick view 界 e\u{301}".into(),"path with a number of words to wrap across this rather narrow panel".into()];if case==14 {q.viewer=Some(Viewer::from_contents(root.0.join("sample.rs"),viewer::from_bytes(contents.as_bytes().to_vec(),ViewMode::Text)));}}
+                        32..=34=>{utilities::open(&mut app,Kind::Calculator);app.utilities.calculator.expression="12345 * (67 + 89)".into();app.utilities.calculator.cursor=app.utilities.calculator.expression.len();app.utilities.calculator.evaluate();if case==33 {app.utilities.calculator.history_open=true;}
+                            if case==34 {utilities::action(&mut app,utilities::Action::CalculatorHelp);}}
+                        35=>utilities::open(&mut app,Kind::Characters),
+                        36=>utilities::open(&mut app,Kind::System),37=>utilities::open(&mut app,Kind::Memory),
+                        38=>dn::palette::open(&mut app),
+                        39=>app.screensaver.setup=Some(Default::default()),
+                        40=>dn::command_line::history::open(&mut app),
+                        41=>dn::user_menu::open(&mut app,dn::user_menu::Source::Auto),
+                        42=>app.open_file_info(),
+                        43=>dn::directory_tree::open(&mut app),
+                        _=>{}
+                    }
+                    match case {
+                        44 | 51 => {
+                            app.show_viewer(Viewer::from_contents(
+                                root.0.join("sample.rs"),
+                                viewer::from_bytes(contents.as_bytes().to_vec(), ViewMode::Text),
+                            ));
+                            if case == 44 {
+                                app.desktop
+                                    .viewer_mut()
+                                    .unwrap()
+                                    .find(
+                                        &viewer::SearchMemory {
+                                            query: "界".into(),
+                                            case_sensitive: true,
+                                        },
+                                        false,
+                                        false,
+                                    )
+                                    .map_err(io::Error::other)?;
+                            } else {
+                                viewer::action(&mut app, viewer::Action::Find);
+                                let d = app
+                                    .desktop
+                                    .viewer_mut()
+                                    .unwrap()
+                                    .search_dialog
+                                    .as_mut()
+                                    .unwrap();
+                                d.memory.query = "界 e\u{301} 👩‍💻".repeat(12);
+                                d.cursor = d.memory.query.len();
+                            }
+                        }
+                        45 | 46 | 50 => {
+                            editor::open(&mut app, true);
+                            let source = if case == 46 {
+                                "long 界 e\u{301} 👩‍💻\t".repeat(80)
+                            } else {
+                                contents.clone()
+                            };
+                            editor::paste(&mut app, &source);
+                            if case == 45 || case == 50 {
+                                editor::action(&mut app, EditorAction::Replace);
+                                if let Some(editor::Modal::Search(d)) =
+                                    &mut app.desktop.editor_mut().unwrap().modal
+                                {
+                                    d.query = "let".into();
+                                    d.replacement = "const 界".into();
+                                    d.cursors = [3, d.replacement.len()];
+                                    d.focus = 1;
+                                }
+                                if case == 50 {
+                                    editor::action(&mut app, EditorAction::SearchSubmit(false));
+                                }
+                            }
+                        }
+                        47 => {
+                            dn::quick_view::toggle(&mut app);
+                            app.quick_view.as_mut().unwrap().lines=vec!["Long prefix /path/with/segments/and-a-very-long-name-without-spaces/界/e\u{301}/next".into(),"  indented     words   to wrap across a narrow pane".into()];
+                        }
+                        48 => {
+                            utilities::open(&mut app, Kind::Calculator);
+                            app.utilities.calculator.expression = "1 / 0".into();
+                            app.utilities.calculator.cursor = 5;
+                            app.utilities.calculator.evaluate();
+                        }
+                        49 => {
+                            utilities::open(&mut app, Kind::Characters);
+                            app.utilities.chart.page = utilities::characters::Page::Cp437;
+                            app.utilities.chart.cells[1] = 255;
+                        }
+                        52 | 53 => {
+                            utilities::open(
+                                &mut app,
+                                if case == 52 {
+                                    Kind::System
+                                } else {
+                                    Kind::Memory
+                                },
+                            );
+                            let deadline = Instant::now() + Duration::from_secs(5);
+                            while app
+                                .utilities
+                                .information
+                                .as_ref()
+                                .is_some_and(|i| i.loading())
+                            {
+                                app.utilities.information.as_mut().unwrap().poll();
+                                assert!(Instant::now() < deadline);
+                                thread::sleep(Duration::from_millis(1));
+                            }
+                            let info = app.utilities.information.as_mut().unwrap();
+                            info.horizontal = 3;
+                            info.offset = 2;
+                        }
+                        54 => dn::menu::open(&mut app, 3),
+                        55 => {
+                            app.screensaver.start(Instant::now());
+                            app.screensaver.resize(size.width, size.height);
+                        }
+                        _ => {}
+                    }
+                    let output = Output::default();
+                    let original = Output::default();
+                    let mut native = Terminal::new(TurboBackend::with_size(output.clone(), size)?)?;
+                    let mut reference =
+                        Terminal::new(TurboBackend::with_size(original.clone(), size)?)?;
+                    native.backend_mut().bind_desktop(app.desktop.native());
+                    reference.backend_mut().bind_desktop(app.desktop.native());
+                    reference.draw(|f| ui::draw(f, &mut app))?;
+                    let targets = format!("{:?}", app.mouse.regions);
+                    let painted = native.draw(|f| ui::draw_native(f, &mut app))?;
+                    assert!(
+                        painted.buffer.content.iter().all(|c| *c == Cell::default()),
+                        "native surface used legacy canvas: case={case}"
+                    );
+                    assert_eq!(
+                        targets,
+                        format!("{:?}", app.mouse.regions),
+                        "native target geometry: case={case}"
+                    );
+                    let expected = colored_screen(&original.take(), size);
+                    let actual = colored_screen(&output.take(), size);
+                    if let Some(i) = expected.iter().zip(&actual).position(|(a, b)| a != b) {
+                        let row = i / usize::from(size.width);
+                        eprintln!(
+                            "expected {:?}",
+                            expected[row * usize::from(size.width)
+                                ..(row + 1) * usize::from(size.width)]
+                                .iter()
+                                .map(|c| c.0.as_str())
+                                .collect::<String>()
+                        );
+                        eprintln!(
+                            "actual {:?}",
+                            actual[row * usize::from(size.width)
+                                ..(row + 1) * usize::from(size.width)]
+                                .iter()
+                                .map(|c| c.0.as_str())
+                                .collect::<String>()
+                        );
+                        panic!("case={case},palette={palette:?},language={language:?},size={size:?},x={},y={row}: expected {:?}, actual {:?}",i%usize::from(size.width),expected[i],actual[i]);
+                    }
+                    assert_eq!(
+                        reference.backend_mut().get_cursor_position()?,
+                        native.backend_mut().get_cursor_position()?,
+                        "cursor case={case}"
+                    );
+                }
+            }
+        }
+    }
+    Ok(())
+}

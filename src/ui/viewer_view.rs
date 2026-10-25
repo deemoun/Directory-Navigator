@@ -1,11 +1,10 @@
+use crate::painting::{Block, Frame, Paragraph};
 use crate::{app::App, filesystem::display_name, formatting::tail, mouse::Target, viewer::Action};
 use ratatui::{
     layout::{Constraint, Layout, Rect},
     text::{Line, Span},
-    widgets::{Block, Paragraph},
-    Frame,
 };
-pub(super) fn draw_viewer(frame: &mut Frame, app: &mut App, area: Rect) {
+pub(super) fn draw_viewer(frame: &mut impl Frame, app: &mut App, area: Rect) {
     let profile = app.config.palette;
     let dos = profile.styles();
     let header = super::clock::header(app, Rect::new(area.x, area.y, area.width, 1));
@@ -204,7 +203,7 @@ pub(super) fn draw_viewer(frame: &mut Frame, app: &mut App, area: Rect) {
 }
 
 pub(super) fn draw_text(
-    frame: &mut Frame,
+    frame: &mut impl Frame,
     viewer: &crate::viewer::Viewer,
     area: Rect,
     profile: crate::palette::PaletteProfile,

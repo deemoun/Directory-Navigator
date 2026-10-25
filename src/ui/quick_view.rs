@@ -1,10 +1,7 @@
+use crate::painting::{Block, Borders, Frame, Paragraph, Wrap};
 use crate::{app::App, filesystem::display_name, formatting::tail, mouse::Target};
-use ratatui::{
-    layout::{Margin, Rect},
-    widgets::{Block, Borders, Paragraph, Wrap},
-    Frame,
-};
-pub(super) fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
+use ratatui::layout::{Margin, Rect};
+pub(super) fn draw(frame: &mut impl Frame, app: &mut App, area: Rect) {
     let profile = app.config.palette;
     let dos = profile.styles();
     let Some(q) = &mut app.quick_view else {
