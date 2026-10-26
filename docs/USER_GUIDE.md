@@ -15,10 +15,13 @@ Ctrl+click marks files. F4 opens the native UTF-8 editor.
 
 ## First start
 
-Directory Navigator shows a compact welcome when `config.conf` does not exist. It lists the active profile’s controls, opening behavior and
+Directory Navigator shows a Welcome page in the native Help window when `config.conf` does not exist. It lists the active profile’s controls, opening behavior and
 current deletion mode. **Start**, Esc or the title close control dismisses it;
 **Keyboard settings** and **Help** return to the welcome when closed. **≡ → Welcome…**
-opens it again without changing panel state.
+opens it again without changing panel state. Tab/Shift+Tab select the action links;
+Enter or a click activates one. PageUp/PageDown and the mouse wheel scroll.
+Welcome and Help share the centered 72×20 frame, colors and shadow; the footer
+shows the controls for the active page.
 
 Dismissing the welcome writes no files. Normal settings saving on exit prevents
 it appearing on later launches. If saving is disabled and no configuration exists,

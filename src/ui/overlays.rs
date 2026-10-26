@@ -19,6 +19,7 @@ pub(super) fn draw_info_dialog(
         if let Some(scene) = help.scene() {
             frame.compose(scene.clone());
             frame.native_shadow(help.bounds());
+            help_status(frame, app, false);
         }
         return;
     }
@@ -262,4 +263,32 @@ pub(super) fn draw_operation_overlays(
         super::dialog_style::close_button(frame, profile, rect, Target::CancelJob);
         frame.regions().push((cancel, Target::CancelJob));
     }
+}
+
+/// DN's help context replaces the manager's file-operation hints.
+pub(super) fn help_status(frame: &mut impl Frame, app: &App, welcome: bool) {
+    if welcome && crate::focus::current(app) != crate::focus::Focus::Welcome {
+        return;
+    }
+    let label = app.config.language.text(if welcome {
+        "Tab Next · Shift+Tab Previous · Enter Select · F1 Help · Esc Start"
+    } else {
+        "F1 Contents · Tab Links · Enter Follow · Alt+F1 Back · Esc Close"
+    });
+    let label = label
+        .split_whitespace()
+        .map(|word| {
+            if ["Tab", "Shift+Tab", "Enter", "F1", "Esc", "Alt+F1"].contains(&word) {
+                format!("~{word}~")
+            } else {
+                word.into()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ");
+    let area = frame.area();
+    frame.render_widget(
+        crate::turbo::widgets::status(&label),
+        Rect::new(0, area.height.saturating_sub(1), area.width, 1),
+    );
 }

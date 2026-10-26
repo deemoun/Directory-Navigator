@@ -187,12 +187,13 @@ fn draw_regional(frame: &mut impl Frame, app: &App, area: Rect) {
             Target::OpenSettingsChoice(i),
         ));
     }
-    let now = chrono::Local::now();
+    // One sample instant per dialog; painting must not read ambient time.
+    let now = &settings.preview_time;
     frame.render_widget(
         Paragraph::new(format!(
             "{}: {}",
             language.text("Preview"),
-            format.stamp(&now, false, true)
+            format.stamp(now, false, true)
         ))
         .style(profile.dos(0x71)),
         Rect::new(rect.x + 3, rect.y + 9, rect.width - 6, 1),

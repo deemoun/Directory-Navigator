@@ -42,6 +42,7 @@ pub struct Settings {
     pub kind: SettingsKind,
     pub draft: Config,
     pub cursor: usize,
+    pub(crate) preview_time: chrono::DateTime<chrono::Local>,
 }
 impl Settings {
     pub fn new(kind: SettingsKind, config: &Config) -> Self {
@@ -49,6 +50,7 @@ impl Settings {
             kind,
             draft: config.clone(),
             cursor: 0,
+            preview_time: chrono::Local::now(),
         }
     }
     pub fn title(&self) -> &'static str {

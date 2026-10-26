@@ -33,6 +33,8 @@ pub struct Browser {
     language: Option<Language>,
     pub revision: u64,
     last_link: Option<(String, std::time::Instant)>,
+    landing: Option<Vec<(&'static str, &'static str)>>,
+    selection: Option<usize>,
 }
 impl Browser {
     pub fn new(title: &str, body: &str) -> Self {
@@ -46,7 +48,62 @@ impl Browser {
             language: None,
             revision: 0,
             last_link: None,
+            landing: None,
+            selection: None,
         }
+    }
+    pub(crate) fn landing(title: &str, actions: Vec<(&'static str, &'static str)>) -> Self {
+        let mut browser = Self::new(title, "");
+        browser.landing = Some(actions);
+        browser
+    }
+    pub(crate) fn set_body(&mut self, body: String) {
+        if self.body != body {
+            self.body = body;
+            self.window = None;
+            self.revision += 1;
+        }
+    }
+    pub(crate) fn select_link(&mut self, index: usize) {
+        if self.selection != Some(index) {
+            self.selection = Some(index);
+            self.revision += 1;
+        }
+        if let Some(window) = &mut self.window {
+            let (delta, _) = window.viewer().get_scroll_state();
+            window.viewer_mut().set_scroll_state(delta, index + 1);
+        }
+    }
+    pub(crate) fn link_regions(&mut self) -> Vec<(String, Rect)> {
+        let Some(window) = &mut self.window else {
+            return Vec::new();
+        };
+        let (delta, selected) = window.viewer().get_scroll_state();
+        let body = Rect::new(
+            self.rect.x + 1,
+            self.rect.y + 1,
+            self.rect.width - 3,
+            self.rect.height - 2,
+        );
+        let mut links = Vec::new();
+        let count = window.viewer().num_cross_refs();
+        for index in 1..=count {
+            window.viewer_mut().set_scroll_state(delta, index);
+            if let Some(link) = window.viewer().get_selected_cross_ref() {
+                let x = body.x as i16 + link.offset - delta.x;
+                let y = body.y as i16 + link.line - 1 - delta.y;
+                let left = x.max(body.x as i16);
+                let right = (x + i16::from(link.length)).min(body.right() as i16);
+                if y >= body.y as i16 && y < body.bottom() as i16 && right > left {
+                    links.push((
+                        link.target.clone(),
+                        Rect::new(left as u16, y as u16, (right - left) as u16, 1),
+                    ));
+                }
+            }
+        }
+        window.viewer_mut().set_scroll_state(delta, selected);
+        links
     }
     pub fn topic(&self) -> Option<String> {
         self.window.as_ref().and_then(|w| w.current_topic())
@@ -73,10 +130,11 @@ impl Browser {
             self.scene = None;
             return;
         }
-        let rect = Rect::new((size.width - 76) / 2, (size.height - 22) / 2, 76, 22);
+        // HELPFILE.PAS centers a 72×20 help window.
+        let rect = Rect::new((size.width - 72) / 2, (size.height - 20) / 2, 72, 20);
         if self.window.is_none() || self.language != Some(language) {
             self.text = TextCells::default();
-            let body = crate::painting::wrap_plain(language.text(&self.body), 70).join("\n");
+            let body = crate::painting::wrap_plain(language.text(&self.body), 66).join("\n");
             let contents = language.text("Contents");
             let pages=[("panels",language.text("File manager"),"Tab switches panels. Arrows and page keys move through entries. Insert/Space marks files. Enter opens; Backspace goes to the parent. Ctrl+Q toggles quick view. Ctrl+T opens the directory tree."),("editor",language.text("Editor"),"F2 saves; Shift+F2 saves to a new destination. F3 opens another document. F7 finds text; Ctrl+F7 replaces. Alt+0 switches documents. Close and quit review unsaved changes."),("viewer",language.text("Viewer"),"F2 toggles wrapping; F7 finds text. Shift+F7 repeats; Ctrl+F7 searches backward. Arrows/page keys scroll. Esc returns. Previews remain bounded and read-only."),("operations",language.text("File operations"),"F5 copies; F6 moves or renames; F7 creates a directory. F8 uses Trash or confirmed permanent deletion. Existing destinations are refused. Esc cancels pending work; completed items are retained.")];
             let links = pages
@@ -90,6 +148,19 @@ impl Browser {
                     "\n# {title} {{#{id}}}\n{}\n\n[{contents}](#contents)\n",
                     language.text(body)
                 ));
+            }
+            if let Some(actions) = &self.landing {
+                let actions = actions
+                    .iter()
+                    .map(|(label, target)| {
+                        format!("[{}](#{target})", crate::menu::plain(language.text(label)))
+                    })
+                    .collect::<Vec<_>>()
+                    .join("   ");
+                content = format!(
+                    "# {} {{#context}}\n{actions}\n\n{body}\n",
+                    language.text(&self.title)
+                );
             }
             let encoded = content
                 .lines()
@@ -105,12 +176,17 @@ impl Browser {
                 .replace('`', &tick.to_string());
             let file = Rc::new(RefCell::new(HelpFile::from_content(&encoded)));
             let title = self.text.text(language.text(&self.title));
-            let mut window = HelpWindow::new(TvRect::new(0, 0, 76, 22), &title, file);
+            let mut window = HelpWindow::new(TvRect::new(0, 0, 72, 20), &title, file);
             window.window_mut().set_resizable(false);
             window.set_state_flag(State::MODAL, true);
             window.show_topic("context");
             self.window = Some(window);
             self.language = Some(language);
+        }
+        if let Some(index) = self.selection {
+            let window = self.window.as_mut().unwrap();
+            let (delta, _) = window.viewer().get_scroll_state();
+            window.viewer_mut().set_scroll_state(delta, index + 1);
         }
         let window = self.window.as_mut().unwrap();
         // Set Window bounds directly: the pinned HelpWindow override uses absolute
@@ -121,7 +197,7 @@ impl Browser {
             rect.right() as i16,
             rect.bottom() as i16,
         ));
-        window.viewer_mut().set_bounds(TvRect::new(0, 0, 74, 20));
+        window.viewer_mut().set_bounds(TvRect::new(0, 0, 70, 18));
         window.viewer_mut().set_focus(true);
         let mut terminal = super::surface::terminal(size.width, size.height);
         terminal.draw_view(window);

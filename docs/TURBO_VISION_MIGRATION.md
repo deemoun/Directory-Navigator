@@ -84,6 +84,15 @@ Native `TextViewer` paints bounded, prepared text for the viewer, quick view and
 information previews. Loading, wrap/search state and limits remain in DN; these
 controls never load a file themselves.
 
+Welcome reuses the Help browser as a landing page with Start, Keyboard settings
+and Help action links. It retains its own owned modal and first-run/menu lifecycle;
+configuration existence rules and settings saving are unchanged. Both Help and
+Welcome use the original `HELPFILE.PAS` centered 72×20 geometry and a native
+context status line with highlighted keys. The original English help index
+(`RESOURCE/ENGLISH/DNHELP.HTX`, topic Index) likewise welcomes users through Help.
+Regional settings capture one sample timestamp when opened, so repeated painting
+cannot change the date/time preview or disagree with native terminal output.
+
 Context help uses a native `HelpWindow` and topic file, with Contents, manager,
 editor, viewer and operation topics. Tab/Shift+Tab select links; Enter or double
 click follows them; F1 opens Contents and Alt+F1/Backspace goes back. The help
@@ -134,7 +143,7 @@ See [document foundations](DOCUMENT_FOUNDATIONS.md) for lifecycle and validation
 
 Local macOS ARM64 validation covers:
 
-- 448 native Rust tests pass; the existing opt-in native Trash check stays ignored.
+- 449 native Rust tests pass; the existing opt-in native Trash check stays ignored.
 - Formatting, all-target Clippy, release build and a no-default-features build.
 - 2,898 layout cases check viewport bounds. Feasible allocations compare against
   frozen pre-removal geometry; 40 wrapping cases preserve narrow widths,

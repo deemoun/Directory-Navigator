@@ -16,6 +16,7 @@ pub(crate) struct ViewportState {
     viewer: Option<(usize, u16, bool, usize, bool)>,
     picker: Option<u64>,
     help: Option<u64>,
+    welcome: Option<u64>,
     game: Option<std::mem::Discriminant<crate::tetris::Screen>>,
     windows: Option<(Vec<crate::desktop::WindowId>, usize)>,
     characters: Option<(crate::utilities::characters::Page, bool)>,
@@ -54,6 +55,7 @@ fn viewport_state(app: &App) -> ViewportState {
             .modals
             .native_help(app.desktop.active().id)
             .map(|h| h.revision),
+        welcome: app.welcome.modals.welcome().map(|w| w.page.revision),
         viewer: app.desktop.active_viewer().map(|v| {
             (
                 v.offset,
@@ -279,6 +281,12 @@ pub fn prepare_window(
         picker.prepare(
             crate::presentation::layout::Size::new(area.width, area.height),
             profile,
+        );
+    }
+    if app.welcome.modals.welcome().is_some() {
+        crate::welcome::prepare(
+            app,
+            crate::presentation::layout::Size::new(area.width, area.height),
         );
     }
     let language = app.config.language;

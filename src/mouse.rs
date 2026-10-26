@@ -181,6 +181,14 @@ fn handle_mouse(app: &mut App, event: MouseEvent) {
             if let Some(Target::Welcome(action)) = target {
                 crate::welcome::action(app, action);
             }
+        } else if matches!(
+            event.kind,
+            MouseEventKind::ScrollUp | MouseEventKind::ScrollDown
+        ) {
+            let offset = app.layout_key.map_or((0, 0), |(_, r, _)| (r.x, r.y));
+            if let Some(welcome) = app.welcome.modals.welcome_mut() {
+                welcome.page.mouse(event, offset);
+            }
         }
         return;
     }

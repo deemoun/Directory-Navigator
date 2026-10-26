@@ -41,7 +41,9 @@ older increment entries below also record earlier migration stages.
   controls; existing wrapping, search highlighting and asynchronous ownership remain.
 - Context help uses native HelpWindow/HelpViewer with Contents, cross-references,
   scrolling and Alt+F1 history. Help stays inside its owned modal and restores its
-  parent. DOS HELPFILE/FLPANEL/FVIEWER and dialog resources guide behavior.
+  parent. Welcome reuses this Help window with action links and its existing
+  first-run/menu rules. Both share DN's centered 72×20 geometry and contextual
+  native status line. DOS HELPFILE/FLPANEL/FVIEWER and dialog resources guide behavior.
   See docs/TURBO_VISION_MIGRATION.md for current validation.
   Terminal workflows cover native controls, Unicode, cancellation, safe destinations,
   multiple documents, resize, shell handoff and restoration. Windows/Linux execution
