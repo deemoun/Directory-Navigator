@@ -599,7 +599,8 @@ fn calculator_classic_layout_results_help_mouse_focus_and_resize() -> io::Result
                 assert_eq!(b[(history.x, history.y)].bg, profile.color(9));
                 assert_eq!(field.width, 60);
                 assert_eq!(evaluate.y - field.y, 12);
-                assert_eq!(b[(evaluate.x + 1, evaluate.y + 1)].bg, profile.color(0));
+                assert_eq!(b[(evaluate.x + 1, evaluate.y + 1)].bg, profile.color(8));
+                assert_eq!(b[(evaluate.x + 1, evaluate.y + 1)].symbol(), " ");
                 assert_eq!(
                     b[(field.x, field.y)].bg,
                     profile.color(if profile == PaletteProfile::ClassicDn {

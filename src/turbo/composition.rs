@@ -242,7 +242,7 @@ impl DialogGroup {
                         if x + text.width() as u16 > plane.rect.right() {
                             text = " ".into();
                         }
-                        let attribute = match plane.appearance {
+                        let mut attribute = match plane.appearance {
                             Appearance::Input(selected) => match (scene.profile, selected) {
                                 (PaletteProfile::ClassicDn, true) => 0x0f,
                                 (PaletteProfile::ClassicDn, false) => 0x07,
@@ -256,6 +256,17 @@ impl DialogGroup {
                             Appearance::Disabled => 0x78,
                             _ => cell.attr.to_u8(),
                         };
+                        if let Appearance::Button(selected) = plane.appearance {
+                            super::widgets::button_cell(
+                                &mut text,
+                                &mut attribute,
+                                x - plane.rect.x,
+                                y - plane.rect.y,
+                                plane.rect.width,
+                                plane.rect.height,
+                                selected,
+                            );
+                        }
                         Glyph {
                             text,
                             attribute,
@@ -371,6 +382,42 @@ mod tests {
         focus::Focus,
         modals::{ModalId, ModalOwner},
     };
+    #[test]
+    fn sparse_captions_never_capture_the_obscured_document() {
+        use crate::painting::{Frame, NativeFrame, Paragraph};
+        let mut frame = NativeFrame::new(Rect::new(0, 0, 80, 25), PaletteProfile::ClassicDn);
+        for y in 0..25 {
+            frame.render_widget(Paragraph::new("Z".repeat(80)), Rect::new(0, y, 80, 1));
+        }
+        frame.modal_scope(Some(ModalInfo {
+            id: ModalId(99),
+            owner: ModalOwner::Workspace,
+            parent: None,
+            return_document: None,
+            focus: Focus::Prompt,
+        }));
+        let rect = Rect::new(10, 5, 49, 10);
+        frame.render_widget(super::super::widgets::dialog("Move / rename to"), rect);
+        // Short text in a large caption area used to capture the pane behind it.
+        frame.render_widget(Paragraph::new("Destination"), Rect::new(12, 7, 45, 5));
+        frame.render_widget(
+            super::super::widgets::button("OK", true),
+            Rect::new(25, 12, 10, 1),
+        );
+        frame.modal_scope(None);
+        let scene = frame.finish();
+        for y in rect.y..rect.bottom() {
+            for x in rect.x..rect.right() {
+                assert_ne!(scene.cells[&(x, y)].text, "Z", "leaked pane at {x},{y}");
+            }
+        }
+        assert_eq!(scene.cells[&(5, 7)].text, "Z");
+        assert_eq!(scene.cells[&(40, 10)].text, " ");
+        assert_eq!(
+            scene.cells[&(40, 10)].resolved(scene.profile).bg,
+            Some(scene.profile.color(7))
+        );
+    }
     #[test]
     fn composed_buttons_have_native_children_shadow_space_and_owner_relative_hits() {
         for (root, button, screen_height) in [

@@ -68,7 +68,11 @@ relative to its interior. DN-specific captions are immutable image views. A sing
 native draw paints the frame, children and shadows over the real underlying cells.
 The last published frame retains the native group for button hit/command proposals;
 DN controllers retain field state, focus policy, validation and destructive-action
-guards. Native buttons have their full two-row bounds. Root/menu/file-picker/help
+guards. Caption images capture an opaque dialog background, so sparse text never
+copies the obscured document. Selected menu rows include shortcut backgrounds.
+Button faces use green for focus and gray otherwise; native shadow bounds use
+solid shaded cells to avoid font-dependent half-block seams, including game and
+file-picker buttons. Native buttons have their full two-row bounds. Root/menu/file-picker/help
 shadows use the toolkit shadow routine. Wide-cell overlay intersections are resolved
 before publishing the frame and terminal diff.
 
@@ -130,7 +134,7 @@ See [document foundations](DOCUMENT_FOUNDATIONS.md) for lifecycle and validation
 
 Local macOS ARM64 validation covers:
 
-- 446 native Rust tests pass; the existing opt-in native Trash check stays ignored.
+- 448 native Rust tests pass; the existing opt-in native Trash check stays ignored.
 - Formatting, all-target Clippy, release build and a no-default-features build.
 - 2,898 layout cases check viewport bounds. Feasible allocations compare against
   frozen pre-removal geometry; 40 wrapping cases preserve narrow widths,

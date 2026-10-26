@@ -429,6 +429,10 @@ impl NativeFrame {
     }
     pub(crate) fn start_dialog(&mut self, widget: crate::turbo::widgets::Native, area: Rect) {
         self.flush_dialog();
+        // Captions paint sparsely. Their image children must capture the dialog
+        // background, never file names or borders from the obscured document.
+        self.scene
+            .fill(area.x, area.y, area.width, area.height, 0x70);
         self.composition = Some(crate::turbo::composition::DialogGroup::new(
             widget,
             area,

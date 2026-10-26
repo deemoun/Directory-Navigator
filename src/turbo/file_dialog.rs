@@ -407,6 +407,31 @@ impl Picker {
                 );
             }
         }
+        for i in 0..self.widget.child_count() {
+            let child = self.widget.child_at(i);
+            if child.as_any().is::<Button>() {
+                let b = child.bounds();
+                for y in 0..b.height_clamped() as u16 {
+                    for x in 0..b.width_clamped() as u16 {
+                        let position = (
+                            rect.x + 1 + b.a.x.max(0) as u16 + x,
+                            rect.y + 1 + b.a.y.max(0) as u16 + y,
+                        );
+                        if let Some(glyph) = scene.cells.get_mut(&position) {
+                            super::widgets::button_cell(
+                                &mut glyph.text,
+                                &mut glyph.attribute,
+                                x,
+                                y,
+                                b.width_clamped() as u16,
+                                b.height_clamped() as u16,
+                                child.is_focused(),
+                            );
+                        }
+                    }
+                }
+            }
+        }
         self.scene = Some(scene);
     }
     pub(crate) fn bounds(&self) -> Rect {

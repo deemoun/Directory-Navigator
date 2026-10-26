@@ -87,6 +87,8 @@ impl TextCells {
 pub(super) enum Appearance {
     #[default]
     Toolkit,
+    Button(bool),
+    Menu(usize, bool),
     Input(bool),
     Status(bool),
     Disabled,
@@ -208,7 +210,7 @@ impl Widget for Native {
                 if usize::from(x) + text.width() > usize::from(area.width) {
                     text = " ".into();
                 }
-                let attribute = match self.appearance {
+                let mut attribute = match self.appearance {
                     Appearance::Input(selected) => match (frame.profile(), selected) {
                         (PaletteProfile::ClassicDn, true) => 0x0f,
                         (PaletteProfile::ClassicDn, false) => 0x07,
@@ -240,6 +242,28 @@ impl Widget for Native {
                     Appearance::Preview(attr) => attr,
                     _ => cell.attr.to_u8(),
                 };
+                match self.appearance {
+                    Appearance::Button(selected) => button_cell(
+                        &mut text,
+                        &mut attribute,
+                        x,
+                        y,
+                        area.width,
+                        height,
+                        selected,
+                    ),
+                    Appearance::Menu(row, true)
+                        if y as usize == row + 1
+                            && x > 0
+                            && x + 1 < area.width
+                            && attribute != 0x78 =>
+                    {
+                        // MenuBox paints shortcut text with its normal palette even
+                        // on the selected row. Keep its foreground, extend selection.
+                        attribute = (attribute & 15) | 0x20;
+                    }
+                    _ => {}
+                }
                 scene.cells.insert(
                     (area.x + x, area.y + y),
                     super::scene::Glyph {
@@ -273,6 +297,45 @@ pub(crate) fn dialog(title: &str) -> Native {
     focus(&mut dialog, true);
     native(dialog, text)
 }
+/// Theme native button cells consistently in groups and isolated game controls.
+/// Solid background cells avoid font-dependent half-block seams in shadows.
+pub(super) fn button_cell(
+    text: &mut String,
+    attribute: &mut u8,
+    x: u16,
+    y: u16,
+    width: u16,
+    height: u16,
+    selected: bool,
+) {
+    if width < 4 || height < 2 {
+        return;
+    }
+    let disabled = *attribute == 0x78;
+    if y + 1 == height || x + 1 == width {
+        *text = " ".into();
+        *attribute = if y + 1 == height && x == 0 {
+            0x70
+        } else {
+            0x80
+        };
+    } else {
+        let mnemonic = *attribute & 15 == 14;
+        *attribute = if disabled {
+            0x78
+        } else if selected {
+            if mnemonic {
+                0x2e
+            } else {
+                0x2f
+            }
+        } else if mnemonic {
+            0x74
+        } else {
+            0x70
+        };
+    }
+}
 pub(crate) fn button(label: &str, selected: bool) -> Native {
     let mut text = TextCells::default();
     let label = label
@@ -282,7 +345,9 @@ pub(crate) fn button(label: &str, selected: bool) -> Native {
         .trim();
     let mut button = Button::new(TvRect::new(0, 0, 1, 1), &text.text(label), 0xf100, selected);
     focus(&mut button, selected);
-    native(button, text)
+    let mut widget = native(button, text);
+    widget.appearance = Appearance::Button(selected);
+    widget
 }
 pub(crate) fn checkbox(label: &str, checked: bool, selected: bool, enabled: bool) -> Native {
     let mut text = TextCells::default();
@@ -510,10 +575,13 @@ pub(crate) fn menu(entries: Vec<MenuEntry>, selected: usize) -> Native {
         views::{menu_viewer::MenuViewer, MenuBox},
     };
     let mut text = TextCells::default();
+    let enabled = entries.get(selected).is_some_and(|entry| entry.enabled);
     let mut control = MenuBox::new(Point::new(0, 0), menu_data(entries, &mut text));
     control.set_current_item(Some(selected));
     focus(&mut control, true);
-    native(control, text)
+    let mut widget = native(control, text);
+    widget.appearance = Appearance::Menu(selected, enabled);
+    widget
 }
 pub(crate) fn menu_title(label: &str, selected: bool, enabled: bool) -> Native {
     use turbo_vision::views::menu_bar::MenuBar;
@@ -802,6 +870,58 @@ mod tests {
             .values()
             .all(|c| !c.text.chars().any(char::is_control)));
         assert!(scene.cells.keys().all(|(x, y)| *x < 40 && *y < 12));
+    }
+    #[test]
+    fn menu_selection_covers_shortcut_and_button_shadows_use_solid_cells() {
+        for profile in [PaletteProfile::ClassicDn, PaletteProfile::Terminal] {
+            let mut frame = NativeFrame::new(Rect::new(0, 0, 50, 15), profile);
+            frame.render_widget(
+                menu(
+                    vec![MenuEntry {
+                        label: "Directory ~t~ree".into(),
+                        shortcut: "Ctrl+T".into(),
+                        enabled: true,
+                        checked: false,
+                        submenu: false,
+                    }],
+                    0,
+                ),
+                Rect::new(2, 2, 35, 3),
+            );
+            frame.render_widget(button("~O~K", true), Rect::new(2, 7, 12, 2));
+            frame.render_widget(button("Cancel", false), Rect::new(18, 7, 12, 2));
+            let scene = frame.finish();
+            for x in 3..36 {
+                assert_eq!(
+                    scene.cells[&(x, 3)].resolved(profile).bg,
+                    Some(profile.color(2)),
+                    "selected menu cell {x}"
+                );
+            }
+            for (x, width) in [(2, 12), (18, 12)] {
+                for dx in 1..width {
+                    let shadow = &scene.cells[&(x + dx, 8)];
+                    assert_eq!(shadow.text, " ");
+                    assert_eq!(shadow.resolved(profile).bg, Some(profile.color(8)));
+                }
+                assert_eq!(
+                    scene.cells[&(x, 8)].resolved(profile).bg,
+                    Some(profile.color(7))
+                );
+            }
+            for x in 2..13 {
+                assert_eq!(
+                    scene.cells[&(x, 7)].resolved(profile).bg,
+                    Some(profile.color(2))
+                );
+            }
+            for x in 18..29 {
+                assert_eq!(
+                    scene.cells[&(x, 7)].resolved(profile).bg,
+                    Some(profile.color(7))
+                );
+            }
+        }
     }
     #[test]
     fn native_input_keeps_byte_cursor_unicode_and_limits() {
