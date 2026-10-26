@@ -27,6 +27,40 @@ impl Glyph {
     }
 }
 impl Scene {
+    /// Terminals cannot colour half of a wide grapheme independently. Resolve
+    /// partial overlay/shadow intersections before transport and hit publication.
+    pub(crate) fn normalize_wide(&mut self) {
+        for y in 0..self.height {
+            let mut x = 0;
+            while x < self.width {
+                let Some(mut glyph) = self.cells.get(&(x, y)).cloned() else {
+                    x += 1;
+                    continue;
+                };
+                let width = glyph.text.width() as u16;
+                if width > 1 {
+                    if x + width <= self.width
+                        && (1..width).all(|i| {
+                            self.cells
+                                .get(&(x + i, y))
+                                .is_some_and(|g| g.text.is_empty())
+                        })
+                    {
+                        glyph.text.clear();
+                        for i in 1..width {
+                            self.cells.insert((x + i, y), glyph.clone());
+                        }
+                        x += width;
+                        continue;
+                    }
+                    self.cells.get_mut(&(x, y)).unwrap().text = " ".into();
+                } else if glyph.text.is_empty() {
+                    self.cells.get_mut(&(x, y)).unwrap().text = " ".into();
+                }
+                x += 1;
+            }
+        }
+    }
     pub(crate) fn put(&mut self, x: u16, y: u16, text: &str, attribute: u8) {
         if x < self.width && y < self.height {
             self.cells.insert(

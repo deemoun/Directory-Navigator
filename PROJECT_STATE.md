@@ -30,9 +30,19 @@ older increment entries below also record earlier migration stages.
   histories/bookmarks/windows, discovery/archive lists, utilities and game pages
   share the adapter. Owned settings choice children retain draft/Cancel semantics;
   existing filesystem, save/quit and stale-result safeguards remain in controllers.
-  Unicode cell encoding, compact native button clipping and existing byte limits
-  are preserved. Local macOS ARM64: 442 tests pass (one existing opt-in Trash check
-  ignored), formatting, all-target Clippy, release and no-default-features checks.
+  Modal controls are children of one native Dialog/Group, with owner-relative
+  bounds and full native button/window shadows. The published group validates
+  button proposals; existing controllers still authorize actions. Unicode cell
+  encoding and existing byte limits remain.
+- File columns use native ListBox/ListViewer controls with DN-specific metadata,
+  column-major ordering, marks and colours; native ScrollBar draws tracks/thumbs
+  and handles arrow/page steps. Wide-integer thumb dragging retains endpoint safety.
+  Quick view, text viewing and information previews use bounded native TextViewer
+  controls; existing wrapping, search highlighting and asynchronous ownership remain.
+- Context help uses native HelpWindow/HelpViewer with Contents, cross-references,
+  scrolling and Alt+F1 history. Help stays inside its owned modal and restores its
+  parent. DOS HELPFILE/FLPANEL/FVIEWER and dialog resources guide behavior.
+  See docs/TURBO_VISION_MIGRATION.md for current validation.
   Terminal workflows cover native controls, Unicode, cancellation, safe destinations,
   multiple documents, resize, shell handoff and restoration. Windows/Linux execution
   remains excluded. See docs/TURBO_VISION_MIGRATION.md for scope and boundaries.

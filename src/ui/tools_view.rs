@@ -181,16 +181,14 @@ pub(super) fn draw_tools(
             ]),
             None => std::borrow::Cow::Owned(vec!["Reading metadata…".into()]),
         };
-        let visible: Vec<Line> = lines
+        let visible: Vec<String> = lines
             .iter()
             .skip(info.offset)
             .take(rect.height.saturating_sub(4) as usize)
-            .map(|line| Line::from(app.config.language.field(line, app.config.datetime)))
+            .map(|line| app.config.language.field(line, app.config.datetime))
             .collect();
         frame.render_widget(
-            Paragraph::new(visible)
-                .scroll((0, info.horizontal))
-                .style(dos(0x70)),
+            crate::turbo::widgets::text_view(&visible, info.horizontal as usize, 0x70),
             Rect::new(rect.x + 2, rect.y + 1, rect.width - 4, rect.height - 4),
         );
         frame.render_widget(

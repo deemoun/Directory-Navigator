@@ -35,8 +35,13 @@ pub trait Frame {
     fn set_cursor_position(&mut self, position: impl Into<crate::presentation::layout::Position>);
     fn regions(&mut self) -> &mut Vec<(Rect, crate::mouse::Target)>;
     fn compose(&mut self, scene: crate::turbo::scene::Scene);
+    fn modal_scope(&mut self, _scope: Option<crate::modals::ModalInfo>) {}
+    fn native_shadow(&mut self, _bounds: Rect) {}
 }
 pub trait Widget {
+    fn is_control(&self) -> bool {
+        false
+    }
     fn native(self, frame: &mut NativeFrame, area: Rect);
 }
 
@@ -353,12 +358,43 @@ fn reflow(glyphs: Vec<Run>, limit: u16, trim: bool) -> Vec<Vec<Run>> {
     output
 }
 
+pub(crate) fn wrap_plain(value: &str, width: u16) -> Vec<String> {
+    use unicode_segmentation::UnicodeSegmentation;
+    use unicode_width::UnicodeWidthStr;
+    value
+        .split('\n')
+        .flat_map(|line| {
+            reflow(
+                line.graphemes(true)
+                    .map(|g| Run {
+                        text: g.into(),
+                        style: Style::default(),
+                        width: g.width() as u16,
+                        space: g == "\u{200b}"
+                            || (g != "\u{a0}" && g.chars().all(char::is_whitespace)),
+                    })
+                    .collect(),
+                width,
+                false,
+            )
+            .into_iter()
+            .map(|row| row.into_iter().map(|g| g.text).collect())
+        })
+        .collect()
+}
+
 pub struct NativeFrame {
     scene: crate::turbo::scene::Scene,
+    composition: Option<crate::turbo::composition::DialogGroup>,
+    scope: Option<crate::modals::ModalInfo>,
+    dialogs: Vec<std::rc::Rc<std::cell::RefCell<crate::turbo::composition::DialogGroup>>>,
 }
 impl NativeFrame {
     pub fn new(area: Rect, profile: crate::palette::PaletteProfile) -> Self {
         Self {
+            composition: None,
+            scope: None,
+            dialogs: Vec::new(),
             scene: crate::turbo::scene::Scene {
                 width: area.width,
                 height: area.height,
@@ -372,9 +408,47 @@ impl NativeFrame {
     pub(crate) fn replace(&mut self, scene: crate::turbo::scene::Scene) {
         self.scene = scene;
     }
-    pub(crate) fn finish(self) -> crate::turbo::scene::Scene {
+    pub(crate) fn finish(mut self) -> crate::turbo::scene::Scene {
+        self.flush_dialog();
         self.scene
     }
+    pub(crate) fn finish_dialogs(
+        mut self,
+    ) -> (
+        crate::turbo::scene::Scene,
+        Vec<std::rc::Rc<std::cell::RefCell<crate::turbo::composition::DialogGroup>>>,
+    ) {
+        self.flush_dialog();
+        (self.scene, self.dialogs)
+    }
+    pub(crate) fn composing(&self) -> bool {
+        self.composition.is_some()
+    }
+    pub(crate) fn dialog_scope(&self) -> Option<crate::modals::ModalInfo> {
+        self.scope
+    }
+    pub(crate) fn start_dialog(&mut self, widget: crate::turbo::widgets::Native, area: Rect) {
+        self.flush_dialog();
+        self.composition = Some(crate::turbo::composition::DialogGroup::new(
+            widget,
+            area,
+            self.scope.unwrap(),
+        ));
+    }
+    pub(crate) fn stage_control(&mut self, widget: crate::turbo::widgets::Native, area: Rect) {
+        self.composition
+            .as_mut()
+            .unwrap()
+            .control(widget, area, self.scene.height);
+    }
+    pub(crate) fn flush_dialog(&mut self) {
+        if let Some(mut dialog) = self.composition.take() {
+            dialog.paint(&mut self.scene);
+            self.dialogs
+                .push(std::rc::Rc::new(std::cell::RefCell::new(dialog)));
+        }
+    }
+
     pub(crate) fn profile(&self) -> crate::palette::PaletteProfile {
         self.scene.profile
     }
@@ -449,7 +523,14 @@ impl Frame for NativeFrame {
         Rect::new(0, 0, self.scene.width, self.scene.height)
     }
     fn render_widget(&mut self, widget: impl Widget, area: Rect) {
-        widget.native(self, area);
+        if !widget.is_control() && self.composition.is_some() {
+            let mut dialog = self.composition.take().unwrap();
+            widget.native(self, area);
+            dialog.image(&self.scene, area);
+            self.composition = Some(dialog);
+        } else {
+            widget.native(self, area);
+        }
     }
     fn set_cursor_position(&mut self, position: impl Into<crate::presentation::layout::Position>) {
         let p = position.into();
@@ -458,7 +539,18 @@ impl Frame for NativeFrame {
     fn regions(&mut self) -> &mut Vec<(Rect, crate::mouse::Target)> {
         &mut self.scene.regions
     }
+    fn native_shadow(&mut self, bounds: Rect) {
+        self.flush_dialog();
+        crate::turbo::composition::paint_shadow(&mut self.scene, bounds);
+    }
+    fn modal_scope(&mut self, scope: Option<crate::modals::ModalInfo>) {
+        self.flush_dialog();
+        self.scope = scope;
+    }
     fn compose(&mut self, scene: crate::turbo::scene::Scene) {
+        if let Some(dialog) = &mut self.composition {
+            dialog.image(&scene, Rect::new(0, 0, scene.width, scene.height));
+        }
         self.scene.cells.extend(scene.cells);
         self.scene.regions.extend(scene.regions);
         self.scene.cursor = scene.cursor;

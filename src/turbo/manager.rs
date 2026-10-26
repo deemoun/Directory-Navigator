@@ -114,91 +114,34 @@ fn pane(
         for (r, text) in cells(header, constraints.clone()).iter().zip(headers) {
             s.text(r.x, r.y, r.width, text, 0x8e);
         }
-        for (row, (entry_index, entry)) in panel
-            .entries
-            .iter()
-            .enumerate()
-            .skip(panel.offset + column_index * g.rows())
-            .take(g.rows())
-            .enumerate()
-        {
-            let selected = panel.selected.contains(&entry.name);
-            let marker = if selected && config.show_tags {
-                if classic {
-                    "√"
-                } else {
-                    "✓"
-                }
-            } else if entry.symlink {
-                "@"
-            } else {
-                " "
-            };
-            let normal = if config.highlight_files {
-                crate::ui::entry_color(entry)
-            } else if entry.directory {
-                0x8f
-            } else {
-                0x87
-            };
-            let color = if active && entry_index == panel.cursor {
-                if selected {
-                    0x3e
-                } else {
-                    0x30
-                }
-            } else if selected {
-                0x8e
-            } else {
-                normal
-            };
-            let marker_color =
-                if selected && config.show_tags && classic && (normal & 15) != (color >> 4) {
-                    (color & 0xf0) | (normal & 15)
-                } else {
-                    color
-                };
-            let row = Rect::new(column.x, column.y + row as u16, column.width, 1);
-            s.fill(row.x, row.y, row.width, 1, color);
-            let cols = cells(row, constraints.clone());
-            if let Some(name) = cols.first() {
-                s.text(name.x, name.y, name.width, marker, marker_color);
-                if name.width > 1 {
-                    s.text(
-                        name.x + 1,
-                        name.y,
-                        name.width - 1,
-                        &display_name(&entry.name.to_string_lossy()),
-                        color,
-                    );
-                }
-            }
-            if let Some(size) = cols.get(1) {
-                let value = if entry.directory {
-                    "<DIR>".into()
-                } else if entry.symlink {
-                    "<LINK>".into()
-                } else {
-                    entry
-                        .size
-                        .map(formatting::size)
-                        .unwrap_or_else(|| "?".into())
-                };
-                s.text(size.x, size.y, size.width, &value, color);
-            }
-            if let Some(modified) = cols.get(2) {
-                s.text(
-                    modified.x,
-                    modified.y,
-                    modified.width,
-                    &formatting::modified_with(entry.modified, date_time, config.datetime),
-                    color,
-                );
-            }
-        }
+        let fields = cells(
+            Rect::new(column.x, column.y, column.width, 1),
+            constraints.clone(),
+        );
+        super::file_panes::column(
+            s,
+            panel,
+            config,
+            active,
+            super::file_panes::Column {
+                rect: *column,
+                start: panel.offset + column_index * g.rows(),
+                fields: &fields,
+                date_time,
+            },
+        );
     }
     let bar = g.scrollbar;
     if !bar.is_empty() {
+        super::widgets::paint_into(
+            s,
+            super::widgets::scrollbar(
+                panel.cursor,
+                panel.entries.len().saturating_sub(1),
+                g.capacity(),
+            ),
+            bar,
+        );
         let enabled = !panel.loading && panel.entries.len() > 1;
         let attr = if classic {
             if enabled {
@@ -212,19 +155,10 @@ fn pane(
             0x78
         };
         for y in bar.y..bar.bottom() {
-            let glyph = if y == bar.y {
-                "▲"
-            } else if y + 1 == bar.bottom() {
-                "▼"
-            } else if !classic && panel.entries.len() <= 1 {
-                "▓"
-            } else {
-                "▒"
-            };
-            s.text(bar.x, y, 1, glyph, attr);
-        }
-        if let Some(thumb) = g.scroll_thumb(panel.cursor, panel.entries.len()) {
-            s.text(thumb.x, thumb.y, 1, "■", attr);
+            if let Some(cell) = s.cells.get_mut(&(bar.x, y)) {
+                cell.attribute = attr;
+                cell.style = None;
+            }
         }
     }
     for divider in &g.dividers {

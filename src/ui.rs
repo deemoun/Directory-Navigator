@@ -43,6 +43,7 @@ pub fn draw(frame: &mut crate::painting::NativeFrame, app: &mut App) {
 pub struct RenderedFrame {
     pub(crate) scene: crate::turbo::scene::Scene,
     pub context: crate::layout::FrameContext,
+    dialogs: Vec<std::rc::Rc<std::cell::RefCell<crate::turbo::composition::DialogGroup>>>,
 }
 impl RenderedFrame {
     pub fn hit_regions(&self) -> &[(crate::presentation::layout::Rect, crate::mouse::Target)] {
@@ -59,16 +60,20 @@ pub fn render(app: &App, snapshot: &crate::layout::LayoutSnapshot) -> RenderedFr
     );
     draw_content(&mut frame, app, snapshot);
     shortcuts_view::draw_prefix(&mut frame, app);
-    let mut scene = frame.finish();
+    let (mut scene, dialogs) = frame.finish_dialogs();
+    scene.normalize_wide();
     snapshot.transform(&mut scene);
+    scene.normalize_wide();
     RenderedFrame {
         scene,
         context: snapshot.context,
+        dialogs,
     }
 }
 pub(crate) fn publish(app: &mut App, frame: &RenderedFrame) {
     app.mouse.regions = frame.scene.regions.clone();
     app.mouse.frame = Some(frame.context);
+    app.mouse.dialogs = frame.dialogs.clone();
 }
 pub(crate) fn native_scene(
     app: &mut App,
@@ -191,6 +196,7 @@ fn draw_layers(
         {
             continue;
         }
+        frame.modal_scope(Some(*modal));
         match modal.focus {
             Focus::Message => draw_info_dialog(frame, app, prepared.message.as_ref()),
             Focus::WindowList => windows_view::draw(frame, app, area),
@@ -217,5 +223,6 @@ fn draw_layers(
             Focus::ConfigImport => config_import_view::draw(frame, app, area),
             _ => {}
         }
+        frame.modal_scope(None);
     }
 }

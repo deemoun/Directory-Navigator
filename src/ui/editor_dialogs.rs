@@ -56,6 +56,7 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
                 scene.cursor = None;
             }
             frame.compose(scene);
+            frame.native_shadow(picker.bounds());
         }
         return;
     }

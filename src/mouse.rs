@@ -71,6 +71,8 @@ pub struct MouseState {
     pub regions: Vec<(Rect, Target)>,
     last_click: Option<(usize, PathBuf, Instant)>,
     pub scrollbar_drag: Option<(usize, Rect)>,
+    pub(crate) dialogs:
+        Vec<std::rc::Rc<std::cell::RefCell<crate::turbo::composition::DialogGroup>>>,
 }
 
 impl MouseState {
@@ -100,6 +102,27 @@ pub fn handle(app: &mut App, event: MouseEvent) {
     }) {
         app.mouse.reset_click();
         return;
+    }
+    let mut event = event;
+    if event.kind == MouseEventKind::Down(MouseButton::Left) {
+        let offset = app.layout_key.map_or((0, 0), |(_, r, _)| (r.x, r.y));
+        let top = app.modal_top().map(|m| m.id);
+        let proposal = app
+            .mouse
+            .dialogs
+            .iter()
+            .rev()
+            .find(|d| Some(d.borrow().scope.id) == top)
+            .and_then(|d| {
+                d.borrow_mut().button(
+                    event.column.saturating_sub(offset.0),
+                    event.row.saturating_sub(offset.1),
+                )
+            });
+        if let Some((rect, _target)) = proposal {
+            event.column = rect.x + offset.0;
+            event.row = rect.y + offset.1;
+        }
     }
     handle_mouse(app, event);
     crate::layout::update(app);
@@ -198,6 +221,14 @@ fn handle_mouse(app: &mut App, event: MouseEvent) {
         return;
     }
     if focus == Focus::Message {
+        let offset = app.layout_key.map_or((0, 0), |(_, r, _)| (r.x, r.y));
+        if let Some(help) = app.modals.native_help_mut(app.desktop.active().id) {
+            let close = help.mouse(event, offset);
+            if close {
+                app.pop_dialog();
+            }
+            return;
+        }
         match event.kind {
             MouseEventKind::Down(MouseButton::Left) if target == Some(Target::CloseDialog) => {
                 crate::dialog::message_key(app, crossterm::event::KeyCode::Enter)
@@ -510,8 +541,15 @@ fn handle_mouse(app: &mut App, event: MouseEvent) {
                 return;
             }
             match action {
-                ScrollAction::Up => panel.step(-1),
-                ScrollAction::Down => panel.step(1),
+                ScrollAction::Up | ScrollAction::Down => {
+                    panel.cursor = crate::turbo::widgets::scroll_step(
+                        panel.cursor,
+                        panel.entries.len() - 1,
+                        1,
+                        action == ScrollAction::Down,
+                        false,
+                    );
+                }
                 ScrollAction::Thumb => {
                     if let Some(track) = track {
                         app.mouse.scrollbar_drag = Some((index, track));
@@ -529,7 +567,13 @@ fn handle_mouse(app: &mut App, event: MouseEvent) {
                             .viewport_rows
                             .saturating_mul(panel.viewport_columns)
                             .min(isize::MAX as usize) as isize;
-                        panel.step(if event.row < thumb { -page } else { page });
+                        panel.cursor = crate::turbo::widgets::scroll_step(
+                            panel.cursor,
+                            panel.entries.len() - 1,
+                            page as usize,
+                            event.row >= thumb,
+                            true,
+                        );
                     }
                 }
             }

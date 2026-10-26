@@ -23,15 +23,26 @@ use unicode_width::UnicodeWidthStr;
 /// cells before native layout, then restore them at the scene boundary. This
 /// preserves combining sequences, wide glyphs and literal private-use characters.
 #[derive(Default)]
-struct CellEncoding {
-    glyphs: BTreeMap<char, String>,
+pub(super) struct CellEncoding {
+    pub(super) glyphs: BTreeMap<char, String>,
     reverse: BTreeMap<String, char>,
     next: u32,
 }
 #[derive(Clone, Default)]
-struct TextCells(std::rc::Rc<std::cell::RefCell<CellEncoding>>);
+pub(super) struct TextCells(pub(super) std::rc::Rc<std::cell::RefCell<CellEncoding>>);
 impl TextCells {
-    fn text(&mut self, value: &str) -> String {
+    pub(super) fn literal(&mut self, value: &str) -> char {
+        let mut state = self.0.borrow_mut();
+        if let Some(ch) = state.reverse.get(value) {
+            return *ch;
+        }
+        let ch = char::from_u32(0xf0000 + state.next).unwrap();
+        state.next += 1;
+        state.reverse.insert(value.into(), ch);
+        state.glyphs.insert(ch, value.into());
+        ch
+    }
+    pub(super) fn text(&mut self, value: &str) -> String {
         let mut state = self.0.borrow_mut();
         let mut result = String::new();
         for g in value.graphemes(true) {
@@ -72,8 +83,8 @@ impl TextCells {
         result
     }
 }
-#[derive(Default)]
-enum Appearance {
+#[derive(Default, Clone, Copy)]
+pub(super) enum Appearance {
     #[default]
     Toolkit,
     Input(bool),
@@ -82,14 +93,15 @@ enum Appearance {
     Text,
     SelectedInput,
     History,
+    Preview(u8),
 }
 pub(crate) struct Native {
-    view: Box<dyn View>,
-    text: TextCells,
-    appearance: Appearance,
-    overscan: u16,
-    inset: u16,
-    status_text: Option<String>,
+    pub(super) view: Box<dyn View>,
+    pub(super) text: TextCells,
+    pub(super) appearance: Appearance,
+    pub(super) overscan: u16,
+    pub(super) inset: u16,
+    pub(super) status_text: Option<String>,
 }
 fn bounds(r: Rect) -> TvRect {
     TvRect::new(
@@ -104,7 +116,22 @@ fn focus(view: &mut impl View, selected: bool) {
     view.set_state_flag(State::SELECTED, selected);
 }
 impl Widget for Native {
+    fn is_control(&self) -> bool {
+        true
+    }
     fn native(mut self, frame: &mut NativeFrame, area: Rect) {
+        if frame.composing() {
+            if self.view.as_any().is::<Dialog>() {
+                frame.flush_dialog();
+            } else {
+                frame.stage_control(self, area);
+                return;
+            }
+        }
+        if self.view.as_any().is::<Dialog>() && frame.dialog_scope().is_some() {
+            frame.start_dialog(self, area);
+            return;
+        }
         if area.is_empty() {
             return;
         }
@@ -210,6 +237,7 @@ impl Widget for Native {
                     Appearance::Text => 0x70,
                     Appearance::SelectedInput => 0x30,
                     Appearance::History => 0x9f,
+                    Appearance::Preview(attr) => attr,
                     _ => cell.attr.to_u8(),
                 };
                 scene.cells.insert(
@@ -223,6 +251,9 @@ impl Widget for Native {
             }
         }
         frame.control_scene(scene);
+        if self.view.has_shadow() {
+            frame.native_shadow(area);
+        }
     }
 }
 fn native(view: impl View + 'static, text: TextCells) -> Native {
@@ -292,7 +323,7 @@ pub(crate) fn list_selection(
     let count = items.len();
     struct Items {
         values: Vec<String>,
-        text: TextCells,
+        pub(super) text: TextCells,
     }
     impl turbo_vision::views::listbox::ListProvider for Items {
         fn len(&self) -> usize {
@@ -613,7 +644,31 @@ pub(crate) fn scrollbar(value: usize, max: usize, page: usize) -> Native {
         page.min(i32::MAX as usize) as i32,
         1,
     );
+    control.set_total(i32::MAX); // DN uses a fixed one-cell thumb.
     native(control, TextCells::default())
+}
+/// Native arrow/page semantics, with a wide-integer fallback beyond the toolkit's
+/// signed range. Thumb dragging retains DN's endpoint-exact geometry adapter.
+pub(crate) fn scroll_step(value: usize, max: usize, page: usize, down: bool, paged: bool) -> usize {
+    let step = if paged { page } else { 1 };
+    if max.saturating_add(step) > i32::MAX as usize {
+        return if down {
+            value.saturating_add(step).min(max)
+        } else {
+            value.saturating_sub(step)
+        };
+    }
+    let mut control =
+        turbo_vision::views::scrollbar::ScrollBar::new_vertical(TvRect::new(0, 0, 1, 3));
+    control.set_params(value as i32, 0, max as i32, page as i32, 1);
+    let key = match (down, paged) {
+        (false, false) => KB_UP,
+        (true, false) => KB_DOWN,
+        (false, true) => KB_PGUP,
+        (true, true) => KB_PGDN,
+    };
+    control.handle_event(&mut Event::keyboard(key));
+    control.get_value() as usize
 }
 pub(crate) fn pan(value: &str, scroll: usize) -> String {
     let mut x = 0;
@@ -704,6 +759,21 @@ pub(crate) fn history_button() -> Native {
     widget.inset = 1;
     widget.appearance = Appearance::History;
     widget
+}
+
+/// Previews receive already bounded and wrapped rows; this never opens a path.
+pub(crate) fn text_view(lines: &[String], horizontal: usize, attribute: u8) -> Native {
+    let mut text = TextCells::default();
+    let content = lines
+        .iter()
+        .map(|line| text.text(&pan(line, horizontal)))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let mut control = turbo_vision::views::text_viewer::TextViewer::new(TvRect::new(0, 0, 1, 1));
+    control.set_text(&content);
+    let mut result = native(control, text);
+    result.appearance = Appearance::Preview(attribute);
+    result
 }
 
 #[cfg(test)]

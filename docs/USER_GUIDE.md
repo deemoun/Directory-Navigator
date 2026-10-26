@@ -693,3 +693,12 @@ Dialogs block switching until closed, and nested help returns to its parent.
 Several editors and viewers can coexist. Games retain one instance and are not
 listed. Windows remain full-screen and session-only; open documents are not
 restored after restarting.
+
+## Context help
+
+F1 opens help for the current screen or dialog. Press F1 again for Contents.
+Tab and Shift+Tab select links; Enter follows the selected link. A single mouse
+click selects a link and a double click follows it. Alt+F1 or Backspace returns
+to the previous topic with its scroll position. Arrows, PageUp/PageDown and the
+mouse wheel scroll. Esc or the title close control returns to the parent dialog
+or document. Help blocks document switching until closed.

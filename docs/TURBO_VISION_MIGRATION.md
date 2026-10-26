@@ -33,12 +33,13 @@ for this finishing pass. Local runtime validation targets macOS ARM64.
   from that state; input editing, list/menu navigation and focus traversal use
   toolkit events. Ephemeral drawing controls do not mutate application models or
   start nested loops. The adapter preserves complete graphemes, literal private-use
-  characters, clipping, cursor placement and existing compact control bounds.
+  characters, clipping and cursor placement. Dialog composition reserves the native
+  two-row button shadow and bottom border.
   Native button faces and menu check marks replace their hand-drawn counterparts.
 - Settings choice fields open an owned native dialog/list child with F4 or the
   arrow control. Child Cancel restores the parent draft; accepting a choice still
-  requires accepting the parent to apply settings. Plain-text help uses read-only
-  `Memo` controls. Numeric fields retain existing validation rather than silently
+  requires accepting the parent to apply settings. Numeric fields retain existing
+  validation rather than silently
   clamping invalid entries. Unknown operation totals use an activity bar, not a
   fabricated percentage.
 - The ASCII/CP437 grid reuses the library's `Table` control for cell drawing,
@@ -59,6 +60,38 @@ for this finishing pass. Local runtime validation targets macOS ARM64.
   `0f2b396a1844c59e31c4714d68ffb6815662918e`. OS clipboard and screenshot
   features remain disabled. Turbo Vision is now mandatory; no Cargo feature
   selects a renderer. `--no-default-features` also builds the native application.
+
+## Composed dialogs, panels, previews and help
+
+Shared modal controls are actual children of one `Dialog`/`Group`, positioned
+relative to its interior. DN-specific captions are immutable image views. A single
+native draw paints the frame, children and shadows over the real underlying cells.
+The last published frame retains the native group for button hit/command proposals;
+DN controllers retain field state, focus policy, validation and destructive-action
+guards. Native buttons have their full two-row bounds. Root/menu/file-picker/help
+shadows use the toolkit shadow routine. Wide-cell overlay intersections are resolved
+before publishing the frame and terminal diff.
+
+File columns use native `ListBox`/`ListViewer` rendering while preserving DN's
+column-major Brief layout, metadata, marks and per-entry colours. `ScrollBar`
+provides tracks, fixed thumbs and arrow/page steps. DN retains its wide-integer,
+endpoint-exact drag adapter rather than adopting the toolkit's coarse drag mapping.
+Native `TextViewer` paints bounded, prepared text for the viewer, quick view and
+information previews. Loading, wrap/search state and limits remain in DN; these
+controls never load a file themselves.
+
+Context help uses a native `HelpWindow` and topic file, with Contents, manager,
+editor, viewer and operation topics. Tab/Shift+Tab select links; Enter or double
+click follows them; F1 opens Contents and Alt+F1/Backspace goes back. The help
+browser belongs to the existing modal instance, retains scroll history and returns
+to its live parent. Unicode and literal arithmetic/markup characters are encoded
+around a byte-oriented parser defect in the pinned toolkit. HelpWindow's viewer is
+kept interior-relative around its upstream bounds override.
+
+Behavior references: `original-dn/HELPFILE.PAS` (cross-references/history),
+`FLPANEL.PAS`/`FLPANELX.PAS` (specialized file rows), `FVIEWER.PAS` (quick view),
+and `RESOURCE/ENGLISH/DN.DNR` (dialog/button spacing). Modern safety checks,
+Unicode, asynchronous ownership and full-screen documents remain in place.
 
 ## Multi-document foundations
 
@@ -97,7 +130,7 @@ See [document foundations](DOCUMENT_FOUNDATIONS.md) for lifecycle and validation
 
 Local macOS ARM64 validation covers:
 
-- 442 native Rust tests pass; the existing opt-in native Trash check stays ignored.
+- 446 native Rust tests pass; the existing opt-in native Trash check stays ignored.
 - Formatting, all-target Clippy, release build and a no-default-features build.
 - 2,898 layout cases check viewport bounds. Feasible allocations compare against
   frozen pre-removal geometry; 40 wrapping cases preserve narrow widths,
@@ -122,6 +155,11 @@ Local macOS ARM64 validation covers:
   choices, immutable painting, stale targets and opening leaf directories by mouse.
   Terminal checks exercise native settings choices with keyboard/mouse, cancellation,
   Unicode mkdir, existing-destination refusal, help scrolling and terminal restoration.
+- Composition regressions check native child ownership, full button shadows,
+  bottom-border spacing and translated command hits. Help regressions cover
+  topic/history scroll restoration, single/double link clicks, translated mouse
+  coordinates, minimum-size recovery, Unicode and literal markup. A terminal
+  workflow exercises Contents, topic activation and Alt+F1 history.
 - Terminal checks cover panes, menus, Tetris, viewer search/wrap, quick view,
   calculator history/help, Unicode editor paste, unsaved-close cancel, Save As to
   disposable files, mouse actions, resize, shell input and terminal restoration.

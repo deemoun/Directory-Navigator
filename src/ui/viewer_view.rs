@@ -1,7 +1,7 @@
 use crate::painting::{Block, Frame, Paragraph};
 use crate::presentation::{
     layout::{Constraint, Layout, Rect},
-    text::{Line, Span},
+    text::Line,
 };
 use crate::{app::App, filesystem::display_name, formatting::tail, mouse::Target, viewer::Action};
 pub(super) fn draw_viewer(frame: &mut impl Frame, app: &App, area: Rect) {
@@ -190,36 +190,48 @@ pub(super) fn draw_text(
 ) {
     let dos = profile.styles();
     if let Some(contents) = &viewer.contents {
-        let lines = viewer
+        use unicode_width::UnicodeWidthStr;
+        let visual = viewer
             .rows
             .iter()
             .skip(viewer.offset)
             .take(area.height as usize)
-            .map(|row| {
-                let text = &contents.lines[row.line];
-                let range = &row.range;
-                let highlight = viewer.current.as_ref().filter(|m| {
-                    m.line == row.line && m.range.start < range.end && m.range.end > range.start
-                });
-                if let Some(found) = highlight {
-                    let start = found.range.start.max(range.start);
-                    let end = found.range.end.min(range.end);
-                    Line::from(vec![
-                        Span::raw(&text[range.start..start]),
-                        Span::styled(&text[start..end], dos(0x30)),
-                        Span::raw(&text[end..range.end]),
-                    ])
-                } else {
-                    Line::from(&text[range.clone()])
-                }
-            })
             .collect::<Vec<_>>();
+        let lines = visual
+            .iter()
+            .map(|row| contents.lines[row.line][row.range.clone()].to_owned())
+            .collect::<Vec<_>>();
+        let horizontal = if viewer.wrap {
+            0
+        } else {
+            viewer.horizontal as usize
+        };
         frame.render_widget(
-            Paragraph::new(lines)
-                .scroll((0, if viewer.wrap { 0 } else { viewer.horizontal }))
-                .style(dos(0x1f)),
+            crate::turbo::widgets::text_view(&lines, horizontal, 0x1f),
             area,
         );
+        for (y, row) in visual.iter().enumerate() {
+            if let Some(found) = viewer.current.as_ref().filter(|m| {
+                m.line == row.line && m.range.start < row.range.end && m.range.end > row.range.start
+            }) {
+                let text = &contents.lines[row.line];
+                let start = found.range.start.max(row.range.start);
+                let end = found.range.end.min(row.range.end);
+                let column = text[row.range.start..start].width();
+                let width = text[start..end].width();
+                if column + width <= horizontal || column >= horizontal + area.width as usize {
+                    continue;
+                }
+                let clipped = horizontal.saturating_sub(column);
+                let value = crate::turbo::widgets::pan(&text[start..end], clipped);
+                let x = column.saturating_sub(horizontal) as u16;
+                let width = (width - clipped).min((area.width - x) as usize) as u16;
+                frame.render_widget(
+                    Paragraph::new(value).style(dos(0x30)),
+                    Rect::new(area.x + x, area.y + y as u16, width, 1),
+                );
+            }
+        }
     } else {
         frame.render_widget(
             Paragraph::new(language.text("Reading file…")).style(dos(0x1f)),

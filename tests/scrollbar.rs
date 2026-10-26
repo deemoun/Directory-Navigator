@@ -157,7 +157,7 @@ fn fixed_scrollbar_both_layouts_profiles_and_no_listing_reflow() -> io::Result<(
                 let b = terminal.backend().buffer();
                 assert_eq!(b[(up.x, up.y)].symbol(), "▲");
                 assert_eq!(b[(down.x, down.y)].symbol(), "▼");
-                assert_eq!(b[(track.x, track.y)].symbol(), "■");
+                assert_eq!(b[(track.x, track.y)].symbol(), "█");
                 assert_eq!(b[(track.x, track.y)].fg, profile.color(0));
                 let background = if profile == PaletteProfile::ClassicDn {
                     15
@@ -177,8 +177,8 @@ fn fixed_scrollbar_both_layouts_profiles_and_no_listing_reflow() -> io::Result<(
                     for (x, y, glyph) in [
                         (up.x, up.y, "▲"),
                         (down.x, down.y, "▼"),
-                        (track.x, track.y, "■"),
-                        (track.x, track.y + 1, "▒"),
+                        (track.x, track.y, "█"),
+                        (track.x, track.y + 1, "░"),
                     ] {
                         assert_eq!(b[(x, y)].symbol(), glyph);
                         assert_eq!(b[(x, y)].fg, profile.color(foreground));

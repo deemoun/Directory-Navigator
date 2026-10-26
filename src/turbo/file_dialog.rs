@@ -409,6 +409,15 @@ impl Picker {
         }
         self.scene = Some(scene);
     }
+    pub(crate) fn bounds(&self) -> Rect {
+        let b = self.widget.bounds();
+        Rect::new(
+            b.a.x.max(0) as u16,
+            b.a.y.max(0) as u16,
+            b.width_clamped() as u16,
+            b.height_clamped() as u16,
+        )
+    }
     pub(crate) fn scene(&self) -> Option<&Scene> {
         self.scene.as_ref()
     }

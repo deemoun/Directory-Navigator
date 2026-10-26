@@ -15,6 +15,7 @@ pub(crate) struct ViewportState {
     editor: Option<(u64, usize, usize, usize)>,
     viewer: Option<(usize, u16, bool, usize, bool)>,
     picker: Option<u64>,
+    help: Option<u64>,
     game: Option<std::mem::Discriminant<crate::tetris::Screen>>,
     windows: Option<(Vec<crate::desktop::WindowId>, usize)>,
     characters: Option<(crate::utilities::characters::Page, bool)>,
@@ -49,6 +50,10 @@ fn viewport_state(app: &App) -> ViewportState {
                 Some(crate::editor::Modal::File(picker)) => Some(picker.revision),
                 _ => None,
             }),
+        help: app
+            .modals
+            .native_help(app.desktop.active().id)
+            .map(|h| h.revision),
         viewer: app.desktop.active_viewer().map(|v| {
             (
                 v.offset,
@@ -276,6 +281,16 @@ pub fn prepare_window(
             profile,
         );
     }
+    let language = app.config.language;
+    let shortcuts = app.config.shortcuts;
+    if let Some(help) = app.modals.native_help_mut(owner) {
+        help.prepare(
+            crate::presentation::layout::Size::new(area.width, area.height),
+            profile,
+            language,
+            shortcuts,
+        );
+    }
     let message = if area.width >= 80 && area.height >= 25 {
         app.last_dialog().map(|d| {
             message_layout(
@@ -288,7 +303,9 @@ pub fn prepare_window(
         None
     };
     if let Some(m) = &message {
-        app.set_message_offset(app.message_offset().min(m.maximum));
+        if app.modals.native_help(owner).is_none() {
+            app.set_message_offset(app.message_offset().min(m.maximum));
+        }
     }
     crate::command_line::prepare(app, regions[2]);
     app.command_line.translate_input(bounds.x);

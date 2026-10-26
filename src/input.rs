@@ -43,6 +43,13 @@ fn handle_key(app: &mut App, key: KeyEvent) {
         return;
     }
     if focus == Focus::Message {
+        if let Some(help) = app.modals.native_help_mut(app.desktop.active().id) {
+            let close = help.key(key);
+            if close {
+                app.pop_dialog();
+            }
+            return;
+        }
         crate::dialog::message_key(app, key.code);
         return;
     }
