@@ -115,7 +115,7 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
             })
             .collect();
         frame.render_widget(
-            crate::turbo::widgets::list(items, m.cursor, m.offset, true),
+            crate::turbo::widgets::list(items, m.cursor, m.offset, m.focus == 0),
             Rect::new(x, rect.y + 3, w, m.rows as u16),
         );
         for index in m.offset..m.count().min(m.offset + m.rows) {
@@ -190,7 +190,7 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
                     profile,
                     r,
                     app.config.language.text(label),
-                    m.focus == index,
+                    m.focus == index + 1 || (index == 0 && m.focus == 0),
                 );
                 frame.regions().push((r, Target::Discovery(*command)));
             } else {

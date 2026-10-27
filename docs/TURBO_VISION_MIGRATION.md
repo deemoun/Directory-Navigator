@@ -192,8 +192,11 @@ commands accept Ctrl+O/Esc/Enter with raw, atomic paste handling.
 
 Local macOS ARM64 validation covers:
 
-- 487 native Rust tests pass; the existing opt-in native Trash check stays ignored.
-- Formatting, all-target Clippy, release build and a no-default-features build.
+- 494 native Rust tests pass; the existing opt-in native Trash check stays ignored.
+- Formatting, all-target Clippy, release build and a no-default-features check.
+- Dialog navigation regressions cover forward/reverse traversal, disabled controls,
+  highlighted Enter actions, cancellation and Tetris pages. A release terminal
+  session verifies these keys, isolated score writes and terminal restoration.
 - 2,898 layout cases check viewport bounds. Feasible allocations compare against
   frozen pre-removal geometry; 40 wrapping cases preserve narrow widths,
   indentation, long words, blank lines, NBSP/zero-width spaces and Unicode.

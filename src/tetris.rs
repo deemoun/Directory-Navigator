@@ -78,6 +78,8 @@ pub struct Game {
     pub over: bool,
     pub screen: Screen,
     pub setup_focus: usize,
+    pub page_focus: usize,
+    pub play_focus: usize,
     pub records: Vec<Record>,
     pub name: String,
     pub name_cursor: usize,
@@ -114,6 +116,8 @@ impl Game {
             over: false,
             screen: Screen::Play,
             setup_focus: 0,
+            page_focus: 0,
+            play_focus: 0,
             records: Vec::new(),
             name: scores::ANONYMOUS.into(),
             name_cursor: scores::ANONYMOUS.len(),
@@ -148,6 +152,8 @@ impl Game {
         self.submitted = false;
         self.highlighted = None;
         self.screen = Screen::Play;
+        self.page_focus = 0;
+        self.play_focus = 0;
         self.last_tick = now;
     }
     fn valid(&self, piece: &Piece) -> bool {
@@ -159,7 +165,11 @@ impl Game {
         })
     }
     pub fn running(&self) -> bool {
-        !self.paused && !self.over && !self.obscured && self.screen == Screen::Play
+        !self.paused
+            && !self.over
+            && !self.obscured
+            && self.screen == Screen::Play
+            && self.play_focus == 0
     }
     pub fn translate(&mut self, dx: i32, dy: i32) -> bool {
         if !self.running() {

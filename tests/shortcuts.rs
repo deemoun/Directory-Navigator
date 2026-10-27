@@ -284,14 +284,14 @@ fn editor_save_find_replace_close_and_quit_keep_unsaved_guards() -> io::Result<(
     prefix(&mut app, 'w');
     assert!(matches!(
         app.desktop.active_editor().unwrap().modals.editor_modal(),
-        Some(dn::editor::Modal::ConfirmClose)
+        Some(dn::editor::Modal::ConfirmClose { .. })
     ));
     key(&mut app, K::Esc);
     assert!(!app.quit);
     prefix(&mut app, 'x');
     assert!(matches!(
         app.desktop.active_editor().unwrap().modals.editor_modal(),
-        Some(dn::editor::Modal::ConfirmClose)
+        Some(dn::editor::Modal::ConfirmClose { .. })
     ));
     key(&mut app, K::Esc);
     assert!(!app.quit);

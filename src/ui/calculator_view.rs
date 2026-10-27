@@ -97,7 +97,7 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
         Rect::new(rect.x + 3, rect.y + 13, rect.width - 6, 2),
     );
     for (i, (label, command, selected, mnemonic)) in [
-        ("Evaluate", Action::Evaluate, focus == 0 || focus == 6, 'e'),
+        ("Evaluate", Action::Evaluate, focus == 6, 'e'),
         ("Copy", Action::Copy, focus == 7, 'c'),
         ("Close", Action::Close, focus == 8, 'l'),
         ("Help", Action::CalculatorHelp, focus == 9, 'h'),
@@ -120,7 +120,11 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
             })
             .collect::<String>();
         frame.render_widget(
-            crate::turbo::widgets::button(&label, selected),
+            crate::turbo::widgets::button_with_default(
+                &label,
+                selected,
+                command == Action::Evaluate && focus < 6,
+            ),
             Rect::new(button.x, button.y, button.width, 2),
         );
         frame.regions().push((button, Target::Utility(command)));

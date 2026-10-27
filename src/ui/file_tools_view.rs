@@ -47,6 +47,7 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
             cursor,
             offset,
             rows,
+            focus,
             ..
         } => {
             if paths.is_empty() {
@@ -67,7 +68,7 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
                             .collect(),
                         *cursor,
                         *offset,
-                        true,
+                        *focus == 0,
                     ),
                     Rect::new(x, rect.y + 1, w, *rows as u16),
                 );
@@ -243,10 +244,20 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
     }
     for (row, action) in controls {
         let focus = match modal {
+            ToolDialog::History { focus, .. } => Some((*focus, 1, 2)),
             ToolDialog::Compare { focus } => Some((*focus, 4, 5)),
             ToolDialog::Export { focus, .. } => Some((*focus, 3, 4)),
             _ => None,
         };
+        if action == ToolAction::Accept
+            && matches!(modal, ToolDialog::History { paths, .. } if paths.is_empty())
+        {
+            frame.render_widget(
+                crate::turbo::widgets::disabled_button(app.config.language.text(" [ OK ] ")),
+                row,
+            );
+            continue;
+        }
         match action {
             ToolAction::Accept => super::dialog_style::button_with_default(
                 frame,

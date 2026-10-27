@@ -92,7 +92,7 @@ pub(super) enum Appearance {
         focused: bool,
         enabled: bool,
     },
-    Menu(usize, bool),
+    Menu(usize, bool, Option<u16>),
     Input(bool),
     Status(bool),
     Disabled,
@@ -184,7 +184,10 @@ fn focus(view: &mut impl View, selected: bool) {
 }
 impl Widget for Native {
     fn is_control(&self) -> bool {
-        true
+        // Menus use application palette indices, unlike ordinary dialog children.
+        // Embed the isolated native painting so a Dialog cannot remap their
+        // colours or replace the controller's selected item with group focus.
+        !self.view.as_any().is::<turbo_vision::views::MenuBox>()
     }
     fn native(mut self, frame: &mut NativeFrame, area: Rect) {
         if frame.composing() {
@@ -285,7 +288,7 @@ impl Widget for Native {
                     (area.width, height),
                 );
                 match self.appearance {
-                    Appearance::Menu(row, true)
+                    Appearance::Menu(row, true, mnemonic)
                         if y as usize == row + 1
                             && x > 0
                             && x + 1 < area.width
@@ -293,7 +296,11 @@ impl Widget for Native {
                     {
                         // MenuBox paints shortcut text with its normal palette even
                         // on the selected row. Keep its foreground, extend selection.
-                        attribute = (attribute & 15) | 0x20;
+                        attribute = if mnemonic == Some(x) {
+                            0x24
+                        } else {
+                            (attribute & 15) | 0x20
+                        };
                     }
                     _ => {}
                 }
@@ -635,11 +642,33 @@ pub(crate) fn menu(entries: Vec<MenuEntry>, selected: usize) -> Native {
     };
     let mut text = TextCells::default();
     let enabled = entries.get(selected).is_some_and(|entry| entry.enabled);
+    let mnemonic = entries.get(selected).and_then(|entry| {
+        let (prefix, suffix) = entry.label.split_once('~')?;
+        suffix.chars().next()?;
+        Some(2 + prefix.width() as u16)
+    });
+    // MenuBox consumes a tilde plus the following character, rather than paired
+    // markers. Keep only the opening marker; otherwise ~F~ile highlights Fi.
+    let entries = entries
+        .into_iter()
+        .map(|mut entry| {
+            let mut first = true;
+            entry.label.retain(|ch| {
+                if ch != '~' {
+                    return true;
+                }
+                let keep = first;
+                first = false;
+                keep
+            });
+            entry
+        })
+        .collect();
     let mut control = MenuBox::new(Point::new(0, 0), menu_data(entries, &mut text));
     control.set_current_item(Some(selected));
     focus(&mut control, true);
     let mut widget = native(control, text);
-    widget.appearance = Appearance::Menu(selected, enabled);
+    widget.appearance = Appearance::Menu(selected, enabled, mnemonic);
     widget
 }
 pub(crate) fn menu_title(label: &str, selected: bool, enabled: bool) -> Native {

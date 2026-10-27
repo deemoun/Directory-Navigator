@@ -339,7 +339,7 @@ fn f4_worker_edit_undo_save_and_unsaved_close_cancel_discard() -> io::Result<()>
     key(&mut app, KeyCode::Esc);
     assert!(matches!(
         app.desktop.active_editor().unwrap().modals.editor_modal(),
-        Some(Modal::ConfirmClose)
+        Some(Modal::ConfirmClose { .. })
     ));
     key(&mut app, KeyCode::Enter);
     assert!(app

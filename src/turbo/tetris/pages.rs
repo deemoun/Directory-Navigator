@@ -79,15 +79,18 @@ impl Scene {
         ));
     }
     fn plain_button(&mut self, app: &App, r: Rect, label: &str, action: GameAction) {
+        let game = app.desktop.game().unwrap();
+        let (focused, default_active) = match action {
+            GameAction::SubmitName => (game.page_focus == 1, game.page_focus == 0),
+            GameAction::SkipName => (game.page_focus == 2, false),
+            _ => (true, false),
+        };
         crate::turbo::widgets::paint_into(
             self,
             crate::turbo::widgets::button_with_default(
                 app.config.language.text(label),
-                false,
-                matches!(
-                    action,
-                    GameAction::Continue | GameAction::SubmitName | GameAction::Back
-                ),
+                focused,
+                default_active,
             ),
             r,
         );
@@ -238,19 +241,25 @@ pub(super) fn draw(scene: &mut Scene, app: &App, game_y: u16) {
                         visible.push_str(glyph);
                     }
                     let input = if game.replace_name {
-                        crate::turbo::widgets::selected_input(&visible, true)
+                        crate::turbo::widgets::selected_input(&visible, game.page_focus == 0)
                     } else {
-                        crate::turbo::widgets::input(&visible, true)
+                        crate::turbo::widgets::input(&visible, game.page_focus == 0)
                     };
                     crate::turbo::widgets::paint_into(
                         scene,
                         input,
                         Rect::new(r.x + 3, r.y + 7, 44, 1),
                     );
-                    scene.cursor = Some((r.x + 3 + (col - scroll) as u16, r.y + 7));
+                    scene.regions.push((
+                        Rect::new(r.x + 3, r.y + 7, 44, 1),
+                        Target::Game(GameAction::NameField),
+                    ));
+                    if game.page_focus == 0 {
+                        scene.cursor = Some((r.x + 3 + (col - scroll) as u16, r.y + 7));
+                    }
                     scene.paragraph(
                         Rect::new(r.x + 3, r.y + 9, 44, 1),
-                        lang.text("Enter saves · Esc uses Anonymous"),
+                        lang.text("Tab chooses · Enter activates · Esc cancels"),
                         0x70,
                     );
                     scene.wrapped(
@@ -273,7 +282,7 @@ pub(super) fn draw(scene: &mut Scene, app: &App, game_y: u16) {
                 } else {
                     scene.paragraph(
                         Rect::new(r.x + 3, r.y + 7, 44, 2),
-                        lang.text("Enter / Esc continues to high scores"),
+                        lang.text("Enter continues · Esc cancels"),
                         0x70,
                     );
                     scene.plain_button(
@@ -385,7 +394,7 @@ fn scores(scene: &mut Scene, app: &App) {
             Rect::new(r.x + 8, r.y + 17, 20, 1),
             "Retry save",
             GameAction::RetrySave,
-            false,
+            game.page_focus == 1,
         );
     }
     scene.classic(
@@ -393,6 +402,6 @@ fn scores(scene: &mut Scene, app: &App) {
         Rect::new(r.x + if retry { 43 } else { 29 }, r.y + 17, 14, 1),
         "OK",
         GameAction::Back,
-        true,
+        !retry || game.page_focus == 0,
     );
 }

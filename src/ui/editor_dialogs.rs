@@ -13,8 +13,8 @@ fn button(frame: &mut impl Frame, app: &App, rect: Rect, label: &str, command: A
         .active_editor()
         .and_then(|e| e.modals.editor_modal())
         .is_some_and(|modal| match modal {
-            Modal::ConfirmClose | Modal::Help => command == A::Cancel,
-            Modal::Prompt { .. } => command == A::Submit,
+            Modal::Help => command == A::Cancel,
+            Modal::Prompt { focus, .. } => *focus == 0 && command == A::Submit,
             Modal::Search(search) => search.focus < 8 && command == A::SearchSubmit(false),
             _ => false,
         });
@@ -73,7 +73,7 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
     }
     let title = match modal {
         Modal::File(_) => unreachable!(),
-        Modal::ConfirmClose => " Unsaved changes ",
+        Modal::ConfirmClose { .. } => " Unsaved changes ",
         Modal::Help => " Editor Help ",
         Modal::Search(dialog) => {
             if dialog.replacing {
@@ -90,7 +90,7 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
     };
     let (width, height) = match modal {
         Modal::Prompt { .. } => (60, 7),
-        Modal::ConfirmClose => (66, 10),
+        Modal::ConfirmClose { .. } => (66, 10),
         Modal::Replace(_) => (72, 15),
         _ => (72, 20),
     };
@@ -281,7 +281,7 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
                     Rect::new(rect.x + 4 + i as u16 * 17, rect.bottom() - 3, 15, 1),
                     label,
                     command,
-                    false,
+                    session.focus == i,
                 );
             }
         }
@@ -296,8 +296,8 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
                 false,
             );
         }
-        Modal::ConfirmClose => {
-            frame.render_widget(crate::turbo::widgets::memo(app.config.language.text("This document has unsaved changes.\n\nSave before closing or switching files?\n\nS: Save    D: Discard    C / Esc / Enter: Cancel")), Rect::new(rect.x + 3, rect.y + 2, rect.width-6, 5));
+        Modal::ConfirmClose { focus } => {
+            frame.render_widget(crate::turbo::widgets::memo(app.config.language.text("This document has unsaved changes.\nSave before closing or switching files?\n\nS: Save · D: Discard · Esc: Cancel\nTab / Shift+Tab chooses · Enter activates")), Rect::new(rect.x + 3, rect.y + 2, rect.width-6, 5));
             for (i, (label, command)) in [
                 (" [ Save ] ", A::Save),
                 (" [ Discard ] ", A::Discard),
@@ -312,7 +312,7 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
                     Rect::new(rect.x + 4 + i as u16 * 20, rect.bottom() - 3, 14, 1),
                     label,
                     command,
-                    false,
+                    *focus == i,
                 );
             }
         }
@@ -320,6 +320,7 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
             kind,
             field,
             cursor,
+            focus,
         } => {
             let label = match kind {
                 PromptKind::GoTo => "Line number (starting at 1)",
@@ -335,15 +336,19 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
                 Rect::new(rect.x + 2, rect.y + 2, rect.width - 4, 1),
                 field,
                 *cursor,
-                app.dialogs().is_empty(),
+                *focus == 0 && app.dialogs().is_empty(),
             );
+            frame.regions().push((
+                Rect::new(rect.x + 2, rect.y + 2, rect.width - 4, 1),
+                Target::Editor(A::PromptField),
+            ));
             button(
                 frame,
                 app,
                 Rect::new(rect.right() - 29, rect.bottom() - 3, 12, 1),
                 " [ OK ] ",
                 A::Submit,
-                false,
+                *focus == 1,
             );
             button(
                 frame,
@@ -351,7 +356,7 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
                 Rect::new(rect.right() - 15, rect.bottom() - 3, 12, 1),
                 " [ Cancel ] ",
                 A::Cancel,
-                false,
+                *focus == 2,
             );
         }
     }

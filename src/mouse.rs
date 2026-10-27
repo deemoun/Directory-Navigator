@@ -61,6 +61,7 @@ pub enum Target {
     AcceptSettings,
     CancelSettings,
     AcceptPattern,
+    PatternField,
     CancelPattern,
     CloseFileInfo,
     ColumnChoice(usize, crate::columns::ColumnPreset),
@@ -341,6 +342,11 @@ fn handle_mouse(app: &mut App, event: MouseEvent) {
     if focus == Focus::Pattern {
         if event.kind == MouseEventKind::Down(MouseButton::Left) {
             match target {
+                Some(Target::PatternField) => {
+                    if let Some(p) = app.modals.pattern_mut() {
+                        p.focus = 0;
+                    }
+                }
                 Some(Target::AcceptPattern) => crate::pattern::accept(app),
                 Some(Target::CancelPattern) => app.modals.set_pattern(None),
                 _ => {}

@@ -117,7 +117,7 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
     }
     if !review {
         frame.render_widget(
-            Paragraph::new(display_name(&m.status)).style(dos(0x78)),
+            Paragraph::new(display_name(app.config.language.text(&m.status))).style(dos(0x78)),
             Rect::new(x, rect.bottom() - 3, w, 1),
         );
     }

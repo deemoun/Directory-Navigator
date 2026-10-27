@@ -8,6 +8,13 @@ pub fn select(current: usize, choices: &[usize], reverse: bool) -> usize {
     if choices.is_empty() {
         return current;
     }
+    if !choices.contains(&current) {
+        return if reverse {
+            *choices.last().unwrap()
+        } else {
+            choices[0]
+        };
+    }
     native::select(current, choices, reverse)
 }
 mod native {
@@ -82,5 +89,7 @@ mod tests {
         assert_eq!(cycle(1, 2, false), 0);
         assert_eq!(select(8, &[0, 3, 8], true), 3);
         assert_eq!(cycle(0, 0, true), 0);
+        assert_eq!(select(99, &[0, 2, 5], false), 0);
+        assert_eq!(select(99, &[0, 2, 5], true), 5);
     }
 }

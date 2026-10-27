@@ -20,13 +20,28 @@
 
 ## Implemented
 
+- F2 user-menu native painting keeps the application menu palette when embedded
+  in a dialog, so rows use grey/red DN colours and full-width green selection.
+  Paired mnemonic markers are adapted for MenuBox without highlighting the next
+  letter; the selected mnemonic stays red. The localized hint fits the minimum
+  supported width. Source switching, definition editing and command review remain.
+
+- Dialog traversal normalizes both Shift+Tab encodings, wraps through enabled
+  controls and recovers stale selection to a valid endpoint. Pattern/editor
+  prompts, dirty-close and replace guards, histories and Tetris pages own explicit
+  focus. Enter follows the highlighted button/default; Esc cancels. Tetris name
+  cancellation retains the draft without an anonymous write; Skip name remains
+  explicit. Main game buttons are tabbable and suspend gravity until board focus
+  returns. Discovery/archive/character-table traversal skips unavailable actions;
+  radio/checkbox choices use Space, with Enter invoking the displayed default.
+
 - Default button appearance is independent of keyboard focus. Game-over Continue,
   score-name OK, game Help, editor prompts/search and safe unsaved Cancel, settings,
   histories, window lists, tree/archive actions, filters and tool dialogs show
   their existing Enter action immediately. Focused alternative buttons suppress
   the implicit highlight; unavailable actions are not promoted. Native input/list
   focus and existing command/confirmation controllers are preserved.
-  macOS ARM64: 487 tests pass (one opt-in native Trash test ignored), formatting,
+  macOS ARM64: 494 tests pass (one opt-in native Trash test ignored), formatting,
   all-target Clippy, release build and no-default-features checks pass. Native
   terminal checks confirm the first-paint game-over/name/settings highlights and
   terminal restoration. Windows/Linux validation remains skipped.
@@ -449,6 +464,18 @@ older increment entries below also record earlier migration stages.
   entries. Keyboard/mouse navigation uses the reduced menu set.
 
 ## Validation
+- F2 menu repair: 97 focused tests pass on macOS ARM64, covering native widgets,
+  appearance, localization, menu visibility, user-menu safety and terminal frame
+  comparisons. Formatting, all-target Clippy, release build and no-default-features
+  check pass. An isolated release PTY verifies green selection, submenu open/back,
+  Esc close and terminal restoration without running commands. Windows/Linux skipped.
+- Dialog navigation: 494 tests pass on macOS ARM64 (one opt-in native Trash
+  test ignored), including seven new isolated-fixture regressions for reverse
+  traversal, disabled controls, highlighted Enter actions, draft cancellation,
+  paste isolation and Tetris gravity suspension. Formatting, all-target Clippy,
+  release build and no-default-features check pass. A release PTY verifies Tetris
+  and settings forward/reverse navigation, Enter on Cancel/Skip, name cancellation
+  without a score write, and terminal restoration. Windows/Linux validation skipped.
 - Desktop refactor: pre/post captures match all cells, styles and mouse targets in
   40 scenes (80×25/132×40, both palettes), using fixed volume snapshots on the
   original HEAD and refactored code to avoid native-I/O timing noise. Identity,

@@ -602,7 +602,7 @@ fn document_close_icons_respect_modal_precedence_and_unsaved_guard() -> io::Resu
         app.desktop
             .active_editor()
             .and_then(|e| e.modals.editor_modal()),
-        Some(dn::editor::Modal::ConfirmClose)
+        Some(dn::editor::Modal::ConfirmClose { .. })
     ));
     draw(&mut app, 80, 25)?;
     assert!(app

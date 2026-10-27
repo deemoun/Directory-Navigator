@@ -41,6 +41,10 @@ When a dialog has an Enter-default action, its button is highlighted immediately
 with the DN yellow caption and cyan pointers where space permits. Input fields
 and lists keep keyboard focus. Selecting another button moves the highlight to
 that button; unsaved-editor confirmation highlights its existing Cancel default.
+Tab and Shift+Tab cycle forward/backward through enabled fields, lists and buttons,
+wrapping at the ends. Enter activates the focused button, or the dialog's default
+from a field/list. Space changes checkbox/radio options. Esc cancels the current
+dialog and returns to its parent; previously completed operations stay completed.
 
 **Options → Configuration → Keyboard shortcuts** selects **Automatic**, **Classic
 DN** or **Mac-friendly**. Apply changes the profile immediately; Cancel preserves
@@ -559,10 +563,13 @@ No drive selector or DOS drive-letter controls are added.
 ## Tetris high scores
 
 The game uses a classic DN-style board with Info, Next and Best panels and
-New / Setup / Top 10 / Pause buttons. The title close control and Esc return to
-files. Top 10 shows Name, Start, End and Score with dotted leaders; the highlighted
+New / Setup / Top 10 / Pause buttons. Tab/Shift+Tab cycle through the board and
+these buttons; Enter activates the selected button. Gravity pauses while button
+focus is active. Esc returns button focus to the board; from the board Esc returns
+to files. Clicking the board also restores play focus. Top 10 shows Name, Start, End and Score with dotted leaders; the highlighted
 entry's line count remains below the table. Pending scores keep a Retry save
-button, and OK or the title close control returns to the game.
+button; Tab/Shift+Tab choose Retry save or OK, and Enter activates that choice.
+Esc, OK or the title close control returns to the game.
 
 Setup provides ten named levels (1–9 and 0 for level 10) and a Piece preview
 checkbox. Arrows select levels; Tab/Shift+Tab move between levels, preview, OK
@@ -572,10 +579,13 @@ score, level, preview and paused state. Classic Tetris is the only implemented
 style; Pentix is not offered.
 
 Alt+F9 opens Tetris. A finished game shows the final score, line count and
-starting/ending levels. Enter/Esc continues: positive scores qualifying for the
+starting/ending levels. Enter continues: positive scores qualifying for the
 top ten ask for a player name; other scores show the leaderboard directly.
-Type or paste a Unicode name (up to 30 graphemes / 240 UTF-8 bytes). Enter/OK
-saves it; Esc/Skip name records Anonymous. Blank names also use Anonymous.
+Esc dismisses game-over without submitting a score. Type or paste a Unicode name
+(up to 30 graphemes / 240 UTF-8 bytes). Tab/Shift+Tab cycle through the input, OK
+and Skip name. Enter activates the selected button; from the input it saves.
+Skip name explicitly records Anonymous; blank names also use Anonymous. Esc
+cancels name entry without saving and keeps its draft on the game-over page.
 The new entry is highlighted. F4 shows the top ten during play. Closing an
 unfinished game does not add a score.
 

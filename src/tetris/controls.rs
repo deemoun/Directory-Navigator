@@ -9,6 +9,8 @@ pub enum GameAction {
     Continue,
     SubmitName,
     SkipName,
+    NameField,
+    BoardFocus,
     RetrySave,
     New,
     Pause,
@@ -73,6 +75,9 @@ pub fn action(app: &mut App, action: GameAction) {
         return;
     }
     if action == GameAction::RetrySave {
+        if let Some(g) = app.desktop.game_mut() {
+            g.page_focus = 1;
+        }
         persist(app);
         return;
     }
@@ -85,11 +90,21 @@ pub fn action(app: &mut App, action: GameAction) {
     };
     let now = Instant::now();
     if game.screen == Screen::Name {
+        match action {
+            GameAction::NameField => game.page_focus = 0,
+            GameAction::Back => {
+                game.screen = Screen::GameOver;
+                game.page_focus = 0;
+            }
+            _ => {}
+        }
         return;
     }
-    if game.screen == Screen::GameOver && action != GameAction::Continue {
+    if game.screen == Screen::GameOver && !matches!(action, GameAction::Continue | GameAction::Back)
+    {
         return;
     }
+    let previous_screen = game.screen;
     match action {
         GameAction::Continue => {
             if qualifies(game) {
@@ -110,6 +125,7 @@ pub fn action(app: &mut App, action: GameAction) {
             }
         }
         GameAction::Back => game.screen = Screen::Play,
+        GameAction::BoardFocus => game.play_focus = 0,
         GameAction::New => game.restart(now),
         GameAction::Pause if game.screen == Screen::Play && !game.over => {
             game.paused = !game.paused
@@ -137,6 +153,7 @@ pub fn action(app: &mut App, action: GameAction) {
         GameAction::Preview => {
             if let Screen::Setup { preview, .. } = &mut game.screen {
                 *preview = !*preview;
+                game.setup_focus = 1;
             } else if game.screen == Screen::Play {
                 game.preview = !game.preview;
             }
@@ -150,22 +167,99 @@ pub fn action(app: &mut App, action: GameAction) {
         }
         _ => {}
     }
+    if game.screen != previous_screen {
+        game.page_focus = 0;
+    }
     game.resume_clock(now);
 }
 
 pub fn key(app: &mut App, key: KeyEvent) {
     let screen = app.desktop.game().map(|game| game.screen);
+    if screen == Some(Screen::Play) {
+        if matches!(key.code, KeyCode::Tab | KeyCode::BackTab) {
+            if let Some(game) = app.desktop.game_mut() {
+                game.play_focus =
+                    crate::control_focus::cycle(game.play_focus, 5, key.code == KeyCode::BackTab);
+                game.resume_clock(Instant::now());
+            }
+            return;
+        }
+        let focus = app.desktop.game().map_or(0, |g| g.play_focus);
+        if focus > 0 {
+            match key.code {
+                KeyCode::Enter => action(
+                    app,
+                    super::BUTTONS
+                        .get(focus - 1)
+                        .map_or(GameAction::BoardFocus, |(_, a)| *a),
+                ),
+                KeyCode::Esc => action(app, GameAction::BoardFocus),
+                KeyCode::Left
+                | KeyCode::Up
+                | KeyCode::Right
+                | KeyCode::Down
+                | KeyCode::Char(' ') => {}
+                _ => {}
+            }
+            if matches!(
+                key.code,
+                KeyCode::Enter
+                    | KeyCode::Esc
+                    | KeyCode::Left
+                    | KeyCode::Right
+                    | KeyCode::Up
+                    | KeyCode::Down
+                    | KeyCode::Char(' ')
+            ) {
+                return;
+            }
+        }
+    }
+    if matches!(key.code, KeyCode::Tab | KeyCode::BackTab) && screen != Some(Screen::Play) {
+        let retry = app.game_scores.has_pending();
+        if let Some(game) = app.desktop.game_mut() {
+            let reverse = key.code == KeyCode::BackTab;
+            match screen {
+                Some(Screen::Setup { .. }) => {
+                    game.setup_focus = crate::control_focus::cycle(game.setup_focus, 4, reverse)
+                }
+                Some(Screen::Name) => {
+                    game.page_focus = crate::control_focus::cycle(game.page_focus, 3, reverse)
+                }
+                Some(Screen::Scores) => {
+                    game.page_focus = crate::control_focus::select(
+                        game.page_focus,
+                        if retry { &[1, 0] } else { &[0] },
+                        reverse,
+                    )
+                }
+                _ => game.page_focus = 0,
+            }
+        }
+        return;
+    }
     if screen == Some(Screen::Name) {
+        let focus = app.desktop.game().unwrap().page_focus;
         match key.code {
-            KeyCode::Enter => action(app, GameAction::SubmitName),
-            KeyCode::Esc => action(app, GameAction::SkipName),
-            _ => edit_name(app, key),
+            KeyCode::Enter => action(
+                app,
+                if focus == 2 {
+                    GameAction::SkipName
+                } else {
+                    GameAction::SubmitName
+                },
+            ),
+            KeyCode::Esc => action(app, GameAction::Back),
+            _ if focus == 0 => edit_name(app, key),
+            _ => {}
         }
         return;
     }
     if screen == Some(Screen::GameOver) {
-        if matches!(key.code, KeyCode::Enter | KeyCode::Esc) {
-            action(app, GameAction::Continue);
+        match key.code {
+            KeyCode::Enter => action(app, GameAction::Continue),
+            KeyCode::Esc => action(app, GameAction::Back),
+            _ => {}
         }
         return;
     }
@@ -222,7 +316,17 @@ pub fn key(app: &mut App, key: KeyEvent) {
     }
     if screen != Some(Screen::Play) {
         if key.code == KeyCode::Enter {
-            action(app, GameAction::Back);
+            let retry = screen == Some(Screen::Scores)
+                && app.game_scores.has_pending()
+                && app.desktop.game().is_some_and(|g| g.page_focus == 1);
+            action(
+                app,
+                if retry {
+                    GameAction::RetrySave
+                } else {
+                    GameAction::Back
+                },
+            );
         }
         return;
     }
@@ -330,6 +434,7 @@ fn submit(app: &mut App, anonymous: bool) {
             .unwrap_or(0),
     );
     g.screen = Screen::Scores;
+    g.page_focus = 0;
     persist(app);
 }
 pub fn paste(app: &mut App, text: &str) {
@@ -339,7 +444,7 @@ pub fn paste(app: &mut App, text: &str) {
     let Some(g) = app.desktop.game_mut() else {
         return;
     };
-    if g.screen != Screen::Name {
+    if g.screen != Screen::Name || g.page_focus != 0 {
         return;
     }
     let mut value = if g.replace_name {

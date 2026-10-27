@@ -78,12 +78,13 @@ pub(super) fn draw_setup(frame: &mut impl Frame, app: &App, area: Rect) {
         (CANCEL, 39, "[ Cancel ]"),
     ] {
         let row = Rect::new(rect.x + x, rect.y + 17, 12, 1);
-        super::dialog_style::button(
+        super::dialog_style::button_with_default(
             frame,
             app.config.palette,
             row,
             app.config.language.text(label),
             setup.cursor == i,
+            i == ACCEPT && setup.cursor < PREVIEW,
         );
         frame.regions().push((row, Target::Screensaver(i)));
     }

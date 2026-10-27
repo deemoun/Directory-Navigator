@@ -216,7 +216,7 @@ fn viewed_and_edited_histories_record_only_success_and_guard_open() -> io::Resul
     editor::request_close(&mut app, editor::CloseIntent::Panel);
     assert!(matches!(
         app.desktop.editor(first).unwrap().modals.editor_modal(),
-        Some(editor::Modal::ConfirmClose)
+        Some(editor::Modal::ConfirmClose { .. })
     ));
     editor::action(&mut app, EditorAction::Cancel);
     assert!(app.desktop.editor(first).unwrap().dirty());

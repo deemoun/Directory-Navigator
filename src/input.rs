@@ -2,7 +2,10 @@ use crate::focus::{self, Focus};
 use crate::{app::App, operations::Kind, panel::SortMode};
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 
-pub fn handle(app: &mut App, key: KeyEvent) {
+pub fn handle(app: &mut App, mut key: KeyEvent) {
+    if key.code == KeyCode::Tab && key.modifiers.contains(KeyModifiers::SHIFT) {
+        key.code = KeyCode::BackTab;
+    }
     if app.output_visible {
         crate::terminal_output::event(app, &crossterm::event::Event::Key(key));
         return;

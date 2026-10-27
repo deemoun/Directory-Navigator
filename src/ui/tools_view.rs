@@ -29,12 +29,10 @@ fn button(
     focused: bool,
 ) {
     let default_active = match target {
-        Target::AcceptPattern => true,
+        Target::AcceptPattern => app.modals.pattern().is_some_and(|p| p.focus == 0),
         Target::AcceptColumns => app.modals.columns_dialog().is_some_and(|d| d.cursor < 2),
         _ => false,
     };
-    // Pattern editing has no button-focus cycle; Cancel is never the Enter default.
-    let focused = focused && !matches!(target, Target::AcceptPattern | Target::CancelPattern);
     super::dialog_style::button_with_default(
         frame,
         app.config.palette,
@@ -71,14 +69,16 @@ pub(super) fn draw_tools(
             if pattern.replace_on_type {
                 crate::turbo::widgets::selected_input(
                     &crate::turbo::widgets::pan(&pattern.field, scroll),
-                    true,
+                    pattern.focus == 0,
                 )
             } else {
-                crate::turbo::widgets::input_scrolled(&pattern.field, scroll, true)
+                crate::turbo::widgets::input_scrolled(&pattern.field, scroll, pattern.focus == 0)
             },
             input,
         );
-        frame.set_cursor_position((input.x + (cursor - scroll) as u16, input.y));
+        if pattern.focus == 0 {
+            frame.set_cursor_position((input.x + (cursor - scroll) as u16, input.y));
+        }
         frame.render_widget(
             Paragraph::new(app.config.language.text(
                 "* any sequence · ? one character\nVisible files and folders only · case-sensitive",
@@ -87,6 +87,7 @@ pub(super) fn draw_tools(
             Rect::new(rect.x + 2, rect.y + 3, rect.width - 4, 2),
         );
         frame.regions().clear();
+        frame.regions().push((input, Target::PatternField));
         super::dialog_style::close_button(frame, profile, rect, Target::CancelPattern);
         button(
             frame,
@@ -94,7 +95,7 @@ pub(super) fn draw_tools(
             Rect::new(rect.x + 15, rect.bottom() - 2, 14, 1),
             " [ OK ] ",
             Target::AcceptPattern,
-            true,
+            pattern.focus == 1,
         );
         button(
             frame,
@@ -102,7 +103,7 @@ pub(super) fn draw_tools(
             Rect::new(rect.right() - 28, rect.bottom() - 2, 14, 1),
             " [ Cancel ] ",
             Target::CancelPattern,
-            true,
+            pattern.focus == 2,
         );
     }
     if let Some(dialog) = app

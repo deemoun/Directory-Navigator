@@ -377,3 +377,50 @@ fn review_wraps_unicode_arguments_and_expansion_is_bounded() -> io::Result<()> {
     assert!(a.user_menu.modals.user_menu().unwrap().review.is_some());
     Ok(())
 }
+
+#[test]
+fn native_menu_rows_keep_dn_palette_inside_dialog_and_shortcuts_do_not_bleed() -> io::Result<()> {
+    let t = Temp::new()?;
+    let mut a = t.app()?;
+    t.open(&mut a, ">1 ~P~rint directory\nprintf directory\n>1 ~F~ile tools\n>2 ~V~iew\nprintf view\n>1 -\n>1 ~S~hell\nprintf shell\n")?;
+    for (width, height) in [(80, 25), (120, 40), (132, 43)] {
+        for selected in [0, 1, 3] {
+            a.user_menu.modals.user_menu_mut().unwrap().cursor = selected;
+            let mut term = Terminal::new(TestBackend::new(width, height))?;
+            term.draw(|f| ui::draw(f, &mut a))?;
+            let b = term.backend().buffer();
+            for index in [0, 1, 3] {
+                let r = a
+                    .mouse
+                    .regions
+                    .iter()
+                    .find(|(_, target)| *target == Target::UserMenu(Action::Choose(index)))
+                    .unwrap_or_else(|| panic!("missing row {index} at {width}x{height}, selected {selected}, state {:?}", a.user_menu.modals.user_menu().map(|m| (m.rows,m.offset,m.items().len()))))
+                    .0;
+                for x in r.x..r.right() {
+                    let cell = &b[(x, r.y)];
+                    assert_eq!(
+                        cell.bg,
+                        a.config
+                            .palette
+                            .color(if index == selected { 2 } else { 7 }),
+                        "row {index}, col {x}"
+                    );
+                }
+                // Native MenuBox has one padding cell before the caption. Only
+                // the mnemonic receives red, never the following character.
+                assert_eq!(b[(r.x + 1, r.y)].fg, a.config.palette.color(4));
+                assert_eq!(b[(r.x + 2, r.y)].fg, a.config.palette.color(0));
+            }
+            let text: String = b.content.iter().map(|c| c.symbol()).collect();
+            assert!(text.contains("Print directory"));
+            assert!(text.contains("File tools"));
+            assert!(text.contains("Ctrl+R reload"));
+            assert!(!text.contains("Global/Local"));
+        }
+    }
+    key(&mut a, KeyCode::Esc);
+    assert!(a.user_menu.modals.user_menu().is_none());
+    assert!(!t.0.join("executed").exists());
+    Ok(())
+}

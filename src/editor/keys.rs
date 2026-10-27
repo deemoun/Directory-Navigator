@@ -32,27 +32,49 @@ pub fn key(app: &mut App, key: KeyEvent) {
     }
     if let Some(modal) = editor.modals.editor_modal_mut() {
         let command = match modal {
-            Modal::ConfirmClose => match key.code {
+            Modal::ConfirmClose { focus } => match key.code {
+                KeyCode::Tab | KeyCode::BackTab => {
+                    *focus = crate::control_focus::cycle(*focus, 3, key.code == KeyCode::BackTab);
+                    None
+                }
+                KeyCode::Enter => Some(
+                    [
+                        EditorAction::Save,
+                        EditorAction::Discard,
+                        EditorAction::Cancel,
+                    ]
+                    .get(*focus)
+                    .copied()
+                    .unwrap_or(EditorAction::Cancel),
+                ),
                 KeyCode::Char('s' | 'S') => Some(EditorAction::Save),
                 KeyCode::Char('d' | 'D') => Some(EditorAction::Discard),
-                KeyCode::Esc | KeyCode::Enter | KeyCode::Char('c' | 'C') => {
-                    Some(EditorAction::Cancel)
-                }
+                KeyCode::Esc | KeyCode::Char('c' | 'C') => Some(EditorAction::Cancel),
                 _ => None,
             },
             Modal::Help => match key.code {
                 KeyCode::Esc | KeyCode::Enter => Some(EditorAction::Cancel),
                 _ => None,
             },
-            Modal::Prompt { field, cursor, .. } => match key.code {
+            Modal::Prompt {
+                field,
+                cursor,
+                focus,
+                ..
+            } => match key.code {
+                KeyCode::Tab | KeyCode::BackTab => {
+                    *focus = crate::control_focus::cycle(*focus, 3, key.code == KeyCode::BackTab);
+                    None
+                }
+                KeyCode::Enter if *focus == 2 => Some(EditorAction::Cancel),
                 KeyCode::Esc => Some(EditorAction::Cancel),
                 KeyCode::Enter => Some(EditorAction::Submit),
-                KeyCode::Char('a') if ctrl => {
+                KeyCode::Char('a') if ctrl && *focus == 0 => {
                     field.clear();
                     *cursor = 0;
                     None
                 }
-                _ if !alt && !ctrl => {
+                _ if *focus == 0 && !alt && !ctrl => {
                     dialog::edit_input(field, cursor, key.code);
                     None
                 }
