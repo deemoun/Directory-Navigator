@@ -77,6 +77,7 @@ pub struct PatternDialog {
     pub field: String,
     pub cursor: usize,
     pub replace_on_type: bool,
+    pub focus: usize,
 }
 impl PatternDialog {
     pub fn new(panel: usize, path: PathBuf, selecting: bool) -> Self {
@@ -87,6 +88,7 @@ impl PatternDialog {
             field: "*".into(),
             cursor: 1,
             replace_on_type: true,
+            focus: 0,
         }
     }
     pub fn title(&self) -> &'static str {
@@ -97,6 +99,9 @@ impl PatternDialog {
         }
     }
     pub fn paste(&mut self, text: &str) {
+        if self.focus != 0 {
+            return;
+        }
         if self.replace_on_type {
             self.field.clear();
             self.cursor = 0;
@@ -143,13 +148,21 @@ pub fn key(app: &mut App, key: KeyEvent) {
     };
     match key.code {
         KeyCode::Esc => app.modals.set_pattern(None),
+        KeyCode::Tab | KeyCode::BackTab => {
+            prompt.focus =
+                crate::control_focus::cycle(prompt.focus, 3, key.code == KeyCode::BackTab)
+        }
+        KeyCode::Enter if prompt.focus == 2 => app.modals.set_pattern(None),
         KeyCode::Enter => accept(app),
-        KeyCode::Char('a') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+        KeyCode::Char('a')
+            if prompt.focus == 0 && key.modifiers.contains(KeyModifiers::CONTROL) =>
+        {
             prompt.replace_on_type = true
         }
-        code if !key
-            .modifiers
-            .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) =>
+        code if prompt.focus == 0
+            && !key
+                .modifiers
+                .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) =>
         {
             prompt.edit(code)
         }

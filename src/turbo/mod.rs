@@ -1,9 +1,12 @@
 //! Turbo Vision terminal host. Scenes paint directly through native documents.
 pub(crate) mod characters;
 mod codec;
+pub(crate) mod composition;
 pub mod desktop;
 pub mod file_dialog;
+mod file_panes;
 pub mod forms;
+pub mod help;
 pub(crate) mod manager;
 mod mouse;
 pub(crate) mod panes;
@@ -11,6 +14,7 @@ pub(crate) mod panes;
 pub mod scene;
 mod surface;
 pub(crate) mod tetris;
+pub(crate) mod widgets;
 use crate::presentation::layout::{Position, Size};
 use codec::Codec;
 use std::{

@@ -4,7 +4,6 @@ use crate::presentation::layout::Rect;
 use crate::{
     app::App,
     mouse::Target,
-    palette::PaletteProfile,
     tetris::{GameAction, Screen},
 };
 use unicode_segmentation::UnicodeSegmentation;
@@ -71,82 +70,38 @@ impl Scene {
     }
 
     fn window(&mut self, r: Rect, title: &str) {
-        self.fill(r.x, r.y, r.width, r.height, 0x70);
-        self.border(r.x, r.y, r.width, r.height, true, 0x7f);
-        self.title(
-            r.x,
-            r.y,
-            r.width,
-            &crate::formatting::tail(title, r.width.saturating_sub(14)),
-        );
+        crate::turbo::widgets::paint_into(self, crate::turbo::widgets::dialog(title), r);
     }
     fn close(&mut self, r: Rect, _app: &App) {
-        self.text(r.x + 2, r.y, 1, "[", 0x7f);
-        self.text(r.x + 3, r.y, 1, "■", 0x7a);
-        self.text(r.x + 4, r.y, 1, "]", 0x7f);
         self.regions.push((
             Rect::new(r.x + 2, r.y, 3, 1),
             Target::Game(GameAction::Back),
         ));
     }
     fn plain_button(&mut self, app: &App, r: Rect, label: &str, action: GameAction) {
-        self.paragraph(r, app.config.language.text(label), 0x30);
+        let game = app.desktop.game().unwrap();
+        let (focused, default_active) = match action {
+            GameAction::SubmitName => (game.page_focus == 1, game.page_focus == 0),
+            GameAction::SkipName => (game.page_focus == 2, false),
+            _ => (true, false),
+        };
+        crate::turbo::widgets::paint_into(
+            self,
+            crate::turbo::widgets::button_with_default(
+                app.config.language.text(label),
+                focused,
+                default_active,
+            ),
+            r,
+        );
         self.regions.push((r, Target::Game(action)));
     }
     fn classic(&mut self, app: &App, r: Rect, label: &str, action: GameAction, focused: bool) {
-        let label = app.config.language.text(label);
-        self.fill(r.x + 1, r.y + 1, r.width, 1, 0x00);
-        if self.profile == PaletteProfile::Terminal {
-            self.paragraph(r, label, if focused { 0x30 } else { 0x70 });
-        } else {
-            self.fill(r.x, r.y, r.width, 1, 0x8f);
-            let label = label
-                .trim()
-                .trim_start_matches('[')
-                .trim_end_matches(']')
-                .trim();
-            let spare = usize::from(r.width).saturating_sub(label.width() + 2);
-            self.text(r.x, r.y, 1, if focused { "►" } else { " " }, 0x8b);
-            let start = 1 + spare / 2;
-            self.text(
-                r.x + start as u16,
-                r.y,
-                r.width.saturating_sub(start as u16),
-                label,
-                if focused { 0x8e } else { 0x8f },
-            );
-            let end = start + label.width() + spare - spare / 2;
-            if end < usize::from(r.width) {
-                self.text(
-                    r.x + end as u16,
-                    r.y,
-                    1,
-                    if focused { "◄" } else { " " },
-                    0x8b,
-                );
-            }
-            if !focused {
-                // The legacy mnemonic overlay resets the whole button's style.
-                for col in r.x..r.right() {
-                    if let Some(glyph) = self.cells.get_mut(&(col, r.y)) {
-                        glyph.attribute = 0x8f;
-                    }
-                }
-                let pad = usize::from(r.width).saturating_sub(label.width()) / 2;
-                let mut chars = label.chars();
-                let first = chars.next().map(|c| c.to_string()).unwrap_or_default();
-                self.text(r.x + pad as u16, r.y, r.width - pad as u16, &first, 0x8e);
-                let rest: String = chars.collect();
-                let start = pad + first.width();
-                self.text(
-                    r.x + start as u16,
-                    r.y,
-                    r.width.saturating_sub(start as u16),
-                    &rest,
-                    0x8f,
-                );
-            }
-        }
+        crate::turbo::widgets::paint_into(
+            self,
+            crate::turbo::widgets::button(app.config.language.text(label), focused),
+            Rect::new(r.x, r.y, r.width, 2),
+        );
         self.regions.push((r, Target::Game(action)));
     }
 }
@@ -184,20 +139,14 @@ pub(super) fn draw(scene: &mut Scene, app: &App, game_y: u16) {
             {
                 let selected = level == i as u8 + 1;
                 let row = Rect::new(r.x + 4, r.y + 3 + i as u16, 35, 1);
-                scene.text(
-                    row.x,
-                    row.y,
-                    4,
-                    if selected { "(•) " } else { "( ) " },
-                    if selected && focus == 0 { 0x7f } else { 0x78 },
-                );
-                scene.text(row.x + 4, row.y, 2, &format!("{:>2}", i + 1), 0x7e);
-                scene.text(
-                    row.x + 6,
-                    row.y,
-                    29,
-                    &format!(" — {}", lang.text(label)),
-                    if selected { 0x7f } else { 0x78 },
+                crate::turbo::widgets::paint_into(
+                    scene,
+                    crate::turbo::widgets::radio(
+                        &format!("{:>2} — {}", i + 1, lang.text(label)),
+                        selected,
+                        selected && focus == 0,
+                    ),
+                    row,
                 );
                 scene
                     .regions
@@ -208,21 +157,22 @@ pub(super) fn draw(scene: &mut Scene, app: &App, game_y: u16) {
                 lang.text("Game style"),
                 0x70,
             );
-            scene.paragraph(
+            crate::turbo::widgets::paint_into(
+                scene,
+                crate::turbo::widgets::radio(lang.text("Classic Tetris"), true, false),
                 Rect::new(right, r.y + 3, 26, 1),
-                &format!("(•) {}", lang.text("Classic Tetris")),
-                0x78,
             );
             scene.paragraph(Rect::new(right, r.y + 6, 26, 1), lang.text("Options"), 0x70);
             let check = Rect::new(right, r.y + 7, 26, 1);
-            scene.paragraph(
-                check,
-                &format!(
-                    "[{}] {}",
-                    if preview { "✓" } else { " " },
-                    lang.text("Piece preview")
+            crate::turbo::widgets::paint_into(
+                scene,
+                crate::turbo::widgets::checkbox(
+                    lang.text("Piece preview"),
+                    preview,
+                    focus == 1,
+                    true,
                 ),
-                if focus == 1 { 0x7f } else { 0x78 },
+                check,
             );
             scene
                 .regions
@@ -290,21 +240,26 @@ pub(super) fn draw(scene: &mut Scene, app: &App, game_y: u16) {
                         skipped = scroll;
                         visible.push_str(glyph);
                     }
-                    scene.paragraph(
+                    let input = if game.replace_name {
+                        crate::turbo::widgets::selected_input(&visible, game.page_focus == 0)
+                    } else {
+                        crate::turbo::widgets::input(&visible, game.page_focus == 0)
+                    };
+                    crate::turbo::widgets::paint_into(
+                        scene,
+                        input,
                         Rect::new(r.x + 3, r.y + 7, 44, 1),
-                        &visible,
-                        if game.replace_name {
-                            0x30
-                        } else if scene.profile == PaletteProfile::ClassicDn {
-                            0x0f
-                        } else {
-                            0x1f
-                        },
                     );
-                    scene.cursor = Some((r.x + 3 + (col - scroll) as u16, r.y + 7));
+                    scene.regions.push((
+                        Rect::new(r.x + 3, r.y + 7, 44, 1),
+                        Target::Game(GameAction::NameField),
+                    ));
+                    if game.page_focus == 0 {
+                        scene.cursor = Some((r.x + 3 + (col - scroll) as u16, r.y + 7));
+                    }
                     scene.paragraph(
                         Rect::new(r.x + 3, r.y + 9, 44, 1),
-                        lang.text("Enter saves · Esc uses Anonymous"),
+                        lang.text("Tab chooses · Enter activates · Esc cancels"),
                         0x70,
                     );
                     scene.wrapped(
@@ -327,7 +282,7 @@ pub(super) fn draw(scene: &mut Scene, app: &App, game_y: u16) {
                 } else {
                     scene.paragraph(
                         Rect::new(r.x + 3, r.y + 7, 44, 2),
-                        lang.text("Enter / Esc continues to high scores"),
+                        lang.text("Enter continues · Esc cancels"),
                         0x70,
                     );
                     scene.plain_button(
@@ -355,7 +310,7 @@ fn scores(scene: &mut Scene, app: &App) {
     scene.window(r, lang.text("Tetris Top Ten"));
     scene.close(r, app);
     let body = Rect::new(r.x + 2, r.y + 3, 68, 12);
-    scene.border(body.x, body.y, body.width, body.height, false, 0x7f);
+    crate::turbo::widgets::paint_into(scene, crate::turbo::widgets::group_box(""), body);
     let x = body.x + 1;
     let width = body.width - 2;
     let nw = width - 33;
@@ -375,26 +330,32 @@ fn scores(scene: &mut Scene, app: &App) {
         scene.text(x + offset, r.y + 2, w - offset, label, 0x7e);
     }
     let game = app.desktop.game().unwrap();
-    for (i, record) in game.records.iter().take(10).enumerate() {
-        let name = crate::formatting::tail(&crate::filesystem::display_name(&record.name), nw);
-        let dots = usize::from(nw).saturating_sub(name.width());
-        let text = format!(
-            "{name}{} {:.>5} {:.>5} {:.>20}",
-            ".".repeat(dots),
-            record.start_level,
-            record.level,
-            record.score
-        );
-        scene.paragraph(
-            Rect::new(x, body.y + 1 + i as u16, width, 1),
-            &text,
-            if game.highlighted == Some(i) {
-                0x30
-            } else {
-                0x70
-            },
-        );
-    }
+    let items = game
+        .records
+        .iter()
+        .take(10)
+        .map(|record| {
+            let name = crate::formatting::tail(&crate::filesystem::display_name(&record.name), nw);
+            let dots = usize::from(nw).saturating_sub(name.width());
+            format!(
+                "{name}{} {:.>5} {:.>5} {:.>20}",
+                ".".repeat(dots),
+                record.start_level,
+                record.level,
+                record.score
+            )
+        })
+        .collect();
+    crate::turbo::widgets::paint_into(
+        scene,
+        crate::turbo::widgets::list_selection(
+            items,
+            game.highlighted,
+            0,
+            game.highlighted.is_some(),
+        ),
+        Rect::new(x, body.y + 1, width, 10),
+    );
     if game.records.is_empty() {
         scene.paragraph(
             Rect::new(x + 1, body.y + 1, width - 2, 1),
@@ -433,7 +394,7 @@ fn scores(scene: &mut Scene, app: &App) {
             Rect::new(r.x + 8, r.y + 17, 20, 1),
             "Retry save",
             GameAction::RetrySave,
-            false,
+            game.page_focus == 1,
         );
     }
     scene.classic(
@@ -441,6 +402,6 @@ fn scores(scene: &mut Scene, app: &App) {
         Rect::new(r.x + if retry { 43 } else { 29 }, r.y + 17, 14, 1),
         "OK",
         GameAction::Back,
-        true,
+        !retry || game.page_focus == 0,
     );
 }

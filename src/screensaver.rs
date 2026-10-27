@@ -223,7 +223,15 @@ pub fn key(app: &mut App, code: KeyCode) {
         KeyCode::BackTab | KeyCode::Up | KeyCode::Left => {
             setup.cursor = crate::control_focus::cycle(setup.cursor, CONTROL_COUNT, true)
         }
-        KeyCode::Enter | KeyCode::Char(' ') => {
+        KeyCode::Enter => {
+            let i = if setup.cursor < PREVIEW {
+                ACCEPT
+            } else {
+                setup.cursor
+            };
+            command(app, i);
+        }
+        KeyCode::Char(' ') => {
             let i = setup.cursor;
             command(app, i);
         }

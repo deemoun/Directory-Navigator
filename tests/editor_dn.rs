@@ -351,7 +351,7 @@ fn original_keys_menu_precedence_and_deferred_function_keys() -> io::Result<()> 
     modified(&mut app, KeyCode::F(4), KeyModifiers::CONTROL);
     assert!(matches!(
         app.desktop.active_editor().unwrap().modals.editor_modal(),
-        Some(Modal::ConfirmClose)
+        Some(Modal::ConfirmClose { .. })
     ));
     key(&mut app, KeyCode::Char('c'));
     modified(&mut app, KeyCode::Char('x'), KeyModifiers::ALT);
@@ -387,7 +387,7 @@ fn multiple_open_documents_preserve_close_guards_and_shared_clipboard() -> io::R
     key(&mut app, KeyCode::Esc);
     assert!(matches!(
         app.desktop.editor(original).unwrap().modals.editor_modal(),
-        Some(Modal::ConfirmClose)
+        Some(Modal::ConfirmClose { .. })
     ));
     editor::action(&mut app, A::Cancel);
     assert_eq!(buffer(&app).text, "original");

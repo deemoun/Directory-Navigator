@@ -177,15 +177,19 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
     .into_iter()
     .enumerate()
     {
+        let key = if app.config.shortcuts.is_mac() {
+            format!("^O{} ", (index + 1) % 10)
+        } else if profile == crate::palette::PaletteProfile::ClassicDn {
+            format!("F{} ", index + 1)
+        } else {
+            (index + 1).to_string()
+        };
         frame.render_widget(
-            Paragraph::new(crate::shortcuts::function(
-                app.config.shortcuts,
-                profile,
-                index as u8 + 1,
+            crate::turbo::widgets::function_status(
+                &key,
                 app.config.language.text(name),
                 command.is_some(),
-            ))
-            .style(profile.bar(command.is_some())),
+            ),
             cells[index],
         );
         if let Some(command) = command {

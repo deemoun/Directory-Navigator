@@ -229,6 +229,7 @@ pub struct ReplaceSession {
     pub remaining: VecDeque<Range<usize>>,
     pub replacement: String,
     pub changed: usize,
+    pub focus: usize,
 }
 impl ReplaceSession {
     pub fn new(matches: Vec<Range<usize>>, replacement: String) -> Self {
@@ -236,6 +237,7 @@ impl ReplaceSession {
             remaining: matches.into(),
             replacement,
             changed: 0,
+            focus: 3,
         }
     }
     pub fn current(&self) -> Option<Range<usize>> {

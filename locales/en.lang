@@ -522,3 +522,51 @@ Sanitarium	Sanitarium
 ~N~ame:	~N~ame:
 ~F~iles:	~F~iles:
 Show ~h~idden	Show ~h~idden
+Contents	Contents
+File operations	File operations
+Tab switches panels. Arrows and page keys move through entries. Insert/Space marks files. Enter opens; Backspace goes to the parent. Ctrl+Q toggles quick view. Ctrl+T opens the directory tree.	Tab switches panels. Arrows and page keys move through entries. Insert/Space marks files. Enter opens; Backspace goes to the parent. Ctrl+Q toggles quick view. Ctrl+T opens the directory tree.
+F2 saves; Shift+F2 saves to a new destination. F3 opens another document. F7 finds text; Ctrl+F7 replaces. Alt+0 switches documents. Close and quit review unsaved changes.	F2 saves; Shift+F2 saves to a new destination. F3 opens another document. F7 finds text; Ctrl+F7 replaces. Alt+0 switches documents. Close and quit review unsaved changes.
+F2 toggles wrapping; F7 finds text. Shift+F7 repeats; Ctrl+F7 searches backward. Arrows/page keys scroll. Esc returns. Previews remain bounded and read-only.	F2 toggles wrapping; F7 finds text. Shift+F7 repeats; Ctrl+F7 searches backward. Arrows/page keys scroll. Esc returns. Previews remain bounded and read-only.
+F5 copies; F6 moves or renames; F7 creates a directory. F8 uses Trash or confirmed permanent deletion. Existing destinations are refused. Esc cancels pending work; completed items are retained.	F5 copies; F6 moves or renames; F7 creates a directory. F8 uses Trash or confirmed permanent deletion. Existing destinations are refused. Esc cancels pending work; completed items are retained.
+Tab Next · Shift+Tab Previous · Enter Select · F1 Help · Esc Start	Tab Next · Shift+Tab Previous · Enter Select · F1 Help · Esc Start
+F1 Contents · Tab Links · Enter Follow · Alt+F1 Back · Esc Close	F1 Contents · Tab Links · Enter Follow · Alt+F1 Back · Esc Close
+Hide ~m~enu bar	Hide ~m~enu bar
+~N~ew	~N~ew
+~S~etup	~S~etup
+~T~op 10	~T~op 10
+~P~ause	~P~ause
+Copy file {} to	Copy file {} to
+Copy {} selected items to	Copy {} selected items to
+~O~verwrite all existing files	~O~verwrite all existing files
+A~p~pend to all existing files	A~p~pend to all existing files
+~R~efuse existing destinations	~R~efuse existing destinations
+~S~kip all existing files	~S~kip all existing files
+Refresh o~l~d files	Refresh o~l~d files
+Existing destinations are never replaced.	Existing destinations are never replaced.
+Check ~f~ree disk space	Check ~f~ree disk space
+~V~erify disk writes	~V~erify disk writes
+Copy ~d~escriptions	Copy ~d~escriptions
+Remove so~u~rce files	Remove so~u~rce files
+O~K~	O~K~
+~T~ree	~T~ree
+Destination history	Destination history
+No destination history	No destination history
+Enter selects · Esc returns	Enter selects · Esc returns
+Copy directory {} to	Copy directory {} to
+Select	Select
+Copy complete	Copy complete
+Copied items	Copied items
+Skipped existing items	Skipped existing items
+Skipped sources and existing destinations were kept.	Skipped sources and existing destinations were kept.
+Rename/move	Rename/move
+Move/rename directory {} to	Move/rename directory {} to
+Move/rename file {} to	Move/rename file {} to
+Move/rename {} selected items to	Move/rename {} selected items to
+Move complete	Move complete
+Moved items	Moved items
+Terminal ~o~utput	Terminal ~o~utput
+Mac-friendly: press Ctrl+O, release, then choose\n1 Help · 2 User · 3 View · 4 Edit · 5 Copy\n6 Move · 7 MkDir · 8 Trash/delete · 9 Menu · 0 Quit\ns Quick search · f Recursive Find · i Info · z Sort\nb Bookmarks · l Filter · e Columns · r Refresh\nh Commands · j Directories · a Edits · v Views\no OS default app · p List file · y Tetris\nk Keyboard settings · u Windows · m Menu\nUp/Down Page · Left/Right First/last entry\nCtrl+A all · Ctrl+U clear · Ctrl+O then Space marks\nCtrl+O twice: terminal output; Esc returns\nEsc or click cancels the prefix; nothing is typed.\nClassic DN keys remain available.\nCommand shortcuts belong to your terminal.\nTrash/delete still requires confirmation.	Mac-friendly: press Ctrl+O, release, then choose\n1 Help · 2 User · 3 View · 4 Edit · 5 Copy\n6 Move · 7 MkDir · 8 Trash/delete · 9 Menu · 0 Quit\ns Quick search · f Recursive Find · i Info · z Sort\nb Bookmarks · l Filter · e Columns · r Refresh\nh Commands · j Directories · a Edits · v Views\no OS default app · p List file · y Tetris\nk Keyboard settings · u Windows · m Menu\nUp/Down Page · Left/Right First/last entry\nCtrl+A all · Ctrl+U clear · Ctrl+O then Space marks\nCtrl+O twice: terminal output; Esc returns\nEsc or click cancels the prefix; nothing is typed.\nClassic DN keys remain available.\nCommand shortcuts belong to your terminal.\nTrash/delete still requires confirmation.
+Tab switches panels. Arrows and page keys move through entries. Insert/Space marks files. Enter opens; Backspace goes to the parent. Ctrl+Q toggles quick view. Ctrl+T opens the directory tree. Ctrl+O reveals terminal output (Mac: Ctrl+O twice); Ctrl+O, Esc or Enter returns.	Tab switches panels. Arrows and page keys move through entries. Insert/Space marks files. Enter opens; Backspace goes to the parent. Ctrl+Q toggles quick view. Ctrl+T opens the directory tree. Ctrl+O reveals terminal output (Mac: Ctrl+O twice); Ctrl+O, Esc or Enter returns.
+Tab chooses · Enter activates · Esc cancels	Tab chooses · Enter activates · Esc cancels
+Enter continues · Esc cancels	Enter continues · Esc cancels
+Enter opens/runs · → submenu · Ctrl+R reload	Enter opens/runs · → submenu · Ctrl+R reload

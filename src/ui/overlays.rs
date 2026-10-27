@@ -14,6 +14,15 @@ pub(super) fn draw_info_dialog(
     app: &App,
     message: Option<&crate::layout::MessageLayout>,
 ) {
+    if let Some(help) = app.modals.native_help(app.desktop.active().id) {
+        frame.regions().clear();
+        if let Some(scene) = help.scene() {
+            frame.compose(scene.clone());
+            frame.native_shadow(help.bounds());
+            help_status(frame, app, false);
+        }
+        return;
+    }
     let profile = app.config.palette;
     if let Some(dialog) = app.last_dialog() {
         let Some(message) = message else {
@@ -30,16 +39,15 @@ pub(super) fn draw_info_dialog(
         let lines = &message.lines;
         let visible = message.visible;
         let maximum = message.maximum;
-        let body = Paragraph::new(
-            lines
+        let body = crate::turbo::widgets::memo(
+            &lines
                 .iter()
                 .skip(app.message_offset())
                 .take(visible)
                 .cloned()
                 .collect::<Vec<_>>()
                 .join("\n"),
-        )
-        .style(profile.dos(0x70));
+        );
         frame.render_widget(
             body,
             Rect::new(
@@ -83,6 +91,11 @@ pub(super) fn draw_operation_overlays(
         .prompt()
         .filter(|_| layer == crate::focus::Focus::Prompt)
     {
+        if prompt.copy.is_some() {
+            let area = frame.area();
+            super::copy_dialog_view::draw(frame, app, area);
+            return;
+        }
         let deleting = matches!(
             prompt.kind,
             PromptKind::Operation(Kind::Delete | Kind::Trash)
@@ -168,8 +181,10 @@ pub(super) fn draw_operation_overlays(
             );
             let cursor = Span::raw(&prefix).width() as u16;
             frame.render_widget(
-                Paragraph::new(format!("{prefix}{}", &prompt.field[prompt.cursor..]))
-                    .style(dialog_style::input_style(profile, prompt.focus == 0)),
+                crate::turbo::widgets::input(
+                    &format!("{prefix}{}", &prompt.field[prompt.cursor..]),
+                    prompt.focus == 0,
+                ),
                 input,
             );
             frame.regions().push((input, Target::PromptField));
@@ -237,6 +252,10 @@ pub(super) fn draw_operation_overlays(
             Paragraph::new(text).style(dos(0x70)),
             Rect::new(rect.x + 2, rect.y + 1, rect.width - 4, 4),
         );
+        frame.render_widget(
+            crate::turbo::widgets::busy(),
+            Rect::new(rect.x + 2, rect.bottom() - 4, rect.width - 4, 1),
+        );
         let cancel = Rect::new(rect.x + (rect.width - 12) / 2, rect.bottom() - 2, 12, 1);
         dialog_style::button(
             frame,
@@ -249,4 +268,32 @@ pub(super) fn draw_operation_overlays(
         super::dialog_style::close_button(frame, profile, rect, Target::CancelJob);
         frame.regions().push((cancel, Target::CancelJob));
     }
+}
+
+/// DN's help context replaces the manager's file-operation hints.
+pub(super) fn help_status(frame: &mut impl Frame, app: &App, welcome: bool) {
+    if welcome && crate::focus::current(app) != crate::focus::Focus::Welcome {
+        return;
+    }
+    let label = app.config.language.text(if welcome {
+        "Tab Next · Shift+Tab Previous · Enter Select · F1 Help · Esc Start"
+    } else {
+        "F1 Contents · Tab Links · Enter Follow · Alt+F1 Back · Esc Close"
+    });
+    let label = label
+        .split_whitespace()
+        .map(|word| {
+            if ["Tab", "Shift+Tab", "Enter", "F1", "Esc", "Alt+F1"].contains(&word) {
+                format!("~{word}~")
+            } else {
+                word.into()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ");
+    let area = frame.area();
+    frame.render_widget(
+        crate::turbo::widgets::status(&label),
+        Rect::new(0, area.height.saturating_sub(1), area.width, 1),
+    );
 }

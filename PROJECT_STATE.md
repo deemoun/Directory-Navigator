@@ -19,9 +19,99 @@
   state owns session dialogs/options/results; quick view owns debounced reads.
 
 ## Implemented
+
+- F2 user-menu native painting keeps the application menu palette when embedded
+  in a dialog, so rows use grey/red DN colours and full-width green selection.
+  Paired mnemonic markers are adapted for MenuBox without highlighting the next
+  letter; the selected mnemonic stays red. The localized hint fits the minimum
+  supported width. Source switching, definition editing and command review remain.
+
+- Dialog traversal normalizes both Shift+Tab encodings, wraps through enabled
+  controls and recovers stale selection to a valid endpoint. Pattern/editor
+  prompts, dirty-close and replace guards, histories and Tetris pages own explicit
+  focus. Enter follows the highlighted button/default; Esc cancels. Tetris name
+  cancellation retains the draft without an anonymous write; Skip name remains
+  explicit. Main game buttons are tabbable and suspend gravity until board focus
+  returns. Discovery/archive/character-table traversal skips unavailable actions;
+  radio/checkbox choices use Space, with Enter invoking the displayed default.
+
+- Default button appearance is independent of keyboard focus. Game-over Continue,
+  score-name OK, game Help, editor prompts/search and safe unsaved Cancel, settings,
+  histories, window lists, tree/archive actions, filters and tool dialogs show
+  their existing Enter action immediately. Focused alternative buttons suppress
+  the implicit highlight; unavailable actions are not promoted. Native input/list
+  focus and existing command/confirmation controllers are preserved.
+  macOS ARM64: 494 tests pass (one opt-in native Trash test ignored), formatting,
+  all-target Clippy, release build and no-default-features checks pass. Native
+  terminal checks confirm the first-paint game-over/name/settings highlights and
+  terminal restoration. Windows/Linux validation remains skipped.
+
+- Terminal output reveal uses the real primary terminal/scrollback, without a
+  shell or transcript replay. Classic Ctrl+O toggles; Mac Ctrl+O twice preserves
+  existing prefix commands; Alt+F5 and Manager menu also reveal it. Output input
+  is read-only with atomic paste, no mouse capture, deferred painting and live
+  background polling. Ctrl+O/Esc/Enter returns with full redraw and unchanged
+  command draft/pane state; post-command return accepts these keys too.
+  macOS ARM64: 482 tests pass (one opt-in native Trash test ignored), including
+  PTY checks for both shortcut profiles, untouched output while hidden, paste
+  consumption, resize, command return and terminal restoration. Formatting,
+  all-target Clippy, release and no-default-features checks pass. Windows/Linux
+  validation remains skipped.
+
+- Native Rename/move now shares DN's 59×16 Copy composition, destination history,
+  Tree and Help, with operation-specific captions/results. Source removal is
+  checked and locked; refusal remains the default and Skip preserves existing
+  destinations and skipped sources. F6/Shift+F6 keep their existing base paths.
+  Native exclusive rename stays fast; optional space checking applies only to
+  copy fallback, while write verification forces staged copy then guarded cleanup.
+  Temporary-fixture tests cover native identity, verification/cancellation/races,
+  batch cleanup, skipped directories/links, modal ownership and immutable layouts.
+  macOS ARM64: 476 tests pass (one opt-in native Trash test ignored), formatting,
+  all-target Clippy, release build and no-default-features checks pass. An isolated
+  terminal run covers F6/Shift+F6, native/verified moves, refusal/skip, history,
+  Help/Tree, resizing and terminal restoration. Windows/Linux validation skipped.
+
+- Expanded native Copy dialog follows original DN's 59×16 resource layout:
+  refuse/skip collision policy, optional space preflight and staged read-back
+  verification, verified copy then guarded source removal, destination history
+  and an owned directory-tree picker. Overwrite/append/refresh/descriptions remain
+  disabled. Default no-replace behavior is preserved; Skip never merges folders
+  or removes skipped sources. History retains native paths; child receipts name
+  the originating modal. Temporary-fixture tests cover races, corruption,
+  cancellation, insufficient/unavailable space, symlinks, focus and ownership.
+  macOS ARM64: 466 Rust tests pass (one opt-in native Trash test ignored), fmt,
+  all-target Clippy, release and no-default-features checks pass. Isolated native
+  terminal Copy/Help/Tree/history/skip/verified-removal and restoration pass.
+  Windows/Linux validation remains skipped.
 Current Turbo Vision status is authoritative in docs/TURBO_VISION_MIGRATION.md;
 older increment entries below also record earlier migration stages.
 
+- Shared dialog/control replacement: actual Turbo Vision Dialog, Button,
+  InputLine, CheckBox/RadioButton, ComboBox, ListBox, Memo, GroupBox, ScrollBar,
+  ProgressBar, MenuBar/MenuBox and StatusLine replace shared hand-drawn controls.
+  Directory trees use OutlineViewer backed by existing asynchronous scans.
+  Messages, confirmations, operation prompts, settings, search/numeric dialogs,
+  histories/bookmarks/windows, discovery/archive lists, utilities and game pages
+  share the adapter. Owned settings choice children retain draft/Cancel semantics;
+  existing filesystem, save/quit and stale-result safeguards remain in controllers.
+  Modal controls are children of one native Dialog/Group, with owner-relative
+  bounds and full native button/window shadows. The published group validates
+  button proposals; existing controllers still authorize actions. Unicode cell
+  encoding and existing byte limits remain.
+- File columns use native ListBox/ListViewer controls with DN-specific metadata,
+  column-major ordering, marks and colours; native ScrollBar draws tracks/thumbs
+  and handles arrow/page steps. Wide-integer thumb dragging retains endpoint safety.
+  Quick view, text viewing and information previews use bounded native TextViewer
+  controls; existing wrapping, search highlighting and asynchronous ownership remain.
+- Context help uses native HelpWindow/HelpViewer with Contents, cross-references,
+  scrolling and Alt+F1 history. Help stays inside its owned modal and restores its
+  parent. Welcome reuses this Help window with action links and its existing
+  first-run/menu rules. Both share DN's centered 72×20 geometry and contextual
+  native status line. DOS HELPFILE/FLPANEL/FVIEWER and dialog resources guide behavior.
+  See docs/TURBO_VISION_MIGRATION.md for current validation.
+  Terminal workflows cover native controls, Unicode, cancellation, safe destinations,
+  multiple documents, resize, shell handoff and restoration. Windows/Linux execution
+  remains excluded. See docs/TURBO_VISION_MIGRATION.md for scope and boundaries.
 - Editor Open/Save As now use Turbo Vision's actual FileDialog and its native
   input/list/buttons, directory browsing, wildcard filtering and hidden-file
   control. The existing event loop and owned modal stack drive the widget;
@@ -374,6 +464,18 @@ older increment entries below also record earlier migration stages.
   entries. Keyboard/mouse navigation uses the reduced menu set.
 
 ## Validation
+- F2 menu repair: 97 focused tests pass on macOS ARM64, covering native widgets,
+  appearance, localization, menu visibility, user-menu safety and terminal frame
+  comparisons. Formatting, all-target Clippy, release build and no-default-features
+  check pass. An isolated release PTY verifies green selection, submenu open/back,
+  Esc close and terminal restoration without running commands. Windows/Linux skipped.
+- Dialog navigation: 494 tests pass on macOS ARM64 (one opt-in native Trash
+  test ignored), including seven new isolated-fixture regressions for reverse
+  traversal, disabled controls, highlighted Enter actions, draft cancellation,
+  paste isolation and Tetris gravity suspension. Formatting, all-target Clippy,
+  release build and no-default-features check pass. A release PTY verifies Tetris
+  and settings forward/reverse navigation, Enter on Cancel/Skip, name cancellation
+  without a score write, and terminal restoration. Windows/Linux validation skipped.
 - Desktop refactor: pre/post captures match all cells, styles and mouse targets in
   40 scenes (80×25/132×40, both palettes), using fixed volume snapshots on the
   original HEAD and refactored code to avoid native-I/O timing noise. Identity,

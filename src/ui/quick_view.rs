@@ -1,4 +1,4 @@
-use crate::painting::{Block, Borders, Frame, Paragraph, Wrap};
+use crate::painting::{Block, Borders, Frame, Paragraph};
 use crate::presentation::layout::{Margin, Rect};
 use crate::{app::App, filesystem::display_name, formatting::tail, mouse::Target};
 pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
@@ -59,21 +59,17 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
             Rect::new(inner.x, inner.bottom().saturating_sub(1), inner.width, 1),
         );
     } else {
-        frame.render_widget(
-            Paragraph::new(
-                q.lines
-                    .iter()
-                    .map(|l| {
-                        app.config
-                            .language
-                            .field(&display_name(l), app.config.datetime)
-                    })
-                    .collect::<Vec<_>>()
-                    .join("\n"),
-            )
-            .wrap(Wrap { trim: false })
-            .style(dos(0x87)),
-            body,
-        );
+        let content = q
+            .lines
+            .iter()
+            .map(|l| {
+                app.config
+                    .language
+                    .field(&display_name(l), app.config.datetime)
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        let lines = crate::painting::wrap_plain(&content, body.width);
+        frame.render_widget(crate::turbo::widgets::text_view(&lines, 0, 0x87), body);
     }
 }

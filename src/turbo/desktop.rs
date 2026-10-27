@@ -29,6 +29,9 @@ pub enum Scope {
 }
 impl Scope {
     pub fn for_app(app: &crate::app::App) -> Self {
+        if app.output_visible {
+            return Self::Layer(Focus::TerminalOutput);
+        }
         if app.screensaver.active {
             return Self::Screensaver;
         }

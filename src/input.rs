@@ -2,7 +2,14 @@ use crate::focus::{self, Focus};
 use crate::{app::App, operations::Kind, panel::SortMode};
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 
-pub fn handle(app: &mut App, key: KeyEvent) {
+pub fn handle(app: &mut App, mut key: KeyEvent) {
+    if key.code == KeyCode::Tab && key.modifiers.contains(KeyModifiers::SHIFT) {
+        key.code = KeyCode::BackTab;
+    }
+    if app.output_visible {
+        crate::terminal_output::event(app, &crossterm::event::Event::Key(key));
+        return;
+    }
     if app.exit_pending && app.quit_review.is_some() {
         if key.code == KeyCode::Esc {
             app.abort_quit();
@@ -25,6 +32,15 @@ fn handle_key(app: &mut App, key: KeyEvent) {
         return;
     };
     let focus = focus::current(app);
+    if (key.code == KeyCode::Char('o') && key.modifiers == KeyModifiers::CONTROL
+        || key.code == KeyCode::F(5) && key.modifiers == KeyModifiers::ALT)
+        && matches!(focus, Focus::Manager | Focus::Menu | Focus::QuickSearch)
+    {
+        if key.kind == KeyEventKind::Press {
+            crate::terminal_output::request(app);
+        }
+        return;
+    }
     if focus == Focus::WindowList {
         crate::windowing::key(app, key);
         return;
@@ -43,6 +59,13 @@ fn handle_key(app: &mut App, key: KeyEvent) {
         return;
     }
     if focus == Focus::Message {
+        if let Some(help) = app.modals.native_help_mut(app.desktop.active().id) {
+            let close = help.key(key);
+            if close {
+                app.pop_dialog();
+            }
+            return;
+        }
         crate::dialog::message_key(app, key.code);
         return;
     }
@@ -167,6 +190,14 @@ fn handle_key(app: &mut App, key: KeyEvent) {
         crate::menu::key(app, key.code);
         return;
     }
+    if focus == Focus::CopyHistory {
+        crate::copy_dialog::history_key(app, key);
+        return;
+    }
+    if focus == Focus::Prompt && app.modals.prompt().is_some_and(|p| p.copy.is_some()) {
+        crate::copy_dialog::key(app, key);
+        return;
+    }
     if focus == Focus::Prompt {
         crate::turbo::forms::prompt_key(app, key);
         return;
@@ -283,6 +314,9 @@ fn handle_key(app: &mut App, key: KeyEvent) {
 
 /// Paste uses the same topmost recipient as keyboard and mouse input.
 pub fn paste(app: &mut App, text: &str) {
+    if app.output_visible {
+        return;
+    }
     paste_text(app, text);
     crate::layout::update(app);
 }

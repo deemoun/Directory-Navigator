@@ -56,10 +56,13 @@ pub enum Modal {
         kind: PromptKind,
         field: String,
         cursor: usize,
+        focus: usize,
     },
     Search(search::SearchDialog),
     Replace(search::ReplaceSession),
-    ConfirmClose,
+    ConfirmClose {
+        focus: usize,
+    },
     Help,
 }
 enum Reply {
@@ -157,7 +160,7 @@ impl Editor {
     pub(crate) fn cancel_quit(&mut self) {
         if self.closing == Some(PendingAction::Quit) {
             self.closing = None;
-            if matches!(self.modals.editor_modal(), Some(Modal::ConfirmClose)) {
+            if matches!(self.modals.editor_modal(), Some(Modal::ConfirmClose { .. })) {
                 self.modals.set_editor_modal(None);
             }
         }

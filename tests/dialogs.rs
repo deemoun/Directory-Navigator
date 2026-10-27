@@ -112,10 +112,13 @@ fn mkdir_original_dimensions_colors_buttons_and_resize() -> io::Result<()> {
                     && r.bottom() < rect.bottom()
             );
             if *t == Target::SubmitPrompt {
-                assert_eq!(b[(r.x, r.y)].symbol(), "►");
-                assert_eq!(b[(r.right() - 1, r.y)].symbol(), "◄");
-                assert_eq!(b[(r.x, r.y)].fg, app.config.palette.color(11));
-                assert_eq!(b[(r.x, r.y)].bg, app.config.palette.color(8));
+                assert_eq!(b[(r.x, r.y)].symbol(), " ");
+                assert_eq!(b[(r.right() - 1, r.y)].symbol(), " ");
+                assert_eq!(b[(r.right() - 1, r.y)].bg, app.config.palette.color(0));
+                assert_eq!(b[(r.x, r.y)].bg, app.config.palette.color(7));
+                assert_eq!(b[(r.x + 1, r.y)].symbol(), "►");
+                assert_eq!(b[(r.x + 1, r.y)].fg, app.config.palette.color(11));
+                assert_eq!(b[(r.x + 1, r.y)].bg, app.config.palette.color(8));
             }
         }
     }

@@ -28,12 +28,18 @@ fn button(
     target: Target,
     focused: bool,
 ) {
-    super::dialog_style::button(
+    let default_active = match target {
+        Target::AcceptPattern => app.modals.pattern().is_some_and(|p| p.focus == 0),
+        Target::AcceptColumns => app.modals.columns_dialog().is_some_and(|d| d.cursor < 2),
+        _ => false,
+    };
+    super::dialog_style::button_with_default(
         frame,
         app.config.palette,
         rect,
         app.config.language.text(text),
         focused,
+        default_active,
     );
     frame.regions().push((rect, target));
 }
@@ -60,16 +66,19 @@ pub(super) fn draw_tools(
         let cursor = Line::from(&pattern.field[..pattern.cursor]).width();
         let scroll = cursor.saturating_sub(input.width.saturating_sub(1) as usize);
         frame.render_widget(
-            Paragraph::new(pattern.field.as_str())
-                .scroll((0, scroll as u16))
-                .style(if pattern.replace_on_type {
-                    dos(0x30)
-                } else {
-                    super::dialog_style::input_style(profile, true)
-                }),
+            if pattern.replace_on_type {
+                crate::turbo::widgets::selected_input(
+                    &crate::turbo::widgets::pan(&pattern.field, scroll),
+                    pattern.focus == 0,
+                )
+            } else {
+                crate::turbo::widgets::input_scrolled(&pattern.field, scroll, pattern.focus == 0)
+            },
             input,
         );
-        frame.set_cursor_position((input.x + (cursor - scroll) as u16, input.y));
+        if pattern.focus == 0 {
+            frame.set_cursor_position((input.x + (cursor - scroll) as u16, input.y));
+        }
         frame.render_widget(
             Paragraph::new(app.config.language.text(
                 "* any sequence · ? one character\nVisible files and folders only · case-sensitive",
@@ -78,6 +87,7 @@ pub(super) fn draw_tools(
             Rect::new(rect.x + 2, rect.y + 3, rect.width - 4, 2),
         );
         frame.regions().clear();
+        frame.regions().push((input, Target::PatternField));
         super::dialog_style::close_button(frame, profile, rect, Target::CancelPattern);
         button(
             frame,
@@ -85,7 +95,7 @@ pub(super) fn draw_tools(
             Rect::new(rect.x + 15, rect.bottom() - 2, 14, 1),
             " [ OK ] ",
             Target::AcceptPattern,
-            true,
+            pattern.focus == 1,
         );
         button(
             frame,
@@ -93,7 +103,7 @@ pub(super) fn draw_tools(
             Rect::new(rect.right() - 28, rect.bottom() - 2, 14, 1),
             " [ Cancel ] ",
             Target::CancelPattern,
-            true,
+            pattern.focus == 2,
         );
     }
     if let Some(dialog) = app
@@ -120,16 +130,11 @@ pub(super) fn draw_tools(
                 let checked = app.config.columns[panel] == preset;
                 let choice = Rect::new(x, rect.y + 4 + row as u16, 31, 1);
                 frame.render_widget(
-                    Paragraph::new(format!(
-                        "({}) {}",
-                        if checked { 'x' } else { ' ' },
-                        app.config.language.text(preset.label())
-                    ))
-                    .style(dos(if cursor == panel && checked {
-                        0x30
-                    } else {
-                        0x70
-                    })),
+                    crate::turbo::widgets::radio(
+                        app.config.language.text(preset.label()),
+                        checked,
+                        cursor == panel && checked,
+                    ),
                     choice,
                 );
                 frame
@@ -185,16 +190,14 @@ pub(super) fn draw_tools(
             ]),
             None => std::borrow::Cow::Owned(vec!["Reading metadata…".into()]),
         };
-        let visible: Vec<Line> = lines
+        let visible: Vec<String> = lines
             .iter()
             .skip(info.offset)
             .take(rect.height.saturating_sub(4) as usize)
-            .map(|line| Line::from(app.config.language.field(line, app.config.datetime)))
+            .map(|line| app.config.language.field(line, app.config.datetime))
             .collect();
         frame.render_widget(
-            Paragraph::new(visible)
-                .scroll((0, info.horizontal))
-                .style(dos(0x70)),
+            crate::turbo::widgets::text_view(&visible, info.horizontal as usize, 0x70),
             Rect::new(rect.x + 2, rect.y + 1, rect.width - 4, rect.height - 4),
         );
         frame.render_widget(

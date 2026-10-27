@@ -295,9 +295,10 @@ pub fn poll(app: &mut App) -> bool {
         match result {
             Ok(Reply::Loaded(data)) => {
                 if let Some(m) = app.user_menu.modals.user_menu_mut() {
-                    m.status = data.error.clone().unwrap_or_else(|| {
-                        "Enter opens/runs · F2 Global/Local · F4 Edit · Ctrl+R reload".into()
-                    });
+                    m.status = data
+                        .error
+                        .clone()
+                        .unwrap_or_else(|| "Enter opens/runs · → submenu · Ctrl+R reload".into());
                     m.data = Some(data);
                     m.step(0);
                 }

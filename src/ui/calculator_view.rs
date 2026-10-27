@@ -1,8 +1,8 @@
 //! Calculator-only DN dialog; other utility layouts keep their existing chrome.
-use crate::painting::{Block, Borders, Frame, Paragraph, Wrap};
+use crate::painting::{Frame, Paragraph, Wrap};
 use crate::presentation::{
     layout::{Alignment, Rect},
-    text::{Line, Span},
+    text::Line,
 };
 use crate::{
     app::App,
@@ -12,28 +12,6 @@ use crate::{
     utilities::{calculator::Value, Action},
 };
 
-fn hot(
-    label: &str,
-    key: char,
-    normal: crate::presentation::style::Style,
-    accent: crate::presentation::style::Style,
-) -> Line<'static> {
-    let mut marked = false;
-    Line::from(
-        label
-            .chars()
-            .map(|c| {
-                let style = if !marked && c.to_ascii_lowercase() == key {
-                    marked = true;
-                    accent
-                } else {
-                    normal
-                };
-                Span::styled(c.to_string(), style)
-            })
-            .collect::<Vec<_>>(),
-    )
-}
 pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
     let profile = app.config.palette;
     let dos = profile.styles();
@@ -46,31 +24,21 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
     let focus = calc.focus;
     let expression = Rect::new(rect.x + 2, rect.y + 2, rect.width - 4, 3);
     frame.render_widget(
-        Block::default()
-            .borders(Borders::ALL)
-            .border_style(dos(0x7f))
-            .title(hot(language.text("Expression"), 'p', dos(0x7f), dos(0x7e))),
+        crate::turbo::widgets::group_box(language.text("Expression")),
         expression,
     );
     let field = Rect::new(expression.x + 2, expression.y + 1, expression.width - 8, 1);
     let column = Line::from(&calc.expression[..calc.cursor]).width();
     let scroll = column.saturating_sub(usize::from(field.width - 1));
     frame.render_widget(
-        Paragraph::new(display_name(&calc.expression))
-            .scroll((0, scroll as u16))
-            .style(super::dialog_style::input_style(profile, focus == 0)),
+        crate::turbo::widgets::input_scrolled(&display_name(&calc.expression), scroll, focus == 0),
         field,
     );
     frame
         .regions()
         .push((field, Target::Utility(Action::Field)));
     let history_button = Rect::new(expression.right() - 4, field.y, 2, 1);
-    frame.render_widget(
-        Paragraph::new("↓")
-            .alignment(Alignment::Center)
-            .style(dos(0x9f)),
-        history_button,
-    );
+    frame.render_widget(crate::turbo::widgets::history_button(), history_button);
     frame
         .regions()
         .push((history_button, Target::Utility(Action::CalculatorHistory)));
@@ -82,12 +50,7 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
         Rect::new(rect.x + 4, rect.y + 6, 11, 1),
     );
     let results = Rect::new(rect.x + 16, rect.y + 6, rect.width - 18, 7);
-    frame.render_widget(
-        Block::default()
-            .borders(Borders::ALL)
-            .border_style(dos(0x7f)),
-        results,
-    );
+    frame.render_widget(crate::turbo::widgets::group_box(""), results);
     let value = calc.result.or_else(|| {
         (calc.expression.is_empty() && calc.error.is_none()).then_some(Value::Integer(0))
     });
@@ -96,14 +59,7 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
         let y = results.y + 1 + index as u16;
         let radio = Rect::new(rect.x + 4, y, 11, 1);
         frame.render_widget(
-            Paragraph::new(Line::from(vec![
-                Span::styled(if calc.base == index { "(•) " } else { "( ) " }, dos(0x78)),
-                Span::styled(label[..1].to_string(), dos(0x7e)),
-                Span::styled(
-                    label[1..].to_string(),
-                    dos(if focus == index + 1 { 0x30 } else { 0x78 }),
-                ),
-            ])),
+            crate::turbo::widgets::radio(label, calc.base == index, focus == index + 1),
             radio,
         );
         frame
@@ -141,7 +97,7 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
         Rect::new(rect.x + 3, rect.y + 13, rect.width - 6, 2),
     );
     for (i, (label, command, selected, mnemonic)) in [
-        ("Evaluate", Action::Evaluate, focus == 0 || focus == 6, 'e'),
+        ("Evaluate", Action::Evaluate, focus == 6, 'e'),
         ("Copy", Action::Copy, focus == 7, 'c'),
         ("Close", Action::Close, focus == 8, 'l'),
         ("Help", Action::CalculatorHelp, focus == 9, 'h'),
@@ -150,28 +106,27 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
     .enumerate()
     {
         let button = Rect::new(rect.x + 2 + i as u16 * 17, rect.y + 15, 14, 1);
-        frame.render_widget(
-            Paragraph::new(" ".repeat(14)).style(dos(0x00)),
-            Rect::new(button.x + 1, button.y + 1, button.width, 1),
-        );
         let label = language.text(label);
-        let padding = 12_usize.saturating_sub(Span::raw(label).width());
-        let mut spans = vec![
-            Span::styled(if selected { "►" } else { " " }, dos(0x8b)),
-            Span::raw(" ".repeat(padding / 2)),
-        ];
-        spans.extend(
-            hot(
-                label,
-                mnemonic,
-                dos(if selected { 0x8b } else { 0x8f }),
-                dos(0x8e),
-            )
-            .spans,
+        let mut marked = false;
+        let label = label
+            .chars()
+            .map(|c| {
+                if !marked && c.to_ascii_lowercase() == mnemonic {
+                    marked = true;
+                    format!("~{c}~")
+                } else {
+                    c.to_string()
+                }
+            })
+            .collect::<String>();
+        frame.render_widget(
+            crate::turbo::widgets::button_with_default(
+                &label,
+                selected,
+                command == Action::Evaluate && focus < 6,
+            ),
+            Rect::new(button.x, button.y, button.width, 2),
         );
-        spans.push(Span::raw(" ".repeat(padding - padding / 2)));
-        spans.push(Span::styled(if selected { "◄" } else { " " }, dos(0x8b)));
-        frame.render_widget(Paragraph::new(Line::from(spans)).style(dos(0x8f)), button);
         frame.regions().push((button, Target::Utility(command)));
     }
     if calc.history_open {
@@ -182,13 +137,8 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
             expression.width,
             rows as u16 + 2,
         );
-        frame.render_widget(crate::painting::Clear, history);
         frame.render_widget(
-            Block::default()
-                .borders(Borders::ALL)
-                .border_style(dos(0x7f))
-                .title(language.text("Expression history"))
-                .style(dos(0x70)),
+            crate::turbo::widgets::dialog(language.text("Expression history")),
             history,
         );
         let offset = calc.history_selection.saturating_sub(rows - 1);
@@ -198,26 +148,27 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
                 Rect::new(history.x + 2, history.y + 1, history.width - 4, 1),
             );
         }
-        for (index, expression) in calc.history.iter().enumerate().skip(offset).take(rows) {
-            let row = Rect::new(
-                history.x + 1,
-                history.y + 1 + (index - offset) as u16,
-                history.width - 2,
-                1,
-            );
+        if !calc.history.is_empty() {
             frame.render_widget(
-                Paragraph::new(formatting::tail(&display_name(expression), row.width)).style(dos(
-                    if index == calc.history_selection {
-                        0x30
-                    } else {
-                        0x70
-                    },
-                )),
-                row,
+                crate::turbo::widgets::list(
+                    calc.history.iter().map(|s| display_name(s)).collect(),
+                    calc.history_selection,
+                    offset,
+                    true,
+                ),
+                Rect::new(history.x + 1, history.y + 1, history.width - 2, rows as u16),
             );
-            frame
-                .regions()
-                .push((row, Target::Utility(Action::CalculatorRecall(index))));
+        }
+        for index in offset..calc.history.len().min(offset + rows) {
+            frame.regions().push((
+                Rect::new(
+                    history.x + 1,
+                    history.y + 1 + (index - offset) as u16,
+                    history.width - 2,
+                    1,
+                ),
+                Target::Utility(Action::CalculatorRecall(index)),
+            ));
         }
     }
 }

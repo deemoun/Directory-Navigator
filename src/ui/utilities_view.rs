@@ -90,7 +90,7 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
                 Rect::new(x, rect.y + 1, 18, 1),
                 " [ ASCII ] ",
                 Action::Page(Page::Ascii),
-                page == Page::Ascii || focus == 1,
+                focus == 1,
             );
             button(
                 frame,
@@ -98,7 +98,7 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
                 Rect::new(x + 20, rect.y + 1, 22, 1),
                 " [ DOS CP437 ] ",
                 Action::Page(Page::Cp437),
-                page == Page::Cp437 || focus == 2,
+                focus == 2,
             );
             for col in 0..16u16 {
                 text(
@@ -154,7 +154,7 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
                     Rect::new(x + 10, rect.bottom() - 2, 16, 1),
                     " [ Copy ] ",
                     Action::Copy,
-                    focus == 3,
+                    focus == 0 || focus == 3,
                 );
             } else {
                 text(

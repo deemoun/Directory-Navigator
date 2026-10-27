@@ -17,6 +17,7 @@ pub enum MenuId {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Action {
+    TerminalOutput,
     ImportDosSettings,
     EditAssociations,
     ReloadAssociations,
@@ -98,6 +99,12 @@ pub const LABELS: [&str; 6] = [
     "~M~anager",
     "~O~ptions",
 ];
+
+/// Hide preferences affect the manager; the game never advertises its menus.
+pub(crate) fn bar_visible(app: &App) -> bool {
+    app.desktop.active().kind == crate::desktop::WindowKind::Manager
+        && (!app.config.hide_menu || app.modals.menu().is_some())
+}
 
 pub fn plain(label: &str) -> String {
     label.replace('~', "")
@@ -208,6 +215,7 @@ pub fn items(menu: usize) -> Vec<Item> {
         4 => vec![
             item("~D~irectory tree", "Ctrl+T", DirectoryTree),
             item("~Q~uick view", "Ctrl+Q", QuickView),
+            item("Terminal ~o~utput", "Ctrl+O", TerminalOutput),
             line(),
             item("~S~wap panels", "", SwapPanels),
             item("~W~indows...", "Alt+0", WindowList),
@@ -330,6 +338,7 @@ pub fn execute(app: &mut App, action: Action) {
     close(app);
     app.modals.set_quick_search(None);
     match action {
+        Action::TerminalOutput => crate::terminal_output::request(app),
         Action::CommandHistory => crate::command_line::history::open(app),
         Action::CopyNames(full) => crate::file_tools::clipboard::copy(app,full),
         Action::ScreensaverSetup => crate::screensaver::open(app),

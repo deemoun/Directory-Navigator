@@ -15,10 +15,14 @@ pub(crate) struct ViewportState {
     editor: Option<(u64, usize, usize, usize)>,
     viewer: Option<(usize, u16, bool, usize, bool)>,
     picker: Option<u64>,
+    help: Option<u64>,
+    welcome: Option<u64>,
     game: Option<std::mem::Discriminant<crate::tetris::Screen>>,
     windows: Option<(Vec<crate::desktop::WindowId>, usize)>,
     characters: Option<(crate::utilities::characters::Page, bool)>,
     menu: Option<(usize, usize)>,
+    hide_menu: bool,
+    copy_history: Option<(usize, usize)>,
     submenus: Vec<(crate::menu::MenuId, usize)>,
     modal_offsets: Vec<usize>,
 }
@@ -49,6 +53,11 @@ fn viewport_state(app: &App) -> ViewportState {
                 Some(crate::editor::Modal::File(picker)) => Some(picker.revision),
                 _ => None,
             }),
+        help: app
+            .modals
+            .native_help(app.desktop.active().id)
+            .map(|h| h.revision),
+        welcome: app.welcome.modals.welcome().map(|w| w.page.revision),
         viewer: app.desktop.active_viewer().map(|v| {
             (
                 v.offset,
@@ -72,6 +81,8 @@ fn viewport_state(app: &App) -> ViewportState {
             )
         }),
         menu: app.modals.menu(),
+        hide_menu: app.config.hide_menu,
+        copy_history: app.modals.copy_history().map(|h| (h.cursor, h.offset)),
         submenus: app.modals.submenus().to_vec(),
         modal_offsets: vec![
             app.modals.archive().map_or(0, |m| m.offset),
@@ -151,7 +162,7 @@ pub fn prepare_window(
     }
     app.utilities.size = (area.width, area.height);
     let r = Layout::vertical([
-        Constraint::Length(1),
+        Constraint::Length(u16::from(!app.config.hide_menu)),
         Constraint::Min(1),
         Constraint::Length(1),
         Constraint::Length(1),
@@ -265,6 +276,10 @@ pub fn prepare_window(
             info.step(0);
         }
     }
+    if let Some(history) = app.modals.copy_history_mut() {
+        history.rows = history.paths.len().clamp(1, 8);
+        history.keep_visible();
+    }
     let profile = app.config.palette;
     if let Some(crate::editor::Modal::File(picker)) = app
         .desktop
@@ -274,6 +289,22 @@ pub fn prepare_window(
         picker.prepare(
             crate::presentation::layout::Size::new(area.width, area.height),
             profile,
+        );
+    }
+    if app.welcome.modals.welcome().is_some() {
+        crate::welcome::prepare(
+            app,
+            crate::presentation::layout::Size::new(area.width, area.height),
+        );
+    }
+    let language = app.config.language;
+    let shortcuts = app.config.shortcuts;
+    if let Some(help) = app.modals.native_help_mut(owner) {
+        help.prepare(
+            crate::presentation::layout::Size::new(area.width, area.height),
+            profile,
+            language,
+            shortcuts,
         );
     }
     let message = if area.width >= 80 && area.height >= 25 {
@@ -288,7 +319,9 @@ pub fn prepare_window(
         None
     };
     if let Some(m) = &message {
-        app.set_message_offset(app.message_offset().min(m.maximum));
+        if app.modals.native_help(owner).is_none() {
+            app.set_message_offset(app.message_offset().min(m.maximum));
+        }
     }
     crate::command_line::prepare(app, regions[2]);
     app.command_line.translate_input(bounds.x);

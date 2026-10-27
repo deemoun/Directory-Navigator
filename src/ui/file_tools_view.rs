@@ -47,6 +47,7 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
             cursor,
             offset,
             rows,
+            focus,
             ..
         } => {
             if paths.is_empty() {
@@ -58,16 +59,25 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
                     false,
                 );
             }
-            for (index, path) in paths.iter().enumerate().skip(*offset).take(*rows) {
-                let row = Rect::new(x, rect.y + 1 + (index - *offset) as u16, w, 1);
-                text(
-                    frame,
-                    profile,
-                    row,
-                    &tail(&display_name(&path.to_string_lossy()), w),
-                    index == *cursor,
+            if !paths.is_empty() {
+                frame.render_widget(
+                    crate::turbo::widgets::list(
+                        paths
+                            .iter()
+                            .map(|p| tail(&display_name(&p.to_string_lossy()), w))
+                            .collect(),
+                        *cursor,
+                        *offset,
+                        *focus == 0,
+                    ),
+                    Rect::new(x, rect.y + 1, w, *rows as u16),
                 );
-                controls.push((row, ToolAction::HistoryRow(index)));
+            }
+            for index in *offset..paths.len().min(*offset + *rows) {
+                controls.push((
+                    Rect::new(x, rect.y + 1 + (index - *offset) as u16, w, 1),
+                    ToolAction::HistoryRow(index),
+                ));
             }
             text(
                 frame,
@@ -121,25 +131,13 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
             ] {
                 let row = Rect::new(x + 2, rect.y + 3 + index as u16 * 2, w - 4, 1);
                 let label = app.config.language.text(label);
-                text(
-                    frame,
-                    profile,
+                frame.render_widget(
+                    if index < 2 {
+                        crate::turbo::widgets::checkbox(label, value, *focus == index, true)
+                    } else {
+                        crate::turbo::widgets::radio(label, value, *focus == index)
+                    },
                     row,
-                    &format!(
-                        "{} {label}",
-                        if index < 2 {
-                            if value {
-                                "[x]"
-                            } else {
-                                "[ ]"
-                            }
-                        } else if value {
-                            "(●)"
-                        } else {
-                            "( )"
-                        }
-                    ),
-                    *focus == index,
                 );
                 controls.push((row, ToolAction::Choice(index)));
             }
@@ -196,9 +194,7 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
             let column = Line::from(&field[..*cursor]).width();
             let scroll = column.saturating_sub(usize::from(w.saturating_sub(1)));
             frame.render_widget(
-                Paragraph::new(display_name(field))
-                    .style(super::dialog_style::input_style(profile, *focus == 0))
-                    .scroll((0, scroll as u16)),
+                crate::turbo::widgets::input_scrolled(&display_name(field), scroll, *focus == 0),
                 input,
             );
             controls.push((input, ToolAction::Field));
@@ -248,17 +244,31 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
     }
     for (row, action) in controls {
         let focus = match modal {
+            ToolDialog::History { focus, .. } => Some((*focus, 1, 2)),
             ToolDialog::Compare { focus } => Some((*focus, 4, 5)),
             ToolDialog::Export { focus, .. } => Some((*focus, 3, 4)),
             _ => None,
         };
+        if action == ToolAction::Accept
+            && matches!(modal, ToolDialog::History { paths, .. } if paths.is_empty())
+        {
+            frame.render_widget(
+                crate::turbo::widgets::disabled_button(app.config.language.text(" [ OK ] ")),
+                row,
+            );
+            continue;
+        }
         match action {
-            ToolAction::Accept => super::dialog_style::button(
+            ToolAction::Accept => super::dialog_style::button_with_default(
                 frame,
                 profile,
                 row,
                 app.config.language.text(" [ OK ] "),
                 focus.is_some_and(|(f, a, _)| f == a),
+                focus.map_or_else(
+                    || matches!(modal, ToolDialog::History { paths, .. } if !paths.is_empty()),
+                    |(f, a, _)| f < a,
+                ),
             ),
             ToolAction::Cancel => super::dialog_style::button(
                 frame,

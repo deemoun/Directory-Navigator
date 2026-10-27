@@ -39,11 +39,7 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
         let row = Rect::new(rect.x + 3, rect.y + 2 + i as u16 * 2, 66, 1);
         let label = app.config.language.text(label);
         frame.render_widget(
-            Paragraph::new(format!(
-                "({}) {label}",
-                if profile == value { '●' } else { ' ' }
-            ))
-            .style(dos(if cursor == i { 0x30 } else { 0x70 })),
+            crate::turbo::widgets::radio(label, profile == value, cursor == i),
             row,
         );
         frame.regions().push((row, Target::ColorChoice(value)));
@@ -82,7 +78,7 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
         Rect::new(rect.x + 3, rect.y + 14, 66, 1),
     );
     for (label, target, selected, x) in [
-        ("[ Apply ]", Target::AcceptColors, cursor == 2, rect.x + 12),
+        ("[ Apply ]", Target::AcceptColors, cursor != 3, rect.x + 12),
         (
             "[ Cancel ]",
             Target::CancelColors,

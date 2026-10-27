@@ -300,7 +300,6 @@ pub fn key(app: &mut App, event: KeyEvent) {
             KeyCode::BackTab => m.focus = crate::control_focus::cycle(m.focus, 5, true),
             KeyCode::Enter => {
                 let command = match m.focus {
-                    1 | 2 => Action::Toggle(m.focus),
                     4 => Action::Close,
                     _ => Action::Start,
                 };
@@ -331,26 +330,52 @@ pub fn key(app: &mut App, event: KeyEvent) {
         }
     } else {
         let buttons = if m.kind == Kind::Sizes { 3 } else { 5 };
+        let choices: Vec<usize> = (0..=buttons)
+            .filter(|i| {
+                if *i == 0 {
+                    return true;
+                }
+                if m.kind == Kind::Sizes {
+                    match *i {
+                        1 => m.job.is_none(),
+                        2 => m.job.is_some(),
+                        _ => true,
+                    }
+                } else {
+                    match *i {
+                        1 => !m.hits.is_empty(),
+                        2 | 3 => m.hits.get(m.cursor).is_some_and(|h| h.regular),
+                        4 => m.job.is_some(),
+                        _ => true,
+                    }
+                }
+            })
+            .collect();
+        if let Some(row) = crate::turbo::widgets::list_key(m.cursor, m.count(), m.rows, event.code)
+        {
+            m.cursor = row;
+            m.keep_visible();
+            return;
+        }
         match event.code {
-            KeyCode::Tab => m.focus = crate::control_focus::cycle(m.focus, buttons, false),
-            KeyCode::BackTab => m.focus = crate::control_focus::cycle(m.focus, buttons, true),
-            KeyCode::Up => m.step(-1),
-            KeyCode::Down => m.step(1),
-            KeyCode::PageUp => m.step(-(m.rows as isize)),
-            KeyCode::PageDown => m.step(m.rows as isize),
-            KeyCode::Home => m.step(isize::MIN),
-            KeyCode::End => m.step(isize::MAX),
+            KeyCode::Tab | KeyCode::BackTab => {
+                m.focus =
+                    crate::control_focus::select(m.focus, &choices, event.code == KeyCode::BackTab)
+            }
             KeyCode::F(3) => action(app, Action::View),
             KeyCode::F(4) => action(app, Action::Edit),
             KeyCode::Enter | KeyCode::Char(' ') => {
+                if m.focus != 0 && !choices.contains(&m.focus) {
+                    return;
+                }
                 let command = if m.kind == Kind::Sizes {
-                    match m.focus {
+                    match m.focus.saturating_sub(1) {
                         1 => Action::Stop,
                         2 => Action::Close,
                         _ => Action::Recalculate,
                     }
                 } else {
-                    match m.focus {
+                    match m.focus.saturating_sub(1) {
                         1 => Action::View,
                         2 => Action::Edit,
                         3 => Action::Stop,

@@ -136,7 +136,7 @@ impl PanelGeometry {
         }
         let span = u128::from(track.height - 1);
         let maximum = count.saturating_sub(1) as u128;
-        let row = (cursor.min(count - 1) as u128 * span + maximum / 2)
+        let row = (cursor.min(count - 1) as u128 * span)
             .checked_div(maximum)
             .unwrap_or(0) as u16;
         Some(Rect::new(track.x, track.y + row, track.width, 1))

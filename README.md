@@ -132,6 +132,7 @@ Automatic remains optional: it selects Mac-friendly on macOS and Classic DN else
 | F2 | User menu |
 | F3 / F4 | View / edit |
 | F5 / F6 | Copy / move or rename |
+| Ctrl+O | Reveal terminal output; Ctrl+O/Esc/Enter returns (Mac: Ctrl+O twice) |
 | F7 / F8 | Create directory / Trash or delete with confirmation |
 | F9 / F10 | Menu / exit |
 | Ctrl+F7 / Alt+F7 | Recursive Find / quick filename search |
@@ -186,7 +187,8 @@ hardware settings and custom palettes are excluded; Trash and confirmation safeg
 are retained. Compatibility is based on source-derived fixtures; a real user-supplied
 `DN.CFG` has not yet been tested.
 
-File operations refuse existing destinations. Trash is the default deletion mode;
+File operations refuse existing destinations by default. Copy can explicitly skip
+conflicts without overwriting. Trash is the default deletion mode;
 a Trash failure never falls back to permanent deletion. Permanent deletion can be
 selected in File Manager Setup and still requires confirmation.
 Detected changes to queued entries or their parent directories stop the operation.

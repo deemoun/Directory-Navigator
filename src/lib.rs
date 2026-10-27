@@ -84,3 +84,7 @@ pub mod control_focus;
 pub mod requests;
 
 pub mod modals;
+
+pub mod copy_dialog;
+
+pub mod terminal_output;

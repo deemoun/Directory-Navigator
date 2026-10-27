@@ -21,12 +21,20 @@ pub struct Prompt {
     pub cursor: usize,
     /// Input, OK, Cancel, Help.
     pub focus: usize,
+    /// Shared Copy/Rename-move draft, including native destination receipts.
+    pub copy: Option<crate::copy_dialog::Draft>,
 }
 
 impl Prompt {
     pub fn paste(&mut self, text: &str) {
         if self.focus == 0 {
+            let previous = self.field.clone();
             paste_input(&mut self.field, &mut self.cursor, text);
+            if self.field != previous {
+                if let Some(copy) = &mut self.copy {
+                    copy.picked = None;
+                }
+            }
         }
     }
     pub fn title(&self) -> &'static str {
@@ -42,7 +50,13 @@ impl Prompt {
     }
 
     pub fn edit(&mut self, code: crossterm::event::KeyCode) {
+        let previous = self.field.clone();
         edit_input(&mut self.field, &mut self.cursor, code);
+        if self.field != previous {
+            if let Some(copy) = &mut self.copy {
+                copy.picked = None;
+            }
+        }
     }
 }
 
@@ -53,48 +67,17 @@ pub fn paste_input(field: &mut String, cursor: &mut usize, text: &str) {
         .take(4096)
         .collect();
     if field.len() + clean.len() <= 16_384 {
-        field.insert_str(*cursor, &clean);
-        *cursor += clean.len();
+        crate::turbo::widgets::edit_input(
+            field,
+            cursor,
+            crossterm::event::KeyCode::Null,
+            Some(&clean),
+        );
     }
 }
 
 pub fn edit_input(field: &mut String, cursor: &mut usize, code: crossterm::event::KeyCode) {
-    use crossterm::event::KeyCode;
-    match code {
-        KeyCode::Char(c) if !c.is_control() && field.len() < 16_384 => {
-            field.insert(*cursor, c);
-            *cursor += c.len_utf8();
-        }
-        KeyCode::Left => {
-            *cursor = field[..*cursor]
-                .char_indices()
-                .next_back()
-                .map(|(i, _)| i)
-                .unwrap_or(0)
-        }
-        KeyCode::Right => {
-            *cursor += field[*cursor..]
-                .chars()
-                .next()
-                .map(char::len_utf8)
-                .unwrap_or(0)
-        }
-        KeyCode::Home => *cursor = 0,
-        KeyCode::End => *cursor = field.len(),
-        KeyCode::Backspace if *cursor > 0 => {
-            let previous = field[..*cursor]
-                .char_indices()
-                .next_back()
-                .map(|(i, _)| i)
-                .unwrap_or(0);
-            field.drain(previous..*cursor);
-            *cursor = previous;
-        }
-        KeyCode::Delete if *cursor < field.len() => {
-            field.remove(*cursor);
-        }
-        _ => {}
-    }
+    crate::turbo::widgets::edit_input(field, cursor, code, None);
 }
 
 pub fn prompt_help(app: &mut crate::app::App) {
@@ -107,7 +90,8 @@ pub fn prompt_help(app: &mut crate::app::App) {
         PromptKind::GoTo => "Enter an absolute or relative directory path.\nRelative paths use the active panel directory.",
         PromptKind::Operation(Kind::Delete) => "Permanently deletes the listed files and directories.\nSymbolic links are removed without following targets.\nCancel leaves everything unchanged.",
         PromptKind::Operation(Kind::Trash) => "Moves the listed items to the system Trash.\nRestore items using your desktop file manager.\nLinks themselves are moved; targets are not followed.\nIf Trash is unavailable, the operation stops without\nfalling back to permanent deletion.",
-        _ => "Enter a destination path. A blank path uses the base directory.\nExisting destinations are refused; files are never overwritten.\nSymbolic links are copied as links.",
+        PromptKind::Operation(Kind::Copy) => "Copy uses the inactive panel directory for a blank destination.\nRefuse stops on existing destinations; Skip leaves each existing top-level file or directory untouched. Directories are not merged.\nOverwrite, append, refresh and description copying are unavailable.\nCheck free disk space estimates source file lengths before writing; filesystem overhead and later space changes can still cause errors.\nVerify disk writes reads back staged bytes before publication. Remove source files forces verification and removes sources only after the whole copied batch succeeds. Skipped sources remain.\nF4 opens destination history; Tree chooses a directory without navigating either panel. Esc cancels.",
+        PromptKind::Operation(Kind::Move) => "Move/rename uses the inactive panel directory for a blank destination; Shift+F6 uses the active directory. Relative paths use that base. A single item may use a new name; multiple items need an existing directory.\nRefuse stops before changes if a top-level destination exists. Skip leaves existing files, folders and their sources untouched; folders are never merged.\nNative no-replace rename is preferred. Check free disk space applies when copying is required. Verify disk writes uses staged copying, reads back the bytes, then removes sources through guarded batch cleanup.\nRemove source files is always selected for Move. Overwrite, append, refresh and description copying are unavailable.\nF4 opens the shared destination history; Tree chooses a directory without navigating either panel. Esc cancels; completed moves remain completed.",
     };
     app.push_dialog(Dialog {
         title: " Help ",

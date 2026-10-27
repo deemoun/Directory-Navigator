@@ -15,10 +15,13 @@ Ctrl+click marks files. F4 opens the native UTF-8 editor.
 
 ## First start
 
-Directory Navigator shows a compact welcome when `config.conf` does not exist. It lists the active profile’s controls, opening behavior and
+Directory Navigator shows a Welcome page in the native Help window when `config.conf` does not exist. It lists the active profile’s controls, opening behavior and
 current deletion mode. **Start**, Esc or the title close control dismisses it;
 **Keyboard settings** and **Help** return to the welcome when closed. **≡ → Welcome…**
-opens it again without changing panel state.
+opens it again without changing panel state. Tab/Shift+Tab select the action links;
+Enter or a click activates one. PageUp/PageDown and the mouse wheel scroll.
+Welcome and Help share the centered 72×20 frame, colors and shadow; the footer
+shows the controls for the active page.
 
 Dismissing the welcome writes no files. Normal settings saving on exit prevents
 it appearing on later launches. If saving is disabled and no configuration exists,
@@ -27,6 +30,21 @@ trigger it; settings errors are reported separately. Load desktop never triggers
 There is no startup delay or splash timer. CLI help/version bypass the interface.
 
 ## Keyboard profiles
+
+Keyboard-profile and regional choice fields use native Turbo Vision controls.
+Left/Right or Space keeps the existing cycle behavior. Press F4, or click the
+field's arrow, to open a choice list; arrows select and Enter or a click accepts.
+Esc closes that list and restores focus to its parent. A choice updates the
+dialog's draft; the parent dialog's OK applies it, and Cancel discards it.
+
+When a dialog has an Enter-default action, its button is highlighted immediately
+with the DN yellow caption and cyan pointers where space permits. Input fields
+and lists keep keyboard focus. Selecting another button moves the highlight to
+that button; unsaved-editor confirmation highlights its existing Cancel default.
+Tab and Shift+Tab cycle forward/backward through enabled fields, lists and buttons,
+wrapping at the ends. Enter activates the focused button, or the dialog's default
+from a field/list. Space changes checkbox/radio options. Esc cancels the current
+dialog and returns to its parent; previously completed operations stay completed.
 
 **Options → Configuration → Keyboard shortcuts** selects **Automatic**, **Classic
 DN** or **Mac-friendly**. Apply changes the profile immediately; Cancel preserves
@@ -37,9 +55,10 @@ preserved. Automatic remains available and selects Mac-friendly on macOS, Classi
 DN elsewhere. Select Mac-friendly explicitly when preferred, including over SSH.
 
 The Mac profile uses **Ctrl+O, release, then another key**. `^O` in menus and
-function bars means this prefix. A context guide appears while waiting; Esc,
-Ctrl+O again, or a mouse click dismisses it without editing text. Text prompts
-retain their normal input behavior. Existing DN and modern Ctrl aliases remain
+function bars means this prefix. A context guide appears while waiting; Esc
+or a mouse click dismisses it without editing text. In the file manager,
+Ctrl+O twice reveals terminal output; the existing letter/number sequences remain.
+Text prompts retain their normal input behavior. Existing DN and modern Ctrl aliases remain
 available; Command stays with the terminal, and no terminal settings are modified.
 
 | After Ctrl+O | File manager |
@@ -51,6 +70,7 @@ available; Command stays with the terminal, and no terminal settings are modifie
 | H / J / A / V | Command / directory / edit / view histories |
 | O / P / Y | OS default application / list export / Tetris |
 | K / M / R | Keyboard settings / menu / refresh |
+| Ctrl+O | Reveal terminal output (Ctrl+O twice total) |
 | Space | Mark highlighted entry, even when ordinary Space selection is disabled |
 | Up / Down / Left / Right | Page up / page down / first entry / last entry (also `[` / `]` / `,` / `.`) |
 
@@ -179,8 +199,38 @@ viewer history. These tools are session-only and add no configuration keys.
 
 Copy/move dialogs default to the other panel's directory. A typed path is
 relative to that base unless absolute. A single item can use a new destination
-name; multiple items require an existing destination directory. Existing files,
-folders and broken links are refused; nothing is silently overwritten or merged.
+name; multiple items require an existing destination directory. Copy and
+Move/rename use DN's expanded dialog with these supported choices:
+
+- **Refuse existing destinations** (default): reject the batch before writing if
+  any top-level destination already exists.
+- **Skip all existing files**: leave existing files, directories and broken links
+  untouched, copying/moving only the remaining items. A completion dialog reports
+  any skips. Existing directories are skipped as a whole; their contents are never
+  merged. Skipped sources are retained.
+- **Check free disk space**: estimate regular-file lengths before writing. This is
+  advisory: filesystem overhead and later space changes can still cause errors.
+  An unavailable space reading stops the operation before writing.
+- **Verify disk writes**: read back and compare staged file bytes before publishing.
+- **Remove source files (Copy only)**: force verification, copy the whole selected
+  batch, then use the guarded move cleanup. A failed or cancelled copy retains its sources;
+  errors during cleanup retain remaining sources and completed destinations.
+- **Tree**: choose a directory without navigating either panel. The history arrow
+  or **F4** recalls up to 16 attempted destinations for this session. **F1/Help**
+  explains the options. Child dialogs return to the current draft.
+
+Overwrite, append, refresh and description copying are displayed disabled.
+Nothing replaces an existing destination, including a destination created after
+preflight. Move/rename defaults to Refuse and offers the same explicit Skip choice.
+Its **Remove source files** box is checked and locked, so the operation stays a
+move. **F6** uses the other panel's directory; **Shift+F6** uses the active panel's
+directory for renaming. Both dialogs share destination history, as in DN.
+
+Move/rename prefers native exclusive rename. Its space check runs only when
+copying is required; a native rename needs no copy capacity. Selecting **Verify
+disk writes** uses staged copying even on the same volume, then guarded source
+cleanup after the whole copied batch succeeds. Cancellation/errors keep completed
+native renames and published copies; there is no automatic rollback.
 
 Operations run in a background worker with item/byte progress. Cancellation and
 errors retain completed work. Moves prefer native no-overwrite rename, with a
@@ -409,14 +459,28 @@ DOS communications/country/printer setup and built-in printing are outside this
 app's scope. Save all and desktop window-management commands await a matching
 multi-document/window model. Future work is separate: safe archive extraction,
 disk/free-space information and permission editing; later,
-output recall, archive creation and palette editing.
+archive creation and palette editing.
 Split/combine and line drawing remain low priority. No settings format changes.
+
+**Ctrl+O** in the Classic profile reveals the terminal's real primary screen and
+scrollback. In the Mac profile, press **Ctrl+O twice**; **Alt+F5** and
+**Manager → Terminal output** also reveal it. **Ctrl+O, Esc or Enter** returns to DN.
+Use your terminal's own scrolling, text selection and copy controls while output
+is visible. The view is read-only: typing, paste and clicks do not execute commands
+or edit the saved command draft. It starts no shell and does not replay output.
+Background work continues; dialogs and editors keep their state, and resize causes
+a full redraw on return. Blocking dialogs must be closed before revealing output.
+
+Output includes commands run from DN and earlier shell scrollback. Programs using
+their own alternate screen control what they leave in the primary terminal.
+After a DN command finishes, Enter, Esc or Ctrl+O returns immediately to the panes.
 
 The bottom row is a command prompt with a blinking cursor, not a status line.
 Type a single-line command and press Enter to run it in the active directory,
 using `$SHELL -c` (or `%COMSPEC% /D /S /C` on Windows). Commands run with your
 normal permissions in the real terminal, without file-operation safeguards.
-DN waits for Enter after completion, restores the panels and refreshes listings.
+After completion, output stays visible until Ctrl+O, Esc or Enter. Background
+polling continues; returning restores the panes, with listings refreshed.
 An empty Enter still opens the highlighted entry. Esc clears the command;
 Left/Right/Home/End, Backspace and Delete edit it when nonempty. Up/Down still
 navigate files. Ctrl+E/Ctrl+X recall previous/next submitted commands (100 unique,
@@ -499,10 +563,13 @@ No drive selector or DOS drive-letter controls are added.
 ## Tetris high scores
 
 The game uses a classic DN-style board with Info, Next and Best panels and
-New / Setup / Top 10 / Pause buttons. The title close control and Esc return to
-files. Top 10 shows Name, Start, End and Score with dotted leaders; the highlighted
+New / Setup / Top 10 / Pause buttons. Tab/Shift+Tab cycle through the board and
+these buttons; Enter activates the selected button. Gravity pauses while button
+focus is active. Esc returns button focus to the board; from the board Esc returns
+to files. Clicking the board also restores play focus. Top 10 shows Name, Start, End and Score with dotted leaders; the highlighted
 entry's line count remains below the table. Pending scores keep a Retry save
-button, and OK or the title close control returns to the game.
+button; Tab/Shift+Tab choose Retry save or OK, and Enter activates that choice.
+Esc, OK or the title close control returns to the game.
 
 Setup provides ten named levels (1–9 and 0 for level 10) and a Piece preview
 checkbox. Arrows select levels; Tab/Shift+Tab move between levels, preview, OK
@@ -512,10 +579,13 @@ score, level, preview and paused state. Classic Tetris is the only implemented
 style; Pentix is not offered.
 
 Alt+F9 opens Tetris. A finished game shows the final score, line count and
-starting/ending levels. Enter/Esc continues: positive scores qualifying for the
+starting/ending levels. Enter continues: positive scores qualifying for the
 top ten ask for a player name; other scores show the leaderboard directly.
-Type or paste a Unicode name (up to 30 graphemes / 240 UTF-8 bytes). Enter/OK
-saves it; Esc/Skip name records Anonymous. Blank names also use Anonymous.
+Esc dismisses game-over without submitting a score. Type or paste a Unicode name
+(up to 30 graphemes / 240 UTF-8 bytes). Tab/Shift+Tab cycle through the input, OK
+and Skip name. Enter activates the selected button; from the input it saves.
+Skip name explicitly records Anonymous; blank names also use Anonymous. Esc
+cancels name entry without saving and keeps its draft on the game-over page.
 The new entry is highlighted. F4 shows the top ten during play. Closing an
 unfinished game does not add a score.
 
@@ -687,3 +757,28 @@ Dialogs block switching until closed, and nested help returns to its parent.
 Several editors and viewers can coexist. Games retain one instance and are not
 listed. Windows remain full-screen and session-only; open documents are not
 restored after restarting.
+
+## Context help
+
+F1 opens help for the current screen or dialog. Press F1 again for Contents.
+Tab and Shift+Tab select links; Enter follows the selected link. A single mouse
+click selects a link and a double click follows it. Alt+F1 or Backspace returns
+to the previous topic with its scroll position. Arrows, PageUp/PageDown and the
+mouse wheel scroll. Esc or the title close control returns to the parent dialog
+or document. Help blocks document switching until closed.
+
+## Hiding the menu bar
+
+Options → Configuration → Interface → **Hide menu bar** gives the top row to the
+file panes. Enter applies the setting; Esc cancels the draft. It is saved with the
+other interface preferences. F9, Alt plus a menu letter, or a click on the top edge
+reveals the menu temporarily. Esc or choosing a command hides it again without
+moving the panes. Uncheck the option to keep the bar visible.
+
+The manager menu is hidden while Tetris is open. The game's buttons use DOS
+Navigator's dark faces, yellow shortcut letters and offset black shadows.
+
+Dialog buttons share DOS Navigator's dark faces and black offset shadows.
+Yellow captions with cyan inward arrows identify the focused/default action;
+disabled buttons have dim captions. In Colors, Apply is the Enter default while
+choosing a palette. Tab to Cancel or press Esc to restore the previous palette.

@@ -5,7 +5,6 @@ use super::scene::Scene;
 use crate::{
     app::App,
     mouse::Target,
-    palette::PaletteProfile,
     tetris::{GameAction, FIGURES, HEIGHT, WIDTH},
 };
 use std::collections::BTreeMap;
@@ -13,31 +12,12 @@ use unicode_width::UnicodeWidthStr;
 mod pages;
 
 impl Scene {
-    pub(crate) fn button(&mut self, x: u16, y: u16, label: &str) {
-        self.fill(x + 1, y + 1, 10, 1, 0x00);
-        if self.profile == PaletteProfile::Terminal {
-            self.fill(x, y, 10, 1, 0x70);
-            self.text(x, y, 10, label, 0x70);
-        } else {
-            self.fill(x, y, 10, 1, 0x8f);
-            // Preserve the existing base label and mnemonic overlay, including
-            // the last column of labels that nearly fill the button.
-            let spare = 10usize.saturating_sub(label.width() + 2);
-            let start = 1 + spare / 2;
-            self.text(x + start as u16, y, 10 - start as u16, label, 0x8f);
-            let padding = 10usize.saturating_sub(label.width()) / 2;
-            let mut chars = label.chars();
-            let first = chars.next().map(|c| c.to_string()).unwrap_or_default();
-            self.text(x + padding as u16, y, 10 - padding as u16, &first, 0x8e);
-            let rest: String = chars.collect();
-            self.text(
-                x + padding as u16 + first.width() as u16,
-                y,
-                10u16.saturating_sub(padding as u16 + first.width() as u16),
-                &rest,
-                0x8f,
-            );
-        }
+    pub(crate) fn button(&mut self, x: u16, y: u16, label: &str, focused: bool) {
+        super::widgets::paint_into(
+            self,
+            super::widgets::button(label, focused),
+            crate::presentation::layout::Rect::new(x, y, 11, 2),
+        );
     }
 }
 
@@ -81,6 +61,10 @@ pub(crate) fn prepare(app: &App, width: u16, height: u16) -> Scene {
             }
         }
     }
+    regions.push((
+        crate::presentation::layout::Rect::new(wx + 1, wy + 1, WIDTH as u16 * 2, HEIGHT as u16),
+        Target::Game(GameAction::BoardFocus),
+    ));
     if !game.over {
         for (col, row) in game.piece.positions().filter(|(col, row)| {
             (0..WIDTH as i32).contains(col) && (0..HEIGHT as i32).contains(row)
@@ -169,15 +153,12 @@ pub(crate) fn prepare(app: &App, width: u16, height: u16) -> Scene {
             0x3f,
         );
     }
-    for (label, action, bx, by) in [
-        ("New", GameAction::New, sx, y + 18),
-        ("Setup", GameAction::Setup, sx + 13, y + 18),
-        ("Top 10", GameAction::Scores, sx, y + 20),
-        ("Pause", GameAction::Pause, sx + 13, y + 20),
-    ] {
-        scene.button(bx, by, language.text(label));
+    for (index, (label, action)) in crate::tetris::BUTTONS.into_iter().enumerate() {
+        let bx = sx + (index as u16 % 2) * 11;
+        let by = y + 18 + (index as u16 / 2) * 2;
+        scene.button(bx, by, language.text(label), game.play_focus == index + 1);
         regions.push((
-            crate::presentation::layout::Rect::new(bx, by, 10, 1),
+            crate::presentation::layout::Rect::new(bx, by, 11, 1),
             Target::Game(action),
         ));
     }

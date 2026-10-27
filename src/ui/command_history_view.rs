@@ -34,9 +34,7 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
     let column = Line::from(&d.query[..d.input_cursor]).width();
     let scroll = column.saturating_sub(usize::from(width.saturating_sub(1)));
     frame.render_widget(
-        Paragraph::new(d.query.as_str())
-            .scroll((0, scroll as u16))
-            .style(super::dialog_style::input_style(profile, d.focus == 0)),
+        crate::turbo::widgets::input_scrolled(d.query.as_str(), scroll, d.focus == 0),
         field,
     );
     if d.focus == 0 {
@@ -56,21 +54,23 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
             Rect::new(x, rect.y + 4, width, 1),
         );
     }
-    for (i, index) in d.matches.iter().enumerate().skip(d.offset).take(d.rows) {
-        if let Some(command) = app.command_line.history().get(*index) {
-            let row = Rect::new(x, rect.y + 4 + (i - d.offset) as u16, width, 1);
-            frame.render_widget(
-                Paragraph::new(display_name(command)).style(dos(if i == d.cursor {
-                    0x30
-                } else {
-                    0x70
-                })),
-                row,
-            );
-            frame
-                .regions()
-                .push((row, Target::CommandHistory(Action::Row(i))));
-        }
+    let items = d
+        .matches
+        .iter()
+        .filter_map(|i| app.command_line.history().get(*i))
+        .map(|s| display_name(s))
+        .collect();
+    if !d.matches.is_empty() {
+        frame.render_widget(
+            crate::turbo::widgets::list(items, d.cursor, d.offset, d.focus == 1),
+            Rect::new(x, rect.y + 4, width, d.rows as u16),
+        );
+    }
+    for i in d.offset..d.matches.len().min(d.offset + d.rows) {
+        frame.regions().push((
+            Rect::new(x, rect.y + 4 + (i - d.offset) as u16, width, 1),
+            Target::CommandHistory(Action::Row(i)),
+        ));
     }
     frame.render_widget(
         Paragraph::new(language.text("Enter recalls without running · Tab moves · Esc cancels"))
@@ -84,16 +84,17 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
         let button = Rect::new(button_x, rect.bottom() - 2, 16, 1);
         if a == Action::Use && d.matches.is_empty() {
             frame.render_widget(
-                Paragraph::new(language.text(label)).style(dos(0x78)),
+                crate::turbo::widgets::disabled_button(language.text(label)),
                 button,
             );
         } else {
-            super::dialog_style::button(
+            super::dialog_style::button_with_default(
                 frame,
                 profile,
                 button,
                 language.text(label),
                 d.focus == focus,
+                focus == 2 && d.focus < 2,
             );
             frame.regions().push((button, Target::CommandHistory(a)));
         }

@@ -1,8 +1,5 @@
 use crate::painting::{Frame, Paragraph};
-use crate::presentation::{
-    layout::Rect,
-    text::{Line, Span},
-};
+use crate::presentation::{layout::Rect, text::Span};
 use crate::{
     app::App,
     archive::{reader::Kind, Action},
@@ -52,23 +49,12 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
         .style(dos(0x7e)),
         Rect::new(x, rect.y + 3, w, 1),
     );
-    for row in 0..b.rows {
-        let index = b.offset + row;
-        if index > b.children().len() {
-            break;
-        }
+    let mut items = Vec::new();
+    for index in 0..=b.children().len() {
         let node = index
             .checked_sub(1)
             .and_then(|i| b.children().get(i))
             .and_then(|id| b.catalog.as_ref().and_then(|c| c.nodes.get(*id)));
-        let selected = index == b.cursor;
-        let color = if selected {
-            0x30
-        } else if node.is_some_and(|n| n.kind == Kind::Link) {
-            0x79
-        } else {
-            0x70
-        };
         let name = node.map(|n| n.name()).unwrap_or_else(|| "..".into());
         let kind = node
             .map(|n| {
@@ -97,18 +83,28 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
         let nw = w.saturating_sub(24);
         let name = tail(&name, nw);
         let name_width = Span::raw(&name).width();
-        let line = Line::from(vec![
-            Span::raw(name),
-            Span::raw(" ".repeat(usize::from(nw).saturating_sub(name_width))),
-            Span::raw(format!("{size:>12}  {kind}")),
-        ]);
-        let r = Rect::new(x, rect.y + 4 + row as u16, w, 1);
-        frame.render_widget(Paragraph::new(line).style(dos(color)), r);
+        items.push(format!(
+            "{}{}{size:>12}  {kind}",
+            name,
+            " ".repeat(usize::from(nw).saturating_sub(name_width))
+        ));
+        if index < b.offset || index >= b.offset + b.rows {
+            continue;
+        }
+        let r = Rect::new(x, rect.y + 4 + (index - b.offset) as u16, w, 1);
         frame
             .regions()
             .push((r, Target::Archive(Action::Row(index))));
     }
+    frame.render_widget(
+        crate::turbo::widgets::list(items, b.cursor, b.offset, true),
+        Rect::new(x, rect.y + 4, w, b.rows as u16),
+    );
     let rows = b.rows as u16;
+    frame.render_widget(
+        crate::turbo::widgets::scrollbar(b.cursor, b.children().len(), b.rows),
+        Rect::new(rect.right() - 2, rect.y + 4, 1, rows),
+    );
     for row in 0..rows {
         let thumb = if b.children().is_empty() {
             0
@@ -127,7 +123,7 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
             ("░", Action::PageDown)
         };
         let r = Rect::new(rect.right() - 2, rect.y + 4 + row, 1, 1);
-        frame.render_widget(Paragraph::new(glyph).style(dos(0x70)), r);
+        let _ = glyph;
         if glyph != "■" {
             frame.regions().push((r, Target::Archive(a)));
         }
@@ -178,16 +174,20 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
             _ => true,
         };
         if enabled {
-            super::dialog_style::button(
+            super::dialog_style::button_with_default(
                 frame,
                 profile,
                 r,
                 app.config.language.text(label),
                 b.focus == i,
+                i == 1 && b.focus == 0,
             );
             frame.regions().push((r, Target::Archive(a)));
         } else {
-            frame.render_widget(Paragraph::new(label).style(dos(0x78)), r);
+            frame.render_widget(
+                crate::turbo::widgets::disabled_button(app.config.language.text(label)),
+                r,
+            );
         }
     }
 }

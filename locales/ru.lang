@@ -522,3 +522,51 @@ Sanitarium	Санаторий
 ~N~ame:	~И~мя:
 ~F~iles:	~Ф~айлы:
 Show ~h~idden	Показывать с~к~рытые
+Contents	Содержание
+File operations	Операции с файлами
+Tab switches panels. Arrows and page keys move through entries. Insert/Space marks files. Enter opens; Backspace goes to the parent. Ctrl+Q toggles quick view. Ctrl+T opens the directory tree.	Tab переключает панели. Стрелки и клавиши страниц перемещают курсор. Insert/Space отмечает файлы. Enter открывает; Backspace переходит к родителю. Ctrl+Q включает быстрый просмотр. Ctrl+T открывает дерево папок.
+F2 saves; Shift+F2 saves to a new destination. F3 opens another document. F7 finds text; Ctrl+F7 replaces. Alt+0 switches documents. Close and quit review unsaved changes.	F2 сохраняет; Shift+F2 сохраняет под новым именем. F3 открывает другой документ. F7 ищет; Ctrl+F7 заменяет. Alt+0 переключает документы. Закрытие и выход проверяют несохранённые изменения.
+F2 toggles wrapping; F7 finds text. Shift+F7 repeats; Ctrl+F7 searches backward. Arrows/page keys scroll. Esc returns. Previews remain bounded and read-only.	F2 переключает перенос строк; F7 ищет. Shift+F7 повторяет поиск; Ctrl+F7 ищет назад. Стрелки и клавиши страниц прокручивают текст. Esc возвращает назад. Предпросмотр ограничен по объёму и доступен только для чтения.
+F5 copies; F6 moves or renames; F7 creates a directory. F8 uses Trash or confirmed permanent deletion. Existing destinations are refused. Esc cancels pending work; completed items are retained.	F5 копирует; F6 перемещает или переименовывает; F7 создаёт папку. F8 переносит в Корзину или удаляет навсегда после подтверждения. Существующие назначения не перезаписываются. Esc отменяет работу; завершённые элементы сохраняются.
+Tab Next · Shift+Tab Previous · Enter Select · F1 Help · Esc Start	Tab Далее · Shift+Tab Назад · Enter Выбор · F1 Справка · Esc Начать
+F1 Contents · Tab Links · Enter Follow · Alt+F1 Back · Esc Close	F1 Содержание · Tab Ссылки · Enter Перейти · Alt+F1 Назад · Esc Закрыть
+Hide ~m~enu bar	Скрывать строку ~м~еню
+~N~ew	~Н~овая
+~S~etup	Н~а~стройка
+~T~op 10	~Т~оп 10
+~P~ause	~П~ауза
+Copy file {} to	Копировать файл {} в
+Copy {} selected items to	Копировать {} выбранных элементов в
+~O~verwrite all existing files	Пере~з~аписывать существующие файлы
+A~p~pend to all existing files	До~б~авлять в существующие файлы
+~R~efuse existing destinations	О~т~клонять существующие назначения
+~S~kip all existing files	Пропу~с~кать существующие файлы
+Refresh o~l~d files	Обновлять ст~а~рые файлы
+Existing destinations are never replaced.	Существующие назначения не заменяются.
+Check ~f~ree disk space	С~в~ободное место
+~V~erify disk writes	П~р~оверять запись
+Copy ~d~escriptions	Копировать оп~и~сания
+Remove so~u~rce files	Удалять ис~х~одники
+O~K~	О~К~
+~T~ree	~Д~ерево
+Destination history	История назначений
+No destination history	История назначений пуста
+Enter selects · Esc returns	Enter — выбор · Esc — возврат
+Copy directory {} to	Копировать каталог {} в
+Select	Выбрать
+Copy complete	Копирование завершено
+Copied items	Скопировано элементов
+Skipped existing items	Пропущено существующих элементов
+Skipped sources and existing destinations were kept.	Пропущенные источники и существующие назначения сохранены.
+Rename/move	Переименование/перемещение
+Move/rename directory {} to	Переместить каталог {} в
+Move/rename file {} to	Переместить файл {} в
+Move/rename {} selected items to	Переместить {} выбранных элементов в
+Move complete	Перемещение завершено
+Moved items	Перемещено элементов
+Terminal ~o~utput	Выв~о~д терминала
+Mac-friendly: press Ctrl+O, release, then choose\n1 Help · 2 User · 3 View · 4 Edit · 5 Copy\n6 Move · 7 MkDir · 8 Trash/delete · 9 Menu · 0 Quit\ns Quick search · f Recursive Find · i Info · z Sort\nb Bookmarks · l Filter · e Columns · r Refresh\nh Commands · j Directories · a Edits · v Views\no OS default app · p List file · y Tetris\nk Keyboard settings · u Windows · m Menu\nUp/Down Page · Left/Right First/last entry\nCtrl+A all · Ctrl+U clear · Ctrl+O then Space marks\nCtrl+O twice: terminal output; Esc returns\nEsc or click cancels the prefix; nothing is typed.\nClassic DN keys remain available.\nCommand shortcuts belong to your terminal.\nTrash/delete still requires confirmation.	Для Mac: нажмите Ctrl+O, отпустите, затем выберите\n1 Помощь · 2 Пользователь · 3 Просмотр · 4 Редактор · 5 Копия\n6 Перенос · 7 Папка · 8 Корзина · 9 Меню · 0 Выход\ns Быстрый поиск · f Поиск файлов · i Свойства · z Сортировка\nb Закладки · l Фильтр · e Колонки · r Обновить\nh Команды · j Каталоги · a Редактирование · v Просмотр\no Приложение ОС · p Список файлов · y Тетрис\nk Клавиши · u Окна · m Меню\n↑/↓ Страница · ←/→ Начало/конец списка\nCtrl+A всё · Ctrl+U снять отметки · Ctrl+O, Пробел отметить\nCtrl+O дважды: вывод терминала; Esc возвращает\nEsc или щелчок отменяет префикс; текст не вводится.\nКлассические клавиши DN также работают.\nСочетания Command обрабатывает терминал.\nУдаление и корзина требуют подтверждения.
+Tab switches panels. Arrows and page keys move through entries. Insert/Space marks files. Enter opens; Backspace goes to the parent. Ctrl+Q toggles quick view. Ctrl+T opens the directory tree. Ctrl+O reveals terminal output (Mac: Ctrl+O twice); Ctrl+O, Esc or Enter returns.	Tab переключает панели. Стрелки и клавиши страниц перемещают курсор. Insert/Space отмечает файлы. Enter открывает; Backspace переходит к родителю. Ctrl+Q включает быстрый просмотр. Ctrl+T открывает дерево папок. Ctrl+O показывает вывод терминала (Mac: дважды Ctrl+O); Ctrl+O, Esc или Enter возвращает.
+Tab chooses · Enter activates · Esc cancels	Tab — выбор · Enter — действие · Esc — отмена
+Enter continues · Esc cancels	Enter — продолжить · Esc — отменить
+Enter opens/runs · → submenu · Ctrl+R reload	Enter — запуск · → подменю · Ctrl+R обновить

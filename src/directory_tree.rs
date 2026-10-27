@@ -141,6 +141,7 @@ pub enum Action {
 pub struct Tree {
     pub(crate) requests: crate::requests::RequestScope,
     pub panel: usize,
+    pub(crate) destination_prompt: Option<crate::modals::ModalId>,
     pub original: PathBuf,
     pub root: Option<PathBuf>,
     pub rows: Vec<Row>,
@@ -160,6 +161,7 @@ impl Tree {
         let mut tree = Self {
             requests: Default::default(),
             panel,
+            destination_prompt: None,
             original: path,
             root: None,
             rows: Vec::new(),
@@ -540,7 +542,12 @@ pub fn action(app: &mut App, command: Action) {
             };
             let path = row.path.clone();
             let panel = tree.panel;
+            let destination = tree.destination_prompt;
             app.modals.set_directory_tree(None);
+            if let Some(parent) = destination {
+                crate::copy_dialog::pick(app, parent, path);
+                return;
+            }
             app.active = panel;
             app.panels[panel].go_to(path, app.config.show_hidden);
         }
@@ -589,9 +596,15 @@ pub fn key(app: &mut App, key: KeyEvent) {
         }
         return;
     }
+    if let Some(row) =
+        crate::turbo::widgets::list_key(tree.cursor, tree.rows.len(), tree.page_rows, key.code)
+    {
+        tree.cursor = row;
+        tree.keep_visible();
+        return;
+    }
     match key.code{
         KeyCode::Esc=>app.modals.set_directory_tree(None),KeyCode::Tab=>tree.focus = crate::control_focus::cycle(tree.focus, 5, false),KeyCode::BackTab=>tree.focus = crate::control_focus::cycle(tree.focus, 5, true),
-        KeyCode::Up=>tree.step(-1),KeyCode::Down=>tree.step(1),KeyCode::PageUp=>tree.step(-(tree.page_rows as isize)),KeyCode::PageDown=>tree.step(tree.page_rows as isize),KeyCode::Home=>tree.step(isize::MIN),KeyCode::End=>tree.step(isize::MAX),
         KeyCode::Left|KeyCode::Backspace|KeyCode::Char('-')=>tree.left(),KeyCode::Right|KeyCode::Char('+')=>tree.right(),
         KeyCode::Char(' ') if tree.focus==0=>tree.toggle(),
         KeyCode::Enter|KeyCode::Char(' ')=>{let command=match tree.focus{2=>Action::Refresh,3=>Action::Hidden,4=>Action::Close,_=>Action::Open};action(app,command);},

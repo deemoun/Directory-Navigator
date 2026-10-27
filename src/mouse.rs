@@ -18,6 +18,9 @@ pub enum Target {
     CancelImport,
     Welcome(crate::welcome::Action),
     ShortcutProfile,
+    OpenSettingsChoice(usize),
+    SettingsChoice(usize),
+    CancelSettingsChoice,
     CommandHistory(crate::command_line::history::Action),
     Archive(crate::archive::Action),
     UserMenu(crate::user_menu::Action),
@@ -36,6 +39,7 @@ pub enum Target {
     Tool(crate::file_tools::ToolAction),
     Editor(crate::editor::EditorAction),
     Menu(usize),
+    RevealMenu,
     MenuItem(usize, usize),
     MenuSurface,
     Function(u8),
@@ -44,6 +48,9 @@ pub enum Target {
     Entry(usize, usize),
     CloseDialog,
     SubmitPrompt,
+    Copy(crate::copy_dialog::Action),
+    CopyHistory(usize),
+    CloseCopyHistory,
     PromptField,
     PromptHelp,
     CancelPrompt,
@@ -54,6 +61,7 @@ pub enum Target {
     AcceptSettings,
     CancelSettings,
     AcceptPattern,
+    PatternField,
     CancelPattern,
     CloseFileInfo,
     ColumnChoice(usize, crate::columns::ColumnPreset),
@@ -68,6 +76,8 @@ pub struct MouseState {
     pub regions: Vec<(Rect, Target)>,
     last_click: Option<(usize, PathBuf, Instant)>,
     pub scrollbar_drag: Option<(usize, Rect)>,
+    pub(crate) dialogs:
+        Vec<std::rc::Rc<std::cell::RefCell<crate::turbo::composition::DialogGroup>>>,
 }
 
 impl MouseState {
@@ -78,6 +88,9 @@ impl MouseState {
 }
 
 pub fn handle(app: &mut App, event: MouseEvent) {
+    if app.output_visible {
+        return;
+    }
     if app.screensaver.active {
         if matches!(event.kind, MouseEventKind::Up(_)) {
             return;
@@ -97,6 +110,27 @@ pub fn handle(app: &mut App, event: MouseEvent) {
     }) {
         app.mouse.reset_click();
         return;
+    }
+    let mut event = event;
+    if event.kind == MouseEventKind::Down(MouseButton::Left) {
+        let offset = app.layout_key.map_or((0, 0), |(_, r, _)| (r.x, r.y));
+        let top = app.modal_top().map(|m| m.id);
+        let proposal = app
+            .mouse
+            .dialogs
+            .iter()
+            .rev()
+            .find(|d| Some(d.borrow().scope.id) == top)
+            .and_then(|d| {
+                d.borrow_mut().button(
+                    event.column.saturating_sub(offset.0),
+                    event.row.saturating_sub(offset.1),
+                )
+            });
+        if let Some((rect, _target)) = proposal {
+            event.column = rect.x + offset.0;
+            event.row = rect.y + offset.1;
+        }
     }
     handle_mouse(app, event);
     crate::layout::update(app);
@@ -155,6 +189,14 @@ fn handle_mouse(app: &mut App, event: MouseEvent) {
             if let Some(Target::Welcome(action)) = target {
                 crate::welcome::action(app, action);
             }
+        } else if matches!(
+            event.kind,
+            MouseEventKind::ScrollUp | MouseEventKind::ScrollDown
+        ) {
+            let offset = app.layout_key.map_or((0, 0), |(_, r, _)| (r.x, r.y));
+            if let Some(welcome) = app.welcome.modals.welcome_mut() {
+                welcome.page.mouse(event, offset);
+            }
         }
         return;
     }
@@ -195,6 +237,14 @@ fn handle_mouse(app: &mut App, event: MouseEvent) {
         return;
     }
     if focus == Focus::Message {
+        let offset = app.layout_key.map_or((0, 0), |(_, r, _)| (r.x, r.y));
+        if let Some(help) = app.modals.native_help_mut(app.desktop.active().id) {
+            let close = help.mouse(event, offset);
+            if close {
+                app.pop_dialog();
+            }
+            return;
+        }
         match event.kind {
             MouseEventKind::Down(MouseButton::Left) if target == Some(Target::CloseDialog) => {
                 crate::dialog::message_key(app, crossterm::event::KeyCode::Enter)
@@ -292,6 +342,11 @@ fn handle_mouse(app: &mut App, event: MouseEvent) {
     if focus == Focus::Pattern {
         if event.kind == MouseEventKind::Down(MouseButton::Left) {
             match target {
+                Some(Target::PatternField) => {
+                    if let Some(p) = app.modals.pattern_mut() {
+                        p.focus = 0;
+                    }
+                }
                 Some(Target::AcceptPattern) => crate::pattern::accept(app),
                 Some(Target::CancelPattern) => app.modals.set_pattern(None),
                 _ => {}
@@ -328,8 +383,22 @@ fn handle_mouse(app: &mut App, event: MouseEvent) {
         return;
     }
     if focus == Focus::Settings {
+        if app.modals.settings_choice().is_some() {
+            if event.kind == MouseEventKind::Down(MouseButton::Left) {
+                if let Some(Target::SettingsChoice(row)) = target {
+                    if let Some(choice) = app.modals.settings_choice_mut() {
+                        choice.cursor = row.min(choice.items.len().saturating_sub(1));
+                    }
+                    crate::settings::choice_key(app, crossterm::event::KeyCode::Enter);
+                } else {
+                    app.modals.set_settings_choice(None);
+                }
+            }
+            return;
+        }
         if event.kind == MouseEventKind::Down(MouseButton::Left) {
             match target {
+                Some(Target::OpenSettingsChoice(row)) => crate::settings::open_choice(app, row),
                 Some(Target::ShortcutProfile) => {
                     if let Some(settings) = app.modals.settings_mut() {
                         settings.keyboard_choice(false);
@@ -394,6 +463,25 @@ fn handle_mouse(app: &mut App, event: MouseEvent) {
                 job.cancel();
             }
             app.notice = "Cancelling…".into();
+        }
+        return;
+    }
+    if focus == Focus::CopyHistory {
+        crate::copy_dialog::history_mouse(app, event, target);
+        return;
+    }
+    if focus == Focus::Prompt && app.modals.prompt().is_some_and(|p| p.copy.is_some()) {
+        if event.kind == MouseEventKind::Down(MouseButton::Left) {
+            match target {
+                Some(Target::Copy(action)) => crate::copy_dialog::action(app, action),
+                Some(Target::PromptField) => {
+                    crate::copy_dialog::action(app, crate::copy_dialog::Action::Field)
+                }
+                Some(Target::SubmitPrompt) => app.submit_prompt(),
+                Some(Target::CancelPrompt) => app.modals.set_prompt(None),
+                Some(Target::PromptHelp) => crate::dialog::prompt_help(app),
+                _ => {}
+            }
         }
         return;
     }
@@ -468,6 +556,7 @@ fn handle_mouse(app: &mut App, event: MouseEvent) {
     }
     let previous = app.mouse.last_click.take();
     match target {
+        Some(Target::RevealMenu) => menu::open(app, 0),
         Some(Target::Menu(index)) => {
             if app.modals.menu().is_some_and(|(open, _)| open == index) {
                 menu::close(app);
@@ -493,8 +582,15 @@ fn handle_mouse(app: &mut App, event: MouseEvent) {
                 return;
             }
             match action {
-                ScrollAction::Up => panel.step(-1),
-                ScrollAction::Down => panel.step(1),
+                ScrollAction::Up | ScrollAction::Down => {
+                    panel.cursor = crate::turbo::widgets::scroll_step(
+                        panel.cursor,
+                        panel.entries.len() - 1,
+                        1,
+                        action == ScrollAction::Down,
+                        false,
+                    );
+                }
                 ScrollAction::Thumb => {
                     if let Some(track) = track {
                         app.mouse.scrollbar_drag = Some((index, track));
@@ -512,7 +608,13 @@ fn handle_mouse(app: &mut App, event: MouseEvent) {
                             .viewport_rows
                             .saturating_mul(panel.viewport_columns)
                             .min(isize::MAX as usize) as isize;
-                        panel.step(if event.row < thumb { -page } else { page });
+                        panel.cursor = crate::turbo::widgets::scroll_step(
+                            panel.cursor,
+                            panel.entries.len() - 1,
+                            page as usize,
+                            event.row >= thumb,
+                            true,
+                        );
                     }
                 }
             }

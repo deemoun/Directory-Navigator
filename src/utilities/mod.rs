@@ -283,7 +283,6 @@ pub fn key(app: &mut App, key: KeyEvent) {
                 }
                 KeyCode::Enter => {
                     command = Some(match calc.focus {
-                        1..=5 => Action::Base(calc.focus - 1),
                         7 => Action::Copy,
                         8 => Action::Close,
                         9 => Action::CalculatorHelp,
@@ -316,8 +315,18 @@ pub fn key(app: &mut App, key: KeyEvent) {
         Some(Kind::Characters) => {
             let chart = &mut app.utilities.chart;
             match key.code {
-                KeyCode::Tab => chart.focus = crate::control_focus::cycle(chart.focus, 5, false),
-                KeyCode::BackTab => chart.focus = crate::control_focus::cycle(chart.focus, 5, true),
+                KeyCode::Tab | KeyCode::BackTab => {
+                    let choices: &[usize] = if chart.copy_text().is_some() {
+                        &[0, 1, 2, 3, 4]
+                    } else {
+                        &[0, 1, 2, 4]
+                    };
+                    chart.focus = crate::control_focus::select(
+                        chart.focus,
+                        choices,
+                        key.code == KeyCode::BackTab,
+                    );
+                }
                 KeyCode::Enter | KeyCode::Char(' ') => {
                     command = Some(match chart.focus {
                         1 => Action::Page(Page::Ascii),

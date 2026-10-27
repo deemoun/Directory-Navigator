@@ -1,5 +1,5 @@
 use crossterm::{
-    cursor::{SetCursorStyle, Show},
+    cursor::{Hide, SetCursorStyle, Show},
     event::{
         self, DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste, EnableMouseCapture,
         MouseEventKind,
@@ -24,7 +24,7 @@ pub struct Session {
 pub fn restore() {
     restore_input(false);
 }
-fn restore_input(mouse_down: bool) {
+fn stop_capture(mouse_down: bool) {
     if mouse_down {
         // Keep capture and raw input active until the pending button is released.
         // Disabling reports first can suppress that release, while a short deadline
@@ -56,6 +56,9 @@ fn restore_input(mouse_down: bool) {
             libc::tcflush(libc::STDIN_FILENO, libc::TCIFLUSH);
         }
     }
+}
+fn restore_input(mouse_down: bool) {
+    stop_capture(mouse_down);
     let _ = execute!(
         io::stdout(),
         SetAttribute(Attribute::Reset),
@@ -91,6 +94,29 @@ impl Session {
     }
     pub fn suspend(&self) {
         restore_input(self.mouse_down.replace(false));
+    }
+    /// Keep raw input in DN while exposing the real primary screen/scrollback.
+    pub fn reveal_output(&self) -> io::Result<()> {
+        stop_capture(self.mouse_down.replace(false));
+        execute!(
+            io::stdout(),
+            SetAttribute(Attribute::Reset),
+            ResetColor,
+            LeaveAlternateScreen,
+            SetCursorStyle::DefaultUserShape
+        )?;
+        self.prepare_output_input()
+    }
+    /// A finished child relinquishes input to DN's nonblocking output scope.
+    /// Raw input and atomic paste prevent text leaking into command execution.
+    pub fn prepare_output_input(&self) -> io::Result<()> {
+        enable_raw_mode()?;
+        execute!(
+            io::stdout(),
+            DisableMouseCapture,
+            EnableBracketedPaste,
+            Hide
+        )
     }
     pub fn resume(&self, screen: &mut Screen) -> io::Result<()> {
         enable_raw_mode()?;

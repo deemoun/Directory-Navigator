@@ -214,7 +214,7 @@ fn layout_menu_marks_choice_and_keeps_cursor_selection_and_columns() -> io::Resu
         .find(|(_, target)| *target == Target::MenuItem(1, 0))
         .unwrap()
         .0;
-    assert_eq!(terminal.backend().buffer()[(rect.x, rect.y)].symbol(), "•");
+    assert_eq!(terminal.backend().buffer()[(rect.x, rect.y)].symbol(), "√");
     click(&mut app, Target::MenuItem(1, 1), KeyModifiers::NONE);
     assert_eq!(
         app.config.layouts,

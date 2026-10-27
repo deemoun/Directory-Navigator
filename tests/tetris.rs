@@ -441,7 +441,7 @@ fn score_qualification_ties_anonymous_and_grapheme_name_limits() -> io::Result<(
     assert_eq!(app.desktop.game().unwrap().name, "é");
     input::paste(&mut app, &"x".repeat(31));
     assert_eq!(app.desktop.game().unwrap().name, "é");
-    key(&mut app, KeyCode::Esc);
+    tetris::action(&mut app, GameAction::SkipName);
     assert_eq!(app.game_scores.board.records[0].name, "Anonymous");
     for score in 1..=10 {
         app.desktop.game_mut().unwrap().records.push(Record {
@@ -708,7 +708,7 @@ fn reference_game_scores_and_setup_layouts_preserve_colors_values_and_mouse_boun
                     .unwrap()
                     .0;
                 assert_eq!(
-                    terminal.backend().buffer()[(apply.x + 1, apply.y + 1)].bg,
+                    terminal.backend().buffer()[(apply.x + 2, apply.y + 1)].bg,
                     profile.color(0)
                 );
                 key(&mut app, KeyCode::Esc);
@@ -755,7 +755,8 @@ fn setup_radio_choices_cancel_focus_and_apply_preserve_game_and_saved_records() 
         .game_mut()
         .unwrap()
         .tick(Instant::now() + Duration::from_secs(600)));
-    for _ in 0..3 {
+    assert_eq!(app.desktop.game().unwrap().setup_focus, 1);
+    for _ in 0..2 {
         key(&mut app, KeyCode::Tab);
     }
     assert_eq!(app.desktop.game().unwrap().setup_focus, 3);

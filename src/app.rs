@@ -9,6 +9,8 @@ use std::{io, path::PathBuf};
 pub struct App {
     pub modals: crate::modals::ModalStack,
     pub welcome: crate::welcome::State,
+    pub copy_dialog: crate::copy_dialog::State,
+    pub output_visible: bool,
     pub shortcuts: crate::shortcuts::State,
     pub associations: crate::associations::State,
     pub user_menu: crate::user_menu::State,
@@ -57,6 +59,8 @@ impl App {
         let mut app = Self {
             modals: Default::default(),
             welcome: Default::default(),
+            copy_dialog: Default::default(),
+            output_visible: false,
             shortcuts: Default::default(),
             associations: Default::default(),
             user_menu: Default::default(),
@@ -514,6 +518,7 @@ impl App {
         }
         if let Some(result) = finished {
             let trashed = self.job.as_ref().is_some_and(|job| job.kind == Kind::Trash);
+            let moved = self.job.as_ref().is_some_and(|job| job.kind == Kind::Move);
             self.last_operation = Some(result.clone());
             self.job = None;
             changed = true;
@@ -524,6 +529,36 @@ impl App {
                     } else {
                         format!("Done: {} items, {} bytes", progress.files, progress.bytes)
                     };
+                    if progress.skipped > 0 {
+                        self.notice
+                            .push_str(&format!(" · {} skipped", progress.skipped));
+                        if !self.exit_pending {
+                            self.push_owned_dialog(
+                                crate::modals::ModalOwner::Workspace,
+                                Dialog {
+                                    title: if moved {
+                                        "Move complete"
+                                    } else {
+                                        "Copy complete"
+                                    },
+                                    message: format!(
+                                        "{}: {}\n{}: {}\n{}",
+                                        self.config.language.text(if moved {
+                                            "Moved items"
+                                        } else {
+                                            "Copied items"
+                                        }),
+                                        progress.files,
+                                        self.config.language.text("Skipped existing items"),
+                                        progress.skipped,
+                                        self.config.language.text(
+                                            "Skipped sources and existing destinations were kept."
+                                        )
+                                    ),
+                                },
+                            );
+                        }
+                    }
                     self.panels[self.active].replace_visible_marks(&Default::default());
                     if let Some(focus) = operation_focus {
                         for panel in &mut self.panels {
@@ -690,6 +725,7 @@ impl App {
         .clone();
         self.modals.set_prompt(Some(Prompt {
             kind: PromptKind::Operation(kind),
+            copy: matches!(kind, Kind::Copy | Kind::Move).then(crate::copy_dialog::Draft::default),
             sources,
             base,
             field: String::new(),
@@ -705,6 +741,7 @@ impl App {
     pub fn prompt_goto(&mut self) {
         self.modals.set_prompt(Some(Prompt {
             kind: PromptKind::GoTo,
+            copy: None,
             sources: Vec::new(),
             base: self.panels[self.active].path.clone(),
             field: String::new(),
@@ -753,7 +790,9 @@ impl App {
             self.error("Enter a new directory name.");
             return;
         }
-        let destination = if prompt.field.is_empty() {
+        let destination = if let Some(path) = prompt.copy.as_ref().and_then(|c| c.picked.clone()) {
+            path
+        } else if prompt.field.is_empty() {
             prompt.base
         } else {
             prompt.base.join(&prompt.field)
@@ -766,6 +805,24 @@ impl App {
             }
             PromptKind::GoTo => {
                 self.panels[self.active].go_to(destination, self.config.show_hidden)
+            }
+            PromptKind::Operation(kind @ (Kind::Copy | Kind::Move)) => {
+                let options = prompt
+                    .copy
+                    .as_ref()
+                    .map_or_else(Default::default, |c| c.options);
+                let plan = Plan {
+                    kind,
+                    sources: prompt.sources,
+                    destination: destination.clone(),
+                };
+                match Job::start_with_options(plan, options) {
+                    Ok(job) => {
+                        self.copy_dialog.record(destination);
+                        self.job = Some(job);
+                    }
+                    Err(error) => self.error(error.to_string()),
+                }
             }
             PromptKind::Operation(kind) => match Job::start(Plan {
                 kind,

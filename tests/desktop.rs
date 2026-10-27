@@ -124,7 +124,7 @@ fn modal_focus_close_cancel_and_quit_guards_retain_window_identity() -> io::Resu
     assert!(!app.quit);
     assert!(matches!(
         app.desktop.active_editor().unwrap().modals.editor_modal(),
-        Some(Modal::ConfirmClose)
+        Some(Modal::ConfirmClose { .. })
     ));
     editor::action(&mut app, EditorAction::Cancel);
     assert!(!app.quit);

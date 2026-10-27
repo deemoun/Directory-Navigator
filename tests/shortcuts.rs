@@ -182,6 +182,9 @@ fn classic_keys_still_work_and_classic_profile_has_no_prefix() -> io::Result<()>
     key(&mut app, K::Esc);
     app.config.shortcuts = Profile::ClassicDn;
     input::handle(&mut app, KeyEvent::new(K::Char('o'), M::CONTROL));
+    assert!(app.output_visible);
+    input::handle(&mut app, KeyEvent::new(K::Char('o'), M::CONTROL));
+    assert!(!app.output_visible);
     key(&mut app, K::Char('5'));
     assert!(!shortcuts::armed(&app) & app.modals.prompt().is_none());
     assert_eq!(app.command_line.text, "5");
@@ -281,14 +284,14 @@ fn editor_save_find_replace_close_and_quit_keep_unsaved_guards() -> io::Result<(
     prefix(&mut app, 'w');
     assert!(matches!(
         app.desktop.active_editor().unwrap().modals.editor_modal(),
-        Some(dn::editor::Modal::ConfirmClose)
+        Some(dn::editor::Modal::ConfirmClose { .. })
     ));
     key(&mut app, K::Esc);
     assert!(!app.quit);
     prefix(&mut app, 'x');
     assert!(matches!(
         app.desktop.active_editor().unwrap().modals.editor_modal(),
-        Some(dn::editor::Modal::ConfirmClose)
+        Some(dn::editor::Modal::ConfirmClose { .. })
     ));
     key(&mut app, K::Esc);
     assert!(!app.quit);

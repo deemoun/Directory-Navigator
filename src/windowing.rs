@@ -140,6 +140,19 @@ pub fn key(app: &mut App, key: KeyEvent) {
         return;
     };
     list.last_click = None;
+    let navigation = match key.code {
+        KeyCode::PageUp => KeyCode::Home,
+        KeyCode::PageDown => KeyCode::End,
+        code => code,
+    };
+    if let Some(row) =
+        crate::turbo::widgets::list_key(list.cursor, list.ids.len(), list.rows, navigation)
+    {
+        list.cursor = row;
+        list.focus = 0;
+        list.keep_visible();
+        return;
+    }
     match key.code {
         KeyCode::Esc => action(app, Action::Cancel),
         KeyCode::Enter => {
@@ -152,22 +165,6 @@ pub fn key(app: &mut App, key: KeyEvent) {
         }
         KeyCode::Tab => list.focus = crate::control_focus::cycle(list.focus, 3, false),
         KeyCode::BackTab => list.focus = crate::control_focus::cycle(list.focus, 3, true),
-        KeyCode::Up => {
-            list.cursor = list.cursor.saturating_sub(1);
-            list.focus = 0;
-        }
-        KeyCode::Down => {
-            list.cursor = (list.cursor + 1).min(list.ids.len().saturating_sub(1));
-            list.focus = 0;
-        }
-        KeyCode::Home | KeyCode::PageUp => {
-            list.cursor = 0;
-            list.focus = 0;
-        }
-        KeyCode::End | KeyCode::PageDown => {
-            list.cursor = list.ids.len().saturating_sub(1);
-            list.focus = 0;
-        }
         _ => {}
     }
     if let Some(list) = app.modals.window_list_mut() {

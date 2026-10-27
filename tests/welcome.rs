@@ -358,3 +358,58 @@ fn cli_flags_skip_welcome_and_new_configuration_creation() -> io::Result<()> {
     }
     Ok(())
 }
+
+#[test]
+fn welcome_reuses_help_chrome_and_native_link_bounds_with_immutable_paint() -> io::Result<()> {
+    use dn::{layout, presentation::layout::Rect, testing::Buffer};
+    let t = Temp::new()?;
+    let mut a = t.app()?;
+    welcome::open(&mut a);
+    let snapshot = layout::prepare_window(
+        &mut a,
+        Rect::new(7, 3, 80, 25),
+        Rect::new(0, 0, 90, 30),
+        Instant::now(),
+    );
+    let first = ui::render(&a, &snapshot);
+    let regions = first.hit_regions().to_vec();
+    let buffer = Buffer::rendered(first);
+    assert_eq!(buffer, Buffer::rendered(ui::render(&a, &snapshot)));
+    for (action, label) in [
+        (Action::Start, "Start"),
+        (Action::Keyboard, "Keyboard settings"),
+        (Action::Help, "Help"),
+    ] {
+        let rect = regions
+            .iter()
+            .find(|(r, t)| *t == Target::Welcome(action) && r.width > 3)
+            .unwrap()
+            .0;
+        let text = (rect.x..rect.right())
+            .map(|x| buffer[(x, rect.y)].symbol())
+            .collect::<String>();
+        assert_eq!(text, label, "link mouse bounds must match visible text");
+    }
+    let welcome_background = buffer[(12, 12)].bg;
+    let mut terminal = Terminal::new(TestBackend::new(80, 25))?;
+    terminal.draw(|f| ui::draw(f, &mut a))?;
+    let footer = terminal.backend().buffer().content[80 * 24..]
+        .iter()
+        .map(|c| c.symbol())
+        .collect::<String>();
+    assert!(footer.contains("Enter Select"));
+    assert!(!footer.contains("F5 Copy"));
+    key(&mut a, K::F(1));
+    terminal.draw(|f| ui::draw(f, &mut a))?;
+    assert_eq!(terminal.backend().buffer()[(5, 9)].bg, welcome_background);
+    let footer = terminal.backend().buffer().content[80 * 24..]
+        .iter()
+        .map(|c| c.symbol())
+        .collect::<String>();
+    assert!(footer.contains("Alt+F1 Back"));
+    key(&mut a, K::Esc);
+    assert_eq!(focus::current(&a), Focus::Welcome);
+    key(&mut a, K::Enter);
+    assert_eq!(focus::current(&a), Focus::Manager);
+    Ok(())
+}

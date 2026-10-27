@@ -89,7 +89,7 @@ impl Picker {
                     } else {
                         label
                     });
-                    *button = Button::new(button.bounds(), text, command, default);
+                    *button = Button::new(button.bounds(), &format!(" {text}"), command, default);
                     *button.core_mut() = core;
                 }
             }
@@ -295,26 +295,16 @@ impl Picker {
         {
             return;
         }
-        // InputLine's key path accepts single-column characters only. Its
-        // native paste path handles UTF-8 strings, including CJK/combining
-        // characters. The dependency's OS clipboard feature stays disabled.
-        static PASTE: std::sync::Mutex<()> = std::sync::Mutex::new(());
-        let _lock = PASTE.lock().unwrap_or_else(|e| e.into_inner());
-        struct Clipboard(String);
-        impl Drop for Clipboard {
-            fn drop(&mut self) {
-                turbo_vision::core::clipboard::set_clipboard(&self.0);
-            }
-        }
-        let _restore = Clipboard(turbo_vision::core::clipboard::get_clipboard());
         let clean = text
             .chars()
             .filter(|c| !c.is_control())
             .take(4096)
             .collect::<String>();
-        turbo_vision::core::clipboard::set_clipboard(&clean);
-        self.dispatch(Event::keyboard(KB_CTRL_V));
+        super::widgets::paste_native(&mut self.widget, &clean);
+        self.update_buttons();
+        self.changed();
     }
+
     pub(crate) fn mouse(&mut self, event: MouseEvent, offset: (u16, u16)) -> Option<Outcome> {
         let bounds = self.widget.bounds();
         let pos = Point::new(
@@ -417,7 +407,45 @@ impl Picker {
                 );
             }
         }
+        let focused_button = (0..self.widget.child_count()).any(|i| {
+            let child = self.widget.child_at(i);
+            child.as_any().is::<Button>() && child.is_focused()
+        });
+        for i in 0..self.widget.child_count() {
+            let child = self.widget.child_at(i);
+            if let Some(button) = child.as_any().downcast_ref::<Button>() {
+                let b = child.bounds();
+                for y in 0..b.height_clamped() as u16 {
+                    for x in 0..b.width_clamped() as u16 {
+                        let position = (
+                            rect.x + 1 + b.a.x.max(0) as u16 + x,
+                            rect.y + 1 + b.a.y.max(0) as u16 + y,
+                        );
+                        if let Some(glyph) = scene.cells.get_mut(&position) {
+                            super::widgets::button_cell(
+                                &mut glyph.text,
+                                &mut glyph.attribute,
+                                x,
+                                y,
+                                b.width_clamped() as u16,
+                                b.height_clamped() as u16,
+                                child.is_focused() || !focused_button && button.is_default(),
+                            );
+                        }
+                    }
+                }
+            }
+        }
         self.scene = Some(scene);
+    }
+    pub(crate) fn bounds(&self) -> Rect {
+        let b = self.widget.bounds();
+        Rect::new(
+            b.a.x.max(0) as u16,
+            b.a.y.max(0) as u16,
+            b.width_clamped() as u16,
+            b.height_clamped() as u16,
+        )
     }
     pub(crate) fn scene(&self) -> Option<&Scene> {
         self.scene.as_ref()

@@ -81,6 +81,7 @@ impl Preview {
 pub fn open(app: &mut App) {
     app.modals.set_prompt(Some(Prompt {
         kind: PromptKind::ImportDos,
+        copy: None,
         sources: Vec::new(),
         base: app.panels[app.active].path.clone(),
         field: "DN.CFG".into(),
@@ -150,7 +151,9 @@ pub fn key(app: &mut App, key: KeyEvent) {
     match key.code {
         KeyCode::Esc => app.modals.set_config_import(None),
         KeyCode::Tab | KeyCode::BackTab => {
-            if preview.can_apply() {
+            if !preview.can_apply() {
+                preview.focus = 1;
+            } else {
                 preview.focus =
                     crate::control_focus::cycle(preview.focus, 2, key.code == KeyCode::BackTab);
             }

@@ -23,6 +23,7 @@ pub enum ToolDialog {
         offset: usize,
         rows: usize,
         last_click: Option<(usize, Instant)>,
+        focus: usize,
     },
     Compare {
         focus: usize,
@@ -85,6 +86,7 @@ pub fn open_history(app: &mut App, kind: HistoryKind) {
             offset: 0,
             rows: 10,
             last_click: None,
+            focus: 0,
         }));
 }
 pub fn open_compare(app: &mut App) {
@@ -277,6 +279,7 @@ pub fn action(app: &mut App, action: ToolAction) {
                 cursor,
                 paths,
                 last_click,
+                focus,
                 ..
             }) = app.file_tools.modals.file_tools_mut()
             {
@@ -286,6 +289,7 @@ pub fn action(app: &mut App, action: ToolAction) {
                         old == index && now.duration_since(time) <= Duration::from_millis(500)
                     });
                     *cursor = index;
+                    *focus = 0;
                     *last_click = Some((index, now));
                 }
             }
@@ -301,7 +305,12 @@ pub fn key(app: &mut App, key: KeyEvent) {
         return;
     }
     if key.code == KeyCode::Enter {
+        if matches!(app.file_tools.modals.file_tools(), Some(ToolDialog::History { paths, focus, .. }) if paths.is_empty() && *focus != 2)
+        {
+            return;
+        }
         let cancel = match app.file_tools.modals.file_tools() {
+            Some(ToolDialog::History { focus, .. }) => *focus == 2,
             Some(ToolDialog::Compare { focus }) => *focus == 5,
             Some(ToolDialog::Export { focus, .. }) => *focus == 4,
             _ => false,
@@ -323,9 +332,23 @@ pub fn key(app: &mut App, key: KeyEvent) {
             paths,
             rows,
             last_click,
+            focus,
             ..
         }) => {
             *last_click = None;
+            if matches!(key.code, KeyCode::Tab | KeyCode::BackTab) {
+                let choices: &[usize] = if paths.is_empty() {
+                    &[0, 2]
+                } else {
+                    &[0, 1, 2]
+                };
+                *focus =
+                    crate::control_focus::select(*focus, choices, key.code == KeyCode::BackTab);
+                return;
+            }
+            if *focus != 0 {
+                return;
+            }
             let amount = match key.code {
                 KeyCode::Up => -1,
                 KeyCode::Down => 1,

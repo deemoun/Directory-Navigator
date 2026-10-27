@@ -32,6 +32,7 @@ pub enum EditorAction {
     Cancel,
     Discard,
     SearchSubmit(bool),
+    PromptField,
     SearchChoice(usize),
     ReplaceYes,
     ReplaceNo,
@@ -329,14 +330,19 @@ fn request_action(app: &mut App, pending: PendingAction) {
         return;
     }
     if editor.dirty() {
-        editor.modals.set_editor_modal(Some(Modal::ConfirmClose));
+        editor
+            .modals
+            .set_editor_modal(Some(Modal::ConfirmClose { focus: 2 }));
         return;
     }
     complete_pending(app);
 }
 fn complete_pending(app: &mut App) {
     let pending = app.desktop.active_editor_mut().and_then(|editor| {
-        if matches!(editor.modals.editor_modal(), Some(Modal::ConfirmClose)) {
+        if matches!(
+            editor.modals.editor_modal(),
+            Some(Modal::ConfirmClose { .. })
+        ) {
             editor.modals.set_editor_modal(None);
         }
         editor.closing.take()
@@ -437,6 +443,7 @@ fn prompt(editor: &mut Editor, kind: PromptKind) {
         kind,
         field,
         cursor,
+        focus: 0,
     }));
 }
 pub fn paste(app: &mut App, text: &str) {
@@ -451,7 +458,12 @@ pub fn paste(app: &mut App, text: &str) {
             picker.paste(text);
             return;
         }
-        Some(Modal::Prompt { field, cursor, .. }) => {
+        Some(Modal::Prompt {
+            field,
+            cursor,
+            focus: 0,
+            ..
+        }) => {
             dialog::paste_input(field, cursor, text);
             return;
         }
@@ -532,6 +544,14 @@ pub fn action(app: &mut App, command: EditorAction) {
         finish_file(app, outcome);
         return;
     }
+    if command == A::Cancel && app.modals.native_help(app.desktop.active().id).is_some() {
+        app.pop_dialog();
+        return;
+    }
+    if command == A::Help {
+        app.push_dialog(crate::dialog::Dialog{title:" Editor Help ",message:app.config.language.text(if app.config.shortcuts.is_mac(){crate::shortcuts::EDITOR_HELP}else{"F2 / Ctrl+S Save · Shift+F2 Save As · F3 Open\nF6 Duplicate line · F7 / Ctrl+F Find\nShift+F7 Search again · Alt+F7 Reverse search\nCtrl+F7 Replace · Alt+G / Ctrl+G Go to line\nCtrl+←/→ words · Ctrl+Shift+←/→ select words\nShift+arrows select · Ctrl+A select all\nAlt+Backspace / Ctrl+Z Undo · Ctrl+Y Redo\nCtrl+Ins/C Copy · Shift+Del / Ctrl+X Cut\nShift+Ins / Ctrl+V Paste · terminal paste supported\nAlt+B Block: selection/clipboard · Options: indent/colors/tabs\nF10 Menu · Alt+0 Windows · Ctrl+F4 / Esc Close · Alt+X Quit DN\nOpen/Close/Quit protect unsaved changes.\nUTF-8, 2 MiB / 100k lines. Line endings preserved.\nSave As never overwrites an existing destination."}).into()});
+        return;
+    }
     if command == A::Windows {
         crate::windowing::open(app);
         return;
@@ -580,10 +600,9 @@ pub fn action(app: &mut App, command: EditorAction) {
         A::Submit => submit_prompt(app),
         A::SearchSubmit(all) => search_controls::submit(app, all),
         A::Discard
-            if app
-                .desktop
-                .active_editor()
-                .is_some_and(|e| matches!(e.modals.editor_modal(), Some(Modal::ConfirmClose))) =>
+            if app.desktop.active_editor().is_some_and(|e| {
+                matches!(e.modals.editor_modal(), Some(Modal::ConfirmClose { .. }))
+            }) =>
         {
             complete_pending(app);
             Ok(())
@@ -629,11 +648,18 @@ fn apply(app: &mut App, command: EditorAction) -> Result<(), String> {
         return search_controls::decision(editor, command);
     }
     match command {
+        A::PromptField => {
+            if let Some(Modal::Prompt { focus, .. }) = editor.modals.editor_modal_mut() {
+                *focus = 0;
+            }
+        }
         A::CancelMenu => editor.modals.set_editor_menu(None),
         A::Cancel => {
-            let quit = matches!(editor.modals.editor_modal(), Some(Modal::ConfirmClose))
-                || (editor.closing == Some(PendingAction::Quit)
-                    && matches!(editor.modals.editor_modal(), Some(Modal::File(_))));
+            let quit = matches!(
+                editor.modals.editor_modal(),
+                Some(Modal::ConfirmClose { .. })
+            ) || (editor.closing == Some(PendingAction::Quit)
+                && matches!(editor.modals.editor_modal(), Some(Modal::File(_))));
             editor.modals.set_editor_modal(None);
             if quit || editor.modals.editor_modal().is_none() {
                 editor.closing = None;

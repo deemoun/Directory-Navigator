@@ -1,8 +1,5 @@
 use crate::painting::{Frame, Paragraph};
-use crate::presentation::{
-    layout::Rect,
-    text::{Line, Span},
-};
+use crate::presentation::{layout::Rect, text::Span};
 use crate::{
     app::App, filesystem::display_name, formatting::tail, mouse::Target, user_menu::Action,
 };
@@ -74,60 +71,53 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
         Paragraph::new(tail(&source, w)).style(dos(0x70)),
         Rect::new(x, rect.y + 1, w, 1),
     );
-    for row in 0..m.rows {
-        let index = m.offset + row;
-        let r = Rect::new(x, rect.y + 3 + row as u16, w, 1);
-        if review {
-            if let Some(text) = m.review_lines.get(index) {
-                frame.render_widget(Paragraph::new(tail(text, w)).style(dos(0x70)), r);
-            }
-        } else if let Some(item) = m.items().get(index) {
-            if item.separator() {
-                frame.render_widget(Paragraph::new("─".repeat(w as usize)).style(dos(0x78)), r);
-                continue;
-            }
-            let selected = index == m.cursor;
-            let mut highlight = false;
-            let mut spans = Vec::new();
-            for c in item.label.chars() {
-                if c == '~' {
-                    highlight = !highlight;
-                    continue;
-                }
-                spans.push(Span::styled(
-                    c.to_string(),
-                    dos(if highlight {
-                        if selected {
-                            0x2c
-                        } else {
-                            0x74
-                        }
-                    } else if selected {
-                        0x20
-                    } else {
-                        0x70
-                    }),
+    if review {
+        frame.render_widget(
+            crate::turbo::widgets::memo(
+                &m.review_lines
+                    .iter()
+                    .skip(m.offset)
+                    .take(m.rows)
+                    .map(|s| tail(s, w))
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+            ),
+            Rect::new(x, rect.y + 3, w, m.rows as u16),
+        );
+    } else {
+        let items = m
+            .items()
+            .iter()
+            .skip(m.offset)
+            .take(m.rows)
+            .map(|item| crate::turbo::widgets::MenuEntry {
+                label: if item.separator() {
+                    String::new()
+                } else {
+                    item.label.clone()
+                },
+                shortcut: String::new(),
+                enabled: !item.separator(),
+                checked: false,
+                submenu: !item.children.is_empty(),
+            })
+            .collect();
+        frame.render_widget(
+            crate::turbo::widgets::menu(items, m.cursor.saturating_sub(m.offset)),
+            Rect::new(x - 1, rect.y + 2, w + 2, m.rows as u16 + 2),
+        );
+        for (index, item) in m.items().iter().enumerate().skip(m.offset).take(m.rows) {
+            if !item.separator() {
+                frame.regions().push((
+                    Rect::new(x, rect.y + 3 + (index - m.offset) as u16, w, 1),
+                    Target::UserMenu(Action::Choose(index)),
                 ));
             }
-            if !item.children.is_empty() {
-                let used = Line::from(spans.clone()).width();
-                spans.push(Span::raw(
-                    " ".repeat(usize::from(w).saturating_sub(used + 1)),
-                ));
-                spans.push(Span::raw("►"));
-            }
-            frame.render_widget(
-                Paragraph::new(Line::from(spans)).style(dos(if selected { 0x20 } else { 0x70 })),
-                r,
-            );
-            frame
-                .regions()
-                .push((r, Target::UserMenu(Action::Choose(index))));
         }
     }
     if !review {
         frame.render_widget(
-            Paragraph::new(display_name(&m.status)).style(dos(0x78)),
+            Paragraph::new(display_name(app.config.language.text(&m.status))).style(dos(0x78)),
             Rect::new(x, rect.bottom() - 3, w, 1),
         );
     }
@@ -159,7 +149,14 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
         } else {
             translated.to_owned()
         };
-        super::dialog_style::button(frame, profile, r, &caption, m.focus == i + 1);
+        super::dialog_style::button_with_default(
+            frame,
+            profile,
+            r,
+            &caption,
+            m.focus == i + 1,
+            review && i == 0 && m.focus == 0,
+        );
         frame.regions().push((r, Target::UserMenu(action)));
     }
 }

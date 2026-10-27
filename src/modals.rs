@@ -23,6 +23,7 @@ pub struct ModalInfo {
 struct MessageState {
     dialog: crate::dialog::Dialog,
     offset: usize,
+    help: Option<crate::turbo::help::Browser>,
 }
 struct Entry {
     info: ModalInfo,
@@ -172,7 +173,20 @@ impl ModalStack {
         }
     }
     pub fn push_message(&mut self, owner: ModalOwner, dialog: crate::dialog::Dialog) {
-        self.push(MessageState { dialog, offset: 0 }, Focus::Message, owner);
+        let help = dialog
+            .title
+            .to_ascii_lowercase()
+            .contains("help")
+            .then(|| crate::turbo::help::Browser::new(dialog.title, &dialog.message));
+        self.push(
+            MessageState {
+                dialog,
+                offset: 0,
+                help,
+            },
+            Focus::Message,
+            owner,
+        );
     }
     fn message_state(&self, active: WindowId) -> Option<&MessageState> {
         self.entries
@@ -193,6 +207,15 @@ impl ModalStack {
                     || e.info.owner == ModalOwner::Document(active)
             })
             .find_map(|e| e.state.downcast_mut())
+    }
+    pub fn native_help(&self, active: WindowId) -> Option<&crate::turbo::help::Browser> {
+        self.message_state(active).and_then(|m| m.help.as_ref())
+    }
+    pub(crate) fn native_help_mut(
+        &mut self,
+        active: WindowId,
+    ) -> Option<&mut crate::turbo::help::Browser> {
+        self.message_state_mut(active).and_then(|m| m.help.as_mut())
     }
     pub fn message_offset(&self, active: WindowId) -> usize {
         self.message_state(active).map_or(0, |m| m.offset)
@@ -544,4 +567,22 @@ slot!(
     set_job_progress,
     JobProgress,
     Job
+);
+
+slot!(
+    settings_choice,
+    settings_choice_mut,
+    take_settings_choice,
+    set_settings_choice,
+    crate::settings::ChoiceDialog,
+    Settings
+);
+
+slot!(
+    copy_history,
+    copy_history_mut,
+    take_copy_history,
+    set_copy_history,
+    crate::copy_dialog::History,
+    CopyHistory
 );
