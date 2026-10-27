@@ -27,7 +27,7 @@ pub(super) fn draw_settings(frame: &mut impl Frame, app: &App, area: Rect) {
         SettingsKind::Keyboard => 20,
         SettingsKind::Regional => 17,
         SettingsKind::System => 14,
-        SettingsKind::Interface => 12,
+        SettingsKind::Interface => 13,
         SettingsKind::FileManager => 14,
         SettingsKind::Highlight => 18,
     };

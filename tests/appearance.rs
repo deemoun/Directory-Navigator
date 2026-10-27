@@ -623,3 +623,69 @@ fn document_close_icons_respect_modal_precedence_and_unsaved_guard() -> io::Resu
     assert_eq!(fs::read_to_string(path)?, "original file");
     Ok(())
 }
+
+#[test]
+fn color_dialog_shares_dn_button_faces_and_moves_default_markers_to_cancel() -> io::Result<()> {
+    let t = Temp::new()?;
+    let mut app = t.app()?;
+    for profile in [PaletteProfile::ClassicDn, PaletteProfile::Terminal] {
+        app.config.palette = profile;
+        palette::open(&mut app);
+        for focused_cancel in [false, true] {
+            if focused_cancel {
+                while app.modals.color_dialog().unwrap().cursor != 3 {
+                    input::handle(&mut app, KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE));
+                }
+            }
+            let mut terminal = Terminal::new(TestBackend::new(80, 25))?;
+            terminal.draw(|f| ui::draw(f, &mut app))?;
+            let b = terminal.backend().buffer();
+            for (target, focused) in [
+                (Target::AcceptColors, !focused_cancel),
+                (Target::CancelColors, focused_cancel),
+            ] {
+                let r = app
+                    .mouse
+                    .regions
+                    .iter()
+                    .find(|(r, t)| *t == target && r.width > 3)
+                    .unwrap()
+                    .0;
+                for x in r.x + 1..r.right() - 1 {
+                    assert_eq!(b[(x, r.y)].bg, profile.color(8));
+                }
+                assert_eq!(b[(r.x + 2, r.y + 1)].bg, profile.color(0));
+                assert_eq!(b[(r.x + 2, r.y + 1)].symbol(), " ");
+                if focused {
+                    assert_eq!(b[(r.x + 1, r.y)].symbol(), "►");
+                    assert_eq!(b[(r.right() - 2, r.y)].symbol(), "◄");
+                    assert_eq!(b[(r.x + 1, r.y)].fg, profile.color(11));
+                    assert!((r.x + 2..r.right() - 2).any(
+                        |x| b[(x, r.y)].symbol() != " " && b[(x, r.y)].fg == profile.color(14)
+                    ));
+                } else {
+                    assert_eq!(b[(r.x + 1, r.y)].symbol(), " ");
+                }
+            }
+        }
+        let button = app
+            .mouse
+            .regions
+            .iter()
+            .find(|(r, t)| *t == Target::CancelColors && r.width > 3)
+            .unwrap()
+            .0;
+        mouse::handle(
+            &mut app,
+            MouseEvent {
+                kind: MouseEventKind::Down(MouseButton::Left),
+                column: button.x + 1,
+                row: button.y,
+                modifiers: KeyModifiers::NONE,
+            },
+        );
+        assert!(app.modals.color_dialog().is_none());
+        assert_eq!(app.config.palette, profile);
+    }
+    Ok(())
+}

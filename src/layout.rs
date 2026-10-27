@@ -21,6 +21,7 @@ pub(crate) struct ViewportState {
     windows: Option<(Vec<crate::desktop::WindowId>, usize)>,
     characters: Option<(crate::utilities::characters::Page, bool)>,
     menu: Option<(usize, usize)>,
+    hide_menu: bool,
     submenus: Vec<(crate::menu::MenuId, usize)>,
     modal_offsets: Vec<usize>,
 }
@@ -79,6 +80,7 @@ fn viewport_state(app: &App) -> ViewportState {
             )
         }),
         menu: app.modals.menu(),
+        hide_menu: app.config.hide_menu,
         submenus: app.modals.submenus().to_vec(),
         modal_offsets: vec![
             app.modals.archive().map_or(0, |m| m.offset),
@@ -158,7 +160,7 @@ pub fn prepare_window(
     }
     app.utilities.size = (area.width, area.height);
     let r = Layout::vertical([
-        Constraint::Length(1),
+        Constraint::Length(u16::from(!app.config.hide_menu)),
         Constraint::Min(1),
         Constraint::Length(1),
         Constraint::Length(1),

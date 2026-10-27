@@ -70,9 +70,21 @@ The last published frame retains the native group for button hit/command proposa
 DN controllers retain field state, focus policy, validation and destructive-action
 guards. Caption images capture an opaque dialog background, so sparse text never
 copies the obscured document. Selected menu rows include shortcut backgrounds.
-Button faces use green for focus and gray otherwise; native shadow bounds use
-solid shaded cells to avoid font-dependent half-block seams, including game and
-file-picker buttons. Native buttons have their full two-row bounds. Root/menu/file-picker/help
+All push buttons share one DN-style presentation: dark-gray faces, white normal
+text, yellow mnemonics, and black offset shadows. Focus/default buttons have yellow
+captions and cyan inward-pointing markers; disabled captions remain dim. This uses
+`DIALOGS.PAS`/`TETRIS.PAS` as the behavior reference. Composed dialogs, isolated game
+controls and native file-picker buttons use the same mapping and title centering.
+Shadow cells use solid backgrounds to avoid font-dependent half-block seams.
+Colors marks Apply as the Enter default while a palette choice has focus, then
+moves the markers to Cancel when Cancel receives focus.
+Embedded checkbox/radio rows fill
+their entire reserved width
+with the dialog background, preserving focus, mnemonics and disabled states.
+Calculator history uses a one-row native ComboBox arrow rather than a two-row
+Button; it cannot expand into the expression frame. Both composed and isolated
+controls share one color-mapping function. Native buttons have their full two-row
+bounds. Root/menu/file-picker/help
 shadows use the toolkit shadow routine. Wide-cell overlay intersections are resolved
 before publishing the frame and terminal diff.
 
@@ -105,6 +117,18 @@ Behavior references: `original-dn/HELPFILE.PAS` (cross-references/history),
 `FLPANEL.PAS`/`FLPANELX.PAS` (specialized file rows), `FVIEWER.PAS` (quick view),
 and `RESOURCE/ENGLISH/DN.DNR` (dialog/button spacing). Modern safety checks,
 Unicode, asynchronous ownership and full-screen documents remain in place.
+
+## Menu visibility
+
+`interface.hide_menu` is a saved checkbox in Options → Configuration → Interface.
+Existing installations keep the visible-bar default. Hidden mode reclaims the top
+row for file panes, following `ouiHideMenu` and `SETUPS.PAS::InterfaceSetup`.
+F9, Alt menu shortcuts and clicking the top edge temporarily reveal the menu over
+row zero; opening/closing it does not resize the panes. Closing or choosing a
+command hides the temporary bar. Published menu targets sit above pane/quick-view
+headers, and layout revisions reject stale targets after visibility changes.
+The manager menu is always suppressed while Tetris is active. Its normal visibility
+returns when the game closes. Modal blocking and game function keys stay intact.
 
 ## Multi-document foundations
 
@@ -143,7 +167,7 @@ See [document foundations](DOCUMENT_FOUNDATIONS.md) for lifecycle and validation
 
 Local macOS ARM64 validation covers:
 
-- 449 native Rust tests pass; the existing opt-in native Trash check stays ignored.
+- 455 native Rust tests pass; the existing opt-in native Trash check stays ignored.
 - Formatting, all-target Clippy, release build and a no-default-features build.
 - 2,898 layout cases check viewport bounds. Feasible allocations compare against
   frozen pre-removal geometry; 40 wrapping cases preserve narrow widths,

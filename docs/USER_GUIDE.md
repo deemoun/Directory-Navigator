@@ -705,3 +705,19 @@ click selects a link and a double click follows it. Alt+F1 or Backspace returns
 to the previous topic with its scroll position. Arrows, PageUp/PageDown and the
 mouse wheel scroll. Esc or the title close control returns to the parent dialog
 or document. Help blocks document switching until closed.
+
+## Hiding the menu bar
+
+Options → Configuration → Interface → **Hide menu bar** gives the top row to the
+file panes. Enter applies the setting; Esc cancels the draft. It is saved with the
+other interface preferences. F9, Alt plus a menu letter, or a click on the top edge
+reveals the menu temporarily. Esc or choosing a command hides it again without
+moving the panes. Uncheck the option to keep the bar visible.
+
+The manager menu is hidden while Tetris is open. The game's buttons use DOS
+Navigator's dark faces, yellow shortcut letters and offset black shadows.
+
+Dialog buttons share DOS Navigator's dark faces and black offset shadows.
+Yellow captions with cyan inward arrows identify the focused/default action;
+disabled buttons have dim captions. In Colors, Apply is the Enter default while
+choosing a palette. Tab to Cancel or press Esc to restore the previous palette.

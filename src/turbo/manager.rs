@@ -9,7 +9,6 @@ use crate::{
     filesystem::display_name,
     formatting,
     layout::Prepared,
-    mouse::Target,
     palette::PaletteProfile,
     panel::Panel,
     panel_layout::{PanelGeometry, PanelLayout},
@@ -50,12 +49,12 @@ fn pane(
     s: &mut Scene,
     panel: &Panel,
     area: Rect,
-    state: (usize, bool),
+    state: (usize, bool, u16),
     config: &Config,
     search: Option<&QuickSearch>,
     g: &PanelGeometry,
 ) {
-    let (index, active) = state;
+    let (index, active, header_reserve) = state;
     let classic = config.palette == PaletteProfile::ClassicDn;
     s.fill(area.x, area.y, area.width, area.height, 0x87);
     s.border(
@@ -77,12 +76,12 @@ fn pane(
     s.text(
         area.x + 1,
         area.y,
-        area.width - 2,
+        area.width.saturating_sub(2 + header_reserve),
         &format!(
             " {} ",
             formatting::tail(
                 &display_name(&panel.path.to_string_lossy()),
-                area.width.saturating_sub(4)
+                area.width.saturating_sub(4 + header_reserve)
             )
         ),
         if active { 0x3f } else { 0x8f },
@@ -307,42 +306,7 @@ pub(crate) fn prepare(
         regions: Vec::new(),
     };
     s.fill(0, 0, width, height, 0x87);
-    let bar = prepared.regions[0];
-    s.fill(bar.x, bar.y, bar.width, 1, 0x70);
-    let clock = app.config.show_clock && app.desktop.game().is_none();
-    let header = Rect {
-        width: bar.width.saturating_sub(if clock {
-            app.config.datetime.clock_width()
-        } else {
-            0
-        }),
-        ..bar
-    };
-    let mut x = bar.x;
-    let mut positions = Vec::new();
-    for (index, label) in crate::menu::LABELS.iter().enumerate() {
-        let label = app.config.language.text(label);
-        let width = crate::menu::plain(label).width() as u16 + 3;
-        let r = Rect::new(x, bar.y, width, 1).intersection(header);
-        let selected = app.modals.menu().is_some_and(|(root, _)| root == index);
-        super::widgets::paint_into(&mut s, super::widgets::menu_title(label, selected, true), r);
-        positions.push(r);
-        s.regions.push((r, Target::Menu(index)));
-        x += width;
-    }
-    if clock {
-        plain(
-            &mut s,
-            Rect::new(
-                bar.right() - app.config.datetime.clock_width(),
-                bar.y,
-                app.config.datetime.clock_width(),
-                1,
-            ),
-            &app.clock.text,
-            0x71,
-        );
-    }
+    let (header, positions) = menu_bar(app, width);
     for (index, area) in prepared.panel_areas.iter().enumerate() {
         if app
             .quick_view
@@ -355,7 +319,19 @@ pub(crate) fn prepare(
             &mut s,
             &app.panels[index],
             *area,
-            (index, index == app.active),
+            (
+                index,
+                index == app.active,
+                if index == 1
+                    && app.config.hide_menu
+                    && app.config.show_clock
+                    && app.desktop.game().is_none()
+                {
+                    app.config.datetime.clock_width()
+                } else {
+                    0
+                },
+            ),
             &app.config,
             app.modals.quick_search().filter(|q| q.panel == index),
             &prepared.panels[index],
@@ -393,6 +369,64 @@ pub(crate) fn prepare(
             &mut s,
             super::widgets::status(&format!("~{key}~{label}")),
             buttons[index],
+        );
+    }
+    s.cells.extend(header.cells);
+    (s, positions)
+}
+
+/// A hidden menu is temporarily painted over row zero without moving the panes.
+pub(crate) fn menu_bar(app: &App, width: u16) -> (Scene, Vec<Rect>) {
+    let mut s = Scene {
+        width,
+        height: 1,
+        profile: app.config.palette,
+        cells: BTreeMap::new(),
+        regions: Vec::new(),
+        cursor: None,
+    };
+    let bar = Rect::new(0, 0, width, 1);
+    let visible = crate::menu::bar_visible(app);
+    if visible || !app.config.hide_menu {
+        s.fill(0, 0, width, 1, 0x70);
+    }
+    let clock = app.config.show_clock && app.desktop.game().is_none();
+    let header = Rect {
+        width: bar.width.saturating_sub(if clock {
+            app.config.datetime.clock_width()
+        } else {
+            0
+        }),
+        ..bar
+    };
+    let mut x = bar.x;
+    let mut positions = Vec::new();
+    for (index, label) in crate::menu::LABELS.iter().enumerate() {
+        let label = app.config.language.text(label);
+        let width = crate::menu::plain(label).width() as u16 + 3;
+        let r = Rect::new(x, bar.y, width, 1).intersection(header);
+        let selected = app.modals.menu().is_some_and(|(root, _)| root == index);
+        if visible {
+            super::widgets::paint_into(
+                &mut s,
+                super::widgets::menu_title(label, selected, true),
+                r,
+            );
+        }
+        positions.push(r);
+        x += width;
+    }
+    if clock {
+        plain(
+            &mut s,
+            Rect::new(
+                bar.right() - app.config.datetime.clock_width(),
+                bar.y,
+                app.config.datetime.clock_width(),
+                1,
+            ),
+            &app.clock.text,
+            0x71,
         );
     }
     (s, positions)

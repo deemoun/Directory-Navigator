@@ -89,7 +89,7 @@ impl Picker {
                     } else {
                         label
                     });
-                    *button = Button::new(button.bounds(), text, command, default);
+                    *button = Button::new(button.bounds(), &format!(" {text}"), command, default);
                     *button.core_mut() = core;
                 }
             }
@@ -407,9 +407,13 @@ impl Picker {
                 );
             }
         }
+        let focused_button = (0..self.widget.child_count()).any(|i| {
+            let child = self.widget.child_at(i);
+            child.as_any().is::<Button>() && child.is_focused()
+        });
         for i in 0..self.widget.child_count() {
             let child = self.widget.child_at(i);
-            if child.as_any().is::<Button>() {
+            if let Some(button) = child.as_any().downcast_ref::<Button>() {
                 let b = child.bounds();
                 for y in 0..b.height_clamped() as u16 {
                     for x in 0..b.width_clamped() as u16 {
@@ -425,7 +429,7 @@ impl Picker {
                                 y,
                                 b.width_clamped() as u16,
                                 b.height_clamped() as u16,
-                                child.is_focused(),
+                                child.is_focused() || !focused_button && button.is_default(),
                             );
                         }
                     }

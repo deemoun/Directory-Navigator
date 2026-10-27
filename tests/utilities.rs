@@ -597,10 +597,31 @@ fn calculator_classic_layout_results_help_mouse_focus_and_resize() -> io::Result
                     .unwrap()
                     .0;
                 assert_eq!(b[(history.x, history.y)].bg, profile.color(9));
+                assert_eq!(history.height, 1);
+                assert_eq!(b[(history.right() - 1, history.y)].symbol(), "▼");
+                for x in history.x..history.right() {
+                    assert_eq!(
+                        b[(x, history.y + 1)].symbol(),
+                        "─",
+                        "history must not overwrite the expression border"
+                    );
+                    assert_eq!(b[(x, history.y + 1)].bg, profile.color(7));
+                }
+                for (row, target) in &app.mouse.regions {
+                    if row.width == 11 && matches!(target, Target::Utility(Action::Base(_))) {
+                        for x in row.x..row.right() {
+                            assert_eq!(
+                                b[(x, row.y)].bg,
+                                profile.color(7),
+                                "embedded radio background"
+                            );
+                        }
+                    }
+                }
                 assert_eq!(field.width, 60);
                 assert_eq!(evaluate.y - field.y, 12);
-                assert_eq!(b[(evaluate.x + 1, evaluate.y + 1)].bg, profile.color(8));
-                assert_eq!(b[(evaluate.x + 1, evaluate.y + 1)].symbol(), " ");
+                assert_eq!(b[(evaluate.x + 2, evaluate.y + 1)].bg, profile.color(0));
+                assert_eq!(b[(evaluate.x + 2, evaluate.y + 1)].symbol(), " ");
                 assert_eq!(
                     b[(field.x, field.y)].bg,
                     profile.color(if profile == PaletteProfile::ClassicDn {

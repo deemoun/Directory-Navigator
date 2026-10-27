@@ -99,6 +99,12 @@ pub const LABELS: [&str; 6] = [
     "~O~ptions",
 ];
 
+/// Hide preferences affect the manager; the game never advertises its menus.
+pub(crate) fn bar_visible(app: &App) -> bool {
+    app.desktop.active().kind == crate::desktop::WindowKind::Manager
+        && (!app.config.hide_menu || app.modals.menu().is_some())
+}
+
 pub fn plain(label: &str) -> String {
     label.replace('~', "")
 }

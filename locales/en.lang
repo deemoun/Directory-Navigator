@@ -530,3 +530,8 @@ F2 toggles wrapping; F7 finds text. Shift+F7 repeats; Ctrl+F7 searches backward.
 F5 copies; F6 moves or renames; F7 creates a directory. F8 uses Trash or confirmed permanent deletion. Existing destinations are refused. Esc cancels pending work; completed items are retained.	F5 copies; F6 moves or renames; F7 creates a directory. F8 uses Trash or confirmed permanent deletion. Existing destinations are refused. Esc cancels pending work; completed items are retained.
 Tab Next · Shift+Tab Previous · Enter Select · F1 Help · Esc Start	Tab Next · Shift+Tab Previous · Enter Select · F1 Help · Esc Start
 F1 Contents · Tab Links · Enter Follow · Alt+F1 Back · Esc Close	F1 Contents · Tab Links · Enter Follow · Alt+F1 Back · Esc Close
+Hide ~m~enu bar	Hide ~m~enu bar
+~N~ew	~N~ew
+~S~etup	~S~etup
+~T~op 10	~T~op 10
+~P~ause	~P~ause

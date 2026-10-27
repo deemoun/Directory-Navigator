@@ -6,6 +6,12 @@ pub mod dos_scores;
 pub mod scores;
 pub use controls::{action, key, open, paste, GameAction};
 
+pub const BUTTONS: [(&str, GameAction); 4] = [
+    ("~N~ew", GameAction::New),
+    ("~S~etup", GameAction::Setup),
+    ("~T~op 10", GameAction::Scores),
+    ("~P~ause", GameAction::Pause),
+];
 pub const WIDTH: usize = 12;
 pub const HEIGHT: usize = 19;
 // Coordinates are (column, row), converted from the original one-based figures.

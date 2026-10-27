@@ -225,3 +225,35 @@ fn native_outline_leaf_name_double_click_opens_the_directory() -> io::Result<()>
     assert_eq!(app.panels[app.active].path, leaf);
     Ok(())
 }
+
+#[test]
+fn embedded_settings_rows_fill_the_whole_width_on_the_dialog_background() -> io::Result<()> {
+    use dn::{localization::Language, palette::PaletteProfile};
+    let (_temp, mut app) = Temp::app()?;
+    for palette in [PaletteProfile::ClassicDn, PaletteProfile::Terminal] {
+        for language in [Language::English, Language::Russian] {
+            app.config.palette = palette;
+            app.config.language = language;
+            app.open_settings(SettingsKind::Interface);
+            let buffer = render(&mut app);
+            let mut rows = 0;
+            for (rect, target) in &app.mouse.regions {
+                if matches!(target, Target::Setting(_)) {
+                    rows += 1;
+                    for x in rect.x..rect.right() {
+                        assert_eq!(
+                            buffer[(x, rect.y)].bg,
+                            palette.color(7),
+                            "checkbox padding at {x},{}",
+                            rect.y
+                        );
+                    }
+                    assert_eq!(buffer[(rect.right() - 1, rect.y)].symbol(), " ");
+                }
+            }
+            assert_eq!(rows, 4);
+            key(&mut app, K::Esc);
+        }
+    }
+    Ok(())
+}

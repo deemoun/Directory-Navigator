@@ -88,6 +88,10 @@ pub(super) enum Appearance {
     #[default]
     Toolkit,
     Button(bool),
+    Cluster {
+        focused: bool,
+        enabled: bool,
+    },
     Menu(usize, bool),
     Input(bool),
     Status(bool),
@@ -96,6 +100,67 @@ pub(super) enum Appearance {
     SelectedInput,
     History,
     Preview(u8),
+}
+impl Appearance {
+    pub(super) fn button_cell(
+        self,
+        text: &mut String,
+        attribute: &mut u8,
+        cell: (u16, u16),
+        size: (u16, u16),
+    ) {
+        if let Self::Button(selected) = self {
+            button_cell(text, attribute, cell.0, cell.1, size.0, size.1, selected);
+        }
+    }
+    /// Shared theme mapping for isolated controls and children of a Dialog.
+    pub(super) fn attribute(self, native: u8, profile: PaletteProfile) -> u8 {
+        match self {
+            Self::Input(selected) => match (profile, selected) {
+                (PaletteProfile::ClassicDn, true) => 0x0f,
+                (PaletteProfile::ClassicDn, false) => 0x07,
+                (_, true) => 0x1f,
+                (_, false) => 0x17,
+            },
+            Self::Cluster { focused, enabled } => {
+                // Upstream Cluster draws marker/label into an otherwise default
+                // DrawBuffer. Its padding must share the embedded row background.
+                if !enabled {
+                    0x78
+                } else if native & 15 == 14 {
+                    0x7e
+                } else if focused {
+                    0x7f
+                } else {
+                    0x70
+                }
+            }
+            Self::Status(enabled) => match profile {
+                PaletteProfile::Terminal => {
+                    if native == 0x74 {
+                        0x07
+                    } else if enabled {
+                        0x30
+                    } else {
+                        0x38
+                    }
+                }
+                PaletteProfile::ClassicDn => {
+                    if enabled {
+                        native
+                    } else {
+                        0x78
+                    }
+                }
+            },
+            Self::Disabled => 0x78,
+            Self::Text => 0x70,
+            Self::SelectedInput => 0x30,
+            Self::History => 0x9f,
+            Self::Preview(attr) => attr,
+            _ => native,
+        }
+    }
 }
 pub(crate) struct Native {
     pub(super) view: Box<dyn View>,
@@ -210,48 +275,16 @@ impl Widget for Native {
                 if usize::from(x) + text.width() > usize::from(area.width) {
                     text = " ".into();
                 }
-                let mut attribute = match self.appearance {
-                    Appearance::Input(selected) => match (frame.profile(), selected) {
-                        (PaletteProfile::ClassicDn, true) => 0x0f,
-                        (PaletteProfile::ClassicDn, false) => 0x07,
-                        (_, true) => 0x1f,
-                        (_, false) => 0x17,
-                    },
-                    Appearance::Status(enabled) => match frame.profile() {
-                        PaletteProfile::Terminal => {
-                            if cell.attr.to_u8() == 0x74 {
-                                0x07
-                            } else if enabled {
-                                0x30
-                            } else {
-                                0x38
-                            }
-                        }
-                        PaletteProfile::ClassicDn => {
-                            if enabled {
-                                cell.attr.to_u8()
-                            } else {
-                                0x78
-                            }
-                        }
-                    },
-                    Appearance::Disabled => 0x78,
-                    Appearance::Text => 0x70,
-                    Appearance::SelectedInput => 0x30,
-                    Appearance::History => 0x9f,
-                    Appearance::Preview(attr) => attr,
-                    _ => cell.attr.to_u8(),
-                };
+                let mut attribute = self
+                    .appearance
+                    .attribute(cell.attr.to_u8(), frame.profile());
+                self.appearance.button_cell(
+                    &mut text,
+                    &mut attribute,
+                    (x, y),
+                    (area.width, height),
+                );
                 match self.appearance {
-                    Appearance::Button(selected) => button_cell(
-                        &mut text,
-                        &mut attribute,
-                        x,
-                        y,
-                        area.width,
-                        height,
-                        selected,
-                    ),
                     Appearance::Menu(row, true)
                         if y as usize == row + 1
                             && x > 0
@@ -297,8 +330,8 @@ pub(crate) fn dialog(title: &str) -> Native {
     focus(&mut dialog, true);
     native(dialog, text)
 }
-/// Theme native button cells consistently in groups and isolated game controls.
-/// Solid background cells avoid font-dependent half-block seams in shadows.
+/// Shared DN-style faces, focus markers and solid black cell shadows.
+/// Native Button still owns title layout and command/event handling.
 pub(super) fn button_cell(
     text: &mut String,
     attribute: &mut u8,
@@ -311,29 +344,31 @@ pub(super) fn button_cell(
     if width < 4 || height < 2 {
         return;
     }
-    let disabled = *attribute == 0x78;
-    if y + 1 == height || x + 1 == width {
+    if y + 1 == height {
         *text = " ".into();
-        *attribute = if y + 1 == height && x == 0 {
-            0x70
-        } else {
-            0x80
-        };
+        *attribute = if x < 2 { 0x70 } else { 0x00 };
+    } else if x == 0 {
+        *text = " ".into();
+        *attribute = 0x70;
+    } else if x + 1 == width {
+        *text = " ".into();
+        *attribute = 0x00;
     } else {
-        let mnemonic = *attribute & 15 == 14;
-        *attribute = if disabled {
-            0x78
-        } else if selected {
-            if mnemonic {
-                0x2e
-            } else {
-                0x2f
-            }
-        } else if mnemonic {
-            0x74
+        let disabled = *attribute == 0x78;
+        let foreground = if disabled {
+            7
+        } else if selected || *attribute & 15 == 14 {
+            14
         } else {
-            0x70
+            15
         };
+        *attribute = 0x80 | foreground;
+        // Keep translated or wide labels intact when a narrow button leaves
+        // no spare marker cell. Yellow text still identifies the default.
+        if selected && !disabled && text == " " && (x == 1 || x + 2 == width) {
+            *text = if x == 1 { "►".into() } else { "◄".into() };
+            *attribute = 0x8b;
+        }
     }
 }
 pub(crate) fn button(label: &str, selected: bool) -> Native {
@@ -343,11 +378,17 @@ pub(crate) fn button(label: &str, selected: bool) -> Native {
         .trim_start_matches('[')
         .trim_end_matches(']')
         .trim();
-    let mut button = Button::new(TvRect::new(0, 0, 1, 1), &text.text(label), 0xf100, selected);
-    focus(&mut button, selected);
-    let mut widget = native(button, text);
-    widget.appearance = Appearance::Button(selected);
-    widget
+    // Reserve the left owner-coloured cell and center within the actual face.
+    let mut view = Button::new(
+        TvRect::new(0, 0, 1, 1),
+        &text.text(&format!(" {label}")),
+        0xf100,
+        selected,
+    );
+    focus(&mut view, selected);
+    let mut control = native(view, text);
+    control.appearance = Appearance::Button(selected);
+    control
 }
 pub(crate) fn checkbox(label: &str, checked: bool, selected: bool, enabled: bool) -> Native {
     let mut text = TextCells::default();
@@ -356,14 +397,24 @@ pub(crate) fn checkbox(label: &str, checked: bool, selected: bool, enabled: bool
     control.set_checked(checked);
     focus(&mut control, selected);
     control.set_state_flag(State::DISABLED, !enabled);
-    native(control, text)
+    let mut widget = native(control, text);
+    widget.appearance = Appearance::Cluster {
+        focused: selected,
+        enabled,
+    };
+    widget
 }
 pub(crate) fn radio(label: &str, checked: bool, selected: bool) -> Native {
     let mut text = TextCells::default();
     let mut control = RadioButton::new(TvRect::new(0, 0, 1, 1), &text.text(label), 1);
     control.set_selected(checked);
     focus(&mut control, selected);
-    native(control, text)
+    let mut widget = native(control, text);
+    widget.appearance = Appearance::Cluster {
+        focused: selected,
+        enabled: true,
+    };
+    widget
 }
 pub(crate) fn input(value: &str, selected: bool) -> Native {
     let mut text = TextCells::default();
@@ -822,9 +873,9 @@ pub(crate) fn disabled_button(label: &str) -> Native {
     widget
 }
 pub(crate) fn history_button() -> Native {
-    let mut widget = button("↓", false);
-    widget.overscan = 2;
-    widget.inset = 1;
+    // This is an input-row affordance, not a two-row push button. ComboBox
+    // supplies the native dropdown arrow without global HistoryManager state.
+    let mut widget = combo(&[], 0, false);
     widget.appearance = Appearance::History;
     widget
 }
@@ -890,6 +941,7 @@ mod tests {
             );
             frame.render_widget(button("~O~K", true), Rect::new(2, 7, 12, 2));
             frame.render_widget(button("Cancel", false), Rect::new(18, 7, 12, 2));
+            frame.render_widget(disabled_button("~D~elete"), Rect::new(2, 10, 12, 2));
             let scene = frame.finish();
             for x in 3..36 {
                 assert_eq!(
@@ -899,28 +951,45 @@ mod tests {
                 );
             }
             for (x, width) in [(2, 12), (18, 12)] {
-                for dx in 1..width {
+                for dx in 2..width {
                     let shadow = &scene.cells[&(x + dx, 8)];
                     assert_eq!(shadow.text, " ");
-                    assert_eq!(shadow.resolved(profile).bg, Some(profile.color(8)));
+                    assert_eq!(shadow.resolved(profile).bg, Some(profile.color(0)));
                 }
                 assert_eq!(
                     scene.cells[&(x, 8)].resolved(profile).bg,
                     Some(profile.color(7))
                 );
             }
-            for x in 2..13 {
+            for x in 3..13 {
                 assert_eq!(
                     scene.cells[&(x, 7)].resolved(profile).bg,
-                    Some(profile.color(2))
+                    Some(profile.color(8))
                 );
             }
-            for x in 18..29 {
+            for x in 19..29 {
                 assert_eq!(
                     scene.cells[&(x, 7)].resolved(profile).bg,
+                    Some(profile.color(8))
+                );
+            }
+            for x in 3..13 {
+                assert_eq!(
+                    scene.cells[&(x, 10)].resolved(profile).bg,
+                    Some(profile.color(8))
+                );
+                assert_eq!(
+                    scene.cells[&(x, 10)].resolved(profile).fg,
                     Some(profile.color(7))
                 );
+                assert!(!["►", "◄"].contains(&scene.cells[&(x, 10)].text.as_str()));
             }
+            assert_eq!(scene.cells[&(3, 7)].text, "►");
+            assert_eq!(scene.cells[&(12, 7)].text, "◄");
+            assert_eq!(
+                scene.cells[&(3, 7)].resolved(profile).fg,
+                Some(profile.color(11))
+            );
         }
     }
     #[test]

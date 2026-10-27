@@ -78,7 +78,7 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
         Rect::new(rect.x + 3, rect.y + 14, 66, 1),
     );
     for (label, target, selected, x) in [
-        ("[ Apply ]", Target::AcceptColors, cursor == 2, rect.x + 12),
+        ("[ Apply ]", Target::AcceptColors, cursor != 3, rect.x + 12),
         (
             "[ Cancel ]",
             Target::CancelColors,

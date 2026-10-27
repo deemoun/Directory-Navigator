@@ -23,6 +23,7 @@ fn records(config: &Config) -> Vec<(&'static str, String, Value)> {
     add!("application", "shortcuts", config.shortcuts.key());
     add!("interface", "palette", config.palette.key());
     add!("interface", "show_clock", config.show_clock);
+    add!("interface", "hide_menu", config.hide_menu);
     add!("regional", "language", config.language.key());
     add!("regional", "date_order", config.datetime.date_order.key());
     add!(
@@ -114,6 +115,7 @@ fn assign(config: &mut Config, group: &str, key: &str, text: &str) -> io::Result
         ("application", "shortcuts") => config.shortcuts = crate::shortcuts::Profile::parse(text),
         ("interface", "palette") => config.palette = crate::palette::PaletteProfile::parse(text),
         ("interface", "show_clock") => config.show_clock = text == "true",
+        ("interface", "hide_menu") => config.hide_menu = text == "true",
         ("regional", "language") => config.language = crate::localization::Language::parse(text),
         ("regional", "date_order") => {
             config.datetime.date_order = crate::regional::DateOrder::parse(text)

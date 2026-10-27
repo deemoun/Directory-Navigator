@@ -530,3 +530,8 @@ F2 toggles wrapping; F7 finds text. Shift+F7 repeats; Ctrl+F7 searches backward.
 F5 copies; F6 moves or renames; F7 creates a directory. F8 uses Trash or confirmed permanent deletion. Existing destinations are refused. Esc cancels pending work; completed items are retained.	F5 копирует; F6 перемещает или переименовывает; F7 создаёт папку. F8 переносит в Корзину или удаляет навсегда после подтверждения. Существующие назначения не перезаписываются. Esc отменяет работу; завершённые элементы сохраняются.
 Tab Next · Shift+Tab Previous · Enter Select · F1 Help · Esc Start	Tab Далее · Shift+Tab Назад · Enter Выбор · F1 Справка · Esc Начать
 F1 Contents · Tab Links · Enter Follow · Alt+F1 Back · Esc Close	F1 Содержание · Tab Ссылки · Enter Перейти · Alt+F1 Назад · Esc Закрыть
+Hide ~m~enu bar	Скрывать строку ~м~еню
+~N~ew	~Н~овая
+~S~etup	Н~а~стройка
+~T~op 10	~Т~оп 10
+~P~ause	~П~ауза

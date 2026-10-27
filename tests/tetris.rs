@@ -708,8 +708,8 @@ fn reference_game_scores_and_setup_layouts_preserve_colors_values_and_mouse_boun
                     .unwrap()
                     .0;
                 assert_eq!(
-                    terminal.backend().buffer()[(apply.x + 1, apply.y + 1)].bg,
-                    profile.color(8)
+                    terminal.backend().buffer()[(apply.x + 2, apply.y + 1)].bg,
+                    profile.color(0)
                 );
                 key(&mut app, KeyCode::Esc);
                 assert_eq!(app.desktop.game().unwrap().records[0].score, u64::MAX);

@@ -39,6 +39,7 @@ pub enum Target {
     Tool(crate::file_tools::ToolAction),
     Editor(crate::editor::EditorAction),
     Menu(usize),
+    RevealMenu,
     MenuItem(usize, usize),
     MenuSurface,
     Function(u8),
@@ -524,6 +525,7 @@ fn handle_mouse(app: &mut App, event: MouseEvent) {
     }
     let previous = app.mouse.last_click.take();
     match target {
+        Some(Target::RevealMenu) => menu::open(app, 0),
         Some(Target::Menu(index)) => {
             if app.modals.menu().is_some_and(|(open, _)| open == index) {
                 menu::close(app);

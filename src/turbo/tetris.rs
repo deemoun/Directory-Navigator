@@ -16,7 +16,7 @@ impl Scene {
         super::widgets::paint_into(
             self,
             super::widgets::button(label, false),
-            crate::presentation::layout::Rect::new(x, y, 10, 2),
+            crate::presentation::layout::Rect::new(x, y, 11, 2),
         );
     }
 }
@@ -149,15 +149,12 @@ pub(crate) fn prepare(app: &App, width: u16, height: u16) -> Scene {
             0x3f,
         );
     }
-    for (label, action, bx, by) in [
-        ("New", GameAction::New, sx, y + 18),
-        ("Setup", GameAction::Setup, sx + 13, y + 18),
-        ("Top 10", GameAction::Scores, sx, y + 20),
-        ("Pause", GameAction::Pause, sx + 13, y + 20),
-    ] {
+    for (index, (label, action)) in crate::tetris::BUTTONS.into_iter().enumerate() {
+        let bx = sx + (index as u16 % 2) * 11;
+        let by = y + 18 + (index as u16 / 2) * 2;
         scene.button(bx, by, language.text(label));
         regions.push((
-            crate::presentation::layout::Rect::new(bx, by, 10, 1),
+            crate::presentation::layout::Rect::new(bx, by, 11, 1),
             Target::Game(action),
         ));
     }

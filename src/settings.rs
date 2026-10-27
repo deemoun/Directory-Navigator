@@ -14,6 +14,7 @@ pub enum SettingsKind {
 pub enum Setting {
     SaveOnExit,
     Clock,
+    HideMenu,
     Hidden,
     Highlight,
     Tags,
@@ -27,6 +28,7 @@ impl Setting {
         match self {
             Self::SaveOnExit => "Save settings on e~x~it",
             Self::Clock => "Show ~c~lock",
+            Self::HideMenu => "Hide ~m~enu bar",
             Self::Hidden => "Show ~h~idden files",
             Self::Highlight => "~H~ighlight file types",
             Self::Tags => "~T~ag character",
@@ -68,7 +70,12 @@ impl Settings {
             SettingsKind::Keyboard => &[],
             SettingsKind::Regional => &[],
             SettingsKind::System => &[Setting::Hidden, Setting::SaveOnExit],
-            SettingsKind::Interface => &[Setting::Highlight, Setting::Tags, Setting::Clock],
+            SettingsKind::Interface => &[
+                Setting::Highlight,
+                Setting::Tags,
+                Setting::Clock,
+                Setting::HideMenu,
+            ],
             SettingsKind::FileManager => &[
                 Setting::Space,
                 Setting::DeleteKey,
@@ -138,6 +145,7 @@ impl Settings {
         match setting {
             Setting::SaveOnExit => self.draft.save_on_exit,
             Setting::Clock => self.draft.show_clock,
+            Setting::HideMenu => self.draft.hide_menu,
             Setting::Hidden => self.draft.show_hidden,
             Setting::Highlight => self.draft.highlight_files,
             Setting::Tags => self.draft.show_tags,
@@ -155,6 +163,7 @@ impl Settings {
         let value = match setting {
             Setting::SaveOnExit => &mut self.draft.save_on_exit,
             Setting::Clock => &mut self.draft.show_clock,
+            Setting::HideMenu => &mut self.draft.hide_menu,
             Setting::Hidden => &mut self.draft.show_hidden,
             Setting::Highlight => &mut self.draft.highlight_files,
             Setting::Tags => &mut self.draft.show_tags,

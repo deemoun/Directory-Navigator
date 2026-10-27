@@ -172,6 +172,20 @@ fn draw_content(frame: &mut impl Frame, app: &App, prepared: &crate::layout::Lay
             .regions()
             .push((*rect, Target::Function(index as u8 + 1)));
     }
+    if crate::menu::bar_visible(app) {
+        if app.config.hide_menu {
+            let (bar, _) = crate::turbo::manager::menu_bar(app, area.width);
+            frame.compose(bar);
+        }
+        for (index, rect) in menu_positions.iter().enumerate() {
+            frame.regions().push((*rect, Target::Menu(index)));
+        }
+    } else if screen == crate::desktop::WindowKind::Manager && app.config.hide_menu {
+        frame.regions().push((
+            crate::presentation::layout::Rect::new(0, 0, area.width, 1),
+            Target::RevealMenu,
+        ));
+    }
     if screen == crate::desktop::WindowKind::Game {
         frame.regions().clear();
         frame.compose(crate::turbo::tetris::prepare(app, area.width, area.height));

@@ -228,10 +228,10 @@ pub fn key(app: &mut App, key: KeyEvent) {
     }
     let command = if key.modifiers.contains(KeyModifiers::ALT) {
         match key.code {
-            KeyCode::Char('n') => Some(GameAction::New),
-            KeyCode::Char('p') => Some(GameAction::Pause),
-            KeyCode::Char('t') => Some(GameAction::Scores),
-            KeyCode::Char('s') => Some(GameAction::Setup),
+            KeyCode::Char(c) => super::BUTTONS
+                .iter()
+                .find(|(label, _)| app.config.language.matches(label, c))
+                .map(|(_, action)| *action),
             _ => None,
         }
     } else {

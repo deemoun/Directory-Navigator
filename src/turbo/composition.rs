@@ -242,31 +242,14 @@ impl DialogGroup {
                         if x + text.width() as u16 > plane.rect.right() {
                             text = " ".into();
                         }
-                        let mut attribute = match plane.appearance {
-                            Appearance::Input(selected) => match (scene.profile, selected) {
-                                (PaletteProfile::ClassicDn, true) => 0x0f,
-                                (PaletteProfile::ClassicDn, false) => 0x07,
-                                (_, true) => 0x1f,
-                                (_, false) => 0x17,
-                            },
-                            Appearance::SelectedInput => 0x30,
-                            Appearance::Text => 0x70,
-                            Appearance::History => 0x9f,
-                            Appearance::Preview(attr) => attr,
-                            Appearance::Disabled => 0x78,
-                            _ => cell.attr.to_u8(),
-                        };
-                        if let Appearance::Button(selected) = plane.appearance {
-                            super::widgets::button_cell(
-                                &mut text,
-                                &mut attribute,
-                                x - plane.rect.x,
-                                y - plane.rect.y,
-                                plane.rect.width,
-                                plane.rect.height,
-                                selected,
-                            );
-                        }
+                        let mut attribute =
+                            plane.appearance.attribute(cell.attr.to_u8(), scene.profile);
+                        plane.appearance.button_cell(
+                            &mut text,
+                            &mut attribute,
+                            (x - plane.rect.x, y - plane.rect.y),
+                            (plane.rect.width, plane.rect.height),
+                        );
                         Glyph {
                             text,
                             attribute,
