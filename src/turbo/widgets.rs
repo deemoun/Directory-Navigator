@@ -405,14 +405,18 @@ pub(crate) fn checkbox(label: &str, checked: bool, selected: bool, enabled: bool
     widget
 }
 pub(crate) fn radio(label: &str, checked: bool, selected: bool) -> Native {
+    radio_enabled(label, checked, selected, true)
+}
+pub(crate) fn radio_enabled(label: &str, checked: bool, selected: bool, enabled: bool) -> Native {
     let mut text = TextCells::default();
     let mut control = RadioButton::new(TvRect::new(0, 0, 1, 1), &text.text(label), 1);
     control.set_selected(checked);
     focus(&mut control, selected);
+    control.set_state_flag(State::DISABLED, !enabled);
     let mut widget = native(control, text);
     widget.appearance = Appearance::Cluster {
         focused: selected,
-        enabled: true,
+        enabled,
     };
     widget
 }

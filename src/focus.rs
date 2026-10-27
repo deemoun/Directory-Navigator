@@ -23,6 +23,7 @@ pub enum Focus {
     Settings,
     Job,
     Prompt,
+    CopyHistory,
     Menu,
     QuickSearch,
     Manager,

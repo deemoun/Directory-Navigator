@@ -163,11 +163,20 @@ See [document foundations](DOCUMENT_FOUNDATIONS.md) for lifecycle and validation
   It supplies no alternate widget renderer or terminal backend. Hidden wide-cell
   continuations are placeholders, without independently meaningful styles.
 
+The Copy prompt follows `RESOURCE/ENGLISH/DN.DNR` (`dlgCopyDialog`) and
+`FILECOPY.PAS` in `original-dn/`. It uses the original DN 59×16 composition with
+native radio buttons, checkboxes, history and four action buttons. Enabled options preserve
+no-replace publication: refuse/skip existing top-level destinations, space
+preflight, staged read-back verification and verified copy followed by guarded
+source removal. History and the existing OutlineViewer directory picker are owned
+children; cancellation restores the parent draft without panel navigation.
+Overwrite, append, refresh and description copying remain disabled.
+
 ## Validation
 
 Local macOS ARM64 validation covers:
 
-- 455 native Rust tests pass; the existing opt-in native Trash check stays ignored.
+- 466 native Rust tests pass; the existing opt-in native Trash check stays ignored.
 - Formatting, all-target Clippy, release build and a no-default-features build.
 - 2,898 layout cases check viewport bounds. Feasible allocations compare against
   frozen pre-removal geometry; 40 wrapping cases preserve narrow widths,

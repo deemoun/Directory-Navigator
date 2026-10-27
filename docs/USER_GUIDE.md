@@ -188,8 +188,29 @@ viewer history. These tools are session-only and add no configuration keys.
 
 Copy/move dialogs default to the other panel's directory. A typed path is
 relative to that base unless absolute. A single item can use a new destination
-name; multiple items require an existing destination directory. Existing files,
-folders and broken links are refused; nothing is silently overwritten or merged.
+name; multiple items require an existing destination directory. Copy uses DN's
+expanded dialog with these supported choices:
+
+- **Refuse existing destinations** (default): reject the batch before writing if
+  any top-level destination already exists.
+- **Skip all existing files**: leave existing files, directories and broken links
+  untouched, copying only the remaining items. A completion dialog reports any
+  skips. Existing directories are skipped as a whole; their contents are never
+  merged. Skipped sources are retained.
+- **Check free disk space**: estimate regular-file lengths before writing. This is
+  advisory: filesystem overhead and later space changes can still cause errors.
+  An unavailable space reading stops the operation before writing.
+- **Verify disk writes**: read back and compare staged file bytes before publishing.
+- **Remove source files**: force verification, copy the whole selected batch, then
+  use the guarded move cleanup. A failed or cancelled copy retains its sources;
+  errors during cleanup retain remaining sources and completed destinations.
+- **Tree**: choose a directory without navigating either panel. The history arrow
+  or **F4** recalls up to 16 attempted destinations for this session. **F1/Help**
+  explains the options. Child dialogs return to the current draft.
+
+Overwrite, append, refresh and description copying are displayed disabled.
+Nothing replaces an existing destination, including a destination created after
+preflight. Move/rename continues to refuse existing destinations.
 
 Operations run in a background worker with item/byte progress. Cancellation and
 errors retain completed work. Moves prefer native no-overwrite rename, with a

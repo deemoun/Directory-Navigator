@@ -21,12 +21,19 @@ pub struct Prompt {
     pub cursor: usize,
     /// Input, OK, Cancel, Help.
     pub focus: usize,
+    pub copy: Option<crate::copy_dialog::Draft>,
 }
 
 impl Prompt {
     pub fn paste(&mut self, text: &str) {
         if self.focus == 0 {
+            let previous = self.field.clone();
             paste_input(&mut self.field, &mut self.cursor, text);
+            if self.field != previous {
+                if let Some(copy) = &mut self.copy {
+                    copy.picked = None;
+                }
+            }
         }
     }
     pub fn title(&self) -> &'static str {
@@ -42,7 +49,13 @@ impl Prompt {
     }
 
     pub fn edit(&mut self, code: crossterm::event::KeyCode) {
+        let previous = self.field.clone();
         edit_input(&mut self.field, &mut self.cursor, code);
+        if self.field != previous {
+            if let Some(copy) = &mut self.copy {
+                copy.picked = None;
+            }
+        }
     }
 }
 
@@ -76,6 +89,7 @@ pub fn prompt_help(app: &mut crate::app::App) {
         PromptKind::GoTo => "Enter an absolute or relative directory path.\nRelative paths use the active panel directory.",
         PromptKind::Operation(Kind::Delete) => "Permanently deletes the listed files and directories.\nSymbolic links are removed without following targets.\nCancel leaves everything unchanged.",
         PromptKind::Operation(Kind::Trash) => "Moves the listed items to the system Trash.\nRestore items using your desktop file manager.\nLinks themselves are moved; targets are not followed.\nIf Trash is unavailable, the operation stops without\nfalling back to permanent deletion.",
+        PromptKind::Operation(Kind::Copy) => "Copy uses the inactive panel directory for a blank destination.\nRefuse stops on existing destinations; Skip leaves each existing top-level file or directory untouched. Directories are not merged.\nOverwrite, append, refresh and description copying are unavailable.\nCheck free disk space estimates source file lengths before writing; filesystem overhead and later space changes can still cause errors.\nVerify disk writes reads back staged bytes before publication. Remove source files forces verification and removes sources only after the whole copied batch succeeds. Skipped sources remain.\nF4 opens destination history; Tree chooses a directory without navigating either panel. Esc cancels.",
         _ => "Enter a destination path. A blank path uses the base directory.\nExisting destinations are refused; files are never overwritten.\nSymbolic links are copied as links.",
     };
     app.push_dialog(Dialog {

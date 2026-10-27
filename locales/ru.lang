@@ -535,3 +535,26 @@ Hide ~m~enu bar	Скрывать строку ~м~еню
 ~S~etup	Н~а~стройка
 ~T~op 10	~Т~оп 10
 ~P~ause	~П~ауза
+Copy file {} to	Копировать файл {} в
+Copy {} selected items to	Копировать {} выбранных элементов в
+~O~verwrite all existing files	Пере~з~аписывать существующие файлы
+A~p~pend to all existing files	До~б~авлять в существующие файлы
+~R~efuse existing destinations	О~т~клонять существующие назначения
+~S~kip all existing files	Пропу~с~кать существующие файлы
+Refresh o~l~d files	Обновлять ст~а~рые файлы
+Existing destinations are never replaced.	Существующие назначения не заменяются.
+Check ~f~ree disk space	С~в~ободное место
+~V~erify disk writes	П~р~оверять запись
+Copy ~d~escriptions	Копировать оп~и~сания
+Remove so~u~rce files	Удалять ис~х~одники
+O~K~	О~К~
+~T~ree	~Д~ерево
+Destination history	История назначений
+No destination history	История назначений пуста
+Enter selects · Esc returns	Enter — выбор · Esc — возврат
+Copy directory {} to	Копировать каталог {} в
+Select	Выбрать
+Copy complete	Копирование завершено
+Copied items	Скопировано элементов
+Skipped existing items	Пропущено существующих элементов
+Skipped sources and existing destinations were kept.	Пропущенные источники и существующие назначения сохранены.

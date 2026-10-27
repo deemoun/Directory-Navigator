@@ -174,6 +174,14 @@ fn handle_key(app: &mut App, key: KeyEvent) {
         crate::menu::key(app, key.code);
         return;
     }
+    if focus == Focus::CopyHistory {
+        crate::copy_dialog::history_key(app, key);
+        return;
+    }
+    if focus == Focus::Prompt && app.modals.prompt().is_some_and(|p| p.copy.is_some()) {
+        crate::copy_dialog::key(app, key);
+        return;
+    }
     if focus == Focus::Prompt {
         crate::turbo::forms::prompt_key(app, key);
         return;

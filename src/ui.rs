@@ -7,6 +7,7 @@ mod clock;
 mod colors_view;
 mod command_history_view;
 mod config_import_view;
+mod copy_dialog_view;
 mod dialog_style;
 mod directory_tree_view;
 mod discovery_view;
@@ -219,6 +220,7 @@ fn draw_layers(
             Focus::EditorMenu => editor_menu::draw_dropdown(frame, app, area),
             Focus::ViewerSearch => viewer_view::draw_search(frame, app, area),
             Focus::Menu => menu_view::draw_dropdowns(frame, app, menu_positions, area),
+            Focus::CopyHistory => copy_dialog_view::history(frame, app, area),
             Focus::Prompt | Focus::Job => draw_operation_overlays(frame, app, area, modal.focus),
             Focus::Settings => settings_view::draw_settings(frame, app, area),
             Focus::Pattern | Focus::Columns | Focus::FileInfo => {

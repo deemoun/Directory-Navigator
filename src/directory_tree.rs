@@ -141,6 +141,7 @@ pub enum Action {
 pub struct Tree {
     pub(crate) requests: crate::requests::RequestScope,
     pub panel: usize,
+    pub(crate) destination_prompt: Option<crate::modals::ModalId>,
     pub original: PathBuf,
     pub root: Option<PathBuf>,
     pub rows: Vec<Row>,
@@ -160,6 +161,7 @@ impl Tree {
         let mut tree = Self {
             requests: Default::default(),
             panel,
+            destination_prompt: None,
             original: path,
             root: None,
             rows: Vec::new(),
@@ -540,7 +542,12 @@ pub fn action(app: &mut App, command: Action) {
             };
             let path = row.path.clone();
             let panel = tree.panel;
+            let destination = tree.destination_prompt;
             app.modals.set_directory_tree(None);
+            if let Some(parent) = destination {
+                crate::copy_dialog::pick(app, parent, path);
+                return;
+            }
             app.active = panel;
             app.panels[panel].go_to(path, app.config.show_hidden);
         }

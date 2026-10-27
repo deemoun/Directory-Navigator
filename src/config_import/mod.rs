@@ -81,6 +81,7 @@ impl Preview {
 pub fn open(app: &mut App) {
     app.modals.set_prompt(Some(Prompt {
         kind: PromptKind::ImportDos,
+        copy: None,
         sources: Vec::new(),
         base: app.panels[app.active].path.clone(),
         field: "DN.CFG".into(),

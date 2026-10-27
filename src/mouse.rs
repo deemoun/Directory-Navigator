@@ -48,6 +48,9 @@ pub enum Target {
     Entry(usize, usize),
     CloseDialog,
     SubmitPrompt,
+    Copy(crate::copy_dialog::Action),
+    CopyHistory(usize),
+    CloseCopyHistory,
     PromptField,
     PromptHelp,
     CancelPrompt,
@@ -451,6 +454,25 @@ fn handle_mouse(app: &mut App, event: MouseEvent) {
                 job.cancel();
             }
             app.notice = "Cancelling…".into();
+        }
+        return;
+    }
+    if focus == Focus::CopyHistory {
+        crate::copy_dialog::history_mouse(app, event, target);
+        return;
+    }
+    if focus == Focus::Prompt && app.modals.prompt().is_some_and(|p| p.copy.is_some()) {
+        if event.kind == MouseEventKind::Down(MouseButton::Left) {
+            match target {
+                Some(Target::Copy(action)) => crate::copy_dialog::action(app, action),
+                Some(Target::PromptField) => {
+                    crate::copy_dialog::action(app, crate::copy_dialog::Action::Field)
+                }
+                Some(Target::SubmitPrompt) => app.submit_prompt(),
+                Some(Target::CancelPrompt) => app.modals.set_prompt(None),
+                Some(Target::PromptHelp) => crate::dialog::prompt_help(app),
+                _ => {}
+            }
         }
         return;
     }

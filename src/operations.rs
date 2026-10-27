@@ -1,6 +1,8 @@
-//! No-replace file operations. Existing destinations are always refused.
+//! No-replace file operations. Existing destinations are refused or explicitly skipped.
+mod copy_options;
 mod guards;
 use crate::filesystem::open_regular;
+pub use copy_options::{CopyOptions, ExistingDestination};
 use guards::DirectoryGuards;
 use std::{
     fs::{self, Metadata},
@@ -34,6 +36,7 @@ pub struct Plan {
 #[derive(Clone, Debug, Default)]
 pub struct Progress {
     pub files: u64,
+    pub skipped: u64,
     pub bytes: u64,
     pub path: PathBuf,
 }
@@ -79,6 +82,9 @@ impl Job {
     }
 
     pub fn start(plan: Plan) -> io::Result<Self> {
+        Self::start_with_options(plan, CopyOptions::default())
+    }
+    pub fn start_with_options(plan: Plan, options: CopyOptions) -> io::Result<Self> {
         let requests = crate::requests::RequestScope::new(crate::requests::Owner::Workspace);
         let token = requests.start("file-operation");
         let (sender, events) = mpsc::sync_channel(8);
@@ -102,8 +108,9 @@ impl Job {
             .name("dn-operation".into())
             .spawn(move || {
                 let mut last = Instant::now() - Duration::from_secs(1);
-                let result = execute(
+                let result = execute_with_options(
                     &plan,
+                    options,
                     &worker_cancel,
                     |progress| {
                         if last.elapsed() >= Duration::from_millis(80) {
@@ -248,7 +255,12 @@ fn destination_path(path: &Path) -> io::Result<PathBuf> {
     Ok(fs::canonicalize(parent)?.join(name))
 }
 
-fn mappings(plan: &Plan, sources: Vec<Source>) -> io::Result<Vec<(Source, PathBuf)>> {
+fn mappings(
+    plan: &Plan,
+    sources: Vec<Source>,
+    policy: ExistingDestination,
+    progress: &mut Progress,
+) -> io::Result<Vec<(Source, PathBuf)>> {
     let container = fs::metadata(&plan.destination).is_ok_and(|m| m.is_dir());
     let container_path = if container {
         Some(fs::canonicalize(&plan.destination)?)
@@ -273,7 +285,6 @@ fn mappings(plan: &Plan, sources: Vec<Source>) -> io::Result<Vec<(Source, PathBu
         } else {
             destination_path(&plan.destination)?
         };
-        absent(&target)?;
         if metadata.is_dir() && target.starts_with(&source.path) {
             return Err(io::Error::other(
                 "Cannot copy or move a directory into itself",
@@ -283,6 +294,16 @@ fn mappings(plan: &Plan, sources: Vec<Source>) -> io::Result<Vec<(Source, PathBu
             return Err(io::Error::other(
                 "Two sources have the same destination name",
             ));
+        }
+        match absent(&target) {
+            Err(e)
+                if e.kind() == io::ErrorKind::AlreadyExists
+                    && policy == ExistingDestination::Skip =>
+            {
+                progress.skipped = progress.skipped.saturating_add(1);
+                continue;
+            }
+            result => result?,
         }
         pairs.push((source, target));
     }
@@ -340,6 +361,15 @@ pub fn run(
 pub fn execute(
     plan: &Plan,
     cancel: &AtomicBool,
+    notify: impl FnMut(&Progress),
+    strategy: MoveStrategy,
+) -> Result<Progress, OperationFailure> {
+    execute_with_options(plan, CopyOptions::default(), cancel, notify, strategy)
+}
+pub fn execute_with_options(
+    plan: &Plan,
+    options: CopyOptions,
+    cancel: &AtomicBool,
     mut notify: impl FnMut(&Progress),
     strategy: MoveStrategy,
 ) -> Result<Progress, OperationFailure> {
@@ -347,8 +377,9 @@ pub fn execute(
         path: plan.destination.clone(),
         ..Progress::default()
     };
-    run_with_strategy(
+    run_with_options(
         plan,
+        options,
         cancel,
         |p| {
             progress = p.clone();
@@ -365,9 +396,40 @@ pub fn execute(
 pub fn run_with_strategy(
     plan: &Plan,
     cancel: &AtomicBool,
-    mut notify: impl FnMut(&Progress),
+    notify: impl FnMut(&Progress),
     strategy: MoveStrategy,
 ) -> io::Result<Progress> {
+    run_with_options(plan, CopyOptions::default(), cancel, notify, strategy)
+}
+pub fn run_with_options(
+    plan: &Plan,
+    options: CopyOptions,
+    cancel: &AtomicBool,
+    notify: impl FnMut(&Progress),
+    strategy: MoveStrategy,
+) -> io::Result<Progress> {
+    run_checked(plan, options, cancel, notify, strategy, |path| {
+        crate::volume_space::read(path).map(|s| s.available)
+    })
+}
+fn run_checked(
+    plan: &Plan,
+    options: CopyOptions,
+    cancel: &AtomicBool,
+    mut notify: impl FnMut(&Progress),
+    strategy: MoveStrategy,
+    space: impl Fn(&Path) -> io::Result<u128>,
+) -> io::Result<Progress> {
+    let mut effective = plan.clone();
+    if options.remove_sources && effective.kind == Kind::Copy {
+        effective.kind = Kind::Move;
+    }
+    let plan = &effective;
+    let strategy = if options.verify_writes || options.remove_sources {
+        MoveStrategy::Copy
+    } else {
+        strategy
+    };
     let mut progress = Progress::default();
     check(cancel)?;
     if plan.kind == Kind::Mkdir {
@@ -463,9 +525,12 @@ pub fn run_with_strategy(
         }
         return Ok(progress);
     }
-    let pairs = mappings(plan, sources)?; // Check all top-level collisions before writing.
+    let pairs = mappings(plan, sources, options.existing, &mut progress)?; // Check all top-level collisions before writing.
     for (_, target) in &pairs {
         guards.capture_parent(target)?;
+    }
+    if options.check_free_space && !pairs.is_empty() {
+        copy_options::preflight(&pairs, &mut guards, cancel, &space)?;
     }
     let mut copied = Vec::new();
     let mut buffer = vec![0_u8; 128 * 1024];
@@ -601,6 +666,9 @@ pub fn run_with_strategy(
                     ));
                 }
                 output.sync_all()?;
+                if options.verify_writes || options.remove_sources {
+                    copy_options::verify(&mut input, output, metadata.len(), cancel)?;
+                }
                 check(cancel)?;
                 guards.verify_parent(&source)?;
                 guards.verify_parent(&target)?;

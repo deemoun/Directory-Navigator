@@ -535,3 +535,26 @@ Hide ~m~enu bar	Hide ~m~enu bar
 ~S~etup	~S~etup
 ~T~op 10	~T~op 10
 ~P~ause	~P~ause
+Copy file {} to	Copy file {} to
+Copy {} selected items to	Copy {} selected items to
+~O~verwrite all existing files	~O~verwrite all existing files
+A~p~pend to all existing files	A~p~pend to all existing files
+~R~efuse existing destinations	~R~efuse existing destinations
+~S~kip all existing files	~S~kip all existing files
+Refresh o~l~d files	Refresh o~l~d files
+Existing destinations are never replaced.	Existing destinations are never replaced.
+Check ~f~ree disk space	Check ~f~ree disk space
+~V~erify disk writes	~V~erify disk writes
+Copy ~d~escriptions	Copy ~d~escriptions
+Remove so~u~rce files	Remove so~u~rce files
+O~K~	O~K~
+~T~ree	~T~ree
+Destination history	Destination history
+No destination history	No destination history
+Enter selects · Esc returns	Enter selects · Esc returns
+Copy directory {} to	Copy directory {} to
+Select	Select
+Copy complete	Copy complete
+Copied items	Copied items
+Skipped existing items	Skipped existing items
+Skipped sources and existing destinations were kept.	Skipped sources and existing destinations were kept.

@@ -22,6 +22,7 @@ pub(crate) struct ViewportState {
     characters: Option<(crate::utilities::characters::Page, bool)>,
     menu: Option<(usize, usize)>,
     hide_menu: bool,
+    copy_history: Option<(usize, usize)>,
     submenus: Vec<(crate::menu::MenuId, usize)>,
     modal_offsets: Vec<usize>,
 }
@@ -81,6 +82,7 @@ fn viewport_state(app: &App) -> ViewportState {
         }),
         menu: app.modals.menu(),
         hide_menu: app.config.hide_menu,
+        copy_history: app.modals.copy_history().map(|h| (h.cursor, h.offset)),
         submenus: app.modals.submenus().to_vec(),
         modal_offsets: vec![
             app.modals.archive().map_or(0, |m| m.offset),
@@ -273,6 +275,10 @@ pub fn prepare_window(
             info.rows = usize::from(area.height.saturating_sub(4).min(24).saturating_sub(6));
             info.step(0);
         }
+    }
+    if let Some(history) = app.modals.copy_history_mut() {
+        history.rows = history.paths.len().clamp(1, 8);
+        history.keep_visible();
     }
     let profile = app.config.palette;
     if let Some(crate::editor::Modal::File(picker)) = app

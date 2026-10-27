@@ -91,6 +91,11 @@ pub(super) fn draw_operation_overlays(
         .prompt()
         .filter(|_| layer == crate::focus::Focus::Prompt)
     {
+        if prompt.copy.is_some() {
+            let area = frame.area();
+            super::copy_dialog_view::draw(frame, app, area);
+            return;
+        }
         let deleting = matches!(
             prompt.kind,
             PromptKind::Operation(Kind::Delete | Kind::Trash)

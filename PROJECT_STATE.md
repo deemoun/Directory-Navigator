@@ -19,6 +19,19 @@
   state owns session dialogs/options/results; quick view owns debounced reads.
 
 ## Implemented
+
+- Expanded native Copy dialog follows original DN's 59×16 resource layout:
+  refuse/skip collision policy, optional space preflight and staged read-back
+  verification, verified copy then guarded source removal, destination history
+  and an owned directory-tree picker. Overwrite/append/refresh/descriptions remain
+  disabled. Default no-replace behavior is preserved; Skip never merges folders
+  or removes skipped sources. History retains native paths; child receipts name
+  the originating modal. Temporary-fixture tests cover races, corruption,
+  cancellation, insufficient/unavailable space, symlinks, focus and ownership.
+  macOS ARM64: 466 Rust tests pass (one opt-in native Trash test ignored), fmt,
+  all-target Clippy, release and no-default-features checks pass. Isolated native
+  terminal Copy/Help/Tree/history/skip/verified-removal and restoration pass.
+  Windows/Linux validation remains skipped.
 Current Turbo Vision status is authoritative in docs/TURBO_VISION_MIGRATION.md;
 older increment entries below also record earlier migration stages.
 

@@ -117,7 +117,16 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
     }
     let bw = (rect.width - 4) / 4;
     for (index, label, command) in [
-        (1, "Open".to_string(), Action::Open),
+        (
+            1,
+            if tree.destination_prompt.is_some() {
+                "Select"
+            } else {
+                "Open"
+            }
+            .to_string(),
+            Action::Open,
+        ),
         (2, "Refresh".to_string(), Action::Refresh),
         (
             3,

@@ -577,3 +577,12 @@ slot!(
     crate::settings::ChoiceDialog,
     Settings
 );
+
+slot!(
+    copy_history,
+    copy_history_mut,
+    take_copy_history,
+    set_copy_history,
+    crate::copy_dialog::History,
+    CopyHistory
+);
