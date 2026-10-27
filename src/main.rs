@@ -27,12 +27,22 @@ fn run() -> io::Result<()> {
     let (session, mut terminal) = Session::start()?;
     terminal.bind_desktop(app.desktop.native());
     let mut dirty = true;
+    let mut showing_output = false;
     loop {
         dirty |= app.poll();
+        if app.output_visible != showing_output {
+            if app.output_visible {
+                session.reveal_output()?;
+            } else {
+                session.resume(&mut terminal)?;
+                dirty = true;
+            }
+            showing_output = app.output_visible;
+        }
         app.desktop
             .native()
             .set_scope(dn::turbo::desktop::Scope::for_app(&app));
-        if dirty {
+        if dirty && !showing_output {
             session.cursor_style(dn::focus::current(&app) == dn::focus::Focus::Manager)?;
             terminal.draw_app(&mut app)?;
 
@@ -45,23 +55,27 @@ fn run() -> io::Result<()> {
             dirty = true;
             continue;
         }
-        if let Some(plan) = app
-            .user_menu
-            .pending
-            .take()
-            .or_else(|| app.associations.pending.take())
-            .or_else(|| app.command_line.pending.take())
-        {
+        let pending = if showing_output {
+            None
+        } else {
+            app.user_menu
+                .pending
+                .take()
+                .or_else(|| app.associations.pending.take())
+                .or_else(|| app.command_line.pending.take())
+        };
+        if let Some(plan) = pending {
             session.suspend();
             let result = dn::user_menu::runner::run(&plan);
             match &result {
                 Ok(status) => println!("\nCommand finished: {status}"),
                 Err(e) => println!("\nCannot run command: {e}"),
             }
-            println!("Press Enter to return to DN.");
-            let mut line = String::new();
-            let _ = io::stdin().read_line(&mut line);
-            session.resume(&mut terminal)?;
+            session.prepare_output_input()?;
+            println!("Press Enter to return to DN. Esc / Ctrl+O also return.\r");
+            app.output_visible = true;
+            showing_output = true;
+            app.screensaver.activity(std::time::Instant::now());
             app.refresh();
             if let Err(e) = result {
                 app.error(e.to_string());
@@ -71,6 +85,10 @@ fn run() -> io::Result<()> {
         }
         let timeout = app.wait_duration(std::time::Instant::now());
         if let Some(event) = session.poll(&mut terminal, timeout)? {
+            if showing_output {
+                dn::terminal_output::event(&mut app, &event);
+                continue;
+            }
             if dn::screensaver::event(&mut app, &event, std::time::Instant::now()) {
                 dirty = true;
                 continue;

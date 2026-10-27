@@ -136,12 +136,13 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
         (4, "Close".to_string(), Action::Close),
     ] {
         let r = Rect::new(x + (index as u16 - 1) * bw, rect.bottom() - 2, bw - 1, 1);
-        super::dialog_style::button(
+        super::dialog_style::button_with_default(
             frame,
             profile,
             r,
             app.config.language.text(&label),
             tree.focus == index,
+            index == 1 && tree.focus == 0,
         );
         frame.regions().push((r, Target::Tree(command)));
     }

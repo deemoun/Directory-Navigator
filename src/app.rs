@@ -10,6 +10,7 @@ pub struct App {
     pub modals: crate::modals::ModalStack,
     pub welcome: crate::welcome::State,
     pub copy_dialog: crate::copy_dialog::State,
+    pub output_visible: bool,
     pub shortcuts: crate::shortcuts::State,
     pub associations: crate::associations::State,
     pub user_menu: crate::user_menu::State,
@@ -59,6 +60,7 @@ impl App {
             modals: Default::default(),
             welcome: Default::default(),
             copy_dialog: Default::default(),
+            output_visible: false,
             shortcuts: Default::default(),
             associations: Default::default(),
             user_menu: Default::default(),
@@ -516,6 +518,7 @@ impl App {
         }
         if let Some(result) = finished {
             let trashed = self.job.as_ref().is_some_and(|job| job.kind == Kind::Trash);
+            let moved = self.job.as_ref().is_some_and(|job| job.kind == Kind::Move);
             self.last_operation = Some(result.clone());
             self.job = None;
             changed = true;
@@ -533,10 +536,18 @@ impl App {
                             self.push_owned_dialog(
                                 crate::modals::ModalOwner::Workspace,
                                 Dialog {
-                                    title: "Copy complete",
+                                    title: if moved {
+                                        "Move complete"
+                                    } else {
+                                        "Copy complete"
+                                    },
                                     message: format!(
                                         "{}: {}\n{}: {}\n{}",
-                                        self.config.language.text("Copied items"),
+                                        self.config.language.text(if moved {
+                                            "Moved items"
+                                        } else {
+                                            "Copied items"
+                                        }),
                                         progress.files,
                                         self.config.language.text("Skipped existing items"),
                                         progress.skipped,
@@ -714,7 +725,7 @@ impl App {
         .clone();
         self.modals.set_prompt(Some(Prompt {
             kind: PromptKind::Operation(kind),
-            copy: (kind == Kind::Copy).then(crate::copy_dialog::Draft::default),
+            copy: matches!(kind, Kind::Copy | Kind::Move).then(crate::copy_dialog::Draft::default),
             sources,
             base,
             field: String::new(),
@@ -795,13 +806,13 @@ impl App {
             PromptKind::GoTo => {
                 self.panels[self.active].go_to(destination, self.config.show_hidden)
             }
-            PromptKind::Operation(Kind::Copy) => {
+            PromptKind::Operation(kind @ (Kind::Copy | Kind::Move)) => {
                 let options = prompt
                     .copy
                     .as_ref()
                     .map_or_else(Default::default, |c| c.options);
                 let plan = Plan {
-                    kind: Kind::Copy,
+                    kind,
                     sources: prompt.sources,
                     destination: destination.clone(),
                 };

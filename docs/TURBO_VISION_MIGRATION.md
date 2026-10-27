@@ -163,20 +163,36 @@ See [document foundations](DOCUMENT_FOUNDATIONS.md) for lifecycle and validation
   It supplies no alternate widget renderer or terminal backend. Hidden wide-cell
   continuations are placeholders, without independently meaningful styles.
 
-The Copy prompt follows `RESOURCE/ENGLISH/DN.DNR` (`dlgCopyDialog`) and
+The Copy and Rename/move prompts follow `RESOURCE/ENGLISH/DN.DNR`
+(`dlgCopyDialog` / `dlgRenameDialog`) and
 `FILECOPY.PAS` in `original-dn/`. It uses the original DN 59×16 composition with
 native radio buttons, checkboxes, history and four action buttons. Enabled options preserve
 no-replace publication: refuse/skip existing top-level destinations, space
 preflight, staged read-back verification and verified copy followed by guarded
 source removal. History and the existing OutlineViewer directory picker are owned
 children; cancellation restores the parent draft without panel navigation.
-Overwrite, append, refresh and description copying remain disabled.
+Overwrite, append, refresh and description copying remain disabled. Rename/move
+locks source removal on, shares the destination history and preserves F6/Shift+F6
+bases. Native exclusive rename remains the default; space checks apply only when
+copying is needed. Selecting verification forces staged copying with guarded
+batch cleanup.
+
+The manager can reveal the terminal's real primary screen/scrollback. DN's
+`RESOURCE/ENGLISH/DN.DNR` assigns Ctrl+O to `cmShowOutput` (saved output window)
+and Alt+F5 to `cmShowUserScreen` (temporary screen reveal); `USERMENU.PAS` owns
+the output scroller and `DNAPP.PAS` implements the reveal. This version uses the
+terminal's own scrollback, colors and selection, without replaying a saved screen.
+Classic Ctrl+O toggles, Mac Ctrl+O twice retains the existing prefix sequences,
+and Alt+F5 / Manager → Terminal output are alternate entry points. A dedicated
+input scope consumes keys/paste without command execution; native painting pauses
+while background polling continues. Return redraws the current viewport. Finished
+commands accept Ctrl+O/Esc/Enter with raw, atomic paste handling.
 
 ## Validation
 
 Local macOS ARM64 validation covers:
 
-- 466 native Rust tests pass; the existing opt-in native Trash check stays ignored.
+- 487 native Rust tests pass; the existing opt-in native Trash check stays ignored.
 - Formatting, all-target Clippy, release build and a no-default-features build.
 - 2,898 layout cases check viewport bounds. Feasible allocations compare against
   frozen pre-removal geometry; 40 wrapping cases preserve narrow widths,

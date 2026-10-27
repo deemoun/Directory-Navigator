@@ -169,12 +169,13 @@ pub(super) fn draw_search(frame: &mut impl Frame, app: &App, area: Rect) {
             ("[ Cancel ]", Action::Cancel, 3, rect.right() - 24),
         ] {
             let row = Rect::new(x, rect.bottom() - 2, 16, 1);
-            super::dialog_style::button(
+            super::dialog_style::button_with_default(
                 frame,
                 profile,
                 row,
                 app.config.language.text(label),
                 dialog.focus == focus,
+                focus == 2 && dialog.focus < 2,
             );
             frame.regions().push((row, Target::Viewer(action)));
         }

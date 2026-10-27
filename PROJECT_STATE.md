@@ -20,6 +20,42 @@
 
 ## Implemented
 
+- Default button appearance is independent of keyboard focus. Game-over Continue,
+  score-name OK, game Help, editor prompts/search and safe unsaved Cancel, settings,
+  histories, window lists, tree/archive actions, filters and tool dialogs show
+  their existing Enter action immediately. Focused alternative buttons suppress
+  the implicit highlight; unavailable actions are not promoted. Native input/list
+  focus and existing command/confirmation controllers are preserved.
+  macOS ARM64: 487 tests pass (one opt-in native Trash test ignored), formatting,
+  all-target Clippy, release build and no-default-features checks pass. Native
+  terminal checks confirm the first-paint game-over/name/settings highlights and
+  terminal restoration. Windows/Linux validation remains skipped.
+
+- Terminal output reveal uses the real primary terminal/scrollback, without a
+  shell or transcript replay. Classic Ctrl+O toggles; Mac Ctrl+O twice preserves
+  existing prefix commands; Alt+F5 and Manager menu also reveal it. Output input
+  is read-only with atomic paste, no mouse capture, deferred painting and live
+  background polling. Ctrl+O/Esc/Enter returns with full redraw and unchanged
+  command draft/pane state; post-command return accepts these keys too.
+  macOS ARM64: 482 tests pass (one opt-in native Trash test ignored), including
+  PTY checks for both shortcut profiles, untouched output while hidden, paste
+  consumption, resize, command return and terminal restoration. Formatting,
+  all-target Clippy, release and no-default-features checks pass. Windows/Linux
+  validation remains skipped.
+
+- Native Rename/move now shares DN's 59×16 Copy composition, destination history,
+  Tree and Help, with operation-specific captions/results. Source removal is
+  checked and locked; refusal remains the default and Skip preserves existing
+  destinations and skipped sources. F6/Shift+F6 keep their existing base paths.
+  Native exclusive rename stays fast; optional space checking applies only to
+  copy fallback, while write verification forces staged copy then guarded cleanup.
+  Temporary-fixture tests cover native identity, verification/cancellation/races,
+  batch cleanup, skipped directories/links, modal ownership and immutable layouts.
+  macOS ARM64: 476 tests pass (one opt-in native Trash test ignored), formatting,
+  all-target Clippy, release build and no-default-features checks pass. An isolated
+  terminal run covers F6/Shift+F6, native/verified moves, refusal/skip, history,
+  Help/Tree, resizing and terminal restoration. Windows/Linux validation skipped.
+
 - Expanded native Copy dialog follows original DN's 59×16 resource layout:
   refuse/skip collision policy, optional space preflight and staged read-back
   verification, verified copy then guarded source removal, destination history

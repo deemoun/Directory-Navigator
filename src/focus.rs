@@ -3,6 +3,7 @@ use crate::app::App;
 pub use crate::desktop::WindowKind as Screen;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Focus {
+    TerminalOutput,
     ConfigImport,
     Welcome,
     CommandHistory,
@@ -38,6 +39,9 @@ pub fn screen(app: &App) -> Screen {
     app.desktop.active().kind
 }
 pub fn current(app: &App) -> Focus {
+    if app.output_visible {
+        return Focus::TerminalOutput;
+    }
     if let Some(modal) = app.modal_top() {
         return modal.focus;
     }

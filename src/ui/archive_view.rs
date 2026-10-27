@@ -174,12 +174,13 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
             _ => true,
         };
         if enabled {
-            super::dialog_style::button(
+            super::dialog_style::button_with_default(
                 frame,
                 profile,
                 r,
                 app.config.language.text(label),
                 b.focus == i,
+                i == 1 && b.focus == 0,
             );
             frame.regions().push((r, Target::Archive(a)));
         } else {

@@ -8,12 +8,23 @@ use crate::{
     mouse::Target,
 };
 fn button(frame: &mut impl Frame, app: &App, rect: Rect, label: &str, command: A, focused: bool) {
-    super::dialog_style::button(
+    let default_active = app
+        .desktop
+        .active_editor()
+        .and_then(|e| e.modals.editor_modal())
+        .is_some_and(|modal| match modal {
+            Modal::ConfirmClose | Modal::Help => command == A::Cancel,
+            Modal::Prompt { .. } => command == A::Submit,
+            Modal::Search(search) => search.focus < 8 && command == A::SearchSubmit(false),
+            _ => false,
+        });
+    super::dialog_style::button_with_default(
         frame,
         app.config.palette,
         rect,
         app.config.language.text(label),
         focused,
+        default_active,
     );
     frame.regions().push((rect, Target::Editor(command)));
 }

@@ -131,12 +131,13 @@ pub(super) fn draw_settings(frame: &mut impl Frame, app: &App, area: Rect) {
             14,
             1,
         );
-        super::dialog_style::button(
+        super::dialog_style::button_with_default(
             frame,
             profile,
             button,
             app.config.language.text(label),
             settings.cursor == count + index,
+            index == 0 && settings.cursor < count,
         );
         frame.regions().push((button, *target));
     }
@@ -215,12 +216,13 @@ fn draw_regional(frame: &mut impl Frame, app: &App, area: Rect) {
     .enumerate()
     {
         let button = Rect::new(rect.x + 17 + i as u16 * 18, rect.bottom() - 3, 14, 1);
-        super::dialog_style::button(
+        super::dialog_style::button_with_default(
             frame,
             profile,
             button,
             app.config.language.text(language.text(label)),
             settings.cursor == 5 + i,
+            i == 0 && settings.cursor < 5,
         );
         frame.regions().push((button, target));
     }

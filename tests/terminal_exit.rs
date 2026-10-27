@@ -422,3 +422,246 @@ mod waiting_tests {
         assert!(error.len() < 20 * 1024);
     }
 }
+
+#[test]
+fn output_toggle_preserves_primary_screen_and_command_return_restores_terminal() -> io::Result<()> {
+    static NEXT: AtomicU64 = AtomicU64::new(0);
+    for profile in ["classic_dn", "mac"] {
+        let directory = std::env::temp_dir().join(format!(
+            "dn-output-pty-{}-{}",
+            std::process::id(),
+            NEXT.fetch_add(1, Ordering::Relaxed)
+        ));
+        fs::create_dir_all(directory.join("config/dn"))?;
+        fs::write(
+            directory.join("config/dn/config.conf"),
+            format!(
+                "config_version=2\n[application]\nsave_on_exit=false\nshortcuts=\"{profile}\"\n"
+            ),
+        )?;
+        let (mut master_fd, mut slave_fd) = (0, 0);
+        let size = libc::winsize {
+            ws_row: 25,
+            ws_col: 80,
+            ws_xpixel: 0,
+            ws_ypixel: 0,
+        };
+        #[cfg(not(target_os = "linux"))]
+        let mut size = size;
+        #[cfg(target_os = "linux")]
+        let size_ptr = &size;
+        #[cfg(not(target_os = "linux"))]
+        let size_ptr = &mut size;
+        // SAFETY: openpty initializes two distinct descriptors using valid size storage.
+        if unsafe {
+            libc::openpty(
+                &mut master_fd,
+                &mut slave_fd,
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+                size_ptr,
+            )
+        } != 0
+        {
+            return Err(io::Error::last_os_error());
+        }
+        // SAFETY: openpty transferred ownership of these distinct descriptors.
+        let mut master = unsafe { File::from_raw_fd(master_fd) };
+        let slave = unsafe { File::from_raw_fd(slave_fd) };
+        let original = terminal_mode(&slave)?;
+        // SAFETY: this is a live descriptor; preserve existing flags while making reads nonblocking.
+        unsafe {
+            let flags = libc::fcntl(master.as_raw_fd(), libc::F_GETFL);
+            if libc::fcntl(master.as_raw_fd(), libc::F_SETFL, flags | libc::O_NONBLOCK) < 0 {
+                return Err(io::Error::last_os_error());
+            }
+        }
+        let mut command = Command::new("/bin/sh");
+        command.args(["-c","printf 'PRIMARY_BEFORE_DN\\n'; \"$1\"; dn_status=$?; printf '\\nDN_STATUS:%s\\nDN_EXIT_READY\\n' \"$dn_status\"; IFS= read -r reply; printf 'DN_INPUT:%s\\n' \"$reply\"; exit \"$dn_status\"","dn-output-test",env!("CARGO_BIN_EXE_dn")])
+            .current_dir(&directory).env("TERM","xterm-256color").env("XDG_CONFIG_HOME",directory.join("config"))
+            .stdin(Stdio::from(slave.try_clone()?)).stdout(Stdio::from(slave.try_clone()?)).stderr(Stdio::from(slave.try_clone()?));
+        // SAFETY: only async-signal-safe session and controlling-terminal operations run after fork.
+        unsafe {
+            command.pre_exec(|| {
+                if libc::setsid() < 0 || libc::ioctl(0, libc::TIOCSCTTY as _, 0) < 0 {
+                    return Err(io::Error::last_os_error());
+                }
+                Ok(())
+            });
+        }
+        let child = command.spawn()?;
+        let mut fixture = Fixture { directory, child };
+        let mut phase = Vec::new();
+        until(
+            &mut master,
+            &mut phase,
+            b"Quit",
+            "output: initial manager",
+            &mut fixture.child,
+        )?;
+        assert!(phase
+            .windows(b"PRIMARY_BEFORE_DN".len())
+            .any(|w| w == b"PRIMARY_BEFORE_DN"));
+        for return_key in [b"\x1b".as_slice(), b"\r".as_slice()] {
+            phase.clear();
+            master.write_all(if profile == "mac" {
+                b"\x0f\x0f"
+            } else {
+                b"\x0f"
+            })?;
+            until(
+                &mut master,
+                &mut phase,
+                b"\x1b[?1049l",
+                "output: primary screen",
+                &mut fixture.child,
+            )?;
+            until(
+                &mut master,
+                &mut phase,
+                b"\x1b[?2004h",
+                "output: paste stays atomic",
+                &mut fixture.child,
+            )?;
+            let mode = terminal_mode(&slave)?;
+            assert_eq!(mode.c_lflag & (libc::ICANON | libc::ECHO), 0);
+            assert!(phase
+                .windows(b"\x1b[?1006l".len())
+                .any(|w| w == b"\x1b[?1006l"));
+            master.write_all(b"\x1b[200~echo SHOULD_NOT_RUN\n\x1b[201~ignored\x1b[21~")?;
+            // Resize the hidden UI; it must redraw only after returning.
+            let size = libc::winsize {
+                ws_row: 30,
+                ws_col: 100,
+                ws_xpixel: 0,
+                ws_ypixel: 0,
+            };
+            // SAFETY: valid terminal descriptor and winsize; child owns this process group.
+            unsafe {
+                if libc::ioctl(slave.as_raw_fd(), libc::TIOCSWINSZ as _, &size) < 0 {
+                    return Err(io::Error::last_os_error());
+                }
+                libc::kill(-(fixture.child.id() as i32), libc::SIGWINCH);
+            }
+            std::thread::sleep(Duration::from_millis(30));
+            let mut extra = [0; 8192];
+            match master.read(&mut extra) {
+                Err(e) if e.kind() == io::ErrorKind::WouldBlock => {}
+                Ok(0) => {}
+                other => panic!("output view unexpectedly wrote to primary screen: {other:?}"),
+            }
+            phase.clear();
+            master.write_all(return_key)?;
+            until(
+                &mut master,
+                &mut phase,
+                b"\x1b[?1049h",
+                "output: return to alternate screen",
+                &mut fixture.child,
+            )?;
+            until(
+                &mut master,
+                &mut phase,
+                b"Quit",
+                "output: full redraw",
+                &mut fixture.child,
+            )?;
+            assert!(!phase
+                .windows(b"SHOULD_NOT_RUN".len())
+                .any(|w| w == b"SHOULD_NOT_RUN"));
+            assert!(!phase.windows(b"ignored".len()).any(|w| w == b"ignored"));
+        }
+        phase.clear();
+        master.write_all(b"printf 'DN_OUTPUT_MARKER\\n'\r")?;
+        until(
+            &mut master,
+            &mut phase,
+            b"Press Enter to return to DN.",
+            "output: command finished",
+            &mut fixture.child,
+        )?;
+        assert!(phase
+            .windows(b"DN_OUTPUT_MARKER".len())
+            .any(|w| w == b"DN_OUTPUT_MARKER"));
+        phase.clear();
+        master.write_all(b"\x0f")?;
+        until(
+            &mut master,
+            &mut phase,
+            b"\x1b[?1049h",
+            "output: Ctrl+O returns after command",
+            &mut fixture.child,
+        )?;
+        until(
+            &mut master,
+            &mut phase,
+            b"Quit",
+            "output: manager after command",
+            &mut fixture.child,
+        )?;
+        phase.clear();
+        master.write_all(if profile == "mac" {
+            b"\x0f\x0f"
+        } else {
+            b"\x0f"
+        })?;
+        until(
+            &mut master,
+            &mut phase,
+            b"\x1b[?1049l",
+            "output: review previous command",
+            &mut fixture.child,
+        )?;
+        assert!(
+            !phase
+                .windows(b"DN_OUTPUT_MARKER".len())
+                .any(|w| w == b"DN_OUTPUT_MARKER"),
+            "reveal must not replay or reexecute output"
+        );
+        phase.clear();
+        master.write_all(b"\x0f")?;
+        until(
+            &mut master,
+            &mut phase,
+            b"Quit",
+            "output: Ctrl+O toggles back",
+            &mut fixture.child,
+        )?;
+        phase.clear();
+        master.write_all(b"\x1b[21~")?;
+        until(
+            &mut master,
+            &mut phase,
+            b"DN_EXIT_READY",
+            "output: exit to parent shell",
+            &mut fixture.child,
+        )?;
+        let restored = terminal_mode(&slave)?;
+        assert_eq!(
+            (
+                original.c_iflag,
+                original.c_oflag,
+                original.c_cflag,
+                original.c_lflag,
+                original.c_cc
+            ),
+            (
+                restored.c_iflag,
+                restored.c_oflag,
+                restored.c_cflag,
+                restored.c_lflag,
+                restored.c_cc
+            )
+        );
+        master.write_all(b"RESTORED\n")?;
+        until(
+            &mut master,
+            &mut phase,
+            b"DN_INPUT:RESTORED",
+            "output: shell input restored",
+            &mut fixture.child,
+        )?;
+        assert!(fixture.child.wait()?.success());
+    }
+    Ok(())
+}

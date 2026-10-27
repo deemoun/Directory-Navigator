@@ -87,6 +87,9 @@ impl MouseState {
 }
 
 pub fn handle(app: &mut App, event: MouseEvent) {
+    if app.output_visible {
+        return;
+    }
     if app.screensaver.active {
         if matches!(event.kind, MouseEventKind::Up(_)) {
             return;

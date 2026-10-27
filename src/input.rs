@@ -3,6 +3,10 @@ use crate::{app::App, operations::Kind, panel::SortMode};
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 
 pub fn handle(app: &mut App, key: KeyEvent) {
+    if app.output_visible {
+        crate::terminal_output::event(app, &crossterm::event::Event::Key(key));
+        return;
+    }
     if app.exit_pending && app.quit_review.is_some() {
         if key.code == KeyCode::Esc {
             app.abort_quit();
@@ -25,6 +29,15 @@ fn handle_key(app: &mut App, key: KeyEvent) {
         return;
     };
     let focus = focus::current(app);
+    if (key.code == KeyCode::Char('o') && key.modifiers == KeyModifiers::CONTROL
+        || key.code == KeyCode::F(5) && key.modifiers == KeyModifiers::ALT)
+        && matches!(focus, Focus::Manager | Focus::Menu | Focus::QuickSearch)
+    {
+        if key.kind == KeyEventKind::Press {
+            crate::terminal_output::request(app);
+        }
+        return;
+    }
     if focus == Focus::WindowList {
         crate::windowing::key(app, key);
         return;
@@ -298,6 +311,9 @@ fn handle_key(app: &mut App, key: KeyEvent) {
 
 /// Paste uses the same topmost recipient as keyboard and mouse input.
 pub fn paste(app: &mut App, text: &str) {
+    if app.output_visible {
+        return;
+    }
     paste_text(app, text);
     crate::layout::update(app);
 }

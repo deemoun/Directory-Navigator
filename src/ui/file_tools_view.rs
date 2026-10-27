@@ -248,12 +248,16 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
             _ => None,
         };
         match action {
-            ToolAction::Accept => super::dialog_style::button(
+            ToolAction::Accept => super::dialog_style::button_with_default(
                 frame,
                 profile,
                 row,
                 app.config.language.text(" [ OK ] "),
                 focus.is_some_and(|(f, a, _)| f == a),
+                focus.map_or_else(
+                    || matches!(modal, ToolDialog::History { paths, .. } if !paths.is_empty()),
+                    |(f, a, _)| f < a,
+                ),
             ),
             ToolAction::Cancel => super::dialog_style::button(
                 frame,

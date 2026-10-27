@@ -17,6 +17,7 @@ pub enum MenuId {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Action {
+    TerminalOutput,
     ImportDosSettings,
     EditAssociations,
     ReloadAssociations,
@@ -214,6 +215,7 @@ pub fn items(menu: usize) -> Vec<Item> {
         4 => vec![
             item("~D~irectory tree", "Ctrl+T", DirectoryTree),
             item("~Q~uick view", "Ctrl+Q", QuickView),
+            item("Terminal ~o~utput", "Ctrl+O", TerminalOutput),
             line(),
             item("~S~wap panels", "", SwapPanels),
             item("~W~indows...", "Alt+0", WindowList),
@@ -336,6 +338,7 @@ pub fn execute(app: &mut App, action: Action) {
     close(app);
     app.modals.set_quick_search(None);
     match action {
+        Action::TerminalOutput => crate::terminal_output::request(app),
         Action::CommandHistory => crate::command_line::history::open(app),
         Action::CopyNames(full) => crate::file_tools::clipboard::copy(app,full),
         Action::ScreensaverSetup => crate::screensaver::open(app),

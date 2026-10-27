@@ -182,6 +182,9 @@ fn classic_keys_still_work_and_classic_profile_has_no_prefix() -> io::Result<()>
     key(&mut app, K::Esc);
     app.config.shortcuts = Profile::ClassicDn;
     input::handle(&mut app, KeyEvent::new(K::Char('o'), M::CONTROL));
+    assert!(app.output_visible);
+    input::handle(&mut app, KeyEvent::new(K::Char('o'), M::CONTROL));
+    assert!(!app.output_visible);
     key(&mut app, K::Char('5'));
     assert!(!shortcuts::armed(&app) & app.modals.prompt().is_none());
     assert_eq!(app.command_line.text, "5");

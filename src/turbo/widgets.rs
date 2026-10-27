@@ -372,6 +372,10 @@ pub(super) fn button_cell(
     }
 }
 pub(crate) fn button(label: &str, selected: bool) -> Native {
+    button_with_default(label, selected, selected)
+}
+/// The Enter default is visible without taking focus from an input or list.
+pub(crate) fn button_with_default(label: &str, focused: bool, default_active: bool) -> Native {
     let mut text = TextCells::default();
     let label = label
         .trim()
@@ -383,11 +387,11 @@ pub(crate) fn button(label: &str, selected: bool) -> Native {
         TvRect::new(0, 0, 1, 1),
         &text.text(&format!(" {label}")),
         0xf100,
-        selected,
+        default_active,
     );
-    focus(&mut view, selected);
+    focus(&mut view, focused);
     let mut control = native(view, text);
-    control.appearance = Appearance::Button(selected);
+    control.appearance = Appearance::Button(focused || default_active);
     control
 }
 pub(crate) fn checkbox(label: &str, checked: bool, selected: bool, enabled: bool) -> Native {
@@ -1040,5 +1044,30 @@ mod tests {
         terminal.draw_view(&mut *control.view);
         // Three visible wide graphemes plus one shared continuation token.
         assert_eq!(control.text.0.borrow().glyphs.len(), 4);
+    }
+    #[test]
+    fn default_button_is_highlighted_without_claiming_keyboard_focus() {
+        let button = button_with_default("Continue", false, true);
+        assert!(!button.view.is_focused());
+        assert!(button
+            .view
+            .as_any()
+            .downcast_ref::<Button>()
+            .unwrap()
+            .is_default());
+        let mut frame = NativeFrame::new(Rect::new(0, 0, 24, 4), PaletteProfile::ClassicDn);
+        frame.render_widget(button, Rect::new(2, 1, 18, 2));
+        let scene = frame.finish();
+        assert_eq!(scene.cells[&(3, 1)].text, "►");
+        assert_eq!(scene.cells[&(18, 1)].text, "◄");
+        let profile = PaletteProfile::ClassicDn;
+        assert_eq!(
+            scene.cells[&(3, 1)].resolved(profile).fg,
+            Some(profile.color(11))
+        );
+        assert_eq!(
+            scene.cells[&(10, 1)].resolved(profile).fg,
+            Some(profile.color(14))
+        );
     }
 }

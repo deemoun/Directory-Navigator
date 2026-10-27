@@ -98,12 +98,13 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
         ("Cancel", Action::Cancel, 2, rect.right() - 30),
     ] {
         let button = Rect::new(x, rect.bottom() - 2, 16, 1);
-        super::dialog_style::button(
+        super::dialog_style::button_with_default(
             frame,
             profile,
             button,
             language.text(label),
             list.focus == focus,
+            focus == 1 && list.focus == 0,
         );
         frame.regions().push((button, Target::Window(command)));
     }

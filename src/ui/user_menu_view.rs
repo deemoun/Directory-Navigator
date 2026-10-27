@@ -149,7 +149,14 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
         } else {
             translated.to_owned()
         };
-        super::dialog_style::button(frame, profile, r, &caption, m.focus == i + 1);
+        super::dialog_style::button_with_default(
+            frame,
+            profile,
+            r,
+            &caption,
+            m.focus == i + 1,
+            review && i == 0 && m.focus == 0,
+        );
         frame.regions().push((r, Target::UserMenu(action)));
     }
 }

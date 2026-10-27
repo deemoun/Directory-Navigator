@@ -21,6 +21,7 @@ pub struct Prompt {
     pub cursor: usize,
     /// Input, OK, Cancel, Help.
     pub focus: usize,
+    /// Shared Copy/Rename-move draft, including native destination receipts.
     pub copy: Option<crate::copy_dialog::Draft>,
 }
 
@@ -90,7 +91,7 @@ pub fn prompt_help(app: &mut crate::app::App) {
         PromptKind::Operation(Kind::Delete) => "Permanently deletes the listed files and directories.\nSymbolic links are removed without following targets.\nCancel leaves everything unchanged.",
         PromptKind::Operation(Kind::Trash) => "Moves the listed items to the system Trash.\nRestore items using your desktop file manager.\nLinks themselves are moved; targets are not followed.\nIf Trash is unavailable, the operation stops without\nfalling back to permanent deletion.",
         PromptKind::Operation(Kind::Copy) => "Copy uses the inactive panel directory for a blank destination.\nRefuse stops on existing destinations; Skip leaves each existing top-level file or directory untouched. Directories are not merged.\nOverwrite, append, refresh and description copying are unavailable.\nCheck free disk space estimates source file lengths before writing; filesystem overhead and later space changes can still cause errors.\nVerify disk writes reads back staged bytes before publication. Remove source files forces verification and removes sources only after the whole copied batch succeeds. Skipped sources remain.\nF4 opens destination history; Tree chooses a directory without navigating either panel. Esc cancels.",
-        _ => "Enter a destination path. A blank path uses the base directory.\nExisting destinations are refused; files are never overwritten.\nSymbolic links are copied as links.",
+        PromptKind::Operation(Kind::Move) => "Move/rename uses the inactive panel directory for a blank destination; Shift+F6 uses the active directory. Relative paths use that base. A single item may use a new name; multiple items need an existing directory.\nRefuse stops before changes if a top-level destination exists. Skip leaves existing files, folders and their sources untouched; folders are never merged.\nNative no-replace rename is preferred. Check free disk space applies when copying is required. Verify disk writes uses staged copying, reads back the bytes, then removes sources through guarded batch cleanup.\nRemove source files is always selected for Move. Overwrite, append, refresh and description copying are unavailable.\nF4 opens the shared destination history; Tree chooses a directory without navigating either panel. Esc cancels; completed moves remain completed.",
     };
     app.push_dialog(Dialog {
         title: " Help ",

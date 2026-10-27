@@ -132,6 +132,7 @@ Automatic remains optional: it selects Mac-friendly on macOS and Classic DN else
 | F2 | User menu |
 | F3 / F4 | View / edit |
 | F5 / F6 | Copy / move or rename |
+| Ctrl+O | Reveal terminal output; Ctrl+O/Esc/Enter returns (Mac: Ctrl+O twice) |
 | F7 / F8 | Create directory / Trash or delete with confirmation |
 | F9 / F10 | Menu / exit |
 | Ctrl+F7 / Alt+F7 | Recursive Find / quick filename search |

@@ -121,7 +121,18 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
         }
     }
     for (rect, label, action, focus) in buttons {
-        super::dialog_style::button(frame, profile, rect, app.config.language.text(label), focus);
+        let default_active = match modal {
+            Modal::Bookmarks { focus, .. } => *focus == 0 && action == Action::Go,
+            Modal::Filter { focus, .. } => *focus == 0 && action == Action::ApplyFilter,
+        };
+        super::dialog_style::button_with_default(
+            frame,
+            profile,
+            rect,
+            app.config.language.text(label),
+            focus,
+            default_active,
+        );
         frame.regions().push((rect, Target::Navigation(action)));
     }
 }

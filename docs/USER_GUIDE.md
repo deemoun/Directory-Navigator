@@ -37,6 +37,11 @@ field's arrow, to open a choice list; arrows select and Enter or a click accepts
 Esc closes that list and restores focus to its parent. A choice updates the
 dialog's draft; the parent dialog's OK applies it, and Cancel discards it.
 
+When a dialog has an Enter-default action, its button is highlighted immediately
+with the DN yellow caption and cyan pointers where space permits. Input fields
+and lists keep keyboard focus. Selecting another button moves the highlight to
+that button; unsaved-editor confirmation highlights its existing Cancel default.
+
 **Options → Configuration → Keyboard shortcuts** selects **Automatic**, **Classic
 DN** or **Mac-friendly**. Apply changes the profile immediately; Cancel preserves
 it. Save/Load desktop and normal settings persistence include `[application]` with `shortcuts = "auto"`,
@@ -46,9 +51,10 @@ preserved. Automatic remains available and selects Mac-friendly on macOS, Classi
 DN elsewhere. Select Mac-friendly explicitly when preferred, including over SSH.
 
 The Mac profile uses **Ctrl+O, release, then another key**. `^O` in menus and
-function bars means this prefix. A context guide appears while waiting; Esc,
-Ctrl+O again, or a mouse click dismisses it without editing text. Text prompts
-retain their normal input behavior. Existing DN and modern Ctrl aliases remain
+function bars means this prefix. A context guide appears while waiting; Esc
+or a mouse click dismisses it without editing text. In the file manager,
+Ctrl+O twice reveals terminal output; the existing letter/number sequences remain.
+Text prompts retain their normal input behavior. Existing DN and modern Ctrl aliases remain
 available; Command stays with the terminal, and no terminal settings are modified.
 
 | After Ctrl+O | File manager |
@@ -60,6 +66,7 @@ available; Command stays with the terminal, and no terminal settings are modifie
 | H / J / A / V | Command / directory / edit / view histories |
 | O / P / Y | OS default application / list export / Tetris |
 | K / M / R | Keyboard settings / menu / refresh |
+| Ctrl+O | Reveal terminal output (Ctrl+O twice total) |
 | Space | Mark highlighted entry, even when ordinary Space selection is disabled |
 | Up / Down / Left / Right | Page up / page down / first entry / last entry (also `[` / `]` / `,` / `.`) |
 
@@ -188,21 +195,21 @@ viewer history. These tools are session-only and add no configuration keys.
 
 Copy/move dialogs default to the other panel's directory. A typed path is
 relative to that base unless absolute. A single item can use a new destination
-name; multiple items require an existing destination directory. Copy uses DN's
-expanded dialog with these supported choices:
+name; multiple items require an existing destination directory. Copy and
+Move/rename use DN's expanded dialog with these supported choices:
 
 - **Refuse existing destinations** (default): reject the batch before writing if
   any top-level destination already exists.
 - **Skip all existing files**: leave existing files, directories and broken links
-  untouched, copying only the remaining items. A completion dialog reports any
-  skips. Existing directories are skipped as a whole; their contents are never
+  untouched, copying/moving only the remaining items. A completion dialog reports
+  any skips. Existing directories are skipped as a whole; their contents are never
   merged. Skipped sources are retained.
 - **Check free disk space**: estimate regular-file lengths before writing. This is
   advisory: filesystem overhead and later space changes can still cause errors.
   An unavailable space reading stops the operation before writing.
 - **Verify disk writes**: read back and compare staged file bytes before publishing.
-- **Remove source files**: force verification, copy the whole selected batch, then
-  use the guarded move cleanup. A failed or cancelled copy retains its sources;
+- **Remove source files (Copy only)**: force verification, copy the whole selected
+  batch, then use the guarded move cleanup. A failed or cancelled copy retains its sources;
   errors during cleanup retain remaining sources and completed destinations.
 - **Tree**: choose a directory without navigating either panel. The history arrow
   or **F4** recalls up to 16 attempted destinations for this session. **F1/Help**
@@ -210,7 +217,16 @@ expanded dialog with these supported choices:
 
 Overwrite, append, refresh and description copying are displayed disabled.
 Nothing replaces an existing destination, including a destination created after
-preflight. Move/rename continues to refuse existing destinations.
+preflight. Move/rename defaults to Refuse and offers the same explicit Skip choice.
+Its **Remove source files** box is checked and locked, so the operation stays a
+move. **F6** uses the other panel's directory; **Shift+F6** uses the active panel's
+directory for renaming. Both dialogs share destination history, as in DN.
+
+Move/rename prefers native exclusive rename. Its space check runs only when
+copying is required; a native rename needs no copy capacity. Selecting **Verify
+disk writes** uses staged copying even on the same volume, then guarded source
+cleanup after the whole copied batch succeeds. Cancellation/errors keep completed
+native renames and published copies; there is no automatic rollback.
 
 Operations run in a background worker with item/byte progress. Cancellation and
 errors retain completed work. Moves prefer native no-overwrite rename, with a
@@ -439,14 +455,28 @@ DOS communications/country/printer setup and built-in printing are outside this
 app's scope. Save all and desktop window-management commands await a matching
 multi-document/window model. Future work is separate: safe archive extraction,
 disk/free-space information and permission editing; later,
-output recall, archive creation and palette editing.
+archive creation and palette editing.
 Split/combine and line drawing remain low priority. No settings format changes.
+
+**Ctrl+O** in the Classic profile reveals the terminal's real primary screen and
+scrollback. In the Mac profile, press **Ctrl+O twice**; **Alt+F5** and
+**Manager → Terminal output** also reveal it. **Ctrl+O, Esc or Enter** returns to DN.
+Use your terminal's own scrolling, text selection and copy controls while output
+is visible. The view is read-only: typing, paste and clicks do not execute commands
+or edit the saved command draft. It starts no shell and does not replay output.
+Background work continues; dialogs and editors keep their state, and resize causes
+a full redraw on return. Blocking dialogs must be closed before revealing output.
+
+Output includes commands run from DN and earlier shell scrollback. Programs using
+their own alternate screen control what they leave in the primary terminal.
+After a DN command finishes, Enter, Esc or Ctrl+O returns immediately to the panes.
 
 The bottom row is a command prompt with a blinking cursor, not a status line.
 Type a single-line command and press Enter to run it in the active directory,
 using `$SHELL -c` (or `%COMSPEC% /D /S /C` on Windows). Commands run with your
 normal permissions in the real terminal, without file-operation safeguards.
-DN waits for Enter after completion, restores the panels and refreshes listings.
+After completion, output stays visible until Ctrl+O, Esc or Enter. Background
+polling continues; returning restores the panes, with listings refreshed.
 An empty Enter still opens the highlighted entry. Esc clears the command;
 Left/Right/Home/End, Backspace and Delete edit it when nonempty. Up/Down still
 navigate files. Ctrl+E/Ctrl+X recall previous/next submitted commands (100 unique,

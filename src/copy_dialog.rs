@@ -1,4 +1,4 @@
-//! DN-style copy controls; guarded file-operation policy remains in operations.
+//! Shared DN-style Copy and Rename/move controls; filesystem policy stays in operations.
 use crate::{
     app::App,
     modals::ModalId,
@@ -87,6 +87,10 @@ pub fn action(app: &mut App, action: Action) {
     let Some(prompt) = app.modals.prompt_mut() else {
         return;
     };
+    let moving = matches!(
+        prompt.kind,
+        crate::dialog::PromptKind::Operation(crate::operations::Kind::Move)
+    );
     let Some(copy) = &mut prompt.copy else {
         return;
     };
@@ -111,6 +115,9 @@ pub fn action(app: &mut App, action: Action) {
             }
         }
         Action::RemoveSources => {
+            if moving {
+                return;
+            }
             copy.options.remove_sources ^= true;
             if copy.options.remove_sources {
                 copy.options.verify_writes = true;
@@ -153,6 +160,10 @@ pub fn key(app: &mut App, key: KeyEvent) {
         return;
     };
     let focus = prompt.focus;
+    let moving = matches!(
+        prompt.kind,
+        crate::dialog::PromptKind::Operation(crate::operations::Kind::Move)
+    );
     let forced_verification = prompt
         .copy
         .as_ref()
@@ -196,7 +207,7 @@ pub fn key(app: &mut App, key: KeyEvent) {
         let choices = FOCUS
             .iter()
             .copied()
-            .filter(|id| *id != 4 || !forced_verification)
+            .filter(|id| (*id != 4 || !forced_verification) && (*id != 5 || !moving))
             .collect::<Vec<_>>();
         let index = choices.iter().position(|v| *v == focus).unwrap_or(0);
         let reverse = key.code == K::BackTab || key.modifiers.contains(M::SHIFT);

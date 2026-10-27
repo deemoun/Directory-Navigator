@@ -81,7 +81,14 @@ impl Scene {
     fn plain_button(&mut self, app: &App, r: Rect, label: &str, action: GameAction) {
         crate::turbo::widgets::paint_into(
             self,
-            crate::turbo::widgets::button(app.config.language.text(label), false),
+            crate::turbo::widgets::button_with_default(
+                app.config.language.text(label),
+                false,
+                matches!(
+                    action,
+                    GameAction::Continue | GameAction::SubmitName | GameAction::Back
+                ),
+            ),
             r,
         );
         self.regions.push((r, Target::Game(action)));

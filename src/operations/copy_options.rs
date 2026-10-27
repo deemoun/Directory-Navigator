@@ -131,29 +131,79 @@ mod tests {
             sources: vec![t.0.join("source")],
             destination: t.0.join("dest"),
         };
-        for unavailable in [false, true] {
-            let r = crate::operations::run_checked(
-                &plan,
-                CopyOptions {
-                    check_free_space: true,
-                    ..Default::default()
-                },
-                &AtomicBool::new(false),
-                |_| {},
-                MoveStrategy::PreferRename,
-                |_| {
-                    if unavailable {
-                        Err(io::Error::other("Space unavailable"))
-                    } else {
-                        Ok(0)
-                    }
-                },
-            );
-            assert!(r.is_err());
-            assert!(!t.0.join("dest").exists());
-            assert_eq!(fs::read(t.0.join("source"))?, vec![1; 4096]);
-            assert_eq!(fs::read_dir(&t.0)?.count(), 1);
+        for (kind, strategy, verify) in [
+            (Kind::Copy, MoveStrategy::PreferRename, false),
+            (Kind::Move, MoveStrategy::Copy, false),
+            (Kind::Move, MoveStrategy::PreferRename, true),
+        ] {
+            let plan = Plan {
+                kind,
+                ..plan.clone()
+            };
+            for unavailable in [false, true] {
+                let r = crate::operations::run_checked(
+                    &plan,
+                    CopyOptions {
+                        check_free_space: true,
+                        verify_writes: verify,
+                        ..Default::default()
+                    },
+                    &AtomicBool::new(false),
+                    |_| {},
+                    strategy,
+                    |_| {
+                        if unavailable {
+                            Err(io::Error::other("Space unavailable"))
+                        } else {
+                            Ok(0)
+                        }
+                    },
+                );
+                assert!(r.is_err());
+                assert!(!t.0.join("dest").exists());
+                assert_eq!(fs::read(t.0.join("source"))?, vec![1; 4096]);
+                assert_eq!(fs::read_dir(&t.0)?.count(), 1);
+            }
         }
+        Ok(())
+    }
+    #[test]
+    #[cfg(any(target_os = "macos", target_os = "linux", windows))]
+    fn native_move_does_not_require_copy_capacity_or_a_space_read() -> io::Result<()> {
+        struct Temp(PathBuf);
+        impl Drop for Temp {
+            fn drop(&mut self) {
+                let _ = fs::remove_dir_all(&self.0);
+            }
+        }
+        let t =
+            Temp(std::env::temp_dir().join(format!("dn-native-move-space-{}", std::process::id())));
+        fs::create_dir(&t.0)?;
+        let source = t.0.join("source");
+        fs::write(&source, b"native move")?;
+        let original = fs::symlink_metadata(&source)?;
+        let destination = t.0.join("dest");
+        crate::operations::run_checked(
+            &Plan {
+                kind: Kind::Move,
+                sources: vec![source.clone()],
+                destination: destination.clone(),
+            },
+            CopyOptions {
+                check_free_space: true,
+                ..Default::default()
+            },
+            &AtomicBool::new(false),
+            |_| {},
+            MoveStrategy::PreferRename,
+            |_| panic!("native rename must not query space for a copy"),
+        )?;
+        assert!(!source.exists());
+        assert_eq!(fs::read(&destination)?, b"native move");
+        assert!(crate::platform_fs::same_identity(
+            &original,
+            &fs::symlink_metadata(destination)?
+        ));
         Ok(())
     }
 }

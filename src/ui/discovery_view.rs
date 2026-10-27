@@ -84,12 +84,13 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
         }
         for (i, label, command) in [(3, "Find", Action::Start), (4, "Cancel", Action::Close)] {
             let button = Rect::new(x + 12 + (i as u16 - 3) * 22, rect.bottom() - 3, 18, 1);
-            super::dialog_style::button(
+            super::dialog_style::button_with_default(
                 frame,
                 profile,
                 button,
                 app.config.language.text(label),
                 m.focus == i,
+                i == 3 && m.focus < 3,
             );
             frame.regions().push((button, Target::Discovery(command)));
         }

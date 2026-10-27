@@ -28,12 +28,20 @@ fn button(
     target: Target,
     focused: bool,
 ) {
-    super::dialog_style::button(
+    let default_active = match target {
+        Target::AcceptPattern => true,
+        Target::AcceptColumns => app.modals.columns_dialog().is_some_and(|d| d.cursor < 2),
+        _ => false,
+    };
+    // Pattern editing has no button-focus cycle; Cancel is never the Enter default.
+    let focused = focused && !matches!(target, Target::AcceptPattern | Target::CancelPattern);
+    super::dialog_style::button_with_default(
         frame,
         app.config.palette,
         rect,
         app.config.language.text(text),
         focused,
+        default_active,
     );
     frame.regions().push((rect, target));
 }

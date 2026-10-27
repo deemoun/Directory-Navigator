@@ -195,6 +195,7 @@ fn unchanged_file(a: &Metadata, b: &Metadata) -> bool {
     same_file(a, b)
 }
 
+#[derive(Clone)]
 struct Source {
     path: PathBuf,
     metadata: Metadata,
@@ -529,13 +530,14 @@ fn run_checked(
     for (_, target) in &pairs {
         guards.capture_parent(target)?;
     }
-    if options.check_free_space && !pairs.is_empty() {
+    let prefer_rename = plan.kind == Kind::Move && strategy == MoveStrategy::PreferRename;
+    if options.check_free_space && !prefer_rename && !pairs.is_empty() {
         copy_options::preflight(&pairs, &mut guards, cancel, &space)?;
     }
     let mut copied = Vec::new();
     let mut buffer = vec![0_u8; 128 * 1024];
     for (source, target) in pairs {
-        if plan.kind == Kind::Move && strategy == MoveStrategy::PreferRename {
+        if prefer_rename {
             check(cancel)?;
             let original = &source.metadata;
             progress.path = display_path(&source.path);
@@ -561,6 +563,16 @@ fn run_checked(
                 }
                 Err(e) if crate::platform_fs::can_copy_fallback(&e) => {}
                 Err(e) => return Err(e),
+            }
+            // A successful native rename needs no copy capacity. Check only
+            // after rename actually requests fallback, before copying this tree.
+            if options.check_free_space {
+                copy_options::preflight(
+                    &[(source.clone(), target.clone())],
+                    &mut guards,
+                    cancel,
+                    &space,
+                )?;
             }
         }
         let mut stack = vec![Work::Visit(source, target)];

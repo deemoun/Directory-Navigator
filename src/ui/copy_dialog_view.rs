@@ -15,10 +15,21 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
     let Some(copy) = &prompt.copy else {
         return;
     };
+    let moving = matches!(
+        prompt.kind,
+        crate::dialog::PromptKind::Operation(crate::operations::Kind::Move)
+    );
     let language = app.config.language;
     let profile = app.config.palette;
     let dos = profile.styles();
-    let rect = super::dialog_style::window(frame, profile, area, 59, 16, language.text("Copy"));
+    let rect = super::dialog_style::window(
+        frame,
+        profile,
+        area,
+        59,
+        16,
+        language.text(if moving { "Rename/move" } else { "Copy" }),
+    );
     frame.regions().clear();
     super::dialog_style::close_button(frame, profile, rect, Target::CancelPrompt);
     let label = if prompt.sources.len() == 1 {
@@ -28,10 +39,11 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
             .flat_map(|p| &p.entries)
             .any(|entry| entry.path == prompt.sources[0] && entry.directory);
         language
-            .text(if directory {
-                "Copy directory {} to"
-            } else {
-                "Copy file {} to"
+            .text(match (moving, directory) {
+                (true, true) => "Move/rename directory {} to",
+                (true, false) => "Move/rename file {} to",
+                (false, true) => "Copy directory {} to",
+                (false, false) => "Copy file {} to",
             })
             .replace(
                 "{}",
@@ -44,7 +56,11 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
             )
     } else {
         language
-            .text("Copy {} selected items to")
+            .text(if moving {
+                "Move/rename {} selected items to"
+            } else {
+                "Copy {} selected items to"
+            })
             .replace("{}", &prompt.sources.len().to_string())
     };
     frame.render_widget(
@@ -137,9 +153,9 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
             11,
             "Remove so~u~rce files",
             Some(Action::RemoveSources),
-            copy.options.remove_sources,
+            moving || copy.options.remove_sources,
             5,
-            true,
+            !moving,
         ),
     ] {
         let area = Rect::new(rect.x + x, rect.y + y, 25, 1);

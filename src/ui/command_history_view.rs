@@ -88,12 +88,13 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
                 button,
             );
         } else {
-            super::dialog_style::button(
+            super::dialog_style::button_with_default(
                 frame,
                 profile,
                 button,
                 language.text(label),
                 d.focus == focus,
+                focus == 2 && d.focus < 2,
             );
             frame.regions().push((button, Target::CommandHistory(a)));
         }
