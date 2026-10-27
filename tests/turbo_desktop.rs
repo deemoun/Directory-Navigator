@@ -5,7 +5,10 @@ use dn::{
     turbo::desktop::{Receipt, Scope},
     viewer::{self, Viewer},
 };
-use std::io;
+use std::{
+    io, thread,
+    time::{Duration, Instant},
+};
 fn viewer() -> Viewer {
     Viewer::from_contents(
         "native-view".into(),
@@ -89,8 +92,26 @@ fn native_modal_scope_keeps_input_on_top_across_switches_and_closes() -> io::Res
 fn repeated_modal_replacement_and_input_never_reuses_a_closed_document() -> io::Result<()> {
     let mut desktop = Desktop::default();
     let native = desktop.native();
+    let mut previous = WindowId::MANAGER;
     for _ in 0..500 {
         let id = desktop.open_viewer(viewer())?;
+        assert_ne!(id, previous);
+        previous = id;
+        // Even an in-memory viewer schedules path identity work. Closing it
+        // immediately cancels that work but leaves its queue entry for a worker
+        // to drain. Pace this desktop test by completion, not CPU scheduling,
+        // rather than overflowing the bounded I/O queue on a fast runner.
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while desktop.identity_pending(id) {
+            desktop.poll_identities();
+            if desktop.identity_pending(id) {
+                assert!(
+                    Instant::now() < deadline,
+                    "viewer identity worker timed out"
+                );
+                thread::sleep(Duration::from_millis(1));
+            }
+        }
         native.set_scope(Scope::Layer(Focus::Message));
         assert_eq!(native.dispatch().unwrap().window.id, id);
         desktop.close_viewer();
