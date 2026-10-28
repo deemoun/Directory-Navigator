@@ -202,29 +202,6 @@ pub(super) fn key(app: &mut App, key: KeyEvent) {
                 dialog.cursors[dialog.focus] = 0;
                 None
             }
-            KeyCode::Esc => Some(EditorAction::Cancel),
-            KeyCode::Tab => {
-                dialog.tab(false);
-                None
-            }
-            KeyCode::BackTab => {
-                dialog.tab(true);
-                None
-            }
-            KeyCode::Enter => Some(match dialog.focus {
-                9 => EditorAction::SearchSubmit(true),
-                10 => EditorAction::Cancel,
-                _ => EditorAction::SearchSubmit(false),
-            }),
-            KeyCode::Char(' ') if dialog.focus >= 2 => match dialog.focus {
-                8 => Some(EditorAction::SearchSubmit(false)),
-                9 => Some(EditorAction::SearchSubmit(true)),
-                10 => Some(EditorAction::Cancel),
-                choice => {
-                    dialog.toggle(choice);
-                    None
-                }
-            },
             _ if dialog.focus < 2
                 && !key
                     .modifiers
@@ -244,23 +221,7 @@ pub(super) fn key(app: &mut App, key: KeyEvent) {
             }
             _ => None,
         },
-        Some(Modal::Replace(session)) => match key.code {
-            KeyCode::Tab | KeyCode::BackTab => {
-                session.focus =
-                    crate::control_focus::cycle(session.focus, 4, key.code == KeyCode::BackTab);
-                None
-            }
-            KeyCode::Enter => Some(
-                [
-                    EditorAction::ReplaceYes,
-                    EditorAction::ReplaceNo,
-                    EditorAction::ReplaceAll,
-                    EditorAction::Cancel,
-                ]
-                .get(session.focus)
-                .copied()
-                .unwrap_or(EditorAction::Cancel),
-            ),
+        Some(Modal::Replace(_)) => match key.code {
             KeyCode::Char('y' | 'Y') => Some(EditorAction::ReplaceYes),
             KeyCode::Char('n' | 'N') => Some(EditorAction::ReplaceNo),
             KeyCode::Char('a' | 'A') => Some(EditorAction::ReplaceAll),

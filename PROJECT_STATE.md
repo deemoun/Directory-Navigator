@@ -20,6 +20,22 @@
 
 ## Implemented
 
+- Document-dialog shared controls: editor search/replace, replacement confirmations,
+  unsaved guards, Go To/tab-width prompts and legacy editor help, plus viewer search,
+  derive painting, traversal and semantic hits from `DialogSpec`. Search flags,
+  Unicode field editing, undo, replacement sessions and save/close safeguards stay
+  document-owned. Invalid guard focus falls back to Cancel; native file pickers
+  remain on their existing path. Advanced file-operation forms/tools/Tetris remain
+  separate increments.
+
+- Shared-control pilot: generic prompts and configuration settings derive native
+  painting, traversal, default/cancel proposals and mouse bounds from one internal
+  `DialogSpec`. Actual field/checkbox/choice/button types replace the pilot's
+  duplicate traversal construction; existing controllers retain values, Unicode
+  editing/limits, validation, drafts and file-operation safeguards. Modal/owner
+  receipts reject stale proposals. Keyboard/regional choice children stay owned;
+  advanced Copy/Move, tool dialogs and Tetris remain later increments.
+
 - F2 user-menu native painting keeps the application menu palette when embedded
   in a dialog, so rows use grey/red DN colours and full-width green selection.
   Paired mnemonic markers are adapted for MenuBox without highlighting the next
@@ -464,6 +480,27 @@ older increment entries below also record earlier migration stages.
   entries. Keyboard/mouse navigation uses the reduced menu set.
 
 ## Validation
+- Document-dialog shared controls: 506 tests pass on macOS ARM64 (one opt-in
+  native Trash test ignored). The 144 document-dialog captures match pre-refactor
+  cells, styles, hits and cursor positions in both palettes/languages at two sizes;
+  the earlier 72 prompt/settings captures also still match. Regressions cover
+  disabled search controls, forward/reverse traversal, Unicode paste isolation,
+  undo retention, safe invalid guard focus, owner switching/retirement and immutable
+  translated rendering. Formatting, all-target Clippy, release and no-default-features
+  checks pass. A release PTY exercises Find/options/default, numeric Cancel,
+  replacement Cancel/All, dirty-close Cancel/Discard without saving, viewer search,
+  mouse Cancel after resize and terminal restoration using temporary fixtures.
+  Windows/Linux validation was skipped; no CI workflow was started.
+- Shared-control pilot: 502 tests pass on macOS ARM64 (one opt-in native Trash
+  test ignored). The 72 pre/post dialog captures match cells, styles and mouse
+  targets across both palettes/languages and 80×25/132×40. New regressions cover
+  actual mixed native control traversal, disabled/default actions, modal identity,
+  Unicode/paste limits, draft children, immutable translated painting and stale
+  mouse targets. Formatting, all-target Clippy, release and no-default-features
+  checks pass. A release PTY covers Unicode mkdir/help/cancel/create, Trash and
+  permanent-delete cancellation, checkbox/default actions, nested keyboard/regional
+  choices, resize and terminal restoration using temporary fixtures only.
+  Windows/Linux validation was skipped; no CI workflow was started.
 - F2 menu repair: 97 focused tests pass on macOS ARM64, covering native widgets,
   appearance, localization, menu visibility, user-menu safety and terminal frame
   comparisons. Formatting, all-target Clippy, release build and no-default-features

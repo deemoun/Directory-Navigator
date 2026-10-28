@@ -311,41 +311,50 @@ pub fn paste(app: &mut App, text: &str) {
     }
 }
 pub fn key(app: &mut App, key: KeyEvent) {
-    let Some(viewer) = app.desktop.active_viewer_mut() else {
-        return;
-    };
-    if let Some(dialog) = viewer.modals.viewer_search_mut() {
-        let command = match key.code {
-            KeyCode::Esc => Some(Action::Cancel),
-            KeyCode::Tab => {
-                dialog.focus = crate::control_focus::cycle(dialog.focus, 4, false);
-                None
-            }
-            KeyCode::BackTab => {
-                dialog.focus = crate::control_focus::cycle(dialog.focus, 4, true);
-                None
-            }
-            KeyCode::Enter => Some(if dialog.focus == 3 {
-                Action::Cancel
-            } else {
-                Action::Submit
-            }),
-            KeyCode::Char(' ') if dialog.focus == 1 => Some(Action::Case),
-            code if dialog.focus == 0
-                && !key
-                    .modifiers
-                    .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) =>
+    let proposal = {
+        let spec = crate::ui::viewer_search_spec(app, crate::turbo::dialog_spec::input_area(app));
+        spec.and_then(|spec| {
+            if matches!(
+                key.code,
+                KeyCode::Tab | KeyCode::BackTab | KeyCode::Enter | KeyCode::Esc
+            ) || (key.code == KeyCode::Char(' ') && spec.focus == 1)
             {
-                dialog::edit_input(&mut dialog.memory.query, &mut dialog.cursor, code);
+                spec.key(key)
+            } else {
                 None
             }
-            _ => None,
-        };
-        if let Some(command) = command {
+        })
+    };
+    if let Some(proposal) = proposal {
+        if !proposal.current(app) {
+            return;
+        }
+        if let Some(dialog) = app
+            .desktop
+            .active_viewer_mut()
+            .and_then(|v| v.modals.viewer_search_mut())
+        {
+            dialog.focus = proposal.focus;
+        }
+        if let Some(crate::mouse::Target::Viewer(command)) = proposal.action {
             action(app, command);
         }
         return;
     }
+    let Some(viewer) = app.desktop.active_viewer_mut() else {
+        return;
+    };
+    if let Some(dialog) = viewer.modals.viewer_search_mut() {
+        if dialog.focus == 0
+            && !key
+                .modifiers
+                .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT)
+        {
+            dialog::edit_input(&mut dialog.memory.query, &mut dialog.cursor, key.code);
+        }
+        return;
+    }
+
     let command = match key.code {
         KeyCode::Esc | KeyCode::F(3) => Some(Action::Close),
         KeyCode::F(2) => Some(Action::Wrap),

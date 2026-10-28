@@ -23,6 +23,10 @@ pub fn key(app: &mut App, key: KeyEvent) {
         file_key(app, key);
         return;
     }
+    if super::dialog_controls::key(app, key) {
+        return;
+    }
+    let editor = app.desktop.active_editor_mut().unwrap();
     if matches!(
         editor.modals.editor_modal(),
         Some(Modal::Search(_) | Modal::Replace(_))
@@ -32,43 +36,19 @@ pub fn key(app: &mut App, key: KeyEvent) {
     }
     if let Some(modal) = editor.modals.editor_modal_mut() {
         let command = match modal {
-            Modal::ConfirmClose { focus } => match key.code {
-                KeyCode::Tab | KeyCode::BackTab => {
-                    *focus = crate::control_focus::cycle(*focus, 3, key.code == KeyCode::BackTab);
-                    None
-                }
-                KeyCode::Enter => Some(
-                    [
-                        EditorAction::Save,
-                        EditorAction::Discard,
-                        EditorAction::Cancel,
-                    ]
-                    .get(*focus)
-                    .copied()
-                    .unwrap_or(EditorAction::Cancel),
-                ),
+            Modal::ConfirmClose { .. } => match key.code {
                 KeyCode::Char('s' | 'S') => Some(EditorAction::Save),
                 KeyCode::Char('d' | 'D') => Some(EditorAction::Discard),
                 KeyCode::Esc | KeyCode::Char('c' | 'C') => Some(EditorAction::Cancel),
                 _ => None,
             },
-            Modal::Help => match key.code {
-                KeyCode::Esc | KeyCode::Enter => Some(EditorAction::Cancel),
-                _ => None,
-            },
+            Modal::Help => None,
             Modal::Prompt {
                 field,
                 cursor,
                 focus,
                 ..
             } => match key.code {
-                KeyCode::Tab | KeyCode::BackTab => {
-                    *focus = crate::control_focus::cycle(*focus, 3, key.code == KeyCode::BackTab);
-                    None
-                }
-                KeyCode::Enter if *focus == 2 => Some(EditorAction::Cancel),
-                KeyCode::Esc => Some(EditorAction::Cancel),
-                KeyCode::Enter => Some(EditorAction::Submit),
                 KeyCode::Char('a') if ctrl && *focus == 0 => {
                     field.clear();
                     *cursor = 0;

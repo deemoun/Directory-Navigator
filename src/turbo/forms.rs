@@ -1,14 +1,9 @@
 //! Native dialog focus and button commands with DN's Unicode field semantics.
 //! Native controls use the application's single event loop; workers and terminal
 //! restoration remain owned by the session.
-use crate::{
-    app::App,
-    dialog::{Prompt, PromptKind},
-    operations::Kind,
-    welcome,
-};
+use crate::{app::App, welcome};
 use crossterm::event::{KeyCode as K, KeyEvent, KeyModifiers as M};
-use std::{cell::RefCell, rc::Rc, time::Duration};
+use std::time::Duration;
 use turbo_vision::{
     core::{
         event::{Event, EventType, KB_ENTER, KB_SHIFT_TAB, KB_TAB},
@@ -17,21 +12,14 @@ use turbo_vision::{
     views::{
         button::{self, Button},
         dialog::{CloseOn, Dialog},
-        input_line::InputLine,
         GroupLike, View, ViewId,
     },
 };
 
 const FIRST_BUTTON: u16 = 0xf100;
-#[derive(Default)]
-struct FieldData {
-    text: String,
-    cursor: usize,
-}
 struct Form {
     dialog: Dialog,
     ids: Vec<(usize, ViewId)>,
-    input: Option<(Rc<RefCell<FieldData>>, KeyEvent)>,
 }
 impl Form {
     fn new() -> Self {
@@ -44,15 +32,7 @@ impl Form {
         Self {
             dialog,
             ids: Vec::new(),
-            input: None,
         }
-    }
-    fn field(&mut self, data: Rc<RefCell<FieldData>>, key: KeyEvent) {
-        let mut input = InputLine::new(Rect::new(1, 1, 60, 2), 16384);
-        input.set_text(data.borrow().text.as_str());
-        let id = self.dialog.add(input);
-        self.input = Some((data, key));
-        self.ids.push((0, id));
     }
     fn button(&mut self, index: usize, default: bool) {
         let mut button = Button::new(
@@ -80,28 +60,6 @@ impl Form {
         // DN buttons have immediate activation. Scope TV's optional animation
         // override to this dispatch, so no delayed command can reach a newer
         // dialog after the original one closes.
-        if self.selected() == 0
-            && event.what == EventType::Keyboard
-            && !matches!(event.key_code, KB_ENTER | KB_TAB | KB_SHIFT_TAB)
-        {
-            if let Some((data, key)) = &self.input {
-                if !key.modifiers.intersects(M::CONTROL | M::ALT) {
-                    let mut field = data.borrow_mut();
-                    let FieldData { text, cursor } = &mut *field;
-                    crate::dialog::edit_input(text, cursor, key.code);
-                    if let Some(input) = self
-                        .dialog
-                        .group_mut()
-                        .child_at_mut(0)
-                        .as_any_mut()
-                        .downcast_mut::<InputLine>()
-                    {
-                        input.set_text(text.as_str());
-                    }
-                }
-                return None;
-            }
-        }
         struct Animation(Duration);
         impl Drop for Animation {
             fn drop(&mut self) {
@@ -166,68 +124,45 @@ pub fn welcome_key(app: &mut App, key: KeyEvent) {
 }
 
 pub fn prompt_key(app: &mut App, key: KeyEvent) {
-    let Some(prompt) = app.modals.prompt() else {
-        return;
-    };
-    let input = !matches!(
-        prompt.kind,
-        PromptKind::Operation(Kind::Delete | Kind::Trash)
-    );
-    let data = Rc::new(RefCell::new(FieldData {
-        text: prompt.field.clone(),
-        cursor: prompt.cursor,
-    }));
-    let mut form = Form::new();
-    if input {
-        form.field(data.clone(), key);
-    }
-    for i in 1..4 {
-        form.button(i, i == 1);
-    }
-    form.select(prompt.focus);
-    let selected = match key.code {
-        K::Esc => form.press(2),
-        K::F(1) => form.press(3),
-        K::Char('d' | 'D') if key.modifiers.contains(M::ALT) => {
-            if input {
-                form.select(0);
-            }
-            None
-        }
-        K::Char('k' | 'K') if key.modifiers.contains(M::ALT) => form.press(1),
-        K::Char('c' | 'C') if key.modifiers.contains(M::ALT) => form.press(2),
-        K::Char('h' | 'H') if key.modifiers.contains(M::ALT) => form.press(3),
-        K::Tab | K::BackTab => form.event(Event::keyboard(
-            if key.code == K::BackTab || key.modifiers.contains(M::SHIFT) {
-                KB_SHIFT_TAB
+    use crate::{mouse::Target, turbo::dialog_spec::input_area};
+    let proposal = {
+        let Some(spec) = crate::ui::prompt_spec(app, input_area(app)) else {
+            return;
+        };
+        if key.code == K::F(1) {
+            Some(spec.proposal(Some(Target::PromptHelp)))
+        } else if let K::Char(c) = key.code {
+            if key.modifiers.contains(M::ALT) {
+                spec.mnemonic(c).map(|id| spec.activate(id))
             } else {
-                KB_TAB
-            },
-        )),
-        K::Enter => form.event(Event::keyboard(KB_ENTER)),
-        _ if prompt.focus == 0 => form.event(Event::text(match key.code {
-            K::Char(c) => c,
-            _ => '\0',
-        })),
-        _ => None,
+                spec.key(key)
+            }
+        } else {
+            spec.key(key)
+        }
     };
-    if let Some(Prompt {
-        field,
-        cursor,
-        focus,
-        ..
-    }) = app.modals.prompt_mut()
-    {
-        let mut data = data.borrow_mut();
-        *field = std::mem::take(&mut data.text);
-        *cursor = data.cursor;
-        *focus = form.selected();
-    }
-    match selected {
-        Some(1) => app.submit_prompt(),
-        Some(2) => app.modals.set_prompt(None),
-        Some(3) => crate::dialog::prompt_help(app),
-        _ => {}
+    if let Some(proposal) = proposal {
+        if !proposal.current(app) {
+            return;
+        }
+        if let Some(prompt) = app.modals.prompt_mut() {
+            prompt.focus = proposal.focus;
+        }
+        match proposal.action {
+            Some(Target::SubmitPrompt) => app.submit_prompt(),
+            Some(Target::CancelPrompt) => app.modals.set_prompt(None),
+            Some(Target::PromptHelp) => crate::dialog::prompt_help(app),
+            Some(Target::PromptField) => {
+                if let Some(prompt) = app.modals.prompt_mut() {
+                    prompt.focus = 0;
+                }
+            }
+            _ => {}
+        }
+    } else if !key.modifiers.intersects(M::CONTROL | M::ALT) {
+        if let Some(prompt) = app.modals.prompt_mut().filter(|p| p.focus == 0) {
+            prompt.edit(key.code);
+        }
     }
 }
 
@@ -235,49 +170,21 @@ pub fn prompt_key(app: &mut App, key: KeyEvent) {
 mod tests {
     use super::*;
     #[test]
-    fn native_form_focus_and_default_commands_are_synchronous_and_bounded() {
+    fn welcome_button_commands_remain_synchronous_and_bounded() {
         let previous = button::press_animation();
         let mut form = Form::new();
-        let data = Rc::new(RefCell::new(FieldData::default()));
-        form.field(data, KeyEvent::new(K::Char('x'), M::NONE));
-        for i in 1..4 {
-            form.button(i, i == 1);
+        for i in 0..3 {
+            form.button(i, i == 0);
         }
         form.select(0);
-        assert_eq!(form.event(Event::keyboard(KB_ENTER)), Some(1));
-        assert_eq!(form.selected(), 0);
-        for selected in [1, 2, 3, 0] {
+        assert_eq!(form.event(Event::keyboard(KB_ENTER)), Some(0));
+        for selected in [1, 2, 0] {
             assert_eq!(form.event(Event::keyboard(KB_TAB)), None);
             assert_eq!(form.selected(), selected);
         }
-        assert_eq!(form.event(Event::keyboard(KB_SHIFT_TAB)), None);
-        assert_eq!(form.selected(), 3);
-        assert_eq!(form.event(Event::keyboard(KB_ENTER)), Some(3));
+        form.event(Event::keyboard(KB_SHIFT_TAB));
+        assert_eq!(form.selected(), 2);
+        assert_eq!(form.event(Event::keyboard(KB_ENTER)), Some(2));
         assert_eq!(button::press_animation(), previous);
-    }
-    #[test]
-    fn native_field_accepts_wide_combining_private_and_non_latin_text() {
-        let data = Rc::new(RefCell::new(FieldData::default()));
-        let mut form = Form::new();
-        form.field(data.clone(), KeyEvent::new(K::Null, M::NONE));
-        form.select(0);
-        for ch in "界е\u{301}👩\u{200d}💻\u{f0000}".chars() {
-            form.input.as_mut().unwrap().1 = KeyEvent::new(K::Char(ch), M::NONE);
-            assert_eq!(form.event(Event::text(ch)), None);
-        }
-        assert_eq!(data.borrow().text, "界е\u{301}👩\u{200d}💻\u{f0000}");
-        assert_eq!(data.borrow().cursor, data.borrow().text.len());
-        form.input.as_mut().unwrap().1 = KeyEvent::new(K::Backspace, M::NONE);
-        form.event(Event::text('\0'));
-        assert_eq!(data.borrow().text, "界е\u{301}👩\u{200d}💻");
-        form.input.as_mut().unwrap().1 = KeyEvent::new(K::Home, M::NONE);
-        form.event(Event::text('\0'));
-        form.input.as_mut().unwrap().1 = KeyEvent::new(K::Delete, M::NONE);
-        form.event(Event::text('\0'));
-        assert_eq!(data.borrow().text, "е\u{301}👩\u{200d}💻");
-        assert_eq!(data.borrow().cursor, 0);
-        form.input.as_mut().unwrap().1 = KeyEvent::new(K::Char('q'), M::CONTROL);
-        form.event(Event::text('q'));
-        assert_eq!(data.borrow().cursor, 0);
     }
 }

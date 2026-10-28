@@ -1,5 +1,6 @@
 use crate::painting::{Frame, Paragraph};
 use crate::presentation::layout::Rect;
+use crate::turbo::dialog_spec::{centered, scope, Control, ControlKind, DialogSpec};
 use crate::{
     app::App,
     focus::{self, Screen},
@@ -41,51 +42,49 @@ pub(super) fn draw_prefix(frame: &mut impl Frame, app: &App) {
     );
 }
 
-pub(super) fn draw_settings(frame: &mut impl Frame, app: &App, area: Rect) {
-    let Some(settings) = app.modals.settings() else {
-        return;
-    };
+pub(super) fn settings_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
+    let settings = app.modals.settings()?;
     let profile = app.config.palette;
     let language = app.config.language;
-    let rect = super::dialog_style::window(
-        frame,
-        profile,
-        area,
-        74,
-        20,
+    let rect = centered(area, 74, 20);
+    let mut spec = DialogSpec::new(
+        rect,
+        scope(app, crate::focus::Focus::Settings)?,
+        settings.cursor,
         language.text(" Keyboard shortcuts "),
+        Target::AcceptSettings,
+        Target::CancelSettings,
     );
-    frame.regions().clear();
-    super::dialog_style::close_button(frame, profile, rect, Target::CancelSettings);
     let choice = Rect::new(rect.x + 3, rect.y + 2, rect.width - 6, 1);
-    frame.render_widget(
+    spec.caption(
         Paragraph::new(language.text("Profile")).style(profile.dos(0x70)),
         Rect::new(choice.x, choice.y, 12, 1),
     );
     let field = Rect::new(choice.x + 12, choice.y, choice.width - 12, 1);
-    frame.render_widget(
-        crate::turbo::widgets::combo(
-            &crate::settings::choice_items(settings, 0, language),
-            0,
-            settings.cursor == 0,
-        ),
+    let mut control = Control::new(
+        0,
         field,
+        ControlKind::Choice(crate::settings::choice_items(settings, 0, language)),
+        Target::ShortcutProfile,
     );
-    frame.regions().push((choice, Target::ShortcutProfile));
-    frame.regions().push((
-        Rect::new(field.right() - 2, field.y, 2, 1),
-        Target::OpenSettingsChoice(0),
-    ));
+    control.hits = vec![
+        (choice, control.action),
+        (
+            Rect::new(field.right() - 2, field.y, 2, 1),
+            Target::OpenSettingsChoice(0),
+        ),
+    ];
+    spec.control(control);
     let text = if settings.draft.shortcuts.is_mac() {
         "^O means Ctrl+O, release, then the next key.\n1 Help · 2 User · 3 View · 4 Edit · 5 Copy\n6 Move · 7 MkDir · 8 Trash · 9 Menu · 0 Quit\ns Quick search · f Find · i Info · z Sort\nb Bookmarks · l Filter · h Commands · k Keyboard\nEditor: a Save As · w Close · r Replace · x Quit\nViewer: 2 Wrap · n Next · p Reverse · w Close\nThe prefix displays a guide for the current screen.\nClassic DN shortcuts remain available."
     } else {
         "Classic DN uses F1–F10 and Alt/Ctrl combinations.\nTab switches panels; Insert or Space marks entries.\nF3 View · F4 Edit · F5 Copy · F6 Move\nF7 MkDir · F8 Trash/delete · F9 Menu · F10 Quit\nEditor: F2 Save · F7 Find · F10 Menu\nMac-friendly adds Ctrl+O sequences without Fn/Option.\nDefault: Classic DN. Automatic: Mac on macOS, Classic elsewhere."
     };
-    frame.render_widget(
+    spec.caption(
         Paragraph::new(language.text(text)).style(profile.dos(0x70)),
         Rect::new(rect.x + 3, rect.y + 4, rect.width - 6, 10),
     );
-    frame.render_widget(
+    spec.caption(
         Paragraph::new(language.text("←/→ or Space changes · Tab/↑↓ chooses"))
             .style(profile.dos(0x70)),
         Rect::new(rect.x + 3, rect.bottom() - 5, rect.width - 6, 1),
@@ -98,14 +97,12 @@ pub(super) fn draw_settings(frame: &mut impl Frame, app: &App, area: Rect) {
     .enumerate()
     {
         let button = Rect::new(rect.x + 20 + i as u16 * 18, rect.bottom() - 3, 14, 1);
-        super::dialog_style::button_with_default(
-            frame,
-            profile,
+        spec.control(Control::new(
+            1 + i,
             button,
-            language.text(label),
-            settings.cursor == 1 + i,
-            i == 0 && settings.cursor == 0,
-        );
-        frame.regions().push((button, target));
+            ControlKind::Button(language.text(label).into()),
+            target,
+        ));
     }
+    Some(spec)
 }

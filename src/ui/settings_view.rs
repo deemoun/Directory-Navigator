@@ -1,22 +1,33 @@
 use crate::painting::{Frame, Paragraph};
 use crate::presentation::layout::Rect;
+use crate::turbo::dialog_spec::{centered, scope, Control, ControlKind, DialogSpec};
 use crate::{app::App, mouse::Target, settings::SettingsKind};
 
 pub(super) fn draw_settings(frame: &mut impl Frame, app: &App, area: Rect) {
+    if let Some(spec) = settings_spec(app, area) {
+        spec.paint(frame, app);
+    }
+    if app.modals.settings_choice().is_some() {
+        if let Some(child) = app
+            .modals
+            .infos()
+            .filter(|m| m.focus == crate::focus::Focus::Settings)
+            .last()
+        {
+            frame.modal_scope(Some(child));
+        }
+        draw_choices(frame, app, area);
+    }
+}
+pub(crate) fn settings_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
     let profile = app.config.palette;
     let dos = profile.styles();
-    let Some(settings) = app.modals.settings() else {
-        return;
-    };
+    let settings = app.modals.settings()?;
     if settings.kind == SettingsKind::Keyboard {
-        super::shortcuts_view::draw_settings(frame, app, area);
-        draw_choices(frame, app, area);
-        return;
+        return super::shortcuts_view::settings_spec(app, area);
     }
     if settings.kind == SettingsKind::Regional {
-        draw_regional(frame, app, area);
-        draw_choices(frame, app, area);
-        return;
+        return regional_spec(app, area);
     }
     let width = if settings.kind == SettingsKind::FileManager {
         74
@@ -31,18 +42,17 @@ pub(super) fn draw_settings(frame: &mut impl Frame, app: &App, area: Rect) {
         SettingsKind::FileManager => 14,
         SettingsKind::Highlight => 18,
     };
-    let rect = super::dialog_style::window(
-        frame,
-        profile,
-        area,
-        width,
-        height,
+    let rect = centered(area, width, height);
+    let mut spec = DialogSpec::new(
+        rect,
+        scope(app, crate::focus::Focus::Settings)?,
+        settings.cursor,
         app.config.language.text(settings.title()),
+        Target::AcceptSettings,
+        Target::CancelSettings,
     );
-    frame.regions().clear();
-    super::dialog_style::close_button(frame, profile, rect, Target::CancelSettings);
     let two_columns = settings.kind == SettingsKind::FileManager;
-    frame.render_widget(
+    spec.caption(
         Paragraph::new(
             app.config
                 .language
@@ -52,7 +62,7 @@ pub(super) fn draw_settings(frame: &mut impl Frame, app: &App, area: Rect) {
         Rect::new(rect.x + 3, rect.y + 2, 30, 1),
     );
     if two_columns {
-        frame.render_widget(
+        spec.caption(
             Paragraph::new(app.config.language.text("Display")).style(dos(0x71)),
             Rect::new(rect.x + 39, rect.y + 2, 26, 1),
         );
@@ -76,17 +86,19 @@ pub(super) fn draw_settings(frame: &mut impl Frame, app: &App, area: Rect) {
             if two_columns { 32 } else { width - 6 },
             1,
         );
-        let selected = settings.cursor == index;
-        frame.render_widget(
-            crate::turbo::widgets::checkbox(
-                app.config.language.text(setting.label()),
-                settings.value(*setting),
-                selected,
-                true,
-            ),
+        let caption = app.config.language.text(setting.label());
+        let mut control = Control::new(
+            index,
             row,
+            ControlKind::Checkbox {
+                caption: caption.into(),
+                checked: settings.value(*setting),
+            },
+            Target::Setting(index),
         );
-        frame.regions().push((row, Target::Setting(index)));
+        control.mnemonic = crate::menu::mnemonic(caption);
+        control.fallback_mnemonic = crate::menu::mnemonic(setting.label());
+        spec.control(control);
     }
     if settings.kind == SettingsKind::Highlight {
         for (index, (color, label)) in [
@@ -100,15 +112,15 @@ pub(super) fn draw_settings(frame: &mut impl Frame, app: &App, area: Rect) {
         .iter()
         .enumerate()
         {
-            frame.render_widget(
+            spec.caption(
                 Paragraph::new(app.config.language.text(label)).style(dos(*color)),
                 Rect::new(rect.x + 5, rect.y + 6 + index as u16, width - 10, 1),
             );
         }
     } else if settings.kind == SettingsKind::System {
-        frame.render_widget(Paragraph::new(app.config.language.text("Existing destinations are always refused.\nTrash and permanent deletion require confirmation.")).style(dos(0x70)), Rect::new(rect.x + 3, rect.y + 7, width - 6, 2));
+        spec.caption(Paragraph::new(app.config.language.text("Existing destinations are always refused.\nTrash and permanent deletion require confirmation.")).style(dos(0x70)), Rect::new(rect.x + 3, rect.y + 7, width - 6, 2));
     }
-    frame.render_widget(
+    spec.caption(
         Paragraph::new(
             app.config
                 .language
@@ -117,7 +129,7 @@ pub(super) fn draw_settings(frame: &mut impl Frame, app: &App, area: Rect) {
         .style(dos(0x70)),
         Rect::new(rect.x + 3, rect.bottom() - 5, width - 6, 1),
     );
-    let count = settings.rows().len();
+    let count = spec.controls.len();
     for (index, (label, target)) in [
         (" [ OK ] ", Target::AcceptSettings),
         (" [ Cancel ] ", Target::CancelSettings),
@@ -131,34 +143,29 @@ pub(super) fn draw_settings(frame: &mut impl Frame, app: &App, area: Rect) {
             14,
             1,
         );
-        super::dialog_style::button_with_default(
-            frame,
-            profile,
+        spec.control(Control::new(
+            count + index,
             button,
-            app.config.language.text(label),
-            settings.cursor == count + index,
-            index == 0 && settings.cursor < count,
-        );
-        frame.regions().push((button, *target));
+            ControlKind::Button(app.config.language.text(label).into()),
+            *target,
+        ));
     }
+    Some(spec)
 }
 
-fn draw_regional(frame: &mut impl Frame, app: &App, area: Rect) {
-    let Some(settings) = app.modals.settings() else {
-        return;
-    };
+fn regional_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
+    let settings = app.modals.settings()?;
     let profile = app.config.palette;
     let language = app.config.language;
-    let rect = super::dialog_style::window(
-        frame,
-        profile,
-        area,
-        68,
-        17,
+    let rect = centered(area, 68, 17);
+    let mut spec = DialogSpec::new(
+        rect,
+        scope(app, crate::focus::Focus::Settings)?,
+        settings.cursor,
         language.text(settings.title()),
+        Target::AcceptSettings,
+        Target::CancelSettings,
     );
-    frame.regions().clear();
-    super::dialog_style::close_button(frame, profile, rect, Target::CancelSettings);
     let format = settings.draft.datetime;
     let labels = [
         "Language",
@@ -169,28 +176,29 @@ fn draw_regional(frame: &mut impl Frame, app: &App, area: Rect) {
     ];
     for (i, label) in labels.into_iter().enumerate() {
         let row = Rect::new(rect.x + 3, rect.y + 2 + i as u16, rect.width - 6, 1);
-        frame.render_widget(
+        spec.caption(
             Paragraph::new(language.text(label)).style(profile.dos(0x70)),
             Rect::new(row.x, row.y, 24, 1),
         );
         let field = Rect::new(row.x + 24, row.y, row.width - 24, 1);
-        frame.render_widget(
-            crate::turbo::widgets::combo(
-                &crate::settings::choice_items(settings, i, language),
-                0,
-                settings.cursor == i,
-            ),
+        let mut control = Control::new(
+            i,
             field,
+            ControlKind::Choice(crate::settings::choice_items(settings, i, language)),
+            Target::RegionalChoice(i),
         );
-        frame.regions().push((row, Target::RegionalChoice(i)));
-        frame.regions().push((
-            Rect::new(field.right() - 2, field.y, 2, 1),
-            Target::OpenSettingsChoice(i),
-        ));
+        control.hits = vec![
+            (row, control.action),
+            (
+                Rect::new(field.right() - 2, field.y, 2, 1),
+                Target::OpenSettingsChoice(i),
+            ),
+        ];
+        spec.control(control);
     }
     // One sample instant per dialog; painting must not read ambient time.
     let now = &settings.preview_time;
-    frame.render_widget(
+    spec.caption(
         Paragraph::new(format!(
             "{}: {}",
             language.text("Preview"),
@@ -199,12 +207,12 @@ fn draw_regional(frame: &mut impl Frame, app: &App, area: Rect) {
         .style(profile.dos(0x71)),
         Rect::new(rect.x + 3, rect.y + 9, rect.width - 6, 1),
     );
-    frame.render_widget(
+    spec.caption(
         Paragraph::new(language.text("←/→ or Space changes · Tab/↑↓ chooses"))
             .style(profile.dos(0x70)),
         Rect::new(rect.x + 3, rect.y + 11, rect.width - 6, 1),
     );
-    frame.render_widget(
+    spec.caption(
         Paragraph::new(language.text("Enter applies · Esc cancels")).style(profile.dos(0x70)),
         Rect::new(rect.x + 3, rect.y + 12, rect.width - 6, 1),
     );
@@ -216,16 +224,14 @@ fn draw_regional(frame: &mut impl Frame, app: &App, area: Rect) {
     .enumerate()
     {
         let button = Rect::new(rect.x + 17 + i as u16 * 18, rect.bottom() - 3, 14, 1);
-        super::dialog_style::button_with_default(
-            frame,
-            profile,
+        spec.control(Control::new(
+            5 + i,
             button,
-            app.config.language.text(language.text(label)),
-            settings.cursor == 5 + i,
-            i == 0 && settings.cursor < 5,
-        );
-        frame.regions().push((button, target));
+            ControlKind::Button(language.text(label).into()),
+            target,
+        ));
     }
+    Some(spec)
 }
 
 fn draw_choices(frame: &mut impl Frame, app: &App, area: Rect) {

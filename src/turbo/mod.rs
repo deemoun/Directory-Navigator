@@ -3,6 +3,7 @@ pub(crate) mod characters;
 mod codec;
 pub(crate) mod composition;
 pub mod desktop;
+pub(crate) mod dialog_spec;
 pub mod file_dialog;
 mod file_panes;
 pub mod forms;

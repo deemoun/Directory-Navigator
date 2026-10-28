@@ -3,6 +3,7 @@ use crate::presentation::{
     layout::{Constraint, Layout, Rect},
     text::Line,
 };
+use crate::turbo::dialog_spec::{centered, scope, Control, ControlKind, DialogSpec};
 use crate::{app::App, filesystem::display_name, formatting::tail, mouse::Target, viewer::Action};
 pub(super) fn draw_viewer(frame: &mut impl Frame, app: &App, area: Rect) {
     let profile = app.config.palette;
@@ -115,71 +116,68 @@ pub(super) fn draw_viewer(frame: &mut impl Frame, app: &App, area: Rect) {
     }
 }
 pub(super) fn draw_search(frame: &mut impl Frame, app: &App, area: Rect) {
-    let profile = app.config.palette;
-    let dos = profile.styles();
-    let Some(viewer) = app.desktop.active_viewer() else {
-        return;
-    };
-    if let Some(dialog) = viewer.modals.viewer_search() {
-        let width = 58;
-        let rect = super::dialog_style::window(
-            frame,
-            profile,
-            area,
-            width,
-            10,
-            app.config.language.text(" Viewer search — loaded text "),
-        );
-        frame.regions().clear();
-        super::dialog_style::close_button(frame, profile, rect, Target::Viewer(Action::Cancel));
-        let x = rect.x + 2;
-        let w = width - 4;
-        let input = Rect::new(x, rect.y + 2, w, 1);
-        let column = Line::from(&dialog.memory.query[..dialog.cursor]).width();
-        let scroll = column.saturating_sub(w.saturating_sub(1) as usize);
-        frame.render_widget(
-            crate::turbo::widgets::input_scrolled(
-                &display_name(&dialog.memory.query),
-                scroll,
-                dialog.focus == 0,
-            ),
-            input,
-        );
-        frame.regions().push((input, Target::Viewer(Action::Field)));
-        if dialog.focus == 0 && app.dialogs().is_empty() {
-            frame.set_cursor_position((input.x + (column - scroll) as u16, input.y));
-        }
-        let case = Rect::new(x, rect.y + 4, w, 1);
-        frame.render_widget(
-            crate::turbo::widgets::checkbox(
-                app.config.language.text("Case-sensitive"),
-                dialog.memory.case_sensitive,
-                dialog.focus == 1,
-                true,
-            ),
-            case,
-        );
-        frame.regions().push((case, Target::Viewer(Action::Case)));
-        frame.render_widget(
-            Paragraph::new(display_name(&viewer.notice)).style(dos(0x70)),
-            Rect::new(x, rect.y + 6, w, 2),
-        );
-        for (label, action, focus, x) in [
-            ("[ Find ]", Action::Submit, 2, x + 8),
-            ("[ Cancel ]", Action::Cancel, 3, rect.right() - 24),
-        ] {
-            let row = Rect::new(x, rect.bottom() - 2, 16, 1);
-            super::dialog_style::button_with_default(
-                frame,
-                profile,
-                row,
-                app.config.language.text(label),
-                dialog.focus == focus,
-                focus == 2 && dialog.focus < 2,
-            );
-            frame.regions().push((row, Target::Viewer(action)));
-        }
+    if let Some(spec) = viewer_search_spec(app, area) {
+        spec.paint(frame, app);
     }
+}
+pub(crate) fn viewer_search_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
+    let dos = app.config.palette.styles();
+    let viewer = app.desktop.active_viewer()?;
+    let dialog = viewer.modals.viewer_search()?;
+    let width = 58;
+    let rect = centered(area, width, 10);
+    let mut spec = DialogSpec::new(
+        rect,
+        scope(app, crate::focus::Focus::ViewerSearch)?,
+        dialog.focus,
+        app.config.language.text(" Viewer search — loaded text "),
+        Target::Viewer(Action::Submit),
+        Target::Viewer(Action::Cancel),
+    );
+    let x = rect.x + 2;
+    let w = width - 4;
+    let input = Rect::new(x, rect.y + 2, w, 1);
+    let column = Line::from(&dialog.memory.query[..dialog.cursor]).width();
+    let scroll = column.saturating_sub(w.saturating_sub(1) as usize);
+    spec.control(Control::new(
+        0,
+        input,
+        ControlKind::ScrolledInput {
+            value: display_name(&dialog.memory.query),
+            scroll,
+        },
+        Target::Viewer(Action::Field),
+    ));
+    if dialog.focus == 0 && app.dialogs().is_empty() {
+        spec.cursor = Some((input.x + (column - scroll) as u16, input.y));
+    }
+    let case = Rect::new(x, rect.y + 4, w, 1);
+    spec.control(Control::new(
+        1,
+        case,
+        ControlKind::Checkbox {
+            caption: app.config.language.text("Case-sensitive").into(),
+            checked: dialog.memory.case_sensitive,
+        },
+        Target::Viewer(Action::Case),
+    ));
+    spec.caption(
+        Paragraph::new(display_name(&viewer.notice)).style(dos(0x70)),
+        Rect::new(x, rect.y + 6, w, 2),
+    );
+    for (label, action, focus, x) in [
+        ("[ Find ]", Action::Submit, 2, x + 8),
+        ("[ Cancel ]", Action::Cancel, 3, rect.right() - 24),
+    ] {
+        let row = Rect::new(x, rect.bottom() - 2, 16, 1);
+        spec.control(Control::new(
+            focus,
+            row,
+            ControlKind::Button(app.config.language.text(label).into()),
+            Target::Viewer(action),
+        ));
+    }
+    Some(spec)
 }
 
 pub(super) fn draw_text(

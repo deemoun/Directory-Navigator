@@ -1,5 +1,6 @@
 pub mod buffer;
 pub(crate) mod controls;
+mod dialog_controls;
 mod editing;
 pub mod highlight;
 mod keys;

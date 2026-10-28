@@ -9,6 +9,154 @@ use crate::{
     operations::Kind,
 };
 
+use crate::turbo::dialog_spec::{centered, scope, Control, ControlKind, DialogSpec};
+pub(crate) fn prompt_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
+    let profile = app.config.palette;
+    let dos = profile.styles();
+    let prompt = app.modals.prompt().filter(|p| p.copy.is_none())?;
+    let deleting = matches!(
+        prompt.kind,
+        PromptKind::Operation(Kind::Delete | Kind::Trash)
+    );
+    let simple = matches!(
+        prompt.kind,
+        PromptKind::GoTo | PromptKind::ImportDos | PromptKind::Operation(Kind::Mkdir)
+    );
+    // original-dn/RESOURCE/ENGLISH/DN.DNR dlgMkDir is 49×7.
+    let width = if matches!(prompt.kind, PromptKind::Operation(Kind::Mkdir)) {
+        49
+    } else {
+        59
+    };
+    let rect = centered(area, width, if simple { 7 } else { 11 });
+    let mut spec = DialogSpec::new(
+        rect,
+        scope(app, crate::focus::Focus::Prompt)?,
+        prompt.focus,
+        app.config.language.text(prompt.title()),
+        Target::SubmitPrompt,
+        Target::CancelPrompt,
+    );
+    if deleting {
+        let mut lines = if matches!(prompt.kind, PromptKind::Operation(Kind::Trash)) {
+            vec![
+                app.config
+                    .language
+                    .text("Move {} item(s) to Trash?")
+                    .replace("{}", &prompt.sources.len().to_string()),
+                app.config
+                    .language
+                    .text("Restore using your desktop file manager.")
+                    .to_string(),
+            ]
+        } else {
+            vec![
+                app.config
+                    .language
+                    .text("Permanently delete {} item(s)?")
+                    .replace("{}", &prompt.sources.len().to_string()),
+                app.config
+                    .language
+                    .text("This cannot be undone.")
+                    .to_string(),
+            ]
+        };
+        for path in prompt.sources.iter().take(3) {
+            lines.push(formatting::tail(
+                &display_name(&path.file_name().unwrap_or_default().to_string_lossy()),
+                rect.width - 4,
+            ));
+        }
+        spec.caption(
+            Paragraph::new(lines.join("\n")).style(dos(0x70)),
+            Rect::new(rect.x + 2, rect.y + 2, rect.width - 4, 5),
+        );
+    } else {
+        let label = app
+            .config
+            .language
+            .text(if matches!(prompt.kind, PromptKind::ImportDos) {
+                "DOS configuration file"
+            } else if simple {
+                "Directory name"
+            } else {
+                "Destination"
+            });
+        let first = label.chars().next().map_or(0, char::len_utf8);
+        spec.caption(
+            Paragraph::new(Line::from(vec![
+                Span::styled(&label[..first], dos(0x7e)),
+                Span::styled(&label[first..], dos(0x7f)),
+            ])),
+            Rect::new(rect.x + 2, rect.y + 1, rect.width - 4, 1),
+        );
+        let input = Rect::new(rect.x + 2, rect.y + 2, rect.width - 4, 1);
+        // Keep the cursor visible without splitting a UTF-8 path.
+        let prefix = formatting::tail(
+            &prompt.field[..prompt.cursor],
+            input.width.saturating_sub(1),
+        );
+        let cursor = Span::raw(&prefix).width() as u16;
+        let mut field = Control::new(
+            0,
+            input,
+            ControlKind::Input(format!("{prefix}{}", &prompt.field[prompt.cursor..])),
+            Target::PromptField,
+        );
+        field.mnemonic = Some('d');
+        spec.control(field);
+        if prompt.focus == 0 && app.dialogs().is_empty() {
+            spec.cursor = Some((input.x + cursor, input.y));
+        }
+        if !simple {
+            spec.caption(
+                Paragraph::new(
+                    app.config
+                        .language
+                        .text("Existing destinations are refused."),
+                )
+                .style(dos(0x70)),
+                Rect::new(rect.x + 2, rect.y + 3, rect.width - 4, 1),
+            );
+            let mut lines = vec![format!("{} item(s):", prompt.sources.len())];
+            for path in prompt.sources.iter().take(3) {
+                lines.push(formatting::tail(
+                    &display_name(&path.file_name().unwrap_or_default().to_string_lossy()),
+                    rect.width - 4,
+                ));
+            }
+            spec.caption(
+                Paragraph::new(lines.join("\n")).style(dos(0x70)),
+                Rect::new(rect.x + 2, rect.y + 4, rect.width - 4, 4),
+            );
+        }
+    }
+    for (i, label, target) in [
+        (
+            1,
+            if deleting { "[ Delete ]" } else { "[ OK ]" },
+            Target::SubmitPrompt,
+        ),
+        (2, "[ Cancel ]", Target::CancelPrompt),
+        (3, "[ Help ]", Target::PromptHelp),
+    ] {
+        let button = Rect::new(rect.right() - 31 + (i - 1) * 10, rect.bottom() - 3, 9, 1);
+        let mut control = Control::new(
+            i as usize,
+            button,
+            ControlKind::Button(app.config.language.text(label).into()),
+            target,
+        );
+        control.mnemonic = Some(match i {
+            1 => 'k',
+            2 => 'c',
+            _ => 'h',
+        });
+        spec.control(control);
+    }
+    Some(spec)
+}
+
 pub(super) fn draw_info_dialog(
     frame: &mut impl Frame,
     app: &App,
@@ -96,144 +244,11 @@ pub(super) fn draw_operation_overlays(
             super::copy_dialog_view::draw(frame, app, area);
             return;
         }
-        let deleting = matches!(
-            prompt.kind,
-            PromptKind::Operation(Kind::Delete | Kind::Trash)
-        );
-        let simple = matches!(
-            prompt.kind,
-            PromptKind::GoTo | PromptKind::ImportDos | PromptKind::Operation(Kind::Mkdir)
-        );
-        // original-dn/RESOURCE/ENGLISH/DN.DNR dlgMkDir is 49×7.
-        let width = if matches!(prompt.kind, PromptKind::Operation(Kind::Mkdir)) {
-            49
-        } else {
-            59
-        };
-        let rect = dialog_style::window(
-            frame,
-            profile,
-            area,
-            width,
-            if simple { 7 } else { 11 },
-            app.config.language.text(prompt.title()),
-        );
-        frame.regions().clear();
-        super::dialog_style::close_button(frame, profile, rect, Target::CancelPrompt);
-        if deleting {
-            let mut lines = if matches!(prompt.kind, PromptKind::Operation(Kind::Trash)) {
-                vec![
-                    app.config
-                        .language
-                        .text("Move {} item(s) to Trash?")
-                        .replace("{}", &prompt.sources.len().to_string()),
-                    app.config
-                        .language
-                        .text("Restore using your desktop file manager.")
-                        .to_string(),
-                ]
-            } else {
-                vec![
-                    app.config
-                        .language
-                        .text("Permanently delete {} item(s)?")
-                        .replace("{}", &prompt.sources.len().to_string()),
-                    app.config
-                        .language
-                        .text("This cannot be undone.")
-                        .to_string(),
-                ]
-            };
-            for path in prompt.sources.iter().take(3) {
-                lines.push(formatting::tail(
-                    &display_name(&path.file_name().unwrap_or_default().to_string_lossy()),
-                    rect.width - 4,
-                ));
-            }
-            frame.render_widget(
-                Paragraph::new(lines.join("\n")).style(dos(0x70)),
-                Rect::new(rect.x + 2, rect.y + 2, rect.width - 4, 5),
-            );
-        } else {
-            let label = app
-                .config
-                .language
-                .text(if matches!(prompt.kind, PromptKind::ImportDos) {
-                    "DOS configuration file"
-                } else if simple {
-                    "Directory name"
-                } else {
-                    "Destination"
-                });
-            let first = label.chars().next().map_or(0, char::len_utf8);
-            frame.render_widget(
-                Paragraph::new(Line::from(vec![
-                    Span::styled(&label[..first], dos(0x7e)),
-                    Span::styled(&label[first..], dos(0x7f)),
-                ])),
-                Rect::new(rect.x + 2, rect.y + 1, rect.width - 4, 1),
-            );
-            let input = Rect::new(rect.x + 2, rect.y + 2, rect.width - 4, 1);
-            // Keep the cursor visible without splitting a UTF-8 path.
-            let prefix = formatting::tail(
-                &prompt.field[..prompt.cursor],
-                input.width.saturating_sub(1),
-            );
-            let cursor = Span::raw(&prefix).width() as u16;
-            frame.render_widget(
-                crate::turbo::widgets::input(
-                    &format!("{prefix}{}", &prompt.field[prompt.cursor..]),
-                    prompt.focus == 0,
-                ),
-                input,
-            );
-            frame.regions().push((input, Target::PromptField));
-            if prompt.focus == 0 && app.dialogs().is_empty() {
-                frame.set_cursor_position((input.x + cursor, input.y));
-            }
-            if !simple {
-                frame.render_widget(
-                    Paragraph::new(
-                        app.config
-                            .language
-                            .text("Existing destinations are refused."),
-                    )
-                    .style(dos(0x70)),
-                    Rect::new(rect.x + 2, rect.y + 3, rect.width - 4, 1),
-                );
-                let mut lines = vec![format!("{} item(s):", prompt.sources.len())];
-                for path in prompt.sources.iter().take(3) {
-                    lines.push(formatting::tail(
-                        &display_name(&path.file_name().unwrap_or_default().to_string_lossy()),
-                        rect.width - 4,
-                    ));
-                }
-                frame.render_widget(
-                    Paragraph::new(lines.join("\n")).style(dos(0x70)),
-                    Rect::new(rect.x + 2, rect.y + 4, rect.width - 4, 4),
-                );
-            }
-        }
-        for (i, label, target) in [
-            (
-                1,
-                if deleting { "[ Delete ]" } else { "[ OK ]" },
-                Target::SubmitPrompt,
-            ),
-            (2, "[ Cancel ]", Target::CancelPrompt),
-            (3, "[ Help ]", Target::PromptHelp),
-        ] {
-            let button = Rect::new(rect.right() - 31 + (i - 1) * 10, rect.bottom() - 3, 9, 1);
-            dialog_style::button(
-                frame,
-                profile,
-                button,
-                app.config.language.text(label),
-                prompt.focus == i as usize || (i == 1 && prompt.focus == 0),
-            );
-            frame.regions().push((button, target));
+        if let Some(spec) = prompt_spec(app, area) {
+            spec.paint(frame, app);
         }
     }
+
     if let Some(job) = app
         .job
         .as_ref()

@@ -1,5 +1,6 @@
 use crate::painting::{Frame, Paragraph};
 use crate::presentation::{layout::Rect, text::Span};
+use crate::turbo::dialog_spec::{centered, scope, Control, ControlKind, DialogSpec};
 use crate::{
     app::App,
     editor::{EditorAction as A, Modal, PromptKind},
@@ -7,49 +8,38 @@ use crate::{
     formatting,
     mouse::Target,
 };
-fn button(frame: &mut impl Frame, app: &App, rect: Rect, label: &str, command: A, focused: bool) {
-    let default_active = app
-        .desktop
-        .active_editor()
-        .and_then(|e| e.modals.editor_modal())
-        .is_some_and(|modal| match modal {
-            Modal::Help => command == A::Cancel,
-            Modal::Prompt { focus, .. } => *focus == 0 && command == A::Submit,
-            Modal::Search(search) => search.focus < 8 && command == A::SearchSubmit(false),
-            _ => false,
-        });
-    super::dialog_style::button_with_default(
-        frame,
-        app.config.palette,
+fn button(spec: &mut DialogSpec<'_>, app: &App, rect: Rect, label: &str, command: A, id: usize) {
+    spec.control(Control::new(
+        id,
         rect,
-        app.config.language.text(label),
-        focused,
-        default_active,
-    );
-    frame.regions().push((rect, Target::Editor(command)));
+        ControlKind::Button(app.config.language.text(label).into()),
+        Target::Editor(command),
+    ));
 }
 fn input(
-    frame: &mut impl Frame,
-    profile: crate::palette::PaletteProfile,
+    spec: &mut DialogSpec<'_>,
     rect: Rect,
     field: &str,
     cursor: usize,
-    focused: bool,
+    id: usize,
+    action: A,
+    visible: bool,
 ) {
-    let _ = profile;
     let prefix = formatting::tail(&field[..cursor], rect.width.saturating_sub(1));
     let col = Span::raw(&prefix).width() as u16;
-    frame.render_widget(
-        crate::turbo::widgets::input(&format!("{prefix}{}", &field[cursor..]), focused),
+    let mut control = Control::new(
+        id,
         rect,
+        ControlKind::Input(format!("{prefix}{}", &field[cursor..])),
+        Target::Editor(action),
     );
-    if focused {
-        frame.set_cursor_position((rect.x + col, rect.y));
+    control.focus_visible = visible;
+    spec.control(control);
+    if spec.focus == id && visible {
+        spec.cursor = Some((rect.x + col, rect.y));
     }
 }
 pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
-    let profile = app.config.palette;
-    let dos = profile.styles();
     let Some(editor) = app.desktop.active_editor() else {
         return;
     };
@@ -70,6 +60,17 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
             frame.native_shadow(picker.bounds());
         }
         return;
+    }
+    if let Some(spec) = editor_spec(app, area) {
+        spec.paint(frame, app);
+    }
+}
+pub(crate) fn editor_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
+    let dos = app.config.palette.styles();
+    let editor = app.desktop.active_editor()?;
+    let modal = editor.modals.editor_modal()?;
+    if matches!(modal, Modal::File(_)) {
+        return None;
     }
     let title = match modal {
         Modal::File(_) => unreachable!(),
@@ -94,21 +95,26 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
         Modal::Replace(_) => (72, 15),
         _ => (72, 20),
     };
-    let rect = super::dialog_style::window(
-        frame,
-        profile,
-        area,
-        width,
-        height,
+    let (focus, default) = match modal {
+        Modal::Search(d) => (d.focus, A::SearchSubmit(false)),
+        Modal::Replace(s) => (s.focus, A::Cancel),
+        Modal::ConfirmClose { focus } => (*focus, A::Cancel),
+        Modal::Prompt { focus, .. } => (*focus, A::Submit),
+        _ => (0, A::Cancel),
+    };
+    let rect = centered(area, width, height);
+    let mut spec = DialogSpec::new(
+        rect,
+        scope(app, crate::focus::Focus::EditorModal)?,
+        focus,
         app.config.language.text(title),
+        Target::Editor(default),
+        Target::Editor(A::Cancel),
     );
-    frame.regions().clear();
-    super::dialog_style::close_button(frame, profile, rect, Target::Editor(A::Cancel));
     match modal {
         Modal::File(_) => unreachable!(),
         Modal::Search(dialog) => {
             let replacing = dialog.replacing;
-            let focus = dialog.focus;
             let selection = dialog.selection.is_some();
             let opts = dialog.options;
             for (row, label, field, cursor, choice) in [
@@ -118,22 +124,20 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
                 if choice == 1 && !replacing {
                     continue;
                 }
-                frame.render_widget(
+                spec.caption(
                     Paragraph::new(app.config.language.text(label)).style(dos(0x70)),
                     Rect::new(rect.x + 3, rect.y + row, 14, 1),
                 );
                 let field_rect = Rect::new(rect.x + 18, rect.y + row, 50, 1);
                 input(
-                    frame,
-                    profile,
+                    &mut spec,
                     field_rect,
                     field,
                     cursor,
-                    focus == choice && app.dialogs().is_empty(),
+                    choice,
+                    A::SearchChoice(choice),
+                    app.dialogs().is_empty(),
                 );
-                frame
-                    .regions()
-                    .push((field_rect, Target::Editor(A::SearchChoice(choice))));
             }
             let checks = [
                 (
@@ -217,42 +221,44 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
                     7 => opts.entire_scope,
                     _ => false,
                 };
-                frame.render_widget(
-                    crate::turbo::widgets::checkbox(&label, checked, focus == choice, enabled),
+                let mut control = Control::new(
+                    choice,
                     row,
+                    ControlKind::Checkbox {
+                        caption: label,
+                        checked,
+                    },
+                    Target::Editor(A::SearchChoice(choice)),
                 );
-                if enabled {
-                    frame
-                        .regions()
-                        .push((row, Target::Editor(A::SearchChoice(choice))));
-                }
+                control.enabled = enabled;
+                spec.control(control);
             }
-            frame.render_widget(Paragraph::new(app.config.language.text("Tab chooses field/option · Space toggles · Enter OK\nAlt+C/W: options · Alt+B/D: direction · Esc Cancel")).style(dos(0x70)), Rect::new(rect.x + 3, rect.y + 14, 66, 2));
+            spec.caption(Paragraph::new(app.config.language.text("Tab chooses field/option · Space toggles · Enter OK\nAlt+C/W: options · Alt+B/D: direction · Esc Cancel")).style(dos(0x70)), Rect::new(rect.x + 3, rect.y + 14, 66, 2));
             button(
-                frame,
+                &mut spec,
                 app,
                 Rect::new(rect.x + 6, rect.bottom() - 3, 15, 1),
                 " [ OK ] ",
                 A::SearchSubmit(false),
-                focus == 8,
+                8,
             );
             if replacing {
                 button(
-                    frame,
+                    &mut spec,
                     app,
                     Rect::new(rect.x + 26, rect.bottom() - 3, 18, 1),
                     " [ Change all ] ",
                     A::SearchSubmit(true),
-                    focus == 9,
+                    9,
                 );
             }
             button(
-                frame,
+                &mut spec,
                 app,
                 Rect::new(rect.x + 50, rect.bottom() - 3, 17, 1),
                 " [ Cancel ] ",
                 A::Cancel,
-                focus == 10,
+                10,
             );
         }
         Modal::Replace(session) => {
@@ -262,10 +268,7 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
                 .unwrap_or_default();
             let text = format!("Replace highlighted occurrence?\n\nCurrent: {}\nNew: {}\n\n{} replaced · {} remaining\n\nY Yes · N No · A All · Esc Cancel\nCancel keeps replacements already accepted.",
                 formatting::tail(&current, 55), formatting::tail(&session.replacement, 55), session.changed, session.remaining.len());
-            frame.render_widget(
-                crate::turbo::widgets::memo(&text),
-                Rect::new(rect.x + 3, rect.y + 2, 66, 9),
-            );
+            spec.memo(&text, Rect::new(rect.x + 3, rect.y + 2, 66, 9));
             for (i, (label, command)) in [
                 (" [ Yes ] ", A::ReplaceYes),
                 (" [ No ] ", A::ReplaceNo),
@@ -276,28 +279,28 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
             .enumerate()
             {
                 button(
-                    frame,
+                    &mut spec,
                     app,
                     Rect::new(rect.x + 4 + i as u16 * 17, rect.bottom() - 3, 15, 1),
                     label,
                     command,
-                    session.focus == i,
+                    i,
                 );
             }
         }
         Modal::Help => {
-            frame.render_widget(crate::turbo::widgets::memo(app.config.language.text(if app.config.shortcuts.is_mac() { crate::shortcuts::EDITOR_HELP } else { "F2 / Ctrl+S Save · Shift+F2 Save As · F3 Open\nF6 Duplicate line · F7 / Ctrl+F Find\nShift+F7 Search again · Alt+F7 Reverse search\nCtrl+F7 Replace · Alt+G / Ctrl+G Go to line\nCtrl+←/→ words · Ctrl+Shift+←/→ select words\nShift+arrows select · Ctrl+A select all\nAlt+Backspace / Ctrl+Z Undo · Ctrl+Y Redo\nCtrl+Ins/C Copy · Shift+Del / Ctrl+X Cut\nShift+Ins / Ctrl+V Paste · terminal paste supported\nAlt+B Block: selection/clipboard · Options: indent/colors/tabs\nF10 Menu · Alt+0 Windows · Ctrl+F4 / Esc Close · Alt+X Quit DN\nOpen/Close/Quit protect unsaved changes.\nUTF-8, 2 MiB / 100k lines. Line endings preserved.\nSave As never overwrites an existing destination." })), Rect::new(rect.x + 2, rect.y + 2, 68, 15));
+            spec.memo(app.config.language.text(if app.config.shortcuts.is_mac() { crate::shortcuts::EDITOR_HELP } else { "F2 / Ctrl+S Save · Shift+F2 Save As · F3 Open\nF6 Duplicate line · F7 / Ctrl+F Find\nShift+F7 Search again · Alt+F7 Reverse search\nCtrl+F7 Replace · Alt+G / Ctrl+G Go to line\nCtrl+←/→ words · Ctrl+Shift+←/→ select words\nShift+arrows select · Ctrl+A select all\nAlt+Backspace / Ctrl+Z Undo · Ctrl+Y Redo\nCtrl+Ins/C Copy · Shift+Del / Ctrl+X Cut\nShift+Ins / Ctrl+V Paste · terminal paste supported\nAlt+B Block: selection/clipboard · Options: indent/colors/tabs\nF10 Menu · Alt+0 Windows · Ctrl+F4 / Esc Close · Alt+X Quit DN\nOpen/Close/Quit protect unsaved changes.\nUTF-8, 2 MiB / 100k lines. Line endings preserved.\nSave As never overwrites an existing destination." }), Rect::new(rect.x + 2, rect.y + 2, 68, 15));
             button(
-                frame,
+                &mut spec,
                 app,
                 Rect::new(rect.x + 28, rect.bottom() - 2, 16, 1),
                 " Enter / Esc OK ",
                 A::Cancel,
-                false,
+                0,
             );
         }
-        Modal::ConfirmClose { focus } => {
-            frame.render_widget(crate::turbo::widgets::memo(app.config.language.text("This document has unsaved changes.\nSave before closing or switching files?\n\nS: Save · D: Discard · Esc: Cancel\nTab / Shift+Tab chooses · Enter activates")), Rect::new(rect.x + 3, rect.y + 2, rect.width-6, 5));
+        Modal::ConfirmClose { .. } => {
+            spec.memo(app.config.language.text("This document has unsaved changes.\nSave before closing or switching files?\n\nS: Save · D: Discard · Esc: Cancel\nTab / Shift+Tab chooses · Enter activates"), Rect::new(rect.x + 3, rect.y + 2, rect.width-6, 5));
             for (i, (label, command)) in [
                 (" [ Save ] ", A::Save),
                 (" [ Discard ] ", A::Discard),
@@ -307,12 +310,12 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
             .enumerate()
             {
                 button(
-                    frame,
+                    &mut spec,
                     app,
                     Rect::new(rect.x + 4 + i as u16 * 20, rect.bottom() - 3, 14, 1),
                     label,
                     command,
-                    *focus == i,
+                    i,
                 );
             }
         }
@@ -320,44 +323,42 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
             kind,
             field,
             cursor,
-            focus,
+            ..
         } => {
             let label = match kind {
                 PromptKind::GoTo => "Line number (starting at 1)",
                 PromptKind::TabWidth => "Tab columns (1–16); Ctrl+A clears",
             };
-            frame.render_widget(
+            spec.caption(
                 Paragraph::new(app.config.language.text(label)).style(dos(0x70)),
                 Rect::new(rect.x + 2, rect.y + 1, rect.width - 4, 1),
             );
             input(
-                frame,
-                profile,
+                &mut spec,
                 Rect::new(rect.x + 2, rect.y + 2, rect.width - 4, 1),
                 field,
                 *cursor,
-                *focus == 0 && app.dialogs().is_empty(),
+                0,
+                A::PromptField,
+                app.dialogs().is_empty(),
             );
-            frame.regions().push((
-                Rect::new(rect.x + 2, rect.y + 2, rect.width - 4, 1),
-                Target::Editor(A::PromptField),
-            ));
             button(
-                frame,
+                &mut spec,
                 app,
                 Rect::new(rect.right() - 29, rect.bottom() - 3, 12, 1),
                 " [ OK ] ",
                 A::Submit,
-                *focus == 1,
+                1,
             );
             button(
-                frame,
+                &mut spec,
                 app,
                 Rect::new(rect.right() - 15, rect.bottom() - 3, 12, 1),
                 " [ Cancel ] ",
                 A::Cancel,
-                *focus == 2,
+                2,
             );
         }
     }
+    Some(spec)
 }

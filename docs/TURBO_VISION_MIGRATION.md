@@ -118,6 +118,29 @@ Behavior references: `original-dn/HELPFILE.PAS` (cross-references/history),
 and `RESOURCE/ENGLISH/DN.DNR` (dialog/button spacing). Modern safety checks,
 Unicode, asynchronous ownership and full-screen documents remain in place.
 
+## Shared control definitions
+
+Common prompts (mkdir, go-to/import and delete/Trash confirmation) and generic
+configuration settings now use one `DialogSpec` for native control factories,
+ordered focus IDs, default/cancel proposals and mouse bounds. Keyboard traversal
+constructs the same actual input/checkbox/choice/button types as painting, rather
+than a separate group of placeholder buttons. Values, Unicode editing and limits,
+configuration drafts, validation and file operations remain in their controllers.
+Proposals identify their modal and owner; nested, replaced or retired owners cannot
+receive stale actions. Native controls are hydrated from model state without
+creating a second editable buffer or starting a nested event loop.
+
+The pilot includes keyboard/regional settings while preserving owned choice-list
+children. Editor Find/Replace, replacement confirmation, unsaved-change guards,
+Go To/tab-width prompts and the legacy editor-help page now use the same definitions;
+viewer search does too. Their ordinary Tab/Enter/Esc handling follows the shared
+controls, while text editing, option shortcuts, replacement sessions and saving
+stay in their existing document controllers. Disabled search options are excluded
+from traversal and mouse targets. Invalid focus retains the declared safe default
+in unsaved/replacement guards. Native FileDialog and HelpWindow integrations remain.
+Advanced Copy/Move forms, tools and Tetris retain their existing integrations for
+later increments. No dependency, configuration format or public API changes are needed.
+
 ## Menu visibility
 
 `interface.hide_menu` is a saved checkbox in Options → Configuration → Interface.
@@ -192,8 +215,19 @@ commands accept Ctrl+O/Esc/Enter with raw, atomic paste handling.
 
 Local macOS ARM64 validation covers:
 
-- 494 native Rust tests pass; the existing opt-in native Trash check stays ignored.
+- 506 native Rust tests pass; the existing opt-in native Trash check stays ignored.
 - Formatting, all-target Clippy, release build and a no-default-features check.
+- Document-dialog shared controls preserve 144 before/after cell/style/hit/cursor
+  captures across both palettes/languages and two sizes; the pilot's 72 captures
+  also still match. Traversal, unavailable search options, paste isolation, undo,
+  safe guard defaults, stale owners and translated immutable painting are covered.
+  A release PTY exercises editor/viewer dialogs, replacement and dirty-close
+  cancellation, resize, mouse activation and terminal restoration.
+- Shared-control pilot: 72 pre/post dialog captures preserve all cells/styles/hits
+  across both palettes/languages and two supported sizes. Mixed native traversal,
+  disabled/default actions, stale proposals, Unicode limits, nested drafts and
+  immutable translated painting have regressions. A release PTY covers common
+  prompts, settings choices, cancellation, resize and terminal restoration.
 - Dialog navigation regressions cover forward/reverse traversal, disabled controls,
   highlighted Enter actions, cancellation and Tetris pages. A release terminal
   session verifies these keys, isolated score writes and terminal restoration.

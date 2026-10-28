@@ -397,26 +397,8 @@ fn handle_mouse(app: &mut App, event: MouseEvent) {
             return;
         }
         if event.kind == MouseEventKind::Down(MouseButton::Left) {
-            match target {
-                Some(Target::OpenSettingsChoice(row)) => crate::settings::open_choice(app, row),
-                Some(Target::ShortcutProfile) => {
-                    if let Some(settings) = app.modals.settings_mut() {
-                        settings.keyboard_choice(false);
-                    }
-                }
-                Some(Target::RegionalChoice(index)) => {
-                    if let Some(settings) = app.modals.settings_mut() {
-                        settings.regional_choice(index, false);
-                    }
-                }
-                Some(Target::Setting(index)) => {
-                    if let Some(settings) = app.modals.settings_mut() {
-                        settings.toggle(index);
-                    }
-                }
-                Some(Target::AcceptSettings) => crate::settings::accept(app),
-                Some(Target::CancelSettings) => app.modals.set_settings(None),
-                _ => {}
+            if let Some(target) = target {
+                crate::settings::action(app, target);
             }
         }
         return;

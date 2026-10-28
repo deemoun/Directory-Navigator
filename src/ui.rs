@@ -29,7 +29,19 @@ mod utilities_view;
 mod viewer_view;
 mod welcome_view;
 mod windows_view;
+pub(crate) use editor_dialogs::editor_spec;
+pub(crate) use overlays::prompt_spec;
 use overlays::{draw_info_dialog, draw_operation_overlays};
+pub(crate) use settings_view::settings_spec;
+pub(crate) use viewer_view::viewer_search_spec;
+pub(crate) fn paint_spec_close(
+    frame: &mut impl Frame,
+    app: &App,
+    rect: crate::presentation::layout::Rect,
+    target: Target,
+) {
+    dialog_style::close_button(frame, app.config.palette, rect, target);
+}
 
 pub use theme::entry_color;
 use viewer_view::draw_viewer;

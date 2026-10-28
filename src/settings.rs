@@ -216,35 +216,40 @@ pub fn key(app: &mut App, code: KeyCode) {
             _ => {}
         }
     }
-    match code {
-        KeyCode::Esc => app.modals.set_settings(None),
-        KeyCode::Enter if settings.cursor == count + 1 => app.modals.set_settings(None),
-        KeyCode::Enter => accept(app),
-        KeyCode::Tab => {
-            settings.cursor = crate::control_focus::cycle(settings.cursor, count + 2, false)
-        }
-        KeyCode::BackTab => {
-            settings.cursor = crate::control_focus::cycle(settings.cursor, count + 2, true)
-        }
-        KeyCode::Up => {
-            settings.cursor = crate::control_focus::cycle(settings.cursor, count + 2, true)
-        }
-        KeyCode::Down => {
-            settings.cursor = crate::control_focus::cycle(settings.cursor, count + 2, false)
-        }
-        KeyCode::Char(' ') if settings.cursor < count => settings.toggle(settings.cursor),
-        KeyCode::Char(' ') if settings.cursor == count => accept(app),
-        KeyCode::Char(' ') => app.modals.set_settings(None),
-        KeyCode::Char(c) => {
-            if let Some(index) = settings
-                .rows()
-                .iter()
-                .position(|setting| app.config.language.matches(setting.label(), c))
-            {
-                settings.toggle(index);
+    // Build the same definition used by painting. Drop its immutable borrow
+    // before applying any controller-owned draft or modal changes.
+    let proposal = {
+        let Some(spec) = crate::ui::settings_spec(app, crate::turbo::dialog_spec::input_area(app))
+        else {
+            return;
+        };
+        let navigation = match code {
+            KeyCode::Up => KeyCode::BackTab,
+            KeyCode::Down => KeyCode::Tab,
+            _ => code,
+        };
+        spec.key(crossterm::event::KeyEvent::new(
+            navigation,
+            crossterm::event::KeyModifiers::NONE,
+        ))
+        .or_else(|| {
+            if let KeyCode::Char(c) = code {
+                spec.mnemonic(c).map(|id| spec.activate(id))
+            } else {
+                None
             }
+        })
+    };
+    if let Some(proposal) = proposal {
+        if !proposal.current(app) {
+            return;
         }
-        _ => {}
+        if let Some(settings) = app.modals.settings_mut() {
+            settings.cursor = proposal.focus;
+        }
+        if let Some(target) = proposal.action {
+            action(app, target);
+        }
     }
 }
 
@@ -347,6 +352,32 @@ pub fn choice_key(app: &mut App, code: KeyCode) {
                 settings.cursor = choice.row;
             }
         }
+        _ => {}
+    }
+}
+
+/// Apply a semantic proposal through the existing settings draft transaction.
+pub(crate) fn action(app: &mut App, target: crate::mouse::Target) {
+    use crate::mouse::Target;
+    match target {
+        Target::OpenSettingsChoice(row) => open_choice(app, row),
+        Target::ShortcutProfile => {
+            if let Some(settings) = app.modals.settings_mut() {
+                settings.keyboard_choice(false);
+            }
+        }
+        Target::RegionalChoice(index) => {
+            if let Some(settings) = app.modals.settings_mut() {
+                settings.regional_choice(index, false);
+            }
+        }
+        Target::Setting(index) => {
+            if let Some(settings) = app.modals.settings_mut() {
+                settings.toggle(index);
+            }
+        }
+        Target::AcceptSettings => accept(app),
+        Target::CancelSettings => app.modals.set_settings(None),
         _ => {}
     }
 }
