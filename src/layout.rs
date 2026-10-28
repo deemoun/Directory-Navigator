@@ -31,6 +31,13 @@ fn viewport_state(app: &App) -> ViewportState {
     let focus = crate::focus::current(app);
     let spec = if focus == crate::focus::Focus::Prompt {
         crate::ui::copy_spec(app, area)
+    } else if focus == crate::focus::Focus::Settings
+        && app
+            .modals
+            .settings()
+            .is_some_and(|s| s.kind == crate::settings::SettingsKind::Plugins)
+    {
+        crate::ui::settings_spec(app, area)
     } else {
         crate::ui::remaining_spec(app, area, focus)
     };

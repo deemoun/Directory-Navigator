@@ -247,12 +247,11 @@ fn handle_key(app: &mut App, key: KeyEvent) {
             KeyCode::Char('r') => app.panels[app.active].refresh(app.config.show_hidden),
             KeyCode::Char('s') => app.open_settings(crate::settings::SettingsKind::FileManager),
             KeyCode::Char('b') => {
-                crate::menu::open(app, 3);
-                if let Some(index) = crate::menu::items(3).iter().position(|item| {
-                    item.action == crate::menu::Action::Submenu(crate::menu::MenuId::Sort)
-                }) {
-                    crate::menu::activate(app, 0, index);
-                }
+                crate::menu::open_submenu(
+                    app,
+                    crate::menu::RootId::Panel,
+                    crate::menu::MenuId::Sort,
+                );
             }
             KeyCode::Char(c) => {
                 crate::menu::open_mnemonic(app, c);
@@ -315,7 +314,9 @@ fn handle_key(app: &mut App, key: KeyEvent) {
         KeyCode::F(7) => app.prompt_operation(Kind::Mkdir, false),
         KeyCode::F(8) => app.prompt_operation(Kind::Delete, false),
         KeyCode::Delete if app.config.delete_key => app.prompt_operation(Kind::Delete, false),
-        KeyCode::F(9) => crate::menu::open(app, 1),
+        KeyCode::F(9) => {
+            crate::menu::open_root(app, crate::menu::RootId::File);
+        }
         KeyCode::F(1) => crate::dialog::keyboard_help(app),
         _ => {}
     }

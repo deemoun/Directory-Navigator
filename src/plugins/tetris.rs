@@ -11,17 +11,9 @@ pub(crate) struct TetrisPlugin {
     pub game: Option<Game>,
     pub scores: crate::tetris::scores::Store,
 }
-pub(super) const DEFINITION: Definition = Definition {
-    id: super::TETRIS,
-    title: "Navigator's game",
-    menu_label: "~G~ame",
-    shortcut: "Alt+F9",
-    menu: 0,
-    presentation: Presentation::Document,
-};
 impl ToolPlugin for TetrisPlugin {
     fn definition(&self) -> Definition {
-        DEFINITION
+        Definition::builtin(super::TETRIS, "Navigator's game", Presentation::Document)
     }
     fn as_any(&self) -> &dyn Any {
         self

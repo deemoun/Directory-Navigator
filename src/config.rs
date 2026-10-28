@@ -12,6 +12,7 @@ pub use store::Store;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Config {
+    pub disabled_plugins: std::collections::BTreeSet<String>,
     pub shortcuts: crate::shortcuts::Profile,
     pub language: crate::localization::Language,
     pub datetime: crate::regional::DateTimeFormat,
@@ -37,6 +38,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
+            disabled_plugins: Default::default(),
             shortcuts: Default::default(),
             language: Default::default(),
             datetime: Default::default(),
@@ -62,6 +64,16 @@ impl Default for Config {
 }
 
 impl Config {
+    pub fn plugin_enabled(&self, id: crate::plugins::PluginId) -> bool {
+        !self.disabled_plugins.contains(id.0)
+    }
+    pub fn set_plugin_enabled(&mut self, id: crate::plugins::PluginId, enabled: bool) {
+        if enabled {
+            self.disabled_plugins.remove(id.0);
+        } else {
+            self.disabled_plugins.insert(id.0.to_owned());
+        }
+    }
     pub fn path() -> Option<PathBuf> {
         #[cfg(windows)]
         {

@@ -21,6 +21,27 @@
 
 ## Implemented
 
+- Main menu hierarchy is declared in `src/menu/definition.rs`: root order/labels,
+  entries, separators, submenus and built-in plugin placement/shortcut captions.
+  Native painting and navigation consume the same definition; `RootId` preserves
+  F9, sort shortcuts and registered plugin categories when roots move. Built-in
+  plugin metadata derives from the hierarchy. Reversing root order passes the
+  category-identity shortcut regressions; the shipped order remains unchanged.
+
+- Options → Configuration → Plugins lists registered modules using native shared
+  checkboxes and OK/Cancel draft semantics. Disabled tools stay in the settings
+  list but disappear from launch menus; shortcuts cannot launch them. Enabling
+  restores their menu entries. Applying a disable retires live tool
+  windows and owned modals while retaining calculator history and pending Tetris
+  scores. Existing TOML v2 stores optional `plugins.disabled` IDs using normal
+  desktop/save-on-exit behavior; old configurations enable all tools and unknown
+  IDs survive saving. Registry extension, long-list scrolling/stale clicks,
+  configuration safeguards, localization and lifecycle tests are included.
+  macOS ARM64: 523 tests pass (one opt-in native Trash test ignored); formatting,
+  all-target Clippy, release and no-default-features checks pass. Release PTY
+  verifies cancellation, disable/re-enable, blocked shortcuts, live game closure,
+  explicit saving, resize and terminal restoration. Windows/Linux skipped.
+
 - Built-in Plugin API: Calculator and Tetris implement one internal `ToolPlugin`
   interface with registry metadata, owner-bound events, native controls/views,
   injected activity/time and Close/Copy/Help effects. Controllers have no `App`

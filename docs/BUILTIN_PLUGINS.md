@@ -2,18 +2,41 @@
 
 The first plugin iteration contains only Calculator and Tetris. They are compiled
 into DN; there is no dynamic loader, binary ABI, installation format, external SDK,
-new dependency or configuration format. This is an internal Rust interface which
+new dependency or separate plugin configuration format. This is an internal Rust interface which
 may evolve with the application.
+
+## Enable and disable
+
+Options → Configuration → Plugins lists every registered built-in tool, including
+disabled tools. Checkboxes edit a draft: OK applies it, Cancel discards it. All
+plugins are enabled by default. Disabling closes the current presentation and
+hides its menu entry and blocks shortcut launches. Enabling restores the menu
+entry without opening the tool automatically. Calculator
+session history and pending Tetris score records survive disabling.
+
+The preference uses the existing configuration file and save behavior (Save desktop
+or save on exit). Its optional TOML v2 section is:
+
+```toml
+[plugins]
+disabled = ["tetris"]
+```
+
+Older configurations enable all tools. Unknown plugin IDs are retained on save.
 
 ## Contract
 
 `plugins::ToolPlugin` supplies a `Definition`, opening availability, open/event/close
 callbacks, an optional wake deadline, controls and an immutable view. A definition
 has a stable `PluginId`, localized title/menu label, existing shortcut label, menu
-location and either Dialog or Document presentation. Existing launch shortcuts
+optional named root category and either Dialog or Document presentation. Existing launch shortcuts
 remain in DN's shortcut maps and dispatch the generic `menu::Action::Plugin(id)`
-or host opening operation. Registered menu entries not already placed by the
-built-in menu layout are appended to their declared menu.
+or host opening operation. The manager hierarchy, built-in plugin captions,
+shortcut labels and placement live in `src/menu/definition.rs`. Built-ins derive
+menu metadata from that hierarchy; removing their entry leaves them registered
+and accessible through existing launch shortcuts. Other registered tools may
+request an optional named root category; entries not already placed are appended
+to that category, independently of its display position.
 
 Events cover keys, atomic paste, local `ActionId` values, mouse input, focus,
 activity transitions and timer ticks. The host runs ordinary Tab/Shift+Tab,
@@ -56,6 +79,20 @@ accessors used by tests, forward to the registry. They are not a separate plugin
 controller or a stable external API. Other utilities and the editor/viewer remain
 on their existing integrations.
 
+## Editing the manager menu
+
+Edit `src/menu/definition.rs`: `ROOTS` sets the category order, caption and ordered
+entries; `submenu_items` describes all nested menus. `item(caption, shortcut,
+action)` adds a command or submenu link, and `line()` places a separator. Captions
+use the existing `~mnemonic~` syntax and remain localization keys; add translations
+to the language catalogs when introducing new captions. Shortcut text describes
+existing input bindings; changing a displayed label does not rebind a key.
+
+Named `RootId` values keep F9, sort shortcuts and plugin registration independent
+of category positions. Reordering an existing category or moving a command among
+root menus requires no changes to input or rendering code. Command execution stays
+in `menu::execute`; adding new behavior still requires its implementation.
+
 ## Adding another built-in tool
 
 1. Add a module implementing `ToolPlugin`, with its own state and local action IDs.
@@ -72,9 +109,13 @@ failure recovery and cancellation.
 
 ## Validation
 
-macOS ARM64: 515 native Rust tests pass; the existing opt-in native Trash test is
+macOS ARM64: 523 native Rust tests pass; the existing opt-in native Trash test is
 ignored. Formatting, all-target Clippy, release and no-default-features checks pass.
 All 128 pre/post cell/style captures match across both palettes/languages and two
 terminal sizes. Release PTYs cover module/window switching, inactive gravity,
 calculator state, owned Help/paste isolation, native controls, score-name
-cancellation, resize and terminal restoration. Windows/Linux validation is skipped.
+cancellation, resize and terminal restoration. Plugins settings additionally cover
+draft cancellation, registry-driven lists, long-list scrolling/stale targets,
+disable/re-enable, owned Help retirement and configuration safeguards. A release
+PTY verifies toggles, blocked shortcuts, live game retirement, explicit saving,
+resize and terminal restoration. Windows/Linux validation is skipped.

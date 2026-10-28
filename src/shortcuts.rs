@@ -227,13 +227,11 @@ pub fn key(app: &mut App, key: KeyEvent) -> Option<KeyEvent> {
                 'm' => mapped(K::F(9), M::NONE),
                 'x' => mapped(K::F(10), M::NONE),
                 'z' => {
-                    crate::menu::open(app, 3);
-                    if let Some(row) = crate::menu::items(3)
-                        .iter()
-                        .position(|i| i.action == Action::Submenu(crate::menu::MenuId::Sort))
-                    {
-                        crate::menu::activate(app, 0, row);
-                    }
+                    crate::menu::open_submenu(
+                        app,
+                        crate::menu::RootId::Panel,
+                        crate::menu::MenuId::Sort,
+                    );
                     None
                 }
                 _ => None,

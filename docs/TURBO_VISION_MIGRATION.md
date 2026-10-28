@@ -248,7 +248,7 @@ commands accept Ctrl+O/Esc/Enter with raw, atomic paste handling.
 
 Local macOS ARM64 validation covers:
 
-- 515 native Rust tests pass; the existing opt-in native Trash check stays ignored.
+- 523 native Rust tests pass; the existing opt-in native Trash check stays ignored.
 - Formatting, all-target Clippy, release build and a no-default-features check.
 - Built-in module extraction preserves all 128 pre/post cell/style captures.
   A test-only registered tool verifies generic menu/input/render routing without
@@ -257,6 +257,11 @@ Local macOS ARM64 validation covers:
   isolation. Release PTYs cover Calculator/Tetris state independence, game window
   switching without restart or gravity catch-up, Help/paste isolation, page/name
   cancellation, resize and terminal restoration.
+- Plugins preferences use the shared native settings dialog with registry-driven
+  checkboxes. Tests cover draft cancellation, enable/disable lifecycle, blocked
+  launches, owned Help retirement, long-list scrolling/stale targets, both
+  palettes/languages and persisted preferences. A release PTY covers toggles,
+  live game closure, explicit saving, resize and terminal restoration.
 - Remaining-control coverage includes 128 before/after cell/style captures in
   both palettes/languages at 80×25 and 132×40: 120 match exactly; the other eight
   differ only in the native export radio marker. Repeated painting, translated

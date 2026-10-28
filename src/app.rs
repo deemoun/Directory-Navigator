@@ -920,6 +920,7 @@ impl App {
         self.shortcuts.clear();
         let hidden_changed = self.config.show_hidden != config.show_hidden;
         self.config = config;
+        crate::plugins::host::apply_enabled(self);
         self.clock.tick_with(self.config.datetime);
         for id in self
             .desktop
@@ -941,8 +942,16 @@ impl App {
 
     pub fn open_settings(&mut self, kind: crate::settings::SettingsKind) {
         self.config.sorts = [self.panels[0].sort, self.panels[1].sort];
-        self.modals
-            .set_settings(Some(crate::settings::Settings::new(kind, &self.config)));
+        let mut settings = crate::settings::Settings::new(kind, &self.config);
+        if kind == crate::settings::SettingsKind::Plugins {
+            settings.plugins = self
+                .desktop
+                .plugins
+                .definitions()
+                .map(|d| (d.id, d.title))
+                .collect();
+        }
+        self.modals.set_settings(Some(settings));
     }
 
     pub fn load_config(&mut self) {

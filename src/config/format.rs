@@ -207,6 +207,19 @@ fn set(root: &mut Table, group: &str, key: String, value: Value) -> io::Result<(
     table.insert(key, value);
     Ok(())
 }
+fn disabled_plugins(value: &Value) -> io::Result<std::collections::BTreeSet<String>> {
+    value
+        .as_array()
+        .ok_or_else(|| invalid("Invalid type for plugins.disabled"))?
+        .iter()
+        .map(|v| {
+            v.as_str()
+                .filter(|s| !s.is_empty() && !s.chars().any(char::is_control))
+                .map(str::to_owned)
+                .ok_or_else(|| invalid("Invalid plugin ID in plugins.disabled"))
+        })
+        .collect()
+}
 pub(super) fn parse(bytes: &[u8]) -> io::Result<Config> {
     if bytes.len() > super::store::MAX_CONFIG_BYTES as usize {
         return Err(invalid("Configuration exceeds 1 MiB"));
@@ -222,6 +235,9 @@ pub(super) fn parse(bytes: &[u8]) -> io::Result<Config> {
                 &checked(group, &key, value, &default)?,
             )?;
         }
+    }
+    if let Some(value) = section(&root, "plugins")?.and_then(|t| t.get("disabled")) {
+        config.disabled_plugins = disabled_plugins(value)?;
     }
     Ok(config)
 }
@@ -239,6 +255,16 @@ pub(super) fn encode(config: &Config, previous: Option<&[u8]>) -> io::Result<Vec
             table.remove(&slot.to_string());
         }
     }
+    let disabled = Value::Array(
+        config
+            .disabled_plugins
+            .iter()
+            .cloned()
+            .map(Value::String)
+            .collect(),
+    );
+    disabled_plugins(&disabled)?;
+    set(&mut root, "plugins", "disabled".into(), disabled)?;
     for (group, key, value) in records(config) {
         if group == "bookmarks" && value.as_str() == Some("") {
             continue;

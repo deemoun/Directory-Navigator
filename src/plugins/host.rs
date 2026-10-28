@@ -9,10 +9,14 @@ pub(crate) fn active(app: &App) -> Option<Binding> {
         return app
             .modals
             .plugin_dialog()
+            .filter(|id| app.config.plugin_enabled(*id))
             .and_then(|id| app.desktop.plugins.binding(id))
             .filter(|b| b.owner == Owner::Modal(m.id));
     }
     if let WindowKind::Plugin(id) = app.desktop.active().kind {
+        if !app.config.plugin_enabled(id) {
+            return None;
+        }
         return app
             .desktop
             .plugins
@@ -22,7 +26,8 @@ pub(crate) fn active(app: &App) -> Option<Binding> {
     None
 }
 fn alive(app: &App, b: Binding) -> bool {
-    app.desktop.plugins.binding(b.plugin) == Some(b)
+    app.config.plugin_enabled(b.plugin)
+        && app.desktop.plugins.binding(b.plugin) == Some(b)
         && match b.owner {
             Owner::Modal(id) => {
                 app.modals.plugin_dialog() == Some(b.plugin)
@@ -58,6 +63,11 @@ pub(crate) fn context(app: &App, b: Binding, area: Rect, now: Instant) -> Option
     })
 }
 pub(crate) fn open(app: &mut App, id: PluginId) {
+    if !app.config.plugin_enabled(id) {
+        app.notice = "Plugin is disabled. Enable it in Options > Configuration > Plugins.".into();
+        return;
+    }
+
     let Some(e) = app.desktop.plugins.entries.get(&id) else {
         return;
     };
@@ -286,4 +296,23 @@ pub(crate) fn reconcile(app: &mut App) {
             app.desktop.plugins.retire(b);
         }
     }
+}
+
+/// Apply only committed preferences; disabling closes the presentation but retains
+/// the module's session state (including pending score records).
+pub(crate) fn apply_enabled(app: &mut App) {
+    for b in app.desktop.plugins.bound() {
+        if !app.config.plugin_enabled(b.plugin) {
+            match b.owner {
+                Owner::Document(id) => app.desktop.close(id),
+                Owner::Modal(_) => {
+                    if app.modals.plugin_dialog() == Some(b.plugin) {
+                        app.modals.set_plugin_dialog(None);
+                    }
+                    app.desktop.plugins.retire(b);
+                }
+            }
+        }
+    }
+    app.sync_modals();
 }

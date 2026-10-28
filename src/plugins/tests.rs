@@ -28,7 +28,7 @@ impl ToolPlugin for Probe {
             title: "Probe tool",
             menu_label: "Probe tool",
             shortcut: "",
-            menu: 2,
+            menu: Some(menu::RootId::Utilities),
             presentation: self.kind,
         }
     }
@@ -322,5 +322,119 @@ fn calculator_and_tetris_keep_independent_state_and_pause_without_catchup() -> i
         a.desktop.plugins.calculator().result,
         Some(crate::utilities::calculator::Value::Integer(42))
     );
+    Ok(())
+}
+
+#[test]
+fn plugins_settings_lists_registered_tools_not_a_builtin_whitelist() -> io::Result<()> {
+    let (_t, mut a) = Temp::app()?;
+    register(&mut a, Presentation::Document);
+    host::open(&mut a, PROBE);
+    let id = a.desktop.active().id;
+    a.desktop.activate(WindowId::MANAGER);
+    a.open_settings(crate::settings::SettingsKind::Plugins);
+    let settings = a.modals.settings().unwrap();
+    assert_eq!(settings.control_count(), 3);
+    let index = settings
+        .plugins
+        .iter()
+        .position(|(id, _)| *id == PROBE)
+        .unwrap();
+    crate::settings::action(&mut a, Target::Setting(index));
+    crate::settings::accept(&mut a);
+    assert!(!a.config.plugin_enabled(PROBE));
+    assert!(!a.desktop.contains(id));
+    assert_eq!(probe(&a).closed, 1);
+    host::open(&mut a, PROBE);
+    assert_eq!(a.desktop.active().id, WindowId::MANAGER);
+    menu::open(&mut a, 2);
+    assert!(!menu::level_items(&a, 0)
+        .iter()
+        .any(|i| i.action == menu::Action::Plugin(PROBE)));
+    menu::close(&mut a);
+    a.open_settings(crate::settings::SettingsKind::Plugins);
+    crate::settings::action(&mut a, Target::Setting(index));
+    crate::settings::accept(&mut a);
+    menu::open(&mut a, 2);
+    assert_eq!(
+        menu::level_items(&a, 0)
+            .iter()
+            .filter(|i| i.action == menu::Action::Plugin(PROBE))
+            .count(),
+        1
+    );
+    menu::close(&mut a);
+    Ok(())
+}
+
+#[test]
+fn long_plugin_settings_list_wraps_clips_and_rejects_scrolled_mouse_targets() -> io::Result<()> {
+    let (_t, mut a) = Temp::app()?;
+    a.open_settings(crate::settings::SettingsKind::Plugins);
+    a.modals.settings_mut().unwrap().plugins = (0..24)
+        .map(|i| {
+            (
+                PluginId(Box::leak(format!("test.{i:02}").into_boxed_str())),
+                "Test tool",
+            )
+        })
+        .collect();
+    draw(&mut a)?;
+    let stale = a
+        .mouse
+        .regions
+        .iter()
+        .find(|(_, t)| *t == Target::Setting(0))
+        .unwrap()
+        .0;
+    let revision = a.layout_revision;
+    for _ in 0..18 {
+        key(&mut a, K::Tab);
+    }
+    assert_eq!(a.modals.settings().unwrap().cursor, 18);
+    assert!(a.layout_revision > revision);
+    crate::mouse::handle(
+        &mut a,
+        MouseEvent {
+            kind: MouseEventKind::Down(MouseButton::Left),
+            column: stale.x,
+            row: stale.y,
+            modifiers: M::NONE,
+        },
+    );
+    assert!(a
+        .modals
+        .settings()
+        .unwrap()
+        .draft
+        .disabled_plugins
+        .is_empty());
+    draw(&mut a)?;
+    assert!(a
+        .mouse
+        .regions
+        .iter()
+        .any(|(_, t)| *t == Target::Setting(18)));
+    assert!(!a
+        .mouse
+        .regions
+        .iter()
+        .any(|(_, t)| *t == Target::Setting(0)));
+    key(&mut a, K::Char(' '));
+    assert!(a
+        .modals
+        .settings()
+        .unwrap()
+        .draft
+        .disabled_plugins
+        .contains("test.18"));
+    for _ in 0..8 {
+        key(&mut a, K::Tab);
+    }
+    assert_eq!(a.modals.settings().unwrap().cursor, 0);
+    key(&mut a, K::BackTab);
+    assert_eq!(a.modals.settings().unwrap().cursor, 25);
+    key(&mut a, K::Enter);
+    assert!(a.config.disabled_plugins.is_empty());
     Ok(())
 }

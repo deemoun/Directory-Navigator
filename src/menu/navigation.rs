@@ -1,4 +1,4 @@
-use super::{items, level_items, selected_row, submenu_items, Action};
+use super::{level_items, selected_row, submenu_items, Action};
 use crate::app::App;
 use crossterm::event::KeyCode;
 
@@ -6,16 +6,37 @@ pub fn close(app: &mut App) {
     app.modals.set_menu(None);
 }
 pub fn open(app: &mut App, root: usize) {
+    if super::LABELS.is_empty() {
+        return;
+    }
     let root = root % super::LABELS.len();
-    let entries = items(root);
-    app.modals.set_menu(Some((
-        root % super::LABELS.len(),
-        entries
-            .iter()
-            .position(|item| item.selectable())
-            .unwrap_or(0),
-    )));
+    app.modals.set_menu(Some((root, 0)));
     app.modals.submenus_mut().clear();
+    // Select from the visible list, including registered/disabled plugins.
+    let first = level_items(app, 0)
+        .iter()
+        .position(|item| item.selectable())
+        .unwrap_or(0);
+    if let Some((_, row)) = app.modals.menu_mut() {
+        *row = first;
+    }
+}
+pub fn open_root(app: &mut App, root: super::RootId) -> bool {
+    let Some(index) = super::root_index(root) else {
+        return false;
+    };
+    open(app, index);
+    true
+}
+pub fn open_submenu(app: &mut App, root: super::RootId, submenu: super::MenuId) {
+    if open_root(app, root) {
+        if let Some(row) = level_items(app, 0)
+            .iter()
+            .position(|i| i.action == Action::Submenu(submenu))
+        {
+            activate(app, 0, row);
+        }
+    }
 }
 pub fn open_mnemonic(app: &mut App, character: char) -> bool {
     if let Some(index) = super::LABELS

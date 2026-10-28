@@ -175,17 +175,9 @@ impl CalculatorPlugin {
         Vec::new()
     }
 }
-pub(super) const DEFINITION: Definition = Definition {
-    id: CALCULATOR,
-    title: "Calculator",
-    menu_label: "~C~alculator",
-    shortcut: "Ctrl+K",
-    menu: 2,
-    presentation: Presentation::Dialog,
-};
 impl ToolPlugin for CalculatorPlugin {
     fn definition(&self) -> Definition {
-        DEFINITION
+        Definition::builtin(CALCULATOR, "Calculator", Presentation::Dialog)
     }
     fn as_any(&self) -> &dyn Any {
         self

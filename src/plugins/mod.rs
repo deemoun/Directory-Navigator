@@ -35,13 +35,21 @@ pub(crate) struct Definition {
     pub title: &'static str,
     pub menu_label: &'static str,
     pub shortcut: &'static str,
-    pub menu: usize,
+    pub menu: Option<crate::menu::RootId>,
     pub presentation: Presentation,
 }
-pub(crate) fn builtin_definition(id: PluginId) -> Option<Definition> {
-    [calculator::DEFINITION, tetris::DEFINITION]
-        .into_iter()
-        .find(|d| d.id == id)
+impl Definition {
+    fn builtin(id: PluginId, title: &'static str, presentation: Presentation) -> Self {
+        let placement = crate::menu::plugin_placement(id);
+        Self {
+            id,
+            title,
+            menu_label: placement.map_or("", |(_, item)| item.label),
+            shortcut: placement.map_or("", |(_, item)| item.shortcut),
+            menu: placement.map(|(root, _)| root),
+            presentation,
+        }
+    }
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Owner {
