@@ -206,7 +206,7 @@ pub fn key(app: &mut App, key: KeyEvent) -> Option<KeyEvent> {
                 'e' => Some(Action::Columns),
                 'p' => Some(Action::ExportList),
                 'o' => Some(Action::OpenExternal),
-                'y' => Some(Action::Game),
+                'y' => Some(Action::Plugin(crate::plugins::TETRIS)),
                 'j' => Some(Action::History(
                     crate::file_tools::history::HistoryKind::Directory,
                 )),
@@ -272,7 +272,7 @@ pub fn key(app: &mut App, key: KeyEvent) -> Option<KeyEvent> {
                 _ => None,
             },
         },
-        Screen::Game => None,
+        Screen::Plugin(_) => None,
     }
 }
 
@@ -333,7 +333,7 @@ pub fn label(profile: Profile, screen: Screen, classic: &str) -> Cow<'_, str> {
             "C-F7" | "Ctrl+F7" => "^Op",
             _ => classic,
         },
-        Screen::Game => classic,
+        Screen::Plugin(_) => classic,
     };
     Cow::Borrowed(value)
 }

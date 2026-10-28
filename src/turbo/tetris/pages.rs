@@ -1,7 +1,7 @@
 //! Game pages drawn with native cells; actions still use the guarded game controller.
 use super::Scene;
 use crate::presentation::layout::Rect;
-use crate::{app::App, tetris::Screen};
+use crate::tetris::{Game, Screen};
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
 
@@ -70,14 +70,17 @@ impl Scene {
     }
 }
 
-pub(super) fn draw(scene: &mut Scene, app: &App, game_y: u16) {
-    let game = app.desktop.game().expect("selected game");
+pub(super) fn draw(
+    scene: &mut Scene,
+    game: &Game,
+    lang: crate::localization::Language,
+    game_y: u16,
+) {
     let screen = game.screen;
     if screen == Screen::Play {
         return;
     }
     scene.regions.clear();
-    let lang = app.config.language;
     match screen {
         Screen::Setup { .. } => {
             let r = Rect::new((scene.width - 72) / 2, (scene.height - 18) / 2, 72, 18);
@@ -96,7 +99,7 @@ pub(super) fn draw(scene: &mut Scene, app: &App, game_y: u16) {
                 0x78,
             );
         }
-        Screen::Scores => scores(scene, app),
+        Screen::Scores => scores(scene, game, lang),
         _ => {
             let r = Rect::new((scene.width - 50) / 2, game_y + 2, 50, 17);
             let title = match screen {
@@ -105,7 +108,6 @@ pub(super) fn draw(scene: &mut Scene, app: &App, game_y: u16) {
                 _ => "Game over",
             };
             scene.window(r, lang.text(title));
-            let game = app.desktop.game().unwrap();
             if matches!(screen, Screen::Name | Screen::GameOver) {
                 scene.paragraph(
                     Rect::new(r.x + 3, r.y + 2, 44, 3),
@@ -150,8 +152,7 @@ pub(super) fn draw(scene: &mut Scene, app: &App, game_y: u16) {
         }
     }
 }
-fn scores(scene: &mut Scene, app: &App) {
-    let lang = app.config.language;
+fn scores(scene: &mut Scene, game: &Game, lang: crate::localization::Language) {
     let r = Rect::new((scene.width - 72) / 2, (scene.height - 20) / 2, 72, 20);
     scene.window(r, lang.text("Tetris Top Ten"));
     let body = Rect::new(r.x + 2, r.y + 3, 68, 12);
@@ -174,7 +175,6 @@ fn scores(scene: &mut Scene, app: &App) {
         };
         scene.text(x + offset, r.y + 2, w - offset, label, 0x7e);
     }
-    let game = app.desktop.game().unwrap();
     let items = game
         .records
         .iter()

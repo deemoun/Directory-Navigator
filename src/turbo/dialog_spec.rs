@@ -244,27 +244,7 @@ impl<'a> DialogSpec<'a> {
             cancel,
         )
     }
-    pub fn document(
-        app: &App,
-        bounds: Rect,
-        window: crate::desktop::WindowId,
-        focus: usize,
-        default: Target,
-        cancel: Target,
-    ) -> Self {
-        Self::owned(
-            bounds,
-            ControlScope::Document {
-                window,
-                revision: app.layout_revision,
-            },
-            focus,
-            "",
-            default,
-            cancel,
-        )
-    }
-    fn owned(
+    pub(crate) fn owned(
         bounds: Rect,
         scope: ControlScope,
         focus: usize,
@@ -713,13 +693,13 @@ mod tests {
         let result = (|| {
             let mut app = App::new(root.clone())?;
             crate::tetris::open(&mut app);
-            let proposal = super::super::tetris::spec(&app, input_area(&app))
+            let proposal = crate::plugins::host::controls(&app, input_area(&app))
                 .unwrap()
                 .proposal(None);
             assert!(proposal.current(&app));
             app.layout_revision += 1;
             assert!(!proposal.current(&app));
-            let proposal = super::super::tetris::spec(&app, input_area(&app))
+            let proposal = crate::plugins::host::controls(&app, input_area(&app))
                 .unwrap()
                 .proposal(None);
             app.error("Owned child");

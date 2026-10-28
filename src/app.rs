@@ -25,7 +25,6 @@ pub struct App {
     pub editor_clipboard: String,
     pub editor_search: crate::editor::search::SearchMemory,
     pub desktop: crate::desktop::Desktop,
-    pub game_scores: crate::tetris::scores::Store,
     pub panels: [Panel; 2],
     pub active: usize,
     pub command_line: crate::command_line::CommandLine,
@@ -75,7 +74,6 @@ impl App {
             editor_clipboard: String::new(),
             editor_search: crate::editor::search::SearchMemory::default(),
             desktop: Default::default(),
-            game_scores: Default::default(),
             panels: [
                 Panel::new_for(0, path.clone(), config.show_hidden)?,
                 Panel::new_for(1, path, config.show_hidden)?,
@@ -301,6 +299,7 @@ impl App {
                 break;
             }
         }
+        crate::plugins::host::reconcile(self);
         let active = self.desktop.active().id;
         let infos = self.modal_infos();
         for info in &infos {
@@ -383,10 +382,7 @@ impl App {
             }
         }
         let mut changed = crate::config_import::poll(self);
-        changed |= self
-            .desktop
-            .game_mut()
-            .is_some_and(|game| game.tick(std::time::Instant::now()));
+        changed |= crate::plugins::host::poll(self, std::time::Instant::now());
         changed |= saver_changed
             | associations_changed
             | editor_changed
@@ -399,7 +395,11 @@ impl App {
             | archive_changed;
         if self.config.show_clock {
             let tick = self.clock.tick_with(self.config.datetime);
-            changed |= tick && self.desktop.game().is_none();
+            changed |= tick
+                && !matches!(
+                    self.desktop.active().kind,
+                    crate::desktop::WindowKind::Plugin(_)
+                );
         }
         if let Some(info) = self.modals.file_info_mut() {
             changed |= info.poll();
@@ -582,8 +582,8 @@ impl App {
 
     pub fn wait_duration(&self, now: std::time::Instant) -> std::time::Duration {
         use std::time::Duration;
-        if let Some(game) = self.desktop.game() {
-            return game.wait_duration(now);
+        if let Some(wait) = crate::plugins::host::next_wake(self, now) {
+            return wait.min(Duration::from_millis(50));
         }
         let pending = self
             .discovery

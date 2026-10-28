@@ -5,7 +5,8 @@
   owned presentation geometry/styles/text and native headless test captures;
   macOS native Trash via `trash`, Windows native shell APIs; minimal ZIP/TAR/gzip
   codec features via zip/tar/flate2; TOML parser for grouped preferences.
-- Session Desktop owns editor/viewer/game content and stable WindowId values;
+- Session Desktop owns editor/viewer content, plugin window references, the built-in
+  tool registry and stable WindowId values;
   default Turbo Vision build reads selection from the native Desktop/Window
   registry. Multiple full-screen editors/viewers use ID-targeted access; the
   permanent manager remains the base. Owned modal IDs gate native dispatch.
@@ -19,6 +20,21 @@
   state owns session dialogs/options/results; quick view owns debounced reads.
 
 ## Implemented
+
+- Built-in Plugin API: Calculator and Tetris implement one internal `ToolPlugin`
+  interface with registry metadata, owner-bound events, native controls/views,
+  injected activity/time and Close/Copy/Help effects. Controllers have no `App`
+  access. Calculator state and Tetris game/score state belong to their modules;
+  Desktop content holds a plugin ID. Tetris participates in window switching and
+  pauses while inactive, blocked or too small. Existing score format/import/write
+  safeguards and calculator session history remain. No external loader, SDK,
+  dependency or config change; other utilities/editor/viewer are unchanged.
+  macOS ARM64: 515 tests pass (one opt-in native Trash test ignored), formatting,
+  all-target Clippy, release and no-default-features checks pass. All 128 pre/post
+  cell/style captures match. Release PTYs cover independent module state, Tetris
+  window switching/inactive gravity, native controls, owned Help/paste isolation,
+  score-name cancellation, resize and terminal restoration. Windows/Linux skipped.
+  See docs/BUILTIN_PLUGINS.md for the contract and registration procedure.
 
 - Remaining shared controls: advanced Copy/Move, destination history, archive and
   discovery tools, compare/export/file histories, navigation, window/command lists,

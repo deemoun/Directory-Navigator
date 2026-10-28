@@ -33,7 +33,7 @@ pub enum Focus {
     EditorMenu,
     Viewer,
     ViewerSearch,
-    Game,
+    Plugin,
 }
 pub fn screen(app: &App) -> Screen {
     app.desktop.active().kind
@@ -52,6 +52,6 @@ pub fn current(app: &App) -> Focus {
         Screen::Manager => Focus::Manager,
         Screen::Editor => Focus::Editor,
         Screen::Viewer => Focus::Viewer,
-        Screen::Game => Focus::Game,
+        Screen::Plugin(_) => Focus::Plugin,
     }
 }

@@ -69,6 +69,12 @@ fn draw(app: &mut App, w: u16, h: u16) -> io::Result<String> {
         .collect())
 }
 fn click(app: &mut App, target: Target) {
+    let target = match target {
+        Target::Utility(a) if app.modals.plugin_dialog() == Some(dn::plugins::CALCULATOR) => {
+            utilities::calculator_target(a)
+        }
+        t => t,
+    };
     let r = app
         .mouse
         .regions
@@ -238,28 +244,34 @@ fn calculator_mouse_keyboard_paste_copy_reopen_and_editor_clipboard() -> io::Res
     let mut app = t.app()?;
     draw(&mut app, 80, 25)?;
     key(&mut app, KeyCode::Char('k'), KeyModifiers::CONTROL);
-    assert_eq!(
-        app.utilities.modals.utility_dialog(),
-        Some(Kind::Calculator)
-    );
-    app.utilities.paste("(0x20+1)*2");
+    assert_eq!(app.modals.plugin_dialog(), Some(dn::plugins::CALCULATOR));
+    input::paste(&mut app, "(0x20+1)*2");
     key(&mut app, KeyCode::Enter, KeyModifiers::NONE);
-    assert_eq!(app.utilities.calculator.result, Some(Value::Integer(66)));
+    assert_eq!(
+        app.desktop.plugins.calculator_mut().result,
+        Some(Value::Integer(66))
+    );
     let screen = draw(&mut app, 80, 25)?;
     assert!(screen.contains("HEX"));
     assert!(screen.contains("0x42"));
-    click(&mut app, Target::Utility(Action::Base(1)));
+    click(&mut app, utilities::calculator_target(Action::Base(1)));
     click(&mut app, Target::Utility(Action::Copy));
     assert_eq!(app.editor_clipboard, "0x42");
     key(&mut app, KeyCode::Esc, KeyModifiers::NONE);
     key(&mut app, KeyCode::Char('k'), KeyModifiers::CONTROL);
-    assert_eq!(app.utilities.calculator.result, Some(Value::Integer(66)));
+    assert_eq!(
+        app.desktop.plugins.calculator_mut().result,
+        Some(Value::Integer(66))
+    );
     draw(&mut app, 120, 40)?;
-    click(&mut app, Target::Utility(Action::Field));
+    click(&mut app, utilities::calculator_target(Action::Field));
     key(&mut app, KeyCode::Char('+'), KeyModifiers::NONE);
-    assert!(app.utilities.calculator.result.is_none());
+    assert!(app.desktop.plugins.calculator_mut().result.is_none());
     key(&mut app, KeyCode::Up, KeyModifiers::NONE);
-    assert_eq!(app.utilities.calculator.expression, "(0x20+1)*2");
+    assert_eq!(
+        app.desktop.plugins.calculator_mut().expression,
+        "(0x20+1)*2"
+    );
     key(&mut app, KeyCode::Enter, KeyModifiers::NONE);
     key(&mut app, KeyCode::Char('c'), KeyModifiers::CONTROL);
     assert_eq!(app.editor_clipboard, "0x42");
@@ -459,9 +471,12 @@ fn utility_menus_modal_precedence_editor_keys_and_small_terminal() -> io::Result
         Kind::System,
         Kind::Memory,
     ] {
-        assert!(menu::items(2)
-            .iter()
-            .any(|i| i.action == menu::Action::Utility(kind)));
+        assert!(menu::items(2).iter().any(|i| i.action
+            == if kind == Kind::Calculator {
+                menu::Action::Plugin(dn::plugins::CALCULATOR)
+            } else {
+                menu::Action::Utility(kind)
+            }));
         menu::execute(&mut app, menu::Action::Utility(kind));
         draw(&mut app, 80, 25)?;
         draw(&mut app, 120, 40)?;
@@ -473,7 +488,7 @@ fn utility_menus_modal_precedence_editor_keys_and_small_terminal() -> io::Result
     utilities::open(&mut app, Kind::Calculator);
     app.error("top dialog");
     key(&mut app, KeyCode::Esc, KeyModifiers::NONE);
-    assert!(app.utilities.modals.utility_dialog().is_some());
+    assert!(app.modals.plugin_dialog().is_some());
     key(&mut app, KeyCode::Esc, KeyModifiers::NONE);
     assert!(app.utilities.modals.utility_dialog().is_none());
     dn::editor::open(&mut app, true);
@@ -497,21 +512,21 @@ fn calculator_scientific_copy_keeps_exact_decimal_and_preserves_clipboard_on_err
     let t = Temp::new()?;
     let mut app = t.app()?;
     utilities::open(&mut app, Kind::Calculator);
-    app.utilities.paste("9007199254740993");
+    input::paste(&mut app, "9007199254740993");
     utilities::action(&mut app, Action::Evaluate);
     utilities::action(&mut app, Action::Copy);
     assert_eq!(app.editor_clipboard, "9007199254740993");
     utilities::action(&mut app, Action::Base(4));
     utilities::action(&mut app, Action::Copy);
     assert_eq!(app.editor_clipboard, "9.00719925474099E+0015");
-    app.utilities.calculator.focus = 0;
-    app.utilities.calculator.expression.clear();
-    app.utilities.calculator.cursor = 0;
-    app.utilities.paste("1/0");
+    app.desktop.plugins.calculator_mut().focus = 0;
+    app.desktop.plugins.calculator_mut().expression.clear();
+    app.desktop.plugins.calculator_mut().cursor = 0;
+    input::paste(&mut app, "1/0");
     utilities::action(&mut app, Action::Evaluate);
     key(&mut app, KeyCode::Char('c'), KeyModifiers::CONTROL);
     assert_eq!(app.editor_clipboard, "9.00719925474099E+0015");
-    assert!(app.utilities.calculator.error.is_some());
+    assert!(app.desktop.plugins.calculator_mut().error.is_some());
     Ok(())
 }
 #[test]
@@ -520,39 +535,42 @@ fn calculator_history_dropdown_recalls_without_evaluation_and_returns_to_draft()
     let mut app = t.app()?;
     utilities::open(&mut app, Kind::Calculator);
     draw(&mut app, 80, 25)?;
-    click(&mut app, Target::Utility(Action::CalculatorHistory));
-    assert!(draw(&mut app, 80, 25)?.contains("No expression history"));
-    app.utilities.paste("not inserted");
-    assert!(app.utilities.calculator.expression.is_empty());
-    key(&mut app, KeyCode::Esc, KeyModifiers::NONE);
-    assert!(!app.utilities.calculator.history_open);
-    assert_eq!(
-        app.utilities.modals.utility_dialog(),
-        Some(Kind::Calculator)
+    click(
+        &mut app,
+        utilities::calculator_target(Action::CalculatorHistory),
     );
+    assert!(draw(&mut app, 80, 25)?.contains("No expression history"));
+    input::paste(&mut app, "not inserted");
+    assert!(app.desktop.plugins.calculator_mut().expression.is_empty());
+    key(&mut app, KeyCode::Esc, KeyModifiers::NONE);
+    assert!(!app.desktop.plugins.calculator_mut().history_open);
+    assert_eq!(app.modals.plugin_dialog(), Some(dn::plugins::CALCULATOR));
     for expression in ["1+2", "sqrt(81)"] {
-        let calc = &mut app.utilities.calculator;
+        let calc = &mut app.desktop.plugins.calculator_mut();
         calc.expression = expression.into();
         calc.cursor = expression.len();
         utilities::action(&mut app, Action::Evaluate);
     }
-    app.utilities.calculator.expression = "draft 界".into();
-    app.utilities.calculator.cursor = "draft 界".len();
-    app.utilities.calculator.result = None;
+    app.desktop.plugins.calculator_mut().expression = "draft 界".into();
+    app.desktop.plugins.calculator_mut().cursor = "draft 界".len();
+    app.desktop.plugins.calculator_mut().result = None;
     utilities::action(&mut app, Action::CalculatorHistory);
     key(&mut app, KeyCode::End, KeyModifiers::NONE);
     key(&mut app, KeyCode::Enter, KeyModifiers::NONE);
-    assert_eq!(app.utilities.calculator.expression, "1+2");
-    assert!(app.utilities.calculator.result.is_none());
+    assert_eq!(app.desktop.plugins.calculator_mut().expression, "1+2");
+    assert!(app.desktop.plugins.calculator_mut().result.is_none());
     key(&mut app, KeyCode::Down, KeyModifiers::NONE);
     key(&mut app, KeyCode::Down, KeyModifiers::NONE);
-    assert_eq!(app.utilities.calculator.expression, "draft 界");
+    assert_eq!(app.desktop.plugins.calculator_mut().expression, "draft 界");
     utilities::action(&mut app, Action::CalculatorHistory);
     draw(&mut app, 80, 25)?;
-    click(&mut app, Target::Utility(Action::CalculatorRecall(0)));
-    assert_eq!(app.utilities.calculator.expression, "sqrt(81)");
-    assert!(app.utilities.calculator.result.is_none());
-    assert!(!app.utilities.calculator.history_open);
+    click(
+        &mut app,
+        utilities::calculator_target(Action::CalculatorRecall(0)),
+    );
+    assert_eq!(app.desktop.plugins.calculator_mut().expression, "sqrt(81)");
+    assert!(app.desktop.plugins.calculator_mut().result.is_none());
+    assert!(!app.desktop.plugins.calculator_mut().history_open);
     Ok(())
 }
 #[test]
@@ -569,7 +587,7 @@ fn calculator_classic_layout_results_help_mouse_focus_and_resize() -> io::Result
             app.config.language = language;
             app.config.palette = profile;
             utilities::open(&mut app, Kind::Calculator);
-            app.utilities.paste("9223372036854775807");
+            input::paste(&mut app, "9223372036854775807");
             utilities::action(&mut app, Action::Evaluate);
             for (w, h) in [(80, 25), (120, 40), (80, 25)] {
                 let mut terminal = Terminal::new(TestBackend::new(w, h))?;
@@ -578,14 +596,14 @@ fn calculator_classic_layout_results_help_mouse_focus_and_resize() -> io::Result
                     .mouse
                     .regions
                     .iter()
-                    .find(|(_, t)| *t == Target::Utility(Action::Field))
+                    .find(|(_, t)| *t == utilities::calculator_target(Action::Field))
                     .unwrap()
                     .0;
                 let evaluate = app
                     .mouse
                     .regions
                     .iter()
-                    .find(|(_, t)| *t == Target::Utility(Action::Evaluate))
+                    .find(|(_, t)| *t == utilities::calculator_target(Action::Evaluate))
                     .unwrap()
                     .0;
                 let b = terminal.backend().buffer();
@@ -593,7 +611,7 @@ fn calculator_classic_layout_results_help_mouse_focus_and_resize() -> io::Result
                     .mouse
                     .regions
                     .iter()
-                    .find(|(_, t)| *t == Target::Utility(Action::CalculatorHistory))
+                    .find(|(_, t)| *t == utilities::calculator_target(Action::CalculatorHistory))
                     .unwrap()
                     .0;
                 assert_eq!(b[(history.x, history.y)].bg, profile.color(9));
@@ -608,7 +626,15 @@ fn calculator_classic_layout_results_help_mouse_focus_and_resize() -> io::Result
                     assert_eq!(b[(x, history.y + 1)].bg, profile.color(7));
                 }
                 for (row, target) in &app.mouse.regions {
-                    if row.width == 11 && matches!(target, Target::Utility(Action::Base(_))) {
+                    if row.width == 11
+                        && matches!(
+                            target,
+                            Target::Plugin(
+                                dn::plugins::CALCULATOR,
+                                dn::plugins::ActionId(100..=104)
+                            )
+                        )
+                    {
                         for x in row.x..row.right() {
                             assert_eq!(
                                 b[(x, row.y)].bg,
@@ -647,7 +673,7 @@ fn calculator_classic_layout_results_help_mouse_focus_and_resize() -> io::Result
                         .mouse
                         .regions
                         .iter()
-                        .any(|(_, t)| *t == Target::Utility(action)));
+                        .any(|(_, t)| *t == utilities::calculator_target(action)));
                 }
                 let screen: String = b.content.iter().map(|c| c.symbol()).collect();
                 assert!(screen.contains(language.text("Expression")));
@@ -658,32 +684,35 @@ fn calculator_classic_layout_results_help_mouse_focus_and_resize() -> io::Result
                     "long binary value should be visibly shortened"
                 );
             }
-            click(&mut app, Target::Utility(Action::Base(2)));
+            click(&mut app, utilities::calculator_target(Action::Base(2)));
             click(&mut app, Target::Utility(Action::Copy));
             assert_eq!(app.editor_clipboard, format!("0b{}", "1".repeat(63)));
             key(&mut app, KeyCode::Tab, KeyModifiers::NONE);
-            assert_eq!(app.utilities.calculator.focus, 4);
+            assert_eq!(app.desktop.plugins.calculator_mut().focus, 4);
             key(&mut app, KeyCode::Down, KeyModifiers::NONE);
-            assert_eq!(app.utilities.calculator.base, 4);
+            assert_eq!(app.desktop.plugins.calculator_mut().base, 4);
             draw(&mut app, 80, 25)?;
-            click(&mut app, Target::Utility(Action::CalculatorHelp));
+            click(
+                &mut app,
+                utilities::calculator_target(Action::CalculatorHelp),
+            );
             assert_eq!(focus::current(&app), Focus::Message);
             input::paste(&mut app, "blocked");
-            assert_eq!(app.utilities.calculator.expression, "9223372036854775807");
+            assert_eq!(
+                app.desktop.plugins.calculator_mut().expression,
+                "9223372036854775807"
+            );
             key(&mut app, KeyCode::Esc, KeyModifiers::NONE);
-            assert_eq!(focus::current(&app), Focus::Utility);
+            assert_eq!(focus::current(&app), Focus::Plugin);
             key(&mut app, KeyCode::F(1), KeyModifiers::NONE);
             assert_eq!(focus::current(&app), Focus::Message);
             key(&mut app, KeyCode::Esc, KeyModifiers::NONE);
             draw(&mut app, 60, 15)?;
-            assert_eq!(
-                app.utilities.modals.utility_dialog(),
-                Some(Kind::Calculator)
-            );
+            assert_eq!(app.modals.plugin_dialog(), Some(dn::plugins::CALCULATOR));
             draw(&mut app, 80, 25)?;
             key(&mut app, KeyCode::Char('e'), KeyModifiers::ALT);
             assert_eq!(
-                app.utilities.calculator.result,
+                app.desktop.plugins.calculator_mut().result,
                 Some(Value::Integer(i64::MAX))
             );
         }

@@ -67,7 +67,10 @@ fn stable_identities_activate_new_documents_and_keep_multiple_instances() -> io:
     editor::open(&mut app, true);
     let editor = app.desktop.active();
     app.show_game(dn::tetris::Game::default());
-    let game = app.desktop.id(WindowKind::Game).unwrap();
+    let game = app
+        .desktop
+        .id(WindowKind::Plugin(dn::plugins::TETRIS))
+        .unwrap();
     app.show_viewer(preview(temp.0.join("preview")));
     let viewer = app.desktop.id(WindowKind::Viewer).unwrap();
     assert_eq!(app.desktop.windows().count(), 4);
@@ -644,8 +647,11 @@ fn window_menu_actions_and_modal_title_close_preserve_existing_shortcuts() -> io
     key(&mut app, K::Esc);
     app.desktop.close_editor();
     app.show_game(dn::tetris::Game::default());
+    let game = app.desktop.active().id;
     windows(&mut app);
-    assert!(app.modals.window_list().is_none());
-    assert_eq!(focus::current(&app), Focus::Game);
+    assert!(app.modals.window_list().unwrap().ids.contains(&game));
+    assert_eq!(focus::current(&app), Focus::WindowList);
+    key(&mut app, K::Esc);
+    assert_eq!(focus::current(&app), Focus::Plugin);
     Ok(())
 }

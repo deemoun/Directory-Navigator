@@ -98,8 +98,8 @@ fn handle_key(app: &mut App, key: KeyEvent) {
     if focus == Focus::QuickSearch && crate::quick_search::key(app, key) {
         return;
     }
-    if focus == Focus::Game {
-        crate::tetris::key(app, key);
+    if focus == Focus::Plugin {
+        crate::plugins::host::key(app, key);
         return;
     }
     if focus == Focus::Job && crate::dialog_controls::key(app, key, focus) {
@@ -185,7 +185,7 @@ fn handle_key(app: &mut App, key: KeyEvent) {
         && key.code == KeyCode::F(9)
         && key.modifiers.contains(KeyModifiers::ALT)
     {
-        crate::tetris::open(app);
+        crate::plugins::host::open(app, crate::plugins::TETRIS);
         return;
     }
     if focus == Focus::Menu {
@@ -238,7 +238,7 @@ fn handle_key(app: &mut App, key: KeyEvent) {
             }
             KeyCode::F(8) => crate::command_line::history::open(app),
             KeyCode::Char('l') => crate::file_tools::open_export(app),
-            KeyCode::F(9) => crate::tetris::open(app),
+            KeyCode::F(9) => crate::plugins::host::open(app, crate::plugins::TETRIS),
             KeyCode::F(7) => crate::quick_search::open(app),
             KeyCode::Char('x') => app.request_exit(),
             KeyCode::Char('e') => app.open_file_info(),
@@ -267,7 +267,7 @@ fn handle_key(app: &mut App, key: KeyEvent) {
             KeyCode::Char(c) if ('1'..='9').contains(&c) => {
                 crate::navigation_tools::assign(app, c as usize - '1' as usize)
             }
-            KeyCode::Char('k') => crate::utilities::open(app, crate::utilities::Kind::Calculator),
+            KeyCode::Char('k') => crate::plugins::host::open(app, crate::plugins::CALCULATOR),
             KeyCode::Char('b') => crate::utilities::open(app, crate::utilities::Kind::Characters),
             KeyCode::Char('c') => crate::file_tools::open_compare(app),
             KeyCode::Char('t') => crate::directory_tree::open(app),
@@ -338,10 +338,10 @@ fn paste_text(app: &mut App, text: &str) {
     match focus::current(app) {
         Focus::Editor | Focus::EditorModal => crate::editor::paste(app, text),
         Focus::Viewer | Focus::ViewerSearch => crate::viewer::paste(app, text),
-        Focus::Game => crate::tetris::paste(app, text),
+        Focus::Plugin => crate::plugins::host::paste(app, text),
         Focus::Manager => crate::command_line::paste(app, text),
         Focus::Navigation => crate::navigation_tools::paste(app, text),
-        Focus::Utility => app.utilities.paste(text),
+        Focus::Utility => {}
         Focus::FileTools => app.file_tools.paste(text),
         Focus::CommandHistory => crate::command_line::history::paste(app, text),
         Focus::Discovery => crate::discovery::paste(app, text),

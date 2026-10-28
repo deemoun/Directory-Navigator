@@ -163,7 +163,10 @@ impl ModalStack {
                         }
                     }
                 }
-                let owner = if matches!(focus, Focus::Settings | Focus::WindowList | Focus::Job) {
+                let owner = if matches!(
+                    focus,
+                    Focus::Settings | Focus::WindowList | Focus::Job | Focus::Plugin
+                ) {
                     ModalOwner::Workspace
                 } else {
                     self.owner
@@ -585,4 +588,13 @@ slot!(
     set_copy_history,
     crate::copy_dialog::History,
     CopyHistory
+);
+
+copy_slot!(
+    plugin_dialog,
+    plugin_dialog_mut,
+    take_plugin_dialog,
+    set_plugin_dialog,
+    crate::plugins::PluginId,
+    Plugin
 );

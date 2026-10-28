@@ -81,21 +81,21 @@ fn game_over_name_and_help_show_their_default_on_first_paint() -> io::Result<()>
     }
     for (w, h) in [(80, 25), (132, 40)] {
         let b = draw(&mut app, w, h)?;
-        assert!(marked(&app, &b, Target::Game(GameAction::Continue)));
+        assert!(marked(&app, &b, dn::tetris::target(GameAction::Continue)));
         assert_eq!(app.desktop.game().unwrap().screen, Screen::GameOver);
     }
     key(&mut app, K::Enter);
     assert_eq!(app.desktop.game().unwrap().screen, Screen::Name);
     let b = draw(&mut app, 80, 25)?;
-    assert!(marked(&app, &b, Target::Game(GameAction::SubmitName)));
-    assert!(!marked(&app, &b, Target::Game(GameAction::SkipName)));
+    assert!(marked(&app, &b, dn::tetris::target(GameAction::SubmitName)));
+    assert!(!marked(&app, &b, dn::tetris::target(GameAction::SkipName)));
     input::paste(&mut app, "Still typing");
     assert!(app.desktop.game().unwrap().name.contains("Still typing"));
     key(&mut app, K::Esc);
     key(&mut app, K::Esc);
     key(&mut app, K::F(1));
     let b = draw(&mut app, 80, 25)?;
-    assert!(marked(&app, &b, Target::Game(GameAction::Back)));
+    assert!(marked(&app, &b, dn::tetris::target(GameAction::Back)));
     Ok(())
 }
 #[test]

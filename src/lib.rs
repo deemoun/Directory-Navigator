@@ -21,6 +21,8 @@ pub mod operations;
 pub mod panel;
 pub mod panel_layout;
 pub mod pattern;
+#[doc(hidden)]
+pub mod plugins;
 pub mod quick_search;
 pub mod settings;
 pub mod shortcuts;

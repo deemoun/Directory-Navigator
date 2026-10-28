@@ -163,6 +163,17 @@ focus widget moves. No dependency, configuration format or public API change is
 introduced; native FileDialog, HelpWindow and owned settings choice integrations
 remain unchanged.
 
+## Built-in tools
+
+Calculator and Tetris now implement a small internal plugin interface over these
+same native controls. Both are compiled into DN. The session registry owns their
+models; Desktop document content retains a plugin reference, while calculator
+presentation remains modal. Input/render dispatch uses one Plugin route with
+existing owner and frame-revision checks. Tetris can be switched through the window
+list and its clock is suspended under modal or inactive surfaces. Existing score
+storage and calculator semantics are retained. There is no external loader, new
+runtime, dependency or configuration format. See [built-in API](BUILTIN_PLUGINS.md).
+
 ## Menu visibility
 
 `interface.hide_menu` is a saved checkbox in Options → Configuration → Interface.
@@ -237,8 +248,15 @@ commands accept Ctrl+O/Esc/Enter with raw, atomic paste handling.
 
 Local macOS ARM64 validation covers:
 
-- 512 native Rust tests pass; the existing opt-in native Trash check stays ignored.
+- 515 native Rust tests pass; the existing opt-in native Trash check stays ignored.
 - Formatting, all-target Clippy, release build and a no-default-features check.
+- Built-in module extraction preserves all 128 pre/post cell/style captures.
+  A test-only registered tool verifies generic menu/input/render routing without
+  new central enum variants, nested ownership, stale bindings/mouse frames,
+  immutable translated painting, duplicate registration and background-effect
+  isolation. Release PTYs cover Calculator/Tetris state independence, game window
+  switching without restart or gravity catch-up, Help/paste isolation, page/name
+  cancellation, resize and terminal restoration.
 - Remaining-control coverage includes 128 before/after cell/style captures in
   both palettes/languages at 80×25 and 132×40: 120 match exactly; the other eight
   differ only in the native export radio marker. Repeated painting, translated

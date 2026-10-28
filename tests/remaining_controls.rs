@@ -154,32 +154,30 @@ fn completed_discovery_disables_stop_and_retires_its_published_mouse_action() ->
 fn calculator_history_is_a_blocking_shared_list_and_preserves_parent_focus() -> io::Result<()> {
     let (_t, mut a) = Fixture::app()?;
     dn::utilities::open(&mut a, dn::utilities::Kind::Calculator);
-    a.utilities.calculator.expression = "41 + 1".into();
-    a.utilities.calculator.cursor = 6;
-    a.utilities.calculator.evaluate();
-    a.utilities.calculator.focus = 7;
+    a.desktop.plugins.calculator_mut().expression = "41 + 1".into();
+    a.desktop.plugins.calculator_mut().cursor = 6;
+    a.desktop.plugins.calculator_mut().evaluate();
+    a.desktop.plugins.calculator_mut().focus = 7;
     dn::utilities::action(&mut a, dn::utilities::Action::CalculatorHistory);
     draw(&mut a, 80, 25)?;
     assert!(a.mouse.regions.iter().all(|(_, t)| matches!(
         t,
-        Target::Utility(
-            dn::utilities::Action::CalculatorHistory | dn::utilities::Action::CalculatorRecall(_)
-        )
+        Target::Plugin(dn::plugins::CALCULATOR, dn::plugins::ActionId(5 | 1000..))
     )));
     for k in [K::Tab, K::BackTab] {
         key(&mut a, k);
-        assert_eq!(a.utilities.calculator.focus, 7);
-        assert!(a.utilities.calculator.history_open);
+        assert_eq!(a.desktop.plugins.calculator_mut().focus, 7);
+        assert!(a.desktop.plugins.calculator_mut().history_open);
     }
     key(&mut a, K::Esc);
-    assert!(!a.utilities.calculator.history_open);
-    assert_eq!(a.utilities.calculator.focus, 7);
+    assert!(!a.desktop.plugins.calculator_mut().history_open);
+    assert_eq!(a.desktop.plugins.calculator_mut().focus, 7);
     dn::utilities::action(&mut a, dn::utilities::Action::CalculatorHistory);
     key(&mut a, K::Enter);
-    assert!(!a.utilities.calculator.history_open);
-    assert_eq!(a.utilities.calculator.focus, 0);
-    assert_eq!(a.utilities.calculator.expression, "41 + 1");
-    assert!(a.utilities.calculator.result.is_none());
+    assert!(!a.desktop.plugins.calculator_mut().history_open);
+    assert_eq!(a.desktop.plugins.calculator_mut().focus, 0);
+    assert_eq!(a.desktop.plugins.calculator_mut().expression, "41 + 1");
+    assert!(a.desktop.plugins.calculator_mut().result.is_none());
     Ok(())
 }
 fn setup(a: &mut App, case: usize) -> (u16, u16) {
@@ -228,11 +226,12 @@ fn setup(a: &mut App, case: usize) -> (u16, u16) {
         }
         6 | 7 => {
             utilities::open(a, utilities::Kind::Calculator);
-            a.utilities.calculator.expression = "12345 * (67 + 89)".into();
-            a.utilities.calculator.cursor = a.utilities.calculator.expression.len();
-            a.utilities.calculator.evaluate();
+            a.desktop.plugins.calculator_mut().expression = "12345 * (67 + 89)".into();
+            a.desktop.plugins.calculator_mut().cursor =
+                a.desktop.plugins.calculator_mut().expression.len();
+            a.desktop.plugins.calculator_mut().evaluate();
             if case == 7 {
-                a.utilities.calculator.history_open = true;
+                a.desktop.plugins.calculator_mut().history_open = true;
             }
             (72, 18)
         }

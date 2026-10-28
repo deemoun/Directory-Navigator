@@ -1,7 +1,7 @@
 //! Session-only switching; content and asynchronous work remain owned by Desktop.
 use crate::{
     app::App,
-    desktop::{WindowId, WindowKind},
+    desktop::WindowId,
     focus::{self, Focus},
     mouse::Target,
 };
@@ -34,12 +34,7 @@ pub enum Action {
     Cancel,
 }
 fn ids(app: &App) -> Vec<WindowId> {
-    let mut windows = app
-        .desktop
-        .windows()
-        .filter(|w| w.kind != WindowKind::Game)
-        .map(|w| w.id)
-        .collect::<Vec<_>>();
+    let mut windows = app.desktop.windows().map(|w| w.id).collect::<Vec<_>>();
     windows.sort();
     windows
 }
@@ -53,6 +48,7 @@ pub fn open(app: &mut App) {
                 | Focus::Editor
                 | Focus::EditorMenu
                 | Focus::Viewer
+                | Focus::Plugin
         )
     {
         return;

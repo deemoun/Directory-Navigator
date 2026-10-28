@@ -39,7 +39,7 @@ impl Scope {
             return Self::Modal(modal);
         }
         match crate::focus::current(app) {
-            Focus::Manager | Focus::Editor | Focus::Viewer | Focus::Game => Self::Content,
+            Focus::Manager | Focus::Editor | Focus::Viewer | Focus::Plugin => Self::Content,
             focus => Self::Layer(focus),
         }
     }

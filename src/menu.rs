@@ -64,7 +64,7 @@ pub enum Action {
     LoadSettings,
     About,
     Welcome,
-    Game,
+    Plugin(crate::plugins::PluginId),
     Settings(SettingsKind),
     Confirmations,
     View(ViewMode),
@@ -86,6 +86,10 @@ fn item(label: &'static str, shortcut: &'static str, action: Action) -> Item {
         shortcut,
         action,
     }
+}
+fn plugin_item(id: crate::plugins::PluginId) -> Item {
+    let d = crate::plugins::builtin_definition(id).expect("builtin definition");
+    item(d.menu_label, d.shortcut, Action::Plugin(id))
 }
 fn line() -> Item {
     item("", "", Action::Separator)
@@ -127,7 +131,7 @@ pub fn items(menu: usize) -> Vec<Item> {
             item("~R~efresh", "", Refresh),
             line(),
             item("~S~creensaver", "", ScreenRest),
-            item("~G~ame", "Alt+F9", Game),
+            plugin_item(crate::plugins::TETRIS),
         ],
         1 => vec![
             item("~V~iew", "", Submenu(MenuId::View)),
@@ -157,11 +161,7 @@ pub fn items(menu: usize) -> Vec<Item> {
                 Utility(crate::utilities::Kind::System),
             ),
             line(),
-            item(
-                "~C~alculator",
-                "Ctrl+K",
-                Utility(crate::utilities::Kind::Calculator),
-            ),
+            plugin_item(crate::plugins::CALCULATOR),
             item(
                 "ASCII Ta~b~le",
                 "Ctrl+B",
@@ -305,7 +305,15 @@ pub fn level_items(app: &App, depth: usize) -> Vec<Item> {
     if depth == 0 {
         app.modals
             .menu()
-            .map(|(root, _)| items(root))
+            .map(|(root, _)| {
+                let mut entries = items(root);
+                for d in app.desktop.plugins.definitions().filter(|d| d.menu == root) {
+                    if !entries.iter().any(|e| e.action == Action::Plugin(d.id)) {
+                        entries.push(item(d.menu_label, d.shortcut, Action::Plugin(d.id)));
+                    }
+                }
+                entries
+            })
             .unwrap_or_default()
     } else {
         app.modals
@@ -381,7 +389,7 @@ pub fn execute(app: &mut App, action: Action) {
             title: " Confirmation policy — read-only ",
             message: "[x] Confirm copy/move destinations\n[x] Confirm Trash / permanent deletion\n[x] Refuse existing destinations\n\nThese safeguards are always enabled.\nDeletion mode: Options → File Manager → Setup.\nEsc cancels an operation; completed items remain.\n\nEnter / Esc: close".into(),
         }),
-        Action::Game => crate::tetris::open(app),
+        Action::Plugin(id)=>crate::plugins::host::open(app,id),
         Action::About => app.push_dialog(crate::dialog::Dialog {
             title: " About Directory Navigator ",
             message: format!("{}\n{} {}\n{}\n\n{}: Dmitry Yarygin\n\n{}\n{}", crate::APPLICATION_NAME, app.config.language.text("Version"), crate::DISPLAY_VERSION, app.config.language.text("Native Rust terminal file manager"), app.config.language.text("Author"), app.config.language.text("F1: keyboard help"), app.config.language.text("Enter / Esc: close")),

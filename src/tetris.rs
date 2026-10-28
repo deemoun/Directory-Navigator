@@ -4,7 +4,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 mod controls;
 pub mod dos_scores;
 pub mod scores;
-pub use controls::{action, key, open, paste, GameAction};
+pub use controls::{action, key, open, paste, target, GameAction};
 
 pub const BUTTONS: [(&str, GameAction); 4] = [
     ("~N~ew", GameAction::New),
