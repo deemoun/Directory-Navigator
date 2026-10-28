@@ -587,7 +587,7 @@ pub fn action(app: &mut App, command: EditorAction) {
         return;
     }
     if command == A::Menu {
-        menus::open(app, 0);
+        menus::open_root(app, menus::EditorRootId::File);
         return;
     }
     if !matches!(command, A::MenuSurface | A::SearchChoice(_)) {

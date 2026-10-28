@@ -83,35 +83,30 @@ pub(super) fn draw_viewer(frame: &mut impl Frame, app: &App, area: Rect) {
         );
     }
     frame.render_widget(Block::default().style(profile.bar(true)), regions[3]);
-    let cells = Layout::horizontal([
-        Constraint::Length(12),
-        Constraint::Length(12),
-        Constraint::Length(16),
-        Constraint::Min(1),
-    ])
-    .split(regions[3]);
-    for (i, label, action) in [
-        (0, "F2 Wrap", Action::Wrap),
-        (1, "F7 Find", Action::Find),
-        (2, "S-F7 Next", Action::Next),
-        (3, "C-F7 Reverse", Action::Reverse),
-    ] {
-        let enabled = viewer.text_ready();
-        let (key, description) = label.split_once(' ').unwrap_or((label, ""));
+    let entries = crate::menu::definition::VIEWER_BAR;
+    let cells = Layout::horizontal(entries.iter().map(|entry| entry.width)).split(regions[3]);
+    for (i, entry) in entries.iter().enumerate() {
+        let enabled = viewer.text_ready() && entry.action.is_some();
         let key = format!(
             "{} ",
-            crate::shortcuts::label(app.config.shortcuts, crate::focus::Screen::Viewer, key)
+            crate::shortcuts::label(
+                app.config.shortcuts,
+                crate::focus::Screen::Viewer,
+                entry.key
+            )
         );
         frame.render_widget(
             crate::turbo::widgets::function_status(
                 &key,
-                app.config.language.text(description),
+                app.config.language.text(entry.label),
                 enabled,
             ),
             cells[i],
         );
         if enabled {
-            frame.regions().push((cells[i], Target::Viewer(action)));
+            if let Some(action) = entry.action {
+                frame.regions().push((cells[i], Target::Viewer(action)));
+            }
         }
     }
 }

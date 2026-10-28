@@ -21,6 +21,14 @@
 
 ## Implemented
 
+- Editor menus and editor/viewer command bars share `src/menu/definition.rs` with
+  the manager: editor category order/enabled state, captions, actions, separators,
+  explicit status keys and widths are declared there. Editor File opens by named
+  identity; traversal derives enabled categories from the definition. Paragraph,
+  blank function-key slots, viewer text/Hex guards and existing bindings remain.
+  Reversing editor categories and both bars passes the identity/mouse/keyboard
+  regressions; the shipped order remains unchanged.
+
 - Main menu hierarchy is declared in `src/menu/definition.rs`: root order/labels,
   entries, separators, submenus and built-in plugin placement/shortcut captions.
   Native painting and navigation consume the same definition; `RootId` preserves
@@ -37,7 +45,7 @@
   desktop/save-on-exit behavior; old configurations enable all tools and unknown
   IDs survive saving. Registry extension, long-list scrolling/stale clicks,
   configuration safeguards, localization and lifecycle tests are included.
-  macOS ARM64: 523 tests pass (one opt-in native Trash test ignored); formatting,
+  macOS ARM64: 525 tests pass (one opt-in native Trash test ignored); formatting,
   all-target Clippy, release and no-default-features checks pass. Release PTY
   verifies cancellation, disable/re-enable, blocked shortcuts, live game closure,
   explicit saving, resize and terminal restoration. Windows/Linux skipped.

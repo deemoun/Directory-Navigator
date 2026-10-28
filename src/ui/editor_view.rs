@@ -1,6 +1,6 @@
 use crate::painting::{Block, Frame, Paragraph};
 use crate::presentation::{
-    layout::{Constraint, Layout, Rect},
+    layout::{Layout, Rect},
     text::{Line, Span},
 };
 use crate::{
@@ -156,34 +156,30 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
         Paragraph::new(status).style(dos(0x70)),
         Rect::new(area.x, area.bottom() - 2, area.width, 1),
     );
-    let cells = Layout::horizontal([Constraint::Fill(1); 10]).split(Rect::new(
+    let entries = crate::menu::definition::EDITOR_BAR;
+    let cells = Layout::horizontal(entries.iter().map(|entry| entry.width)).split(Rect::new(
         area.x,
         area.bottom() - 1,
         area.width,
         1,
     ));
-    for (index, (name, command)) in [
-        ("Help", Some(A::Help)),
-        ("Save", Some(A::Save)),
-        ("Open", Some(A::Open)),
-        ("", None),
-        ("", None),
-        ("Dupe", Some(A::Duplicate)),
-        ("Find", Some(A::Find)),
-        ("", None),
-        ("", None),
-        ("Menu", Some(A::Menu)),
-    ]
-    .into_iter()
-    .enumerate()
-    {
-        let key = if app.config.shortcuts.is_mac() {
-            format!("^O{} ", (index + 1) % 10)
-        } else if profile == crate::palette::PaletteProfile::ClassicDn {
-            format!("F{} ", index + 1)
+    for (index, entry) in entries.iter().enumerate() {
+        let key = if app.config.shortcuts.is_mac()
+            || profile == crate::palette::PaletteProfile::ClassicDn
+        {
+            format!(
+                "{} ",
+                crate::shortcuts::label(
+                    app.config.shortcuts,
+                    crate::focus::Screen::Editor,
+                    entry.key
+                )
+            )
         } else {
-            (index + 1).to_string()
+            entry.key.strip_prefix('F').unwrap_or(entry.key).to_owned()
         };
+        let name = entry.label;
+        let command = entry.action;
         frame.render_widget(
             crate::turbo::widgets::function_status(
                 &key,

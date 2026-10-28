@@ -1,4 +1,4 @@
-//! Single source for the manager's menu hierarchy.
+//! Single source for manager/editor menus and editor/viewer command bars.
 //! Reorder ROOTS or their entries here; named IDs keep shortcuts/plugin placement
 //! independent of display positions. Captions use ~mnemonics~ and locale keys.
 use super::{item, line, Action, Item};
@@ -231,3 +231,226 @@ pub(super) fn submenu_items(menu: MenuId) -> Vec<Item> {
         ],
     }
 }
+
+// Editor: categories, enablement, entries and separators.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum EditorRootId {
+    File,
+    Edit,
+    Search,
+    Paragraph,
+    Block,
+    Misc,
+    Options,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct EditorItem {
+    pub label: &'static str,
+    pub shortcut: &'static str,
+    pub action: Option<crate::editor::EditorAction>,
+}
+pub struct EditorRoot {
+    pub id: EditorRootId,
+    pub label: &'static str,
+    pub enabled: bool,
+    pub entries: &'static [EditorItem],
+}
+const fn editor_item(
+    label: &'static str,
+    shortcut: &'static str,
+    action: crate::editor::EditorAction,
+) -> EditorItem {
+    EditorItem {
+        label,
+        shortcut,
+        action: Some(action),
+    }
+}
+const fn editor_line() -> EditorItem {
+    EditorItem {
+        label: "",
+        shortcut: "",
+        action: None,
+    }
+}
+use crate::editor::EditorAction as A;
+pub const EDITOR_ROOTS: &[EditorRoot] = &[
+    EditorRoot {
+        id: EditorRootId::File,
+        label: "~F~ile",
+        enabled: true,
+        entries: &[
+            editor_item("~O~pen...", "F3", A::Open),
+            editor_item("~S~ave", "F2", A::Save),
+            editor_item("Save ~a~s...", "Shift+F2", A::SaveAs),
+            editor_line(),
+            editor_item("~W~indows...", "Alt+0", A::Windows),
+            editor_item("~C~lose editor", "Ctrl+F4", A::Close),
+            editor_item("E~x~it DN", "Alt+X", A::Quit),
+        ],
+    },
+    EditorRoot {
+        id: EditorRootId::Edit,
+        label: "~E~dit",
+        enabled: true,
+        entries: &[
+            editor_item("~U~ndo", "Alt+Backspace", A::Undo),
+            editor_item("~R~edo", "Ctrl+Y", A::Redo),
+            editor_line(),
+            editor_item("Cu~t~", "Shift+Del", A::Cut),
+            editor_item("~C~opy", "Ctrl+Ins", A::Copy),
+            editor_item("~P~aste", "Shift+Ins", A::Paste),
+            editor_item("Select ~a~ll", "Ctrl+A", A::SelectAll),
+            editor_item("De~l~ete selection", "Ctrl+Del", A::Clear),
+        ],
+    },
+    EditorRoot {
+        id: EditorRootId::Search,
+        label: "~S~earch",
+        enabled: true,
+        entries: &[
+            editor_item("~F~ind...", "F7", A::Find),
+            editor_item("~R~eplace...", "Ctrl+F7", A::Replace),
+            editor_item("~S~earch again", "Shift+F7", A::FindNext),
+            editor_item("Re~v~ersed search", "Alt+F7", A::FindPrevious),
+            editor_item("~G~o to line...", "Alt+G", A::GoTo),
+        ],
+    },
+    EditorRoot {
+        id: EditorRootId::Paragraph,
+        label: "~P~aragraph",
+        enabled: false,
+        entries: &[],
+    },
+    EditorRoot {
+        id: EditorRootId::Block,
+        label: "~B~lock",
+        enabled: true,
+        entries: &[
+            editor_item("Select ~a~ll", "Ctrl+A", A::SelectAll),
+            editor_item("De~l~ete selection", "Ctrl+Del", A::Clear),
+            editor_line(),
+            editor_item("Cu~t~", "Shift+Del", A::Cut),
+            editor_item("~C~opy", "Ctrl+Ins", A::Copy),
+            editor_item("~P~aste", "Shift+Ins", A::Paste),
+        ],
+    },
+    EditorRoot {
+        id: EditorRootId::Misc,
+        label: "~M~isc",
+        enabled: true,
+        entries: &[editor_item("~D~uplicate line", "F6", A::Duplicate)],
+    },
+    EditorRoot {
+        id: EditorRootId::Options,
+        label: "~O~ptions",
+        enabled: true,
+        entries: &[
+            editor_item("Auto~i~ndent", "", A::AutoIndent),
+            editor_item("Syntax ~h~ighlight", "", A::Colors),
+            editor_item("~T~ab width...", "", A::TabWidth),
+            editor_item("~E~xpand typed tabs to spaces", "", A::ExpandTabs),
+            editor_line(),
+            editor_item("~S~ave desktop", "", A::SaveDesktop),
+        ],
+    },
+];
+
+/// Status-bar entries are display order, captions and mouse actions. Shortcut
+/// labels describe existing bindings; moving an entry never rebinds its key.
+pub struct BarItem<A> {
+    pub key: &'static str,
+    pub label: &'static str,
+    pub action: Option<A>,
+    pub width: crate::presentation::layout::Constraint,
+}
+use crate::presentation::layout::Constraint as C;
+pub const EDITOR_BAR: &[BarItem<A>] = &[
+    BarItem {
+        key: "F1",
+        label: "Help",
+        action: Some(A::Help),
+        width: C::Fill(1),
+    },
+    BarItem {
+        key: "F2",
+        label: "Save",
+        action: Some(A::Save),
+        width: C::Fill(1),
+    },
+    BarItem {
+        key: "F3",
+        label: "Open",
+        action: Some(A::Open),
+        width: C::Fill(1),
+    },
+    BarItem {
+        key: "F4",
+        label: "",
+        action: None,
+        width: C::Fill(1),
+    },
+    BarItem {
+        key: "F5",
+        label: "",
+        action: None,
+        width: C::Fill(1),
+    },
+    BarItem {
+        key: "F6",
+        label: "Dupe",
+        action: Some(A::Duplicate),
+        width: C::Fill(1),
+    },
+    BarItem {
+        key: "F7",
+        label: "Find",
+        action: Some(A::Find),
+        width: C::Fill(1),
+    },
+    BarItem {
+        key: "F8",
+        label: "",
+        action: None,
+        width: C::Fill(1),
+    },
+    BarItem {
+        key: "F9",
+        label: "",
+        action: None,
+        width: C::Fill(1),
+    },
+    BarItem {
+        key: "F10",
+        label: "Menu",
+        action: Some(A::Menu),
+        width: C::Fill(1),
+    },
+];
+use crate::viewer::Action as V;
+pub const VIEWER_BAR: &[BarItem<V>] = &[
+    BarItem {
+        key: "F2",
+        label: "Wrap",
+        action: Some(V::Wrap),
+        width: C::Length(12),
+    },
+    BarItem {
+        key: "F7",
+        label: "Find",
+        action: Some(V::Find),
+        width: C::Length(12),
+    },
+    BarItem {
+        key: "S-F7",
+        label: "Next",
+        action: Some(V::Next),
+        width: C::Length(16),
+    },
+    BarItem {
+        key: "C-F7",
+        label: "Reverse",
+        action: Some(V::Reverse),
+        width: C::Min(1),
+    },
+];

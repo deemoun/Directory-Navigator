@@ -248,7 +248,7 @@ commands accept Ctrl+O/Esc/Enter with raw, atomic paste handling.
 
 Local macOS ARM64 validation covers:
 
-- 523 native Rust tests pass; the existing opt-in native Trash check stays ignored.
+- 525 native Rust tests pass; the existing opt-in native Trash check stays ignored.
 - Formatting, all-target Clippy, release build and a no-default-features check.
 - Built-in module extraction preserves all 128 pre/post cell/style captures.
   A test-only registered tool verifies generic menu/input/render routing without

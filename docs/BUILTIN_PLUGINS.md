@@ -79,17 +79,24 @@ accessors used by tests, forward to the registry. They are not a separate plugin
 controller or a stable external API. Other utilities and the editor/viewer remain
 on their existing integrations.
 
-## Editing the manager menu
+## Editing menus and command bars
 
 Edit `src/menu/definition.rs`: `ROOTS` sets the category order, caption and ordered
-entries; `submenu_items` describes all nested menus. `item(caption, shortcut,
+entries; `submenu_items` describes all nested manager menus. `EDITOR_ROOTS`
+defines editor categories, their enabled state, entries and separators.
+`EDITOR_BAR` and `VIEWER_BAR` define the bottom command bars, including captions,
+explicit shortcut labels, actions, gaps and widths. The viewer retains its command
+bar without gaining a dropdown menu. Moving an entry preserves its existing key;
+blank editor function-key slots stay explicit entries. `item(caption, shortcut,
 action)` adds a command or submenu link, and `line()` places a separator. Captions
 use the existing `~mnemonic~` syntax and remain localization keys; add translations
 to the language catalogs when introducing new captions. Shortcut text describes
 existing input bindings; changing a displayed label does not rebind a key.
 
 Named `RootId` values keep F9, sort shortcuts and plugin registration independent
-of category positions. Reordering an existing category or moving a command among
+of category positions. `EditorRootId` similarly keeps F10 opening File regardless
+of the editor category order; Tab/Shift+Tab derive the enabled categories from
+the same definition. Reordering an existing category or moving a command among
 root menus requires no changes to input or rendering code. Command execution stays
 in `menu::execute`; adding new behavior still requires its implementation.
 
@@ -109,7 +116,7 @@ failure recovery and cancellation.
 
 ## Validation
 
-macOS ARM64: 523 native Rust tests pass; the existing opt-in native Trash test is
+macOS ARM64: 525 native Rust tests pass; the existing opt-in native Trash test is
 ignored. Formatting, all-target Clippy, release and no-default-features checks pass.
 All 128 pre/post cell/style captures match across both palettes/languages and two
 terminal sizes. Release PTYs cover module/window switching, inactive gravity,
