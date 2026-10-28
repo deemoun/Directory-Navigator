@@ -1,85 +1,30 @@
-use super::EditorAction as A;
 use crate::app::App;
+use crate::menu::definition::EDITOR_ROOTS;
+pub use crate::menu::definition::{EditorItem as Item, EditorRootId};
 use crossterm::event::KeyCode;
-pub const LABELS: [&str; 7] = [
-    "~F~ile",
-    "~E~dit",
-    "~S~earch",
-    "~P~aragraph",
-    "~B~lock",
-    "~M~isc",
-    "~O~ptions",
-];
-const ROOTS: [usize; 6] = [0, 1, 2, 4, 5, 6];
-pub struct Item {
-    pub label: &'static str,
-    pub shortcut: &'static str,
-    pub action: Option<A>,
-}
-fn item(label: &'static str, shortcut: &'static str, action: A) -> Item {
-    Item {
-        label,
-        shortcut,
-        action: Some(action),
+pub const LABELS: [&str; EDITOR_ROOTS.len()] = {
+    let mut labels = [""; EDITOR_ROOTS.len()];
+    let mut i = 0;
+    while i < labels.len() {
+        labels[i] = EDITOR_ROOTS[i].label;
+        i += 1;
     }
+    labels
+};
+pub fn root_index(id: EditorRootId) -> Option<usize> {
+    EDITOR_ROOTS.iter().position(|root| root.id == id)
 }
-fn line() -> Item {
-    Item {
-        label: "",
-        shortcut: "",
-        action: None,
-    }
-}
-
 pub fn enabled(root: usize) -> bool {
-    ROOTS.contains(&root)
+    EDITOR_ROOTS.get(root).is_some_and(|root| root.enabled)
 }
 pub fn items(root: usize) -> Vec<Item> {
-    match root {
-        0 => vec![
-            item("~O~pen...", "F3", A::Open),
-            item("~S~ave", "F2", A::Save),
-            item("Save ~a~s...", "Shift+F2", A::SaveAs),
-            line(),
-            item("~W~indows...", "Alt+0", A::Windows),
-            item("~C~lose editor", "Ctrl+F4", A::Close),
-            item("E~x~it DN", "Alt+X", A::Quit),
-        ],
-        1 => vec![
-            item("~U~ndo", "Alt+Backspace", A::Undo),
-            item("~R~edo", "Ctrl+Y", A::Redo),
-            line(),
-            item("Cu~t~", "Shift+Del", A::Cut),
-            item("~C~opy", "Ctrl+Ins", A::Copy),
-            item("~P~aste", "Shift+Ins", A::Paste),
-            item("Select ~a~ll", "Ctrl+A", A::SelectAll),
-            item("De~l~ete selection", "Ctrl+Del", A::Clear),
-        ],
-        2 => vec![
-            item("~F~ind...", "F7", A::Find),
-            item("~R~eplace...", "Ctrl+F7", A::Replace),
-            item("~S~earch again", "Shift+F7", A::FindNext),
-            item("Re~v~ersed search", "Alt+F7", A::FindPrevious),
-            item("~G~o to line...", "Alt+G", A::GoTo),
-        ],
-        4 => vec![
-            item("Select ~a~ll", "Ctrl+A", A::SelectAll),
-            item("De~l~ete selection", "Ctrl+Del", A::Clear),
-            line(),
-            item("Cu~t~", "Shift+Del", A::Cut),
-            item("~C~opy", "Ctrl+Ins", A::Copy),
-            item("~P~aste", "Shift+Ins", A::Paste),
-        ],
-        5 => vec![item("~D~uplicate line", "F6", A::Duplicate)],
-        6 => vec![
-            item("Auto~i~ndent", "", A::AutoIndent),
-            item("Syntax ~h~ighlight", "", A::Colors),
-            item("~T~ab width...", "", A::TabWidth),
-            item("~E~xpand typed tabs to spaces", "", A::ExpandTabs),
-            line(),
-            item("~S~ave desktop", "", A::SaveDesktop),
-        ],
-        _ => Vec::new(),
+    EDITOR_ROOTS
+        .get(root)
+        .map_or_else(Vec::new, |root| root.entries.to_vec())
+}
+pub fn open_root(app: &mut App, id: EditorRootId) {
+    if let Some(index) = root_index(id) {
+        open(app, index);
     }
 }
 pub fn open(app: &mut App, root: usize) {
@@ -87,7 +32,11 @@ pub fn open(app: &mut App, root: usize) {
         return;
     }
     if let Some(editor) = app.desktop.active_editor_mut() {
-        editor.modals.set_editor_menu(Some((root, 0)));
+        let first = items(root)
+            .iter()
+            .position(|item| item.action.is_some())
+            .unwrap_or(0);
+        editor.modals.set_editor_menu(Some((root, first)));
     }
 }
 pub fn activate(app: &mut App, row: usize) {
@@ -120,11 +69,17 @@ pub fn key(app: &mut App, code: KeyCode) {
             }
         }
         KeyCode::Left | KeyCode::Right | KeyCode::Tab | KeyCode::BackTab => {
-            let i = ROOTS.iter().position(|r| *r == root).unwrap_or(0);
+            let roots: Vec<_> = EDITOR_ROOTS
+                .iter()
+                .enumerate()
+                .filter(|(_, r)| r.enabled)
+                .map(|(i, _)| i)
+                .collect();
+            let i = roots.iter().position(|r| *r == root).unwrap_or(0);
             let reverse = matches!(code, KeyCode::Left | KeyCode::BackTab);
             open(
                 app,
-                ROOTS[crate::control_focus::cycle(i, ROOTS.len(), reverse)],
+                roots[crate::control_focus::cycle(i, roots.len(), reverse)],
             );
         }
         KeyCode::Enter => activate(app, row),

@@ -17,7 +17,6 @@ pub(crate) struct ViewportState {
     picker: Option<u64>,
     help: Option<u64>,
     welcome: Option<u64>,
-    game: Option<std::mem::Discriminant<crate::tetris::Screen>>,
     windows: Option<(Vec<crate::desktop::WindowId>, usize)>,
     characters: Option<(crate::utilities::characters::Page, bool)>,
     menu: Option<(usize, usize)>,
@@ -26,19 +25,24 @@ pub(crate) struct ViewportState {
     submenus: Vec<(crate::menu::MenuId, usize)>,
     modal_offsets: Vec<usize>,
     controls: Vec<(bool, Rect, crate::mouse::Target)>,
-    calculator_history: bool,
 }
 fn viewport_state(app: &App) -> ViewportState {
     let area = crate::turbo::dialog_spec::input_area(app);
     let focus = crate::focus::current(app);
     let spec = if focus == crate::focus::Focus::Prompt {
         crate::ui::copy_spec(app, area)
+    } else if focus == crate::focus::Focus::Settings
+        && app
+            .modals
+            .settings()
+            .is_some_and(|s| s.kind == crate::settings::SettingsKind::Plugins)
+    {
+        crate::ui::settings_spec(app, area)
     } else {
         crate::ui::remaining_spec(app, area, focus)
     };
     ViewportState {
         controls: spec.map_or_else(Vec::new, |s| s.interaction_state()),
-        calculator_history: app.utilities.calculator.history_open,
         panels: std::array::from_fn(|i| {
             let p = &app.panels[i];
             (
@@ -78,10 +82,6 @@ fn viewport_state(app: &App) -> ViewportState {
                 v.contents.is_some(),
             )
         }),
-        game: app
-            .desktop
-            .game()
-            .map(|g| std::mem::discriminant(&g.screen)),
         windows: app.modals.window_list().map(|l| (l.ids.clone(), l.offset)),
         characters: (app.utilities.modals.utility_dialog()
             == Some(crate::utilities::Kind::Characters))
@@ -139,6 +139,12 @@ pub fn prepare_window(
     now: std::time::Instant,
 ) -> LayoutSnapshot {
     app.sync_modals();
+    if app.utilities.size != (bounds.width, bounds.height) {
+        app.mouse.scrollbar_drag = None;
+    }
+    app.utilities.size = (bounds.width, bounds.height);
+    crate::plugins::host::update_activity(app, now);
+    app.sync_modals();
     let clip = bounds.intersection(screen);
     let owner = app.desktop.active().id;
     let key = (owner, bounds, screen);
@@ -168,10 +174,6 @@ pub fn prepare_window(
     app.desktop
         .native()
         .sync_panes(app.active, (bounds.width, bounds.height));
-    if app.utilities.size != (area.width, area.height) {
-        app.mouse.scrollbar_drag = None;
-    }
-    app.utilities.size = (area.width, area.height);
     let r = Layout::vertical([
         Constraint::Length(u16::from(!app.config.hide_menu)),
         Constraint::Min(1),
@@ -190,9 +192,6 @@ pub fn prepare_window(
     });
     if let Some(q) = &mut app.quick_view {
         q.layout(panel_areas[q.source ^ 1]);
-    }
-    if let Some(game) = app.desktop.game_mut() {
-        game.set_obscured(area.width < 80 || area.height < 25, now);
     }
     if app.screensaver.active {
         app.screensaver.resize(area.width, area.height);

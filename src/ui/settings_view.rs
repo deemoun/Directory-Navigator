@@ -29,6 +29,9 @@ pub(crate) fn settings_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
     if settings.kind == SettingsKind::Regional {
         return regional_spec(app, area);
     }
+    if settings.kind == SettingsKind::Plugins {
+        return plugins_spec(app, area);
+    }
     let width = if settings.kind == SettingsKind::FileManager {
         74
     } else {
@@ -41,6 +44,7 @@ pub(crate) fn settings_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
         SettingsKind::Interface => 13,
         SettingsKind::FileManager => 14,
         SettingsKind::Highlight => 18,
+        SettingsKind::Plugins => unreachable!("registry dialog handled above"),
     };
     let rect = centered(area, width, height);
     let mut spec = DialogSpec::new(
@@ -148,6 +152,81 @@ pub(crate) fn settings_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
             button,
             ControlKind::Button(app.config.language.text(label).into()),
             *target,
+        ));
+    }
+    Some(spec)
+}
+
+fn plugins_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
+    let settings = app.modals.settings()?;
+    let language = app.config.language;
+    let palette = app.config.palette;
+    let count = settings.plugins.len();
+    let rect = centered(
+        area,
+        64,
+        ((count + 10).min(usize::from(area.height.saturating_sub(2)))) as u16,
+    );
+    let rows = usize::from(rect.height.saturating_sub(9)).max(1);
+    let offset = settings
+        .cursor
+        .min(count.saturating_sub(1))
+        .saturating_sub(rows - 1);
+    let mut spec = DialogSpec::new(
+        rect,
+        scope(app, crate::focus::Focus::Settings)?,
+        settings.cursor,
+        language.text(settings.title()),
+        Target::AcceptSettings,
+        Target::CancelSettings,
+    );
+    spec.caption(
+        Paragraph::new(language.text("Enabled plugins")).style(palette.dos(0x71)),
+        Rect::new(rect.x + 3, rect.y + 2, rect.width - 6, 1),
+    );
+    for (index, (id, title)) in settings.plugins.iter().enumerate() {
+        let visible = (offset..offset + rows).contains(&index);
+        let row = Rect::new(
+            rect.x + 3,
+            rect.y + 4 + if visible { (index - offset) as u16 } else { 0 },
+            rect.width - 7,
+            1,
+        );
+        let mut c = Control::new(
+            index,
+            row,
+            ControlKind::Checkbox {
+                caption: format!("{} ({})", language.text(title), id.0),
+                checked: settings.draft.plugin_enabled(*id),
+            },
+            Target::Setting(index),
+        );
+        if !visible {
+            c.paint = false;
+            c.hits.clear();
+        }
+        spec.control(c);
+    }
+    if count > rows {
+        spec.native(
+            crate::turbo::widgets::scrollbar(settings.cursor.min(count - 1), count - 1, rows),
+            Rect::new(rect.right() - 3, rect.y + 4, 1, rows as u16),
+        );
+    }
+    spec.caption(
+        Paragraph::new(language.text("Disabling closes open plugin windows."))
+            .style(palette.dos(0x78)),
+        Rect::new(rect.x + 3, rect.bottom() - 5, rect.width - 6, 1),
+    );
+    for (index, label, target) in [
+        (0, " [ OK ] ", Target::AcceptSettings),
+        (1, " [ Cancel ] ", Target::CancelSettings),
+    ] {
+        spec.control(Control::new(
+            count + index,
+            Rect::new(rect.x + 17 + index as u16 * 18, rect.bottom() - 3, 14, 1),
+            ControlKind::Button(language.text(label).into()),
+            target,
         ));
     }
     Some(spec)

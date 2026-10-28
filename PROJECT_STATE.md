@@ -5,7 +5,8 @@
   owned presentation geometry/styles/text and native headless test captures;
   macOS native Trash via `trash`, Windows native shell APIs; minimal ZIP/TAR/gzip
   codec features via zip/tar/flate2; TOML parser for grouped preferences.
-- Session Desktop owns editor/viewer/game content and stable WindowId values;
+- Session Desktop owns editor/viewer content, plugin window references, the built-in
+  tool registry and stable WindowId values;
   default Turbo Vision build reads selection from the native Desktop/Window
   registry. Multiple full-screen editors/viewers use ID-targeted access; the
   permanent manager remains the base. Owned modal IDs gate native dispatch.
@@ -19,6 +20,50 @@
   state owns session dialogs/options/results; quick view owns debounced reads.
 
 ## Implemented
+
+- Editor menus and editor/viewer command bars share `src/menu/definition.rs` with
+  the manager: editor category order/enabled state, captions, actions, separators,
+  explicit status keys and widths are declared there. Editor File opens by named
+  identity; traversal derives enabled categories from the definition. Paragraph,
+  blank function-key slots, viewer text/Hex guards and existing bindings remain.
+  Reversing editor categories and both bars passes the identity/mouse/keyboard
+  regressions; the shipped order remains unchanged.
+
+- Main menu hierarchy is declared in `src/menu/definition.rs`: root order/labels,
+  entries, separators, submenus and built-in plugin placement/shortcut captions.
+  Native painting and navigation consume the same definition; `RootId` preserves
+  F9, sort shortcuts and registered plugin categories when roots move. Built-in
+  plugin metadata derives from the hierarchy. Reversing root order passes the
+  category-identity shortcut regressions; the shipped order remains unchanged.
+
+- Options → Configuration → Plugins lists registered modules using native shared
+  checkboxes and OK/Cancel draft semantics. Disabled tools stay in the settings
+  list but disappear from launch menus; shortcuts cannot launch them. Enabling
+  restores their menu entries. Applying a disable retires live tool
+  windows and owned modals while retaining calculator history and pending Tetris
+  scores. Existing TOML v2 stores optional `plugins.disabled` IDs using normal
+  desktop/save-on-exit behavior; old configurations enable all tools and unknown
+  IDs survive saving. Registry extension, long-list scrolling/stale clicks,
+  configuration safeguards, localization and lifecycle tests are included.
+  macOS ARM64: 525 tests pass (one opt-in native Trash test ignored); formatting,
+  all-target Clippy, release and no-default-features checks pass. Release PTY
+  verifies cancellation, disable/re-enable, blocked shortcuts, live game closure,
+  explicit saving, resize and terminal restoration. Windows/Linux skipped.
+
+- Built-in Plugin API: Calculator and Tetris implement one internal `ToolPlugin`
+  interface with registry metadata, owner-bound events, native controls/views,
+  injected activity/time and Close/Copy/Help effects. Controllers have no `App`
+  access. Calculator state and Tetris game/score state belong to their modules;
+  Desktop content holds a plugin ID. Tetris participates in window switching and
+  pauses while inactive, blocked or too small. Existing score format/import/write
+  safeguards and calculator session history remain. No external loader, SDK,
+  dependency or config change; other utilities/editor/viewer are unchanged.
+  macOS ARM64: 515 tests pass (one opt-in native Trash test ignored), formatting,
+  all-target Clippy, release and no-default-features checks pass. All 128 pre/post
+  cell/style captures match. Release PTYs cover independent module state, Tetris
+  window switching/inactive gravity, native controls, owned Help/paste isolation,
+  score-name cancellation, resize and terminal restoration. Windows/Linux skipped.
+  See docs/BUILTIN_PLUGINS.md for the contract and registration procedure.
 
 - Remaining shared controls: advanced Copy/Move, destination history, archive and
   discovery tools, compare/export/file histories, navigation, window/command lists,

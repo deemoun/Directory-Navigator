@@ -1,19 +1,10 @@
 //! Structure and mnemonics follow original-dn/RESOURCE/ENGLISH/DN.DNR, dlgMainMenu.
 use crate::{app::App, panel::SortMode, settings::SettingsKind, viewer::ViewMode};
+pub mod definition;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+pub use definition::{MenuId, RootId};
 mod navigation;
-pub use navigation::{activate, close, key, open, open_mnemonic};
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum MenuId {
-    Associations,
-    CopyNames,
-    View,
-    Sort,
-    Layout,
-    Configuration,
-    FileManager,
-}
+pub use navigation::{activate, close, key, open, open_mnemonic, open_root, open_submenu};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Action {
@@ -64,12 +55,13 @@ pub enum Action {
     LoadSettings,
     About,
     Welcome,
-    Game,
+    Plugin(crate::plugins::PluginId),
     Settings(SettingsKind),
     Confirmations,
     View(ViewMode),
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Item {
     pub label: &'static str,
     pub shortcut: &'static str,
@@ -80,25 +72,46 @@ impl Item {
         !matches!(self.action, Action::Disabled | Action::Separator)
     }
 }
-fn item(label: &'static str, shortcut: &'static str, action: Action) -> Item {
+const fn item(label: &'static str, shortcut: &'static str, action: Action) -> Item {
     Item {
         label,
         shortcut,
         action,
     }
 }
-fn line() -> Item {
+const fn line() -> Item {
     item("", "", Action::Separator)
 }
 
-pub const LABELS: [&str; 6] = [
-    "≡",
-    "~F~ile",
-    "~U~tilities",
-    "~P~anel",
-    "~M~anager",
-    "~O~ptions",
-];
+/// Compatibility view derived from the hierarchy; never edit labels separately.
+pub const LABELS: [&str; definition::ROOTS.len()] = {
+    let mut labels = [""; definition::ROOTS.len()];
+    let mut i = 0;
+    while i < labels.len() {
+        labels[i] = definition::ROOTS[i].label;
+        i += 1;
+    }
+    labels
+};
+pub fn root_index(id: RootId) -> Option<usize> {
+    definition::ROOTS.iter().position(|r| r.id == id)
+}
+pub fn items(index: usize) -> Vec<Item> {
+    definition::ROOTS
+        .get(index)
+        .map_or_else(Vec::new, |r| r.entries.to_vec())
+}
+pub fn submenu_items(id: MenuId) -> Vec<Item> {
+    definition::submenu_items(id)
+}
+pub(crate) fn plugin_placement(id: crate::plugins::PluginId) -> Option<(RootId, Item)> {
+    definition::ROOTS.iter().find_map(|root| {
+        root.entries
+            .iter()
+            .find(|i| i.action == Action::Plugin(id))
+            .map(|i| (root.id, *i))
+    })
+}
 
 /// Hide preferences affect the manager; the game never advertises its menus.
 pub(crate) fn bar_visible(app: &App) -> bool {
@@ -118,194 +131,27 @@ pub fn mnemonic(label: &str) -> Option<char> {
         .and_then(|c| c.to_lowercase().next())
 }
 
-pub fn items(menu: usize) -> Vec<Item> {
-    use Action::*;
-    match menu {
-        0 => vec![
-            item("~W~elcome...", "", Welcome),
-            item("~A~bout...", "", About),
-            item("~R~efresh", "", Refresh),
-            line(),
-            item("~S~creensaver", "", ScreenRest),
-            item("~G~ame", "Alt+F9", Game),
-        ],
-        1 => vec![
-            item("~V~iew", "", Submenu(MenuId::View)),
-            item("~E~dit", "F4", Key(4)),
-            item("~B~rowse archive...", "Enter", BrowseArchive),
-            item("~O~pen with default app", "Ctrl+Enter", OpenExternal),
-            item("~F~ind...", "Ctrl+F7", Find),
-            item("~C~opy...", "F5", Key(5)),
-            item("Copy ~n~ames / paths", "", Submenu(MenuId::CopyNames)),
-            item("~R~ename/Move...", "F6", Key(6)),
-            item("~M~ake directory", "F7", Key(7)),
-            item("~D~elete", "F8", Key(8)),
-            item("File ~A~ttributes / Info...", "Alt+E", FileInfo),
-            line(),
-            item("E~x~it", "Alt+X / F10", Key(10)),
-        ],
-        2 => vec![
-            item("~U~ser menu", "F2", UserMenu),
-            item(
-                "~M~emory Information",
-                "Alt+Y",
-                Utility(crate::utilities::Kind::Memory),
-            ),
-            item(
-                "S~y~stem Information",
-                "",
-                Utility(crate::utilities::Kind::System),
-            ),
-            line(),
-            item(
-                "~C~alculator",
-                "Ctrl+K",
-                Utility(crate::utilities::Kind::Calculator),
-            ),
-            item(
-                "ASCII Ta~b~le",
-                "Ctrl+B",
-                Utility(crate::utilities::Kind::Characters),
-            ),
-            line(),
-            item("Commands ~H~istory", "Alt+F8", CommandHistory),
-            item(
-                "File ~E~dit History",
-                "Alt+PgUp",
-                History(crate::file_tools::history::HistoryKind::Edit),
-            ),
-            item(
-                "File ~V~iew History",
-                "Alt+PgDn",
-                History(crate::file_tools::history::HistoryKind::View),
-            ),
-        ],
-        3 => vec![
-            item("~Q~uick directories...", "", Bookmarks),
-            item("~F~ilename filter...", "Alt+Del", FilenameFilter),
-            item("~M~ake list file...", "Alt+L", ExportList),
-            item("~C~ompare directories...", "Ctrl+C", CompareDirectories),
-            line(),
-            item("Setup c~o~lumns...", "Alt+K", Columns),
-            item(
-                "~S~etup Panel...",
-                "Alt+S",
-                Settings(SettingsKind::FileManager),
-            ),
-            item("Sort ~b~y...", "Alt+B", Submenu(MenuId::Sort)),
-            line(),
-            item("Select grou~p~...", "+", SelectGroup),
-            item("~U~nselect group...", "-", UnselectGroup),
-            item("In~v~ert selection", "*", InvertSelection),
-            item("Select all", "Ctrl+A", SelectAll),
-            item("Clear all marks", "Ctrl+U", ClearSelection),
-            line(),
-            item("Change direc~t~ory...", "Alt+T", GoTo),
-            item("~R~e-read", "Alt+R", Refresh),
-            item("Parent directory", "Backspace", Parent),
-            item(
-                "History of ~d~irectories...",
-                "Alt+Backspace",
-                History(crate::file_tools::history::HistoryKind::Directory),
-            ),
-            item("~L~ayout", "", Submenu(MenuId::Layout)),
-            item("Quick s~e~arch...", "Alt+F7", QuickSearch),
-            item("Calculate directory si~z~es...", "", DirectorySizes),
-        ],
-        4 => vec![
-            item("~D~irectory tree", "Ctrl+T", DirectoryTree),
-            item("~Q~uick view", "Ctrl+Q", QuickView),
-            item("Terminal ~o~utput", "Ctrl+O", TerminalOutput),
-            line(),
-            item("~S~wap panels", "", SwapPanels),
-            item("~W~indows...", "Alt+0", WindowList),
-        ],
-        5 => vec![
-            item("~C~onfiguration", "", Submenu(MenuId::Configuration)),
-            item("~F~ile Manager", "", Submenu(MenuId::FileManager)),
-            line(),
-            item("~G~lobal menu definition...", "", EditUserMenu(false)),
-            item("Local ~m~enu definition...", "", EditUserMenu(true)),
-            item("File ~a~ssociations", "", Submenu(MenuId::Associations)),
-            line(),
-            item("~S~ave desktop", "", SaveSettings),
-            item("~L~oad desktop", "", LoadSettings),
-            item("~I~mport DOS settings...", "", ImportDosSettings),
-            line(),
-            item("C~o~lors...", "", Colors),
-        ],
-        _ => Vec::new(),
-    }
-}
-
-pub fn submenu_items(menu: MenuId) -> Vec<Item> {
-    use Action::*;
-    match menu {
-        MenuId::Associations => vec![
-            item("~E~dit associations...", "", EditAssociations),
-            item("~R~eload associations", "", ReloadAssociations),
-        ],
-        MenuId::CopyNames => vec![
-            item("~N~ames", "", CopyNames(false)),
-            item("~F~ull paths", "", CopyNames(true)),
-        ],
-        MenuId::View => vec![
-            item("~A~s is", "F3", View(ViewMode::Auto)),
-            item("As ~T~ext", "", View(ViewMode::Text)),
-            item("As He~x~", "", View(ViewMode::Hex)),
-        ],
-        MenuId::Sort => vec![
-            item("~N~ame", "Ctrl+F3", Sort(SortMode::Name)),
-            item("~E~xtension", "Ctrl+F4", Sort(SortMode::Extension)),
-            item("~S~ize", "Ctrl+F6", Sort(SortMode::Size)),
-            item("~D~ate", "Ctrl+F5", Sort(SortMode::Date)),
-        ],
-        MenuId::Layout => vec![
-            item(
-                "~B~rief",
-                "",
-                Layout(crate::panel_layout::PanelLayout::Brief),
-            ),
-            item(
-                "~D~etails",
-                "",
-                Layout(crate::panel_layout::PanelLayout::Details),
-            ),
-        ],
-        MenuId::Configuration => vec![
-            item(
-                "~K~eyboard shortcuts...",
-                "",
-                Settings(SettingsKind::Keyboard),
-            ),
-            item("S~y~stem Setup...", "", Settings(SettingsKind::System)),
-            item("~I~nterface...", "", Settings(SettingsKind::Interface)),
-            item(
-                "~L~anguage / date & time...",
-                "",
-                Settings(SettingsKind::Regional),
-            ),
-            item("~C~onfirmation policy...", "", Confirmations),
-            line(),
-            item("Screen sa~v~ers...", "", ScreensaverSetup),
-        ],
-        MenuId::FileManager => vec![
-            item("~S~etup...", "", Settings(SettingsKind::FileManager)),
-            item("~C~olumn defaults...", "", Columns),
-            item(
-                "~H~ighlight groups...",
-                "",
-                Settings(SettingsKind::Highlight),
-            ),
-        ],
-    }
-}
-
 pub fn level_items(app: &App, depth: usize) -> Vec<Item> {
     if depth == 0 {
         app.modals
             .menu()
-            .map(|(root, _)| items(root))
+            .map(|(root, _)| {
+                let mut entries = items(root);
+                for d in app.desktop.plugins.definitions().filter(|d| {
+                    definition::ROOTS
+                        .get(root)
+                        .is_some_and(|r| Some(r.id) == d.menu)
+                }) {
+                    if !entries.iter().any(|e| e.action == Action::Plugin(d.id)) {
+                        entries.push(item(d.menu_label, d.shortcut, Action::Plugin(d.id)));
+                    }
+                }
+                entries.retain(|entry| match entry.action {
+                    Action::Plugin(id) => app.config.plugin_enabled(id),
+                    _ => true,
+                });
+                entries
+            })
             .unwrap_or_default()
     } else {
         app.modals
@@ -381,7 +227,7 @@ pub fn execute(app: &mut App, action: Action) {
             title: " Confirmation policy — read-only ",
             message: "[x] Confirm copy/move destinations\n[x] Confirm Trash / permanent deletion\n[x] Refuse existing destinations\n\nThese safeguards are always enabled.\nDeletion mode: Options → File Manager → Setup.\nEsc cancels an operation; completed items remain.\n\nEnter / Esc: close".into(),
         }),
-        Action::Game => crate::tetris::open(app),
+        Action::Plugin(id)=>crate::plugins::host::open(app,id),
         Action::About => app.push_dialog(crate::dialog::Dialog {
             title: " About Directory Navigator ",
             message: format!("{}\n{} {}\n{}\n\n{}: Dmitry Yarygin\n\n{}\n{}", crate::APPLICATION_NAME, app.config.language.text("Version"), crate::DISPLAY_VERSION, app.config.language.text("Native Rust terminal file manager"), app.config.language.text("Author"), app.config.language.text("F1: keyboard help"), app.config.language.text("Enter / Esc: close")),

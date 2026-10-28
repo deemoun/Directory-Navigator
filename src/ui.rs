@@ -2,7 +2,6 @@ use crate::painting::{Block, Frame, Paragraph, Wrap};
 use crate::presentation::layout::{Constraint, Layout};
 use crate::{app::App, mouse::Target};
 mod archive_view;
-mod calculator_view;
 mod clock;
 mod colors_view;
 mod command_history_view;
@@ -200,9 +199,11 @@ fn draw_content(frame: &mut impl Frame, app: &App, prepared: &crate::layout::Lay
             Target::RevealMenu,
         ));
     }
-    if screen == crate::desktop::WindowKind::Game {
+    if let crate::desktop::WindowKind::Plugin(id) = screen {
         frame.regions().clear();
-        frame.compose(crate::turbo::tetris::prepare(app, area.width, area.height));
+        if let Some(b) = app.desktop.plugins.binding(id) {
+            crate::plugins::host::draw(frame, app, area, b);
+        }
         draw_layers(frame, app, prepared, &menu_positions);
         return;
     }
@@ -246,6 +247,13 @@ fn draw_layers(
             Focus::Archive => archive_view::draw(frame, app, area),
             Focus::Navigation => navigation_view::draw(frame, app, area),
             Focus::Utility => utilities_view::draw(frame, app, area),
+            Focus::Plugin => {
+                if let Some(id) = app.modals.plugin_dialog() {
+                    if let Some(b) = app.desktop.plugins.binding(id) {
+                        crate::plugins::host::draw(frame, app, area, b);
+                    }
+                }
+            }
             Focus::Colors => colors_view::draw(frame, app, area),
             Focus::SaverSetup => screensaver_view::draw_setup(frame, app, area),
             Focus::CommandHistory => command_history_view::draw(frame, app, area),
@@ -263,7 +271,7 @@ pub(crate) fn remaining_spec(
 ) -> Option<crate::turbo::dialog_spec::DialogSpec<'_>> {
     use crate::focus::Focus;
     match focus {
-        Focus::Game => crate::turbo::tetris::spec(app, area),
+        Focus::Plugin => crate::plugins::host::controls(app, area),
         Focus::Message if app.modals.native_help(app.desktop.active().id).is_none() => {
             let d = app.last_dialog()?;
             let m = crate::layout::message_layout(
@@ -281,13 +289,6 @@ pub(crate) fn remaining_spec(
         }
         Focus::Tree => directory_tree_view::tree_spec(app, area),
         Focus::UserMenu => user_menu_view::user_menu_spec(app, area),
-        Focus::Utility
-            if app.utilities.modals.utility_dialog()
-                == Some(crate::utilities::Kind::Calculator)
-                && app.utilities.calculator.history_open =>
-        {
-            calculator_view::history_spec(app, area)
-        }
         Focus::Utility => utilities_view::utility_spec(app, area),
         Focus::WindowList => windows_view::windows_spec(app, area),
         Focus::CommandHistory => command_history_view::command_history_spec(app, area),

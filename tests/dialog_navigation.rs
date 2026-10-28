@@ -106,8 +106,12 @@ fn tetris_name_cycles_both_directions_and_cancel_keeps_unsaved_score_and_draft()
     assert_eq!(app.desktop.game().unwrap().name, "Kept draft");
     key(&mut app, K::Tab);
     let b = draw(&mut app, 80, 25)?;
-    assert!(marked(&app, &b, Target::Game(GameAction::SkipName)));
-    assert!(!marked(&app, &b, Target::Game(GameAction::SubmitName)));
+    assert!(marked(&app, &b, dn::tetris::target(GameAction::SkipName)));
+    assert!(!marked(
+        &app,
+        &b,
+        dn::tetris::target(GameAction::SubmitName)
+    ));
     shift_tab(&mut app);
     assert_eq!(app.desktop.game().unwrap().page_focus, 1);
     key(&mut app, K::BackTab);
@@ -115,19 +119,22 @@ fn tetris_name_cycles_both_directions_and_cancel_keeps_unsaved_score_and_draft()
     key(&mut app, K::Esc);
     assert_eq!(app.desktop.game().unwrap().screen, Screen::GameOver);
     assert_eq!(app.desktop.game().unwrap().name, "Kept draft");
-    assert!(app.game_scores.board.records.is_empty());
+    assert!(app.desktop.plugins.scores_mut().board.records.is_empty());
     assert!(!t.0.join("tetris.conf").exists());
     key(&mut app, K::Esc);
     assert_eq!(app.desktop.game().unwrap().screen, Screen::Play);
     assert!(app.desktop.game().unwrap().over);
-    assert!(app.game_scores.board.records.is_empty());
+    assert!(app.desktop.plugins.scores_mut().board.records.is_empty());
     ended(&mut app);
     key(&mut app, K::Enter);
     shift_tab(&mut app);
     assert_eq!(app.desktop.game().unwrap().page_focus, 2);
     key(&mut app, K::Enter);
     assert_eq!(app.desktop.game().unwrap().screen, Screen::Scores);
-    assert_eq!(app.game_scores.board.records[0].name, "Anonymous");
+    assert_eq!(
+        app.desktop.plugins.scores_mut().board.records[0].name,
+        "Anonymous"
+    );
     assert!(t.0.join("tetris.conf").exists());
     Ok(())
 }
@@ -139,7 +146,7 @@ fn tetris_main_buttons_setup_and_retry_have_real_focus_and_pause_gravity() -> io
     shift_tab(&mut app);
     assert_eq!(app.desktop.game().unwrap().play_focus, 4);
     let b = draw(&mut app, 80, 25)?;
-    assert!(marked(&app, &b, Target::Game(GameAction::Pause)));
+    assert!(marked(&app, &b, dn::tetris::target(GameAction::Pause)));
     let y = app.desktop.game().unwrap().piece.y;
     assert!(!app
         .desktop
@@ -159,11 +166,13 @@ fn tetris_main_buttons_setup_and_retry_have_real_focus_and_pause_gravity() -> io
     shift_tab(&mut app);
     assert_eq!(app.desktop.game().unwrap().setup_focus, 3);
     let b = draw(&mut app, 80, 25)?;
-    assert!(marked(&app, &b, Target::Game(GameAction::Back)));
+    assert!(marked(&app, &b, dn::tetris::target(GameAction::Back)));
     key(&mut app, K::Enter);
     assert_eq!(app.desktop.game().unwrap().screen, Screen::Play);
     assert_eq!(app.desktop.game().unwrap().board, board);
-    app.game_scores
+    app.desktop
+        .plugins
+        .scores_mut()
         .add(tetris::Record {
             name: "Pending".into(),
             score: 1,
@@ -176,9 +185,9 @@ fn tetris_main_buttons_setup_and_retry_have_real_focus_and_pause_gravity() -> io
     key(&mut app, K::Tab);
     assert_eq!(app.desktop.game().unwrap().page_focus, 1);
     let b = draw(&mut app, 80, 25)?;
-    assert!(marked(&app, &b, Target::Game(GameAction::RetrySave)));
+    assert!(marked(&app, &b, dn::tetris::target(GameAction::RetrySave)));
     key(&mut app, K::Enter);
-    assert!(!app.game_scores.has_pending());
+    assert!(!app.desktop.plugins.scores_mut().has_pending());
     key(&mut app, K::Tab);
     assert_eq!(app.desktop.game().unwrap().page_focus, 0);
     key(&mut app, K::Esc);
@@ -352,11 +361,11 @@ fn settings_calculator_characters_and_screensaver_share_reverse_tab_and_enter_de
     utilities::open(&mut app, Kind::Calculator);
     input::paste(&mut app, "2+3");
     key(&mut app, K::Tab);
-    assert_eq!(app.utilities.calculator.focus, 1);
+    assert_eq!(app.desktop.plugins.calculator_mut().focus, 1);
     key(&mut app, K::Enter);
-    assert!(app.utilities.calculator.result.is_some());
+    assert!(app.desktop.plugins.calculator_mut().result.is_some());
     shift_tab(&mut app);
-    assert_eq!(app.utilities.calculator.focus, 0);
+    assert_eq!(app.desktop.plugins.calculator_mut().focus, 0);
     key(&mut app, K::Esc);
     utilities::open(&mut app, Kind::Characters);
     app.utilities.chart.select(0);

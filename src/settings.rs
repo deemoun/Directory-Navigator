@@ -9,6 +9,7 @@ pub enum SettingsKind {
     Interface,
     FileManager,
     Highlight,
+    Plugins,
 }
 #[derive(Clone, Copy)]
 pub enum Setting {
@@ -44,6 +45,7 @@ pub struct Settings {
     pub kind: SettingsKind,
     pub draft: Config,
     pub cursor: usize,
+    pub(crate) plugins: Vec<(crate::plugins::PluginId, &'static str)>,
     pub(crate) preview_time: chrono::DateTime<chrono::Local>,
 }
 impl Settings {
@@ -52,6 +54,7 @@ impl Settings {
             kind,
             draft: config.clone(),
             cursor: 0,
+            plugins: Vec::new(),
             preview_time: chrono::Local::now(),
         }
     }
@@ -63,11 +66,12 @@ impl Settings {
             SettingsKind::Interface => " Interface Setup ",
             SettingsKind::FileManager => " File Manager Setup ",
             SettingsKind::Highlight => " Highlight Groups ",
+            SettingsKind::Plugins => " Plugins ",
         }
     }
     pub fn rows(&self) -> &'static [Setting] {
         match self.kind {
-            SettingsKind::Keyboard => &[],
+            SettingsKind::Plugins | SettingsKind::Keyboard => &[],
             SettingsKind::Regional => &[],
             SettingsKind::System => &[Setting::Hidden, Setting::SaveOnExit],
             SettingsKind::Interface => &[
@@ -88,7 +92,9 @@ impl Settings {
         }
     }
     pub fn control_count(&self) -> usize {
-        if self.kind == SettingsKind::Keyboard {
+        if self.kind == SettingsKind::Plugins {
+            self.plugins.len()
+        } else if self.kind == SettingsKind::Keyboard {
             1
         } else if self.kind == SettingsKind::Regional {
             5
@@ -156,6 +162,15 @@ impl Settings {
         }
     }
     pub fn toggle(&mut self, index: usize) {
+        if self.kind == SettingsKind::Plugins {
+            if let Some((id, _)) = self.plugins.get(index) {
+                self.cursor = index;
+                self.draft
+                    .set_plugin_enabled(*id, !self.draft.plugin_enabled(*id));
+            }
+            return;
+        }
+
         let Some(setting) = self.rows().get(index) else {
             return;
         };

@@ -48,7 +48,7 @@ pub(crate) fn utility_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
     let dos = profile.styles();
     let kind = app.utilities.modals.utility_dialog()?;
     if kind == Kind::Calculator {
-        return super::calculator_view::calculator_spec(app, area);
+        return None;
     }
     let height = match kind {
         Kind::Characters => 24,

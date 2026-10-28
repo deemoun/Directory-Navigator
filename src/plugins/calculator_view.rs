@@ -1,32 +1,28 @@
-use crate::turbo::dialog_spec::{centered, scope, Control, ControlKind, DialogSpec};
+use super::{Action, CalculatorPlugin};
+use crate::plugins::Context;
+use crate::turbo::dialog_spec::{centered, Control, ControlKind, DialogSpec};
 // Calculator controls share the guarded utility definition.
 use crate::painting::{Paragraph, Wrap};
 use crate::presentation::{
     layout::{Alignment, Rect},
     text::Line,
 };
-use crate::{
-    app::App,
-    filesystem::display_name,
-    formatting,
-    mouse::Target,
-    utilities::{calculator::Value, Action},
-};
+use crate::{filesystem::display_name, formatting, utilities::calculator::Value};
 
-pub(crate) fn calculator_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
-    let profile = app.config.palette;
+pub(super) fn calculator_spec<'a>(plugin: &'a CalculatorPlugin, ctx: &Context) -> DialogSpec<'a> {
+    let area = ctx.area;
+    let profile = ctx.palette;
     let dos = profile.styles();
-    let language = app.config.language;
+    let language = ctx.language;
     let rect = centered(area, 72, 18);
-    let calc = &app.utilities.calculator;
+    let calc = &plugin.state;
     let focus = calc.focus;
-    let mut spec = DialogSpec::new(
+    let mut spec = ctx.dialog(
         rect,
-        scope(app, crate::focus::Focus::Utility)?,
         focus,
         language.text("Calculator"),
-        Target::Utility(Action::Evaluate),
-        Target::Utility(Action::Close),
+        Action::Evaluate.id(),
+        Action::Close.id(),
     );
     let expression = Rect::new(rect.x + 2, rect.y + 2, rect.width - 4, 3);
     spec.native(
@@ -43,12 +39,12 @@ pub(crate) fn calculator_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
             value: display_name(&calc.expression),
             scroll,
         },
-        Target::Utility(Action::Field),
+        ctx.target(Action::Field.id()),
     ));
     let history_button = Rect::new(expression.right() - 4, field.y, 2, 1);
     spec.native(crate::turbo::widgets::history_button(), history_button);
-    spec.hit(history_button, Target::Utility(Action::CalculatorHistory));
-    if focus == 0 && !calc.history_open && app.dialogs().is_empty() {
+    spec.hit(history_button, ctx.target(Action::History.id()));
+    if focus == 0 && !calc.history_open {
         spec.cursor = Some((field.x + (column - scroll) as u16, field.y));
     }
     spec.caption(
@@ -71,7 +67,7 @@ pub(crate) fn calculator_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
                 caption: (*label).into(),
                 checked: calc.base == index,
             },
-            Target::Utility(Action::Base(index)),
+            ctx.target(Action::Base(index).id()),
         ));
         let text = if index == 4 {
             value.map(Value::scientific).unwrap_or_else(|| "—".into())
@@ -89,13 +85,13 @@ pub(crate) fn calculator_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
                 .style(dos(0x78)),
             row,
         );
-        spec.hit(row, Target::Utility(Action::Base(index)));
+        spec.hit(row, ctx.target(Action::Base(index).id()));
     }
     let notice = calc
         .error
         .as_deref()
         .filter(|_| !calc.history_open)
-        .unwrap_or(&app.utilities.notice);
+        .unwrap_or(&plugin.notice);
     spec.caption(
         Paragraph::new(language.text(notice))
             .style(dos(if calc.error.is_some() { 0x74 } else { 0x70 }))
@@ -106,7 +102,7 @@ pub(crate) fn calculator_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
         ("Evaluate", Action::Evaluate, 'e'),
         ("Copy", Action::Copy, 'c'),
         ("Close", Action::Close, 'l'),
-        ("Help", Action::CalculatorHelp, 'h'),
+        ("Help", Action::Help, 'h'),
     ]
     .into_iter()
     .enumerate()
@@ -129,35 +125,37 @@ pub(crate) fn calculator_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
             i + 6,
             button,
             ControlKind::Button(label),
-            Target::Utility(command),
+            ctx.target(command.id()),
         ));
     }
-    if let Some(child) = history_spec(app, area) {
+    if let Some(child) = history_spec(plugin, ctx) {
         spec.overlay(child);
     }
-    Some(spec)
+    spec
 }
-pub(crate) fn history_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
-    let calc = &app.utilities.calculator;
+pub(super) fn history_spec<'a>(
+    plugin: &'a CalculatorPlugin,
+    ctx: &Context,
+) -> Option<DialogSpec<'a>> {
+    let area = ctx.area;
+    let calc = &plugin.state;
     if !calc.history_open {
         return None;
     }
     let rect = centered(area, 72, 18);
     let rows = calc.history.len().clamp(1, 6);
     let r = Rect::new(rect.x + 2, rect.y + 5, rect.width - 4, rows as u16 + 2);
-    let action = Target::Utility(Action::CalculatorRecall(calc.history_selection));
-    let mut s = DialogSpec::new(
+    let action = ctx.target(Action::Recall(calc.history_selection).id());
+    let mut s = ctx.dialog(
         r,
-        scope(app, crate::focus::Focus::Utility)?,
         0,
-        app.config.language.text("Expression history"),
-        action,
-        Target::Utility(Action::CalculatorHistory),
+        ctx.language.text("Expression history"),
+        Action::Recall(calc.history_selection).id(),
+        Action::History.id(),
     );
     if calc.history.is_empty() {
         s.caption(
-            Paragraph::new(app.config.language.text("No expression history"))
-                .style(app.config.palette.dos(0x78)),
+            Paragraph::new(ctx.language.text("No expression history")).style(ctx.palette.dos(0x78)),
             Rect::new(r.x + 2, r.y + 1, r.width - 4, 1),
         );
     }
@@ -178,7 +176,7 @@ pub(crate) fn history_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
         .map(|i| {
             (
                 Rect::new(r.x + 1, r.y + 1 + (i - offset) as u16, r.width - 2, 1),
-                Target::Utility(Action::CalculatorRecall(i)),
+                ctx.target(Action::Recall(i).id()),
             )
         })
         .collect();

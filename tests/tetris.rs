@@ -216,7 +216,7 @@ fn click(app: &mut App, action: GameAction) {
         .mouse
         .regions
         .iter()
-        .find(|(_, target)| *target == Target::Game(action))
+        .find(|(_, target)| *target == dn::tetris::target(action))
         .unwrap()
         .0;
     mouse::handle(
@@ -271,7 +271,7 @@ fn original_shortcut_menu_and_game_keys_preserve_files_and_panel_state() -> io::
     menu::open(&mut app, 0);
     let row = menu::items(0)
         .iter()
-        .position(|item| item.action == Action::Game)
+        .position(|item| item.action == Action::Plugin(dn::plugins::TETRIS))
         .unwrap();
     menu::activate(&mut app, 0, row);
     assert!(app.desktop.game().is_some() & app.modals.menu().is_none());
@@ -317,7 +317,7 @@ fn game_dialog_mouse_setup_cancel_apply_scores_and_resize() -> io::Result<()> {
                 .mouse
                 .regions
                 .iter()
-                .all(|(_, target)| matches!(target, Target::Game(_))));
+                .all(|(_, target)| matches!(target, Target::Plugin(dn::plugins::TETRIS, _))));
         } else {
             assert!(app.mouse.regions.is_empty());
         }
@@ -346,13 +346,13 @@ fn game_dialog_mouse_setup_cancel_apply_scores_and_resize() -> io::Result<()> {
         .mouse
         .regions
         .iter()
-        .all(|(_, target)| *target == Target::Game(GameAction::Back)));
+        .all(|(_, target)| *target == dn::tetris::target(GameAction::Back)));
     click(&mut app, GameAction::Back);
     key(&mut app, KeyCode::F(4));
     render(&mut app, 80, 25)?;
     assert_eq!(app.desktop.game().unwrap().screen, Screen::Scores);
     key(&mut app, KeyCode::Enter);
-    app.game_scores.add(Record {
+    app.desktop.plugins.scores_mut().add(Record {
         name: "Anonymous".into(),
         start_level: 1,
         score: 123,
@@ -410,12 +410,12 @@ fn final_score_name_entry_saved_immediately_and_reloaded() -> io::Result<()> {
     assert!(fs::read_to_string(&path)?.contains("Дмитрий, 世界 👩‍💻"));
     assert!(!t.0.join("config.conf").exists());
     tetris::action(&mut app, GameAction::SubmitName);
-    assert_eq!(app.game_scores.board.records.len(), 1);
+    assert_eq!(app.desktop.plugins.scores_mut().board.records.len(), 1);
     let mut other = t.app()?;
     tetris::open(&mut other);
     assert_eq!(
         other.desktop.game().unwrap().records,
-        app.game_scores.board.records
+        app.desktop.plugins.scores_mut().board.records
     );
     key(&mut other, KeyCode::F(4));
     for (w, h) in [(80, 25), (120, 40), (40, 10), (80, 25)] {
@@ -442,7 +442,10 @@ fn score_qualification_ties_anonymous_and_grapheme_name_limits() -> io::Result<(
     input::paste(&mut app, &"x".repeat(31));
     assert_eq!(app.desktop.game().unwrap().name, "é");
     tetris::action(&mut app, GameAction::SkipName);
-    assert_eq!(app.game_scores.board.records[0].name, "Anonymous");
+    assert_eq!(
+        app.desktop.plugins.scores_mut().board.records[0].name,
+        "Anonymous"
+    );
     for score in 1..=10 {
         app.desktop.game_mut().unwrap().records.push(Record {
             name: "other".into(),
@@ -553,7 +556,7 @@ fn failed_score_save_is_visible_retryable_and_survives_game_close() -> io::Resul
     key(&mut app, KeyCode::Enter);
     input::paste(&mut app, "Winner");
     key(&mut app, KeyCode::Enter);
-    assert!(app.game_scores.has_pending());
+    assert!(app.desktop.plugins.scores_mut().has_pending());
     assert!(app.desktop.game().unwrap().notice.contains("not saved"));
     assert_eq!(fs::read_to_string(&path)?, "invalid");
     tetris::action(&mut app, GameAction::Close);
@@ -563,7 +566,7 @@ fn failed_score_save_is_visible_retryable_and_survives_game_close() -> io::Resul
     tetris::action(&mut app, GameAction::Scores);
     render(&mut app, 80, 25)?;
     click(&mut app, GameAction::RetrySave);
-    assert!(!app.game_scores.has_pending());
+    assert!(!app.desktop.plugins.scores_mut().has_pending());
     assert_eq!(
         dn::tetris::scores::Board::parse(&fs::read(&path)?)?.records[0].name,
         "Winner"
@@ -616,7 +619,7 @@ fn reference_game_scores_and_setup_layouts_preserve_colors_values_and_mouse_boun
                     .mouse
                     .regions
                     .iter()
-                    .find(|(_, t)| *t == Target::Game(GameAction::Close))
+                    .find(|(_, t)| *t == dn::tetris::target(GameAction::Close))
                     .unwrap()
                     .0;
                 let origin = (close.x - 2, close.y);
@@ -634,7 +637,7 @@ fn reference_game_scores_and_setup_layouts_preserve_colors_values_and_mouse_boun
                         .mouse
                         .regions
                         .iter()
-                        .any(|(_, t)| *t == Target::Game(action)));
+                        .any(|(_, t)| *t == dn::tetris::target(action)));
                 }
                 tetris::action(&mut app, GameAction::Scores);
                 let terminal = render(&mut app, w, h)?;
@@ -655,12 +658,12 @@ fn reference_game_scores_and_setup_layouts_preserve_colors_values_and_mouse_boun
                     .mouse
                     .regions
                     .iter()
-                    .any(|(_, t)| *t == Target::Game(GameAction::RetrySave)));
+                    .any(|(_, t)| *t == dn::tetris::target(GameAction::RetrySave)));
                 let ok = app
                     .mouse
                     .regions
                     .iter()
-                    .find(|(_, t)| *t == Target::Game(GameAction::Back))
+                    .find(|(_, t)| *t == dn::tetris::target(GameAction::Back))
                     .unwrap()
                     .0;
                 // The border close control cancels only this page and retains the game.
@@ -698,13 +701,13 @@ fn reference_game_scores_and_setup_layouts_preserve_colors_values_and_mouse_boun
                         .mouse
                         .regions
                         .iter()
-                        .any(|(_, t)| *t == Target::Game(GameAction::SetLevel(level))));
+                        .any(|(_, t)| *t == dn::tetris::target(GameAction::SetLevel(level))));
                 }
                 let apply = app
                     .mouse
                     .regions
                     .iter()
-                    .find(|(_, t)| *t == Target::Game(GameAction::Apply))
+                    .find(|(_, t)| *t == dn::tetris::target(GameAction::Apply))
                     .unwrap()
                     .0;
                 assert_eq!(

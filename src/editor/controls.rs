@@ -45,7 +45,7 @@ pub enum EditorAction {
     Position(usize, bool),
 }
 pub fn open(app: &mut App, new: bool) {
-    if app.job.is_some() || crate::focus::screen(app) == crate::focus::Screen::Game {
+    if app.job.is_some() || matches!(crate::focus::screen(app), crate::focus::Screen::Plugin(_)) {
         return;
     }
     let panel = &app.panels[app.active];
@@ -587,7 +587,7 @@ pub fn action(app: &mut App, command: EditorAction) {
         return;
     }
     if command == A::Menu {
-        menus::open(app, 0);
+        menus::open_root(app, menus::EditorRootId::File);
         return;
     }
     if !matches!(command, A::MenuSurface | A::SearchChoice(_)) {

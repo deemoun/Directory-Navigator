@@ -1,8 +1,5 @@
-use super::{Game, Screen};
-use crate::{app::App, menu};
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use std::time::Instant;
-
+use crate::app::App;
+use crossterm::event::KeyEvent;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum GameAction {
     Help,
@@ -25,411 +22,72 @@ pub enum GameAction {
     Close,
 }
 
+impl GameAction {
+    pub(crate) fn id(self) -> usize {
+        match self {
+            Self::Help => 0,
+            Self::Continue => 1,
+            Self::SubmitName => 2,
+            Self::SkipName => 3,
+            Self::NameField => 4,
+            Self::BoardFocus => 5,
+            Self::RetrySave => 6,
+            Self::New => 7,
+            Self::Pause => 8,
+            Self::Scores => 9,
+            Self::Setup => 10,
+            Self::LevelUp => 11,
+            Self::LevelDown => 12,
+            Self::Preview => 13,
+            Self::Apply => 14,
+            Self::Back => 15,
+            Self::Close => 16,
+            Self::SetLevel(v) => 100 + usize::from(v),
+        }
+    }
+    pub(crate) fn from_id(id: usize) -> Option<Self> {
+        Some(match id {
+            0 => Self::Help,
+            1 => Self::Continue,
+            2 => Self::SubmitName,
+            3 => Self::SkipName,
+            4 => Self::NameField,
+            5 => Self::BoardFocus,
+            6 => Self::RetrySave,
+            7 => Self::New,
+            8 => Self::Pause,
+            9 => Self::Scores,
+            10 => Self::Setup,
+            11 => Self::LevelUp,
+            12 => Self::LevelDown,
+            13 => Self::Preview,
+            14 => Self::Apply,
+            15 => Self::Back,
+            16 => Self::Close,
+            101..=110 => Self::SetLevel((id - 100) as u8),
+            _ => return None,
+        })
+    }
+}
+
+pub fn target(a: GameAction) -> crate::mouse::Target {
+    crate::mouse::Target::Plugin(crate::plugins::TETRIS, crate::plugins::ActionId(a.id()))
+}
 pub fn open(app: &mut App) {
-    if app.job.is_some()
-        || !app.dialogs().is_empty()
-        || crate::focus::screen(app) == crate::focus::Screen::Viewer
-        || app.modals.settings().is_some()
-        || app.modals.prompt().is_some()
-        || app.modals.pattern().is_some()
-        || app.modals.columns_dialog().is_some()
-    {
-        return;
-    }
-    menu::close(app);
-    app.modals.set_quick_search(None);
-    if app.desktop.game().is_none() {
-        let path = app
-            .config_store
-            .path()
-            .ok()
-            .map(|p| p.with_file_name("tetris.conf"));
-        let encoding = if app.config.language == crate::localization::Language::Russian {
-            super::dos_scores::Encoding::Cp866
-        } else {
-            super::dos_scores::Encoding::Cp437
-        };
-        let error = app.game_scores.load_with_encoding(path, encoding).err();
-        app.show_game(Game {
-            records: app.game_scores.board.records.clone(),
-            name: app.game_scores.board.last_name.clone(),
-            name_cursor: app.game_scores.board.last_name.len(),
-            notice: error.map_or_else(
-                || {
-                    if app.game_scores.has_pending() {
-                        "Scores not saved. Retry save.".into()
-                    } else {
-                        String::new()
-                    }
-                },
-                |e| format!("Cannot load scores: {e}"),
-            ),
-            ..Game::default()
-        });
-    }
+    crate::plugins::host::open(app, crate::plugins::TETRIS);
 }
-
-pub fn action(app: &mut App, action: GameAction) {
-    if action == GameAction::Close {
-        app.desktop.close_game();
-        return;
-    }
-    if action == GameAction::RetrySave {
-        if let Some(g) = app.desktop.game_mut() {
-            g.page_focus = 1;
-        }
-        persist(app);
-        return;
-    }
-    if matches!(action, GameAction::SubmitName | GameAction::SkipName) {
-        submit(app, action == GameAction::SkipName);
-        return;
-    }
-    let Some(game) = app.desktop.game_mut() else {
-        return;
-    };
-    let now = Instant::now();
-    if game.screen == Screen::Name {
-        match action {
-            GameAction::NameField => game.page_focus = 0,
-            GameAction::Back => {
-                game.screen = Screen::GameOver;
-                game.page_focus = 0;
-            }
-            _ => {}
-        }
-        return;
-    }
-    if game.screen == Screen::GameOver && !matches!(action, GameAction::Continue | GameAction::Back)
-    {
-        return;
-    }
-    let previous_screen = game.screen;
-    match action {
-        GameAction::Continue => {
-            if qualifies(game) {
-                game.screen = Screen::Name;
-                game.replace_name = true;
-                game.name_cursor = game.name.len();
-            } else {
-                game.screen = Screen::Scores;
-            }
-        }
-        GameAction::Help => game.screen = Screen::Help,
-        GameAction::Scores => game.screen = Screen::Scores,
-        GameAction::Setup => {
-            game.setup_focus = 0;
-            game.screen = Screen::Setup {
-                level: game.start_level,
-                preview: game.preview,
-            }
-        }
-        GameAction::Back => game.screen = Screen::Play,
-        GameAction::BoardFocus => game.play_focus = 0,
-        GameAction::New => game.restart(now),
-        GameAction::Pause if game.screen == Screen::Play && !game.over => {
-            game.paused = !game.paused
-        }
-        GameAction::LevelUp => {
-            if let Screen::Setup { level, .. } = &mut game.screen {
-                *level = (*level + 1).min(10);
-            } else if game.screen == Screen::Play {
-                game.level = (game.level + 1).min(10);
-            }
-        }
-        GameAction::LevelDown => {
-            if let Screen::Setup { level, .. } = &mut game.screen {
-                *level = level.saturating_sub(1).max(1);
-            }
-        }
-        GameAction::SetLevel(value) => {
-            if let Screen::Setup { level, .. } = &mut game.screen {
-                if (1..=10).contains(&value) {
-                    *level = value;
-                    game.setup_focus = 0;
-                }
-            }
-        }
-        GameAction::Preview => {
-            if let Screen::Setup { preview, .. } = &mut game.screen {
-                *preview = !*preview;
-                game.setup_focus = 1;
-            } else if game.screen == Screen::Play {
-                game.preview = !game.preview;
-            }
-        }
-        GameAction::Apply => {
-            if let Screen::Setup { level, preview } = game.screen {
-                game.start_level = level;
-                game.preview = preview;
-                game.restart(now);
-            }
-        }
-        _ => {}
-    }
-    if game.screen != previous_screen {
-        game.page_focus = 0;
-    }
-    game.resume_clock(now);
-}
-
 pub fn key(app: &mut App, key: KeyEvent) {
-    if crate::dialog_controls::key(app, key, crate::focus::Focus::Game) {
-        return;
-    }
-    let screen = app.desktop.game().map(|game| game.screen);
-    if screen == Some(Screen::Play)
-        && app.desktop.game().is_some_and(|g| g.play_focus > 0)
-        && matches!(
-            key.code,
-            KeyCode::Left | KeyCode::Right | KeyCode::Up | KeyCode::Down | KeyCode::Char(' ')
-        )
-    {
-        return;
-    }
-    if screen == Some(Screen::Name) {
-        if app.desktop.game().is_some_and(|g| g.page_focus == 0) {
-            edit_name(app, key);
-        }
-        return;
-    }
-    if matches!(screen, Some(Screen::Setup { .. })) {
-        let focus = app.desktop.game().map_or(0, |g| g.setup_focus);
-        match key.code {
-            KeyCode::Right | KeyCode::Char('+') => action(app, GameAction::LevelUp),
-            KeyCode::Left | KeyCode::Char('-') => action(app, GameAction::LevelDown),
-            KeyCode::Up if focus == 0 => action(app, GameAction::LevelDown),
-            KeyCode::Down if focus == 0 => action(app, GameAction::LevelUp),
-            KeyCode::Home => action(app, GameAction::SetLevel(1)),
-            KeyCode::End => action(app, GameAction::SetLevel(10)),
-            KeyCode::Char(c @ '0'..='9') => action(
-                app,
-                GameAction::SetLevel(if c == '0' { 10 } else { c as u8 - b'0' }),
-            ),
-            KeyCode::Char('*') => action(app, GameAction::Preview),
-            KeyCode::Char(' ') => action(
-                app,
-                match focus {
-                    2 => GameAction::Apply,
-                    3 => GameAction::Back,
-                    _ => GameAction::Preview,
-                },
-            ),
-            _ => {}
-        }
-        return;
-    }
-    if screen != Some(Screen::Play) {
-        return;
-    }
-    let command = if key.modifiers.contains(KeyModifiers::ALT) {
-        match key.code {
-            KeyCode::Char(c) => super::BUTTONS
-                .iter()
-                .find(|(label, _)| app.config.language.matches(label, c))
-                .map(|(_, action)| *action),
-            _ => None,
-        }
-    } else {
-        match key.code {
-            KeyCode::F(1) => Some(GameAction::Help),
-            KeyCode::F(2) => Some(GameAction::New),
-            KeyCode::F(3) => Some(GameAction::Pause),
-            KeyCode::F(4) => Some(GameAction::Scores),
-            KeyCode::F(5) => Some(GameAction::Setup),
-            KeyCode::Char('+') => Some(GameAction::LevelUp),
-            KeyCode::Char('*') => Some(GameAction::Preview),
-            _ => None,
-        }
-    };
-    if let Some(command) = command {
-        action(app, command);
-        return;
-    }
-    if key
-        .modifiers
-        .intersects(KeyModifiers::ALT | KeyModifiers::CONTROL)
-    {
-        return;
-    }
-    if let Some(game) = app.desktop.game_mut() {
-        match key.code {
-            KeyCode::Left | KeyCode::Home => {
-                game.translate(-1, 0);
-            }
-            KeyCode::Right | KeyCode::PageUp => {
-                game.translate(1, 0);
-            }
-            KeyCode::Up => game.rotate(),
-            KeyCode::Down | KeyCode::Char(' ') => game.drop(Instant::now()),
-            _ => {}
-        }
-    }
-}
-
-fn qualifies(game: &Game) -> bool {
-    game.score > 0
-        && (game.records.len() < 10 || game.records.last().is_some_and(|r| game.score > r.score))
-}
-fn persist(app: &mut App) {
-    let result = app.game_scores.save();
-    if let Some(g) = app.desktop.game_mut() {
-        g.records = app.game_scores.board.records.clone();
-        if g.submitted {
-            g.highlighted = g
-                .records
-                .iter()
-                .rposition(|r| r.score == g.score && r.name == g.name && r.lines == Some(g.lines));
-        }
-        if result.is_ok() {
-            g.notice = "Scores saved".into();
-        } else if let Err(e) = result {
-            g.notice = format!("Scores not saved: {e}. Retry save.");
-        }
-    }
-}
-fn submit(app: &mut App, anonymous: bool) {
-    let Some(g) = app.desktop.game_mut() else {
-        return;
-    };
-    if g.screen != Screen::Name || g.submitted {
-        return;
-    }
-    let name = if anonymous || g.name.trim().is_empty() {
-        super::scores::ANONYMOUS.to_owned()
-    } else {
-        g.name.trim().to_owned()
-    };
-    if !super::scores::validate_name(&name) {
-        g.notice = "Name must fit 30 characters / 240 bytes, without controls".into();
-        return;
-    }
-    let record = super::Record {
-        name: name.clone(),
-        score: g.score,
-        lines: Some(g.lines),
-        start_level: g.start_level,
-        level: g.level,
-    };
-    if let Err(e) = app.game_scores.add(record) {
-        g.notice = e.to_string();
-        return;
-    }
-    g.name = name.clone();
-    g.submitted = true;
-    g.highlighted = Some(
-        app.game_scores
-            .board
-            .records
-            .iter()
-            .rposition(|r| r.score == g.score && r.name == name)
-            .unwrap_or(0),
-    );
-    g.screen = Screen::Scores;
-    g.page_focus = 0;
-    persist(app);
+    crate::plugins::host::key(app, key);
 }
 pub fn paste(app: &mut App, text: &str) {
-    if text.is_empty() {
-        return;
-    }
-    let Some(g) = app.desktop.game_mut() else {
-        return;
-    };
-    if g.screen != Screen::Name || g.page_focus != 0 {
-        return;
-    }
-    let mut value = if g.replace_name {
-        String::new()
-    } else {
-        g.name.clone()
-    };
-    let cursor = if g.replace_name { 0 } else { g.name_cursor };
-    value.insert_str(cursor, text);
-    if !super::scores::validate_name(&value) {
-        g.notice = "Name must fit 30 characters / 240 bytes, without controls".into();
-        return;
-    }
-    g.name = value;
-    g.name_cursor = cursor + text.len();
-    use unicode_segmentation::UnicodeSegmentation;
-    g.name_cursor = g
-        .name
-        .grapheme_indices(true)
-        .map(|(i, _)| i)
-        .find(|i| *i >= g.name_cursor)
-        .unwrap_or(g.name.len());
-    g.replace_name = false;
-    g.name_cursor = g
-        .name
-        .grapheme_indices(true)
-        .map(|(i, _)| i)
-        .find(|i| *i >= g.name_cursor)
-        .unwrap_or(g.name.len());
-    if g.notice.starts_with("Name must fit") {
-        g.notice.clear();
-    }
+    crate::plugins::host::paste(app, text);
 }
-fn edit_name(app: &mut App, key: KeyEvent) {
-    use unicode_segmentation::UnicodeSegmentation;
-    if key
-        .modifiers
-        .intersects(KeyModifiers::ALT | KeyModifiers::CONTROL)
-    {
-        return;
-    }
-    if let KeyCode::Char(c) = key.code {
-        paste(app, &c.to_string());
-        return;
-    }
-    if !matches!(
-        key.code,
-        KeyCode::Left
-            | KeyCode::Right
-            | KeyCode::Home
-            | KeyCode::End
-            | KeyCode::Backspace
-            | KeyCode::Delete
-    ) {
-        return;
-    }
-    let Some(g) = app.desktop.game_mut() else {
-        return;
-    };
-    let previous = g.name[..g.name_cursor]
-        .grapheme_indices(true)
-        .next_back()
-        .map_or(0, |(i, _)| i);
-    let next = g.name[g.name_cursor..]
-        .grapheme_indices(true)
-        .nth(1)
-        .map_or(g.name.len(), |(i, _)| g.name_cursor + i);
-    match key.code {
-        KeyCode::Left => g.name_cursor = previous,
-        KeyCode::Right => g.name_cursor = next,
-        KeyCode::Home => g.name_cursor = 0,
-        KeyCode::End => g.name_cursor = g.name.len(),
-        KeyCode::Backspace | KeyCode::Delete if g.replace_name => {
-            g.name.clear();
-            g.name_cursor = 0;
-        }
-        KeyCode::Backspace => {
-            g.name.replace_range(previous..g.name_cursor, "");
-            g.name_cursor = previous;
-        }
-        KeyCode::Delete => {
-            g.name.replace_range(g.name_cursor..next, "");
-        }
-        _ => {}
-    }
-    g.replace_name = false;
-    g.name_cursor = g
-        .name
-        .grapheme_indices(true)
-        .map(|(i, _)| i)
-        .find(|i| *i >= g.name_cursor)
-        .unwrap_or(g.name.len());
-    if g.notice.starts_with("Name must fit") {
-        g.notice.clear();
+pub fn action(app: &mut App, a: GameAction) {
+    if let Some(b) = app.desktop.plugins.binding(crate::plugins::TETRIS) {
+        crate::plugins::host::dispatch(
+            app,
+            b,
+            crate::plugins::Event::Action(crate::plugins::ActionId(a.id())),
+        );
     }
 }

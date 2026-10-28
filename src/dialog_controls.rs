@@ -2,9 +2,6 @@
 use crate::{app::App, focus::Focus, mouse::Target, turbo::dialog_spec::input_area};
 use crossterm::event::{KeyCode, KeyEvent};
 pub(crate) fn key(app: &mut App, event: KeyEvent, scope: Focus) -> bool {
-    if scope == Focus::Game && event.code == KeyCode::Char(' ') {
-        return false;
-    }
     if scope == Focus::Columns
         && event.code == KeyCode::Char(' ')
         && app.modals.columns_dialog().is_some_and(|m| m.cursor < 2)
@@ -79,23 +76,7 @@ pub(crate) fn key(app: &mut App, event: KeyEvent, scope: Focus) -> bool {
                 m.focus = p.focus;
             }
         }
-        Focus::Game => {
-            if let Some(g) = app.desktop.game_mut() {
-                match g.screen {
-                    crate::tetris::Screen::Play => {
-                        g.play_focus = p.focus;
-                        g.resume_clock(std::time::Instant::now());
-                    }
-                    crate::tetris::Screen::Setup { .. } => g.setup_focus = p.focus,
-                    _ => g.page_focus = p.focus,
-                }
-            }
-        }
         Focus::Utility => match app.utilities.modals.utility_dialog() {
-            Some(crate::utilities::Kind::Calculator) if !app.utilities.calculator.history_open => {
-                app.utilities.calculator.focus = p.focus
-            }
-            Some(crate::utilities::Kind::Calculator) => {}
             Some(crate::utilities::Kind::Characters) => app.utilities.chart.focus = p.focus,
             _ => app.utilities.focus = p.focus,
         },
@@ -172,7 +153,6 @@ pub(crate) fn key(app: &mut App, event: KeyEvent, scope: Focus) -> bool {
         Some(Target::CloseFileInfo) => app.modals.set_file_info(None),
         Some(Target::Tree(a)) => crate::directory_tree::action(app, a),
         Some(Target::UserMenu(a)) => crate::user_menu::action(app, a),
-        Some(Target::Game(a)) => crate::tetris::action(app, a),
         Some(Target::Utility(a)) => crate::utilities::action(app, a),
         Some(Target::Window(a)) => crate::windowing::action(app, a),
         Some(Target::CommandHistory(a)) => crate::command_line::history::action(app, a),

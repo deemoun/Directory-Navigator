@@ -85,7 +85,10 @@ fn native_modal_scope_keeps_input_on_top_across_switches_and_closes() -> io::Res
             scope: Scope::Content
         })
     );
-    assert_eq!(desktop.active().kind, WindowKind::Game);
+    assert_eq!(
+        desktop.active().kind,
+        WindowKind::Plugin(dn::plugins::TETRIS)
+    );
     Ok(())
 }
 #[test]

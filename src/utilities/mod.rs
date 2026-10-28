@@ -1,7 +1,7 @@
 pub mod calculator;
 pub mod characters;
 pub mod information;
-use crate::{app::App, dialog, menu};
+use crate::{app::App, menu};
 use characters::Page;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -28,42 +28,22 @@ pub enum Action {
 #[derive(Default)]
 pub struct Utilities {
     pub modals: crate::modals::ModalStack,
-    pub calculator: calculator::Calculator,
     pub chart: characters::Chart,
     pub information: Option<information::Information>,
     pub size: (u16, u16),
     pub focus: usize,
     pub notice: String,
 }
-impl Utilities {
-    pub fn paste(&mut self, text: &str) {
-        if self.modals.utility_dialog() == Some(Kind::Calculator)
-            && self.calculator.focus == 0
-            && !self.calculator.history_open
-        {
-            let calc = &mut self.calculator;
-            let before = calc.expression.clone();
-            let cursor = calc.cursor;
-            dialog::paste_input(&mut calc.expression, &mut calc.cursor, text);
-            if calc.expression.len() > 2048 {
-                calc.expression = before;
-                calc.cursor = cursor;
-            } else {
-                calc.result = None;
-                calc.error = None;
-                calc.history_cursor = None;
-            }
-        }
-    }
-}
 pub fn open(app: &mut App, kind: Kind) {
+    if kind == Kind::Calculator {
+        crate::plugins::host::open(app, crate::plugins::CALCULATOR);
+        return;
+    }
     menu::close(app);
     app.modals.set_quick_search(None);
     app.utilities.modals.set_utility_dialog(Some(kind));
     app.utilities.notice.clear();
     app.utilities.focus = 0;
-    app.utilities.calculator.focus = 0;
-    app.utilities.calculator.history_open = false;
     app.utilities.chart.focus = 0;
     if matches!(kind, Kind::System | Kind::Memory) {
         app.utilities.information = None;
@@ -118,43 +98,61 @@ pub fn poll(app: &mut App) -> bool {
     }
     app.utilities.information.as_mut().is_some_and(|i| i.poll())
 }
-pub fn action(app: &mut App, action: Action) {
-    match action {
+/// Compatibility launcher/actions; the calculator controller lives in plugins.
+pub fn calculator_target(a: Action) -> crate::mouse::Target {
+    crate::mouse::Target::Plugin(
+        crate::plugins::CALCULATOR,
+        crate::plugins::ActionId(calculator_action(a).expect("calculator action").id()),
+    )
+}
+fn calculator_action(a: Action) -> Option<crate::plugins::calculator::Action> {
+    use crate::plugins::calculator::Action as C;
+    Some(match a {
+        Action::Close => C::Close,
+        Action::Evaluate => C::Evaluate,
+        Action::Copy => C::Copy,
+        Action::Base(i) => C::Base(i),
+        Action::Field => C::Field,
+        Action::CalculatorHelp => C::Help,
+        Action::CalculatorHistory => C::History,
+        Action::CalculatorRecall(i) => C::Recall(i),
+        _ => return None,
+    })
+}
+pub fn action(app: &mut App, a: Action) {
+    if crate::plugins::host::active(app).is_some_and(|b| b.plugin == crate::plugins::CALCULATOR) {
+        if let Some(a) = calculator_action(a) {
+            let b = crate::plugins::host::active(app).unwrap();
+            crate::plugins::host::dispatch(
+                app,
+                b,
+                crate::plugins::Event::Action(crate::plugins::ActionId(a.id())),
+            );
+        }
+        return;
+    }
+    match a {
         Action::Close => {
             app.utilities.modals.set_utility_dialog(None);
             app.utilities.information = None;
         }
-        Action::Evaluate => {
-            if app.utilities.modals.utility_dialog() == Some(Kind::Calculator) {
-                app.utilities.calculator.evaluate();
-                app.utilities.notice.clear();
-            }
-        }
         Action::Copy => {
-            let result = match app.utilities.modals.utility_dialog() {
-                Some(Kind::Calculator) => app.utilities.calculator.copy_text(),
-                Some(Kind::Characters) => app
-                    .utilities
-                    .chart
-                    .copy_text()
-                    .ok_or("ASCII controls cannot be copied".into()),
-                _ => return,
-            };
-            match result {
+            if app.utilities.modals.utility_dialog() != Some(Kind::Characters) {
+                return;
+            }
+            match app
+                .utilities
+                .chart
+                .copy_text()
+                .ok_or("ASCII controls cannot be copied")
+            {
                 Ok(text) => {
                     app.editor_clipboard = text;
                     app.utilities.notice = "Copied to DN internal clipboard".into();
                 }
-                Err(message) => app.utilities.notice = message,
+                Err(e) => app.utilities.notice = e.into(),
             }
         }
-        Action::Base(index) => {
-            if index < 5 {
-                app.utilities.calculator.base = index;
-                app.utilities.calculator.focus = index + 1;
-            }
-        }
-        Action::Field => app.utilities.calculator.focus = 0,
         Action::Page(page) => {
             app.utilities.chart.page = page;
             app.utilities.chart.focus = 0;
@@ -164,88 +162,11 @@ pub fn action(app: &mut App, action: Action) {
             app.utilities.chart.focus = 0;
         }
         Action::Refresh => refresh(app),
-        Action::CalculatorHelp
-            if app.utilities.modals.utility_dialog() == Some(Kind::Calculator) =>
-        {
-            app.push_dialog(dialog::Dialog {
-                title: " Calculator Help ",
-                message: CALCULATOR_HELP.into(),
-            });
-        }
-        Action::CalculatorHistory
-            if app.utilities.modals.utility_dialog() == Some(Kind::Calculator) =>
-        {
-            let calc = &mut app.utilities.calculator;
-            calc.history_open = !calc.history_open;
-            calc.history_selection = 0;
-        }
-        Action::CalculatorRecall(index)
-            if app.utilities.modals.utility_dialog() == Some(Kind::Calculator) =>
-        {
-            let calc = &mut app.utilities.calculator;
-            if let Some(expression) = calc.history.get(index).cloned() {
-                if calc.history_cursor.is_none() {
-                    calc.draft = calc.expression.clone();
-                }
-                calc.expression = expression;
-                calc.cursor = calc.expression.len();
-                calc.history_cursor = Some(index);
-                calc.result = None;
-                calc.error = None;
-                calc.focus = 0;
-                calc.history_open = false;
-                app.utilities.notice.clear();
-            }
-        }
-        Action::CalculatorHelp | Action::CalculatorHistory | Action::CalculatorRecall(_) => {}
+        _ => {}
     }
 }
 pub const CALCULATOR_HELP: &str = "Enter evaluates · Tab / Shift+Tab move focus\nAlt+P expression · Alt+E evaluate · Alt+C copy\nAlt+L close · F1 / Alt+H help\nUp/Down recall history while editing\nThe arrow button opens session history; Enter recalls\nDEC / HEX / BIN / OCT / EXP choose the copy format\nCtrl+C copies the full value to the internal clipboard\nLong values are shortened on screen, copied in full\nEXP is approximate scientific notation (15 significant digits)\nOperators: + - * / % ^ and parentheses\nFunctions: sqrt(), abs() · Bases: 0x, 0b, 0o\nOnly expressions are evaluated; commands are never run.";
 pub fn key(app: &mut App, key: KeyEvent) {
-    if app.utilities.modals.utility_dialog() == Some(Kind::Calculator) {
-        if app.utilities.calculator.history_open {
-            if crate::dialog_controls::key(app, key, crate::focus::Focus::Utility) {
-                return;
-            }
-            let calc = &mut app.utilities.calculator;
-            match key.code {
-                KeyCode::Up => calc.history_selection = calc.history_selection.saturating_sub(1),
-                KeyCode::Down => {
-                    calc.history_selection =
-                        (calc.history_selection + 1).min(calc.history.len().saturating_sub(1))
-                }
-                KeyCode::Home => calc.history_selection = 0,
-                KeyCode::End => calc.history_selection = calc.history.len().saturating_sub(1),
-                KeyCode::PageUp => {
-                    calc.history_selection = calc.history_selection.saturating_sub(6)
-                }
-                KeyCode::PageDown => {
-                    calc.history_selection =
-                        (calc.history_selection + 6).min(calc.history.len().saturating_sub(1))
-                }
-                _ => {}
-            }
-            return;
-        }
-        let command = if key.code == KeyCode::F(1) {
-            Some(Action::CalculatorHelp)
-        } else if key.modifiers == KeyModifiers::ALT {
-            match key.code {
-                KeyCode::Char('e' | 'E') => Some(Action::Evaluate),
-                KeyCode::Char('c' | 'C') => Some(Action::Copy),
-                KeyCode::Char('l' | 'L') => Some(Action::Close),
-                KeyCode::Char('h' | 'H') => Some(Action::CalculatorHelp),
-                KeyCode::Char('p' | 'P') => Some(Action::Field),
-                _ => None,
-            }
-        } else {
-            None
-        };
-        if let Some(command) = command {
-            action(app, command);
-            return;
-        }
-    }
     if crate::dialog_controls::key(app, key, crate::focus::Focus::Utility) {
         return;
     }
@@ -255,47 +176,7 @@ pub fn key(app: &mut App, key: KeyEvent) {
     }
     let mut command = None;
     match app.utilities.modals.utility_dialog() {
-        Some(Kind::Calculator) => {
-            let calc = &mut app.utilities.calculator;
-            match key.code {
-                KeyCode::Up if calc.focus == 0 => {
-                    calc.recall(true);
-                    calc.result = None;
-                    calc.error = None;
-                }
-                KeyCode::Down if calc.focus == 0 => {
-                    calc.recall(false);
-                    calc.result = None;
-                    calc.error = None;
-                }
-                KeyCode::Up | KeyCode::Down if (1..=5).contains(&calc.focus) => {
-                    calc.focus = crate::control_focus::select(
-                        calc.focus,
-                        &[1, 2, 3, 4, 5],
-                        key.code == KeyCode::Up,
-                    );
-                    command = Some(Action::Base(calc.focus - 1));
-                }
-                code if calc.focus == 0
-                    && !key
-                        .modifiers
-                        .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) =>
-                {
-                    let before = calc.expression.clone();
-                    let cursor = calc.cursor;
-                    dialog::edit_input(&mut calc.expression, &mut calc.cursor, code);
-                    if calc.expression.len() > 2048 {
-                        calc.expression = before;
-                        calc.cursor = cursor;
-                    } else if calc.expression != before {
-                        calc.result = None;
-                        calc.error = None;
-                        calc.history_cursor = None;
-                    }
-                }
-                _ => {}
-            }
-        }
+        Some(Kind::Calculator) => {}
         Some(Kind::Characters) => {
             let chart = &mut app.utilities.chart;
             match key.code {
@@ -333,21 +214,6 @@ pub fn key(app: &mut App, key: KeyEvent) {
     }
 }
 pub fn mouse(app: &mut App, event: MouseEvent, target: Option<crate::mouse::Target>) {
-    if app.utilities.modals.utility_dialog() == Some(Kind::Calculator)
-        && app.utilities.calculator.history_open
-    {
-        if event.kind == MouseEventKind::Down(MouseButton::Left) {
-            if let Some(crate::mouse::Target::Utility(
-                command @ (Action::CalculatorRecall(_) | Action::CalculatorHistory),
-            )) = target
-            {
-                action(app, command);
-            } else {
-                app.utilities.calculator.history_open = false;
-            }
-        }
-        return;
-    }
     match event.kind {
         MouseEventKind::Down(MouseButton::Left) => {
             if let Some(crate::mouse::Target::Utility(command)) = target {

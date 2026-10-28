@@ -1,8 +1,5 @@
 //! One definition for game page widgets, traversal and semantic mouse actions.
 use crate::{
-    app::App,
-    desktop::WindowKind,
-    mouse::Target,
     presentation::layout::{Constraint, Layout, Rect},
     tetris::{GameAction as A, Screen},
     turbo::{
@@ -14,7 +11,7 @@ use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
 fn button(
     s: &mut DialogSpec<'_>,
-    app: &App,
+    ctx: &crate::plugins::Context,
     id: usize,
     r: Rect,
     label: &str,
@@ -25,16 +22,19 @@ fn button(
     let mut c = Control::new(
         id,
         bounds,
-        ControlKind::Button(app.config.language.text(label).into()),
-        Target::Game(a),
+        ControlKind::Button(ctx.language.text(label).into()),
+        ctx.target(a.id()),
     );
-    c.hits = vec![(r, Target::Game(a))];
+    c.hits = vec![(r, ctx.target(a.id()))];
     s.control(c);
 }
-pub(crate) fn spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
-    let g = app.desktop.game()?;
-    let id = app.desktop.id(WindowKind::Game)?;
-    let lang = app.config.language;
+pub(crate) fn spec(
+    g: &crate::tetris::Game,
+    pending: bool,
+    ctx: &crate::plugins::Context,
+) -> DialogSpec<'static> {
+    let area = ctx.area;
+    let lang = ctx.language;
     let x = (area.width - 54) / 2;
     let y = (area.height - 23) / 2;
     let (focus, default, cancel) = match g.screen {
@@ -52,29 +52,22 @@ pub(crate) fn spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
         Screen::GameOver => (0, A::Continue, A::Back),
         _ => (g.page_focus, A::Back, A::Back),
     };
-    let mut s = DialogSpec::document(
-        app,
-        area,
-        id,
-        focus,
-        Target::Game(default),
-        Target::Game(cancel),
-    );
+    let mut s = ctx.dialog(area, focus, "", default.id(), cancel.id());
     match g.screen {
         Screen::Play => {
-            s.hit(Rect::new(x + 2, y, 3, 1), Target::Game(A::Close));
+            s.hit(Rect::new(x + 2, y, 3, 1), crate::tetris::target(A::Close));
             let mut board = Control::new(
                 0,
                 Rect::new(x + 2, y + 2, 20, 20),
                 ControlKind::Surface,
-                Target::Game(A::BoardFocus),
+                crate::tetris::target(A::BoardFocus),
             );
             board.paint = false;
             s.control(board);
             for (i, (label, a)) in crate::tetris::BUTTONS.into_iter().enumerate() {
                 button(
                     &mut s,
-                    app,
+                    ctx,
                     i + 1,
                     Rect::new(
                         x + 28 + (i as u16 % 2) * 11,
@@ -111,12 +104,15 @@ pub(crate) fn spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
                     widgets::function_status(&format!("{key} "), lang.text(text), true),
                     slots[i],
                 );
-                s.hit(slots[i], Target::Game(a));
+                s.hit(slots[i], ctx.target(a.id()));
             }
         }
         Screen::Setup { level, preview } => {
             let r = Rect::new((area.width - 72) / 2, (area.height - 18) / 2, 72, 18);
-            s.hit(Rect::new(r.x + 2, r.y, 3, 1), Target::Game(A::Back));
+            s.hit(
+                Rect::new(r.x + 2, r.y, 3, 1),
+                crate::tetris::target(A::Back),
+            );
             for (i, label) in [
                 "Baby",
                 "Little fella",
@@ -142,14 +138,14 @@ pub(crate) fn spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
                             caption,
                             checked: true,
                         },
-                        Target::Game(A::SetLevel(i as u8 + 1)),
+                        crate::tetris::target(A::SetLevel(i as u8 + 1)),
                     );
                     c.hits.clear();
                     s.control(c);
                 } else {
                     s.native(widgets::radio(&caption, false, false), row);
                 }
-                s.hit(row, Target::Game(A::SetLevel(i as u8 + 1)));
+                s.hit(row, crate::tetris::target(A::SetLevel(i as u8 + 1)));
             }
             s.native(
                 widgets::radio(lang.text("Classic Tetris"), true, false),
@@ -162,11 +158,11 @@ pub(crate) fn spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
                     caption: lang.text("Piece preview").into(),
                     checked: preview,
                 },
-                Target::Game(A::Preview),
+                crate::tetris::target(A::Preview),
             ));
             button(
                 &mut s,
-                app,
+                ctx,
                 2,
                 Rect::new(r.x + 49, r.y + 11, 16, 1),
                 "OK",
@@ -175,7 +171,7 @@ pub(crate) fn spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
             );
             button(
                 &mut s,
-                app,
+                ctx,
                 3,
                 Rect::new(r.x + 49, r.y + 14, 16, 1),
                 "Cancel",
@@ -185,12 +181,15 @@ pub(crate) fn spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
         }
         Screen::Scores => {
             let r = Rect::new((area.width - 72) / 2, (area.height - 20) / 2, 72, 20);
-            s.hit(Rect::new(r.x + 2, r.y, 3, 1), Target::Game(A::Back));
-            let retry = app.game_scores.has_pending();
+            s.hit(
+                Rect::new(r.x + 2, r.y, 3, 1),
+                crate::tetris::target(A::Back),
+            );
+            let retry = pending;
             if retry {
                 button(
                     &mut s,
-                    app,
+                    ctx,
                     1,
                     Rect::new(r.x + 8, r.y + 17, 20, 1),
                     "Retry save",
@@ -200,7 +199,7 @@ pub(crate) fn spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
             }
             button(
                 &mut s,
-                app,
+                ctx,
                 0,
                 Rect::new(r.x + if retry { 43 } else { 29 }, r.y + 17, 14, 1),
                 "OK",
@@ -210,7 +209,10 @@ pub(crate) fn spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
         }
         screen => {
             let r = Rect::new((area.width - 50) / 2, y + 2, 50, 17);
-            s.hit(Rect::new(r.x + 2, r.y, 3, 1), Target::Game(A::Back));
+            s.hit(
+                Rect::new(r.x + 2, r.y, 3, 1),
+                crate::tetris::target(A::Back),
+            );
             if screen == Screen::Name {
                 let col = g.name[..g.name_cursor].width();
                 let scroll = col.saturating_sub(43);
@@ -233,14 +235,14 @@ pub(crate) fn spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
                     0,
                     Rect::new(r.x + 3, r.y + 7, 44, 1),
                     kind,
-                    Target::Game(A::NameField),
+                    crate::tetris::target(A::NameField),
                 ));
                 if g.page_focus == 0 {
                     s.cursor = Some((r.x + 3 + (col - scroll) as u16, r.y + 7));
                 }
                 button(
                     &mut s,
-                    app,
+                    ctx,
                     1,
                     Rect::new(r.x + 5, r.bottom() - 2, 16, 1),
                     "OK",
@@ -249,7 +251,7 @@ pub(crate) fn spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
                 );
                 button(
                     &mut s,
-                    app,
+                    ctx,
                     2,
                     Rect::new(r.x + 27, r.bottom() - 2, 18, 1),
                     "Skip name",
@@ -259,7 +261,7 @@ pub(crate) fn spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
             } else {
                 button(
                     &mut s,
-                    app,
+                    ctx,
                     0,
                     Rect::new(r.x + 16, r.bottom() - 2, 18, 1),
                     if screen == Screen::GameOver {
@@ -277,5 +279,5 @@ pub(crate) fn spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
             }
         }
     }
-    Some(s)
+    s
 }

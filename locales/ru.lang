@@ -570,3 +570,9 @@ Tab switches panels. Arrows and page keys move through entries. Insert/Space mar
 Tab chooses · Enter activates · Esc cancels	Tab — выбор · Enter — действие · Esc — отмена
 Enter continues · Esc cancels	Enter — продолжить · Esc — отменить
 Enter opens/runs · → submenu · Ctrl+R reload	Enter — запуск · → подменю · Ctrl+R обновить
+
+~P~lugins...	П~л~агины...
+Plugins	Плагины
+Enabled plugins	Включённые плагины
+Disabling closes open plugin windows.	Отключение закрывает окна плагинов.
+Plugin is disabled. Enable it in Options > Configuration > Plugins.	Плагин отключён. Включите его: Параметры > Конфигурация > Плагины.

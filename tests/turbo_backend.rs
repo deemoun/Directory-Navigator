@@ -544,7 +544,7 @@ fn native_tetris_matches_snapshot_colors_text_targets_and_transitions() -> io::R
                             lines: Some(12),
                             score: 1234,
                         };
-                        app.game_scores.add(record.clone())?;
+                        app.desktop.plugins.scores_mut().add(record.clone())?;
                         app.desktop.game_mut().unwrap().records = vec![record];
                     }
                     snapshot.draw(|frame| ui::draw(frame, &mut app))?;
@@ -916,7 +916,7 @@ fn native_requested_surfaces_match_headless_frames() -> io::Result<()> {
                         9=>app.open_settings(SettingsKind::FileManager),10=>app.open_settings(SettingsKind::Highlight),
                         11=>app.open_pattern(true),12=>app.open_columns(),
                         13|14=>{dn::quick_view::toggle(&mut app);let q=app.quick_view.as_mut().unwrap();q.lines=vec!["Quick view 界 e\u{301}".into(),"path with a number of words to wrap across this rather narrow panel".into()];if case==14 {q.viewer=Some(Viewer::from_contents(root.0.join("sample.rs"),viewer::from_bytes(contents.as_bytes().to_vec(),ViewMode::Text)));}}
-                        32..=34=>{utilities::open(&mut app,Kind::Calculator);app.utilities.calculator.expression="12345 * (67 + 89)".into();app.utilities.calculator.cursor=app.utilities.calculator.expression.len();app.utilities.calculator.evaluate();if case==33 {app.utilities.calculator.history_open=true;}
+                        32..=34=>{utilities::open(&mut app,Kind::Calculator);app.desktop.plugins.calculator_mut().expression="12345 * (67 + 89)".into();app.desktop.plugins.calculator_mut().cursor=app.desktop.plugins.calculator_mut().expression.len();app.desktop.plugins.calculator_mut().evaluate();if case==33 {app.desktop.plugins.calculator_mut().history_open=true;}
                             if case==34 {utilities::action(&mut app,utilities::Action::CalculatorHelp);}}
                         35=>utilities::open(&mut app,Kind::Characters),
                         36=>utilities::open(&mut app,Kind::System),37=>utilities::open(&mut app,Kind::Memory),
@@ -993,9 +993,9 @@ fn native_requested_surfaces_match_headless_frames() -> io::Result<()> {
                         }
                         48 => {
                             utilities::open(&mut app, Kind::Calculator);
-                            app.utilities.calculator.expression = "1 / 0".into();
-                            app.utilities.calculator.cursor = 5;
-                            app.utilities.calculator.evaluate();
+                            app.desktop.plugins.calculator_mut().expression = "1 / 0".into();
+                            app.desktop.plugins.calculator_mut().cursor = 5;
+                            app.desktop.plugins.calculator_mut().evaluate();
                         }
                         49 => {
                             utilities::open(&mut app, Kind::Characters);

@@ -2,23 +2,22 @@
 //! The document paints these native cells
 //! through TV. The codec boundary preserves graphemes and terminal-theme colors.
 use super::scene::Scene;
-use crate::{
-    app::App,
-    tetris::{FIGURES, HEIGHT, WIDTH},
-};
+use crate::tetris::{FIGURES, HEIGHT, WIDTH};
 use std::collections::BTreeMap;
 use unicode_width::UnicodeWidthStr;
 mod controls;
 mod pages;
 pub(crate) use controls::spec;
 
-pub(crate) fn prepare(app: &App, width: u16, height: u16) -> Scene {
+pub(crate) fn prepare(game: &crate::tetris::Game, ctx: &crate::plugins::Context) -> Scene {
+    let width = ctx.area.width;
+    let height = ctx.area.height;
     assert!(width >= 80 && height >= 25);
-    let language = app.config.language;
+    let language = ctx.language;
     let mut scene = Scene {
         width,
         height,
-        profile: app.config.palette,
+        profile: ctx.palette,
         cells: BTreeMap::new(),
         cursor: None,
         regions: Vec::new(),
@@ -40,7 +39,6 @@ pub(crate) fn prepare(app: &App, width: u16, height: u16) -> Scene {
     let wy = y + 1;
     scene.fill(wx, wy, WIDTH as u16 * 2 + 2, HEIGHT as u16 + 2, 0x0f);
     scene.border(wx, wy, WIDTH as u16 * 2 + 2, HEIGHT as u16 + 2, false, 0x7f);
-    let game = app.desktop.game().expect("selected game");
     for (row, cells) in game.board.iter().enumerate() {
         for (col, &color) in cells.iter().enumerate() {
             if color != 0 {
@@ -136,17 +134,6 @@ pub(crate) fn prepare(app: &App, width: u16, height: u16) -> Scene {
             0x3f,
         );
     }
-    pages::draw(&mut scene, app, y);
-    let mut frame = crate::painting::NativeFrame::new(
-        crate::presentation::layout::Rect::new(0, 0, width, height),
-        app.config.palette,
-    );
-    frame.replace(scene);
-    if let Some(spec) = spec(
-        app,
-        crate::presentation::layout::Rect::new(0, 0, width, height),
-    ) {
-        spec.append(&mut frame);
-    }
-    frame.finish()
+    pages::draw(&mut scene, game, ctx.language, y);
+    scene
 }

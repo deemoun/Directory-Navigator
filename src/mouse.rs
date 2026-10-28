@@ -67,7 +67,7 @@ pub enum Target {
     ColumnChoice(usize, crate::columns::ColumnPreset),
     AcceptColumns,
     CancelColumns,
-    Game(crate::tetris::GameAction),
+    Plugin(crate::plugins::PluginId, crate::plugins::ActionId),
 }
 
 #[derive(Default)]
@@ -308,12 +308,8 @@ fn handle_mouse(app: &mut App, event: MouseEvent) {
         }
         return;
     }
-    if focus == Focus::Game {
-        if event.kind == MouseEventKind::Down(MouseButton::Left) {
-            if let Some(Target::Game(action)) = target {
-                crate::tetris::action(app, action);
-            }
-        }
+    if focus == Focus::Plugin {
+        crate::plugins::host::mouse(app, event, target);
         return;
     }
     if focus == Focus::Colors {

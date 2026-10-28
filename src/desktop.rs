@@ -20,7 +20,7 @@ pub enum WindowKind {
     Manager,
     Viewer,
     Editor,
-    Game,
+    Plugin(crate::plugins::PluginId),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -32,7 +32,7 @@ enum Content {
     Manager,
     Editor(Box<Editor>),
     Viewer(Box<Viewer>),
-    Game(Box<Game>),
+    Plugin(crate::plugins::PluginId),
 }
 impl Content {
     fn kind(&self) -> WindowKind {
@@ -40,7 +40,7 @@ impl Content {
             Self::Manager => WindowKind::Manager,
             Self::Editor(_) => WindowKind::Editor,
             Self::Viewer(_) => WindowKind::Viewer,
-            Self::Game(_) => WindowKind::Game,
+            Self::Plugin(id) => WindowKind::Plugin(*id),
         }
     }
 }
@@ -63,6 +63,7 @@ impl Window {
 }
 
 pub struct Desktop {
+    pub plugins: crate::plugins::Runtime,
     windows: Vec<Window>,
 
     native: crate::turbo::desktop::NativeDesktop,
@@ -74,6 +75,7 @@ pub struct Desktop {
 impl Default for Desktop {
     fn default() -> Self {
         Self {
+            plugins: Default::default(),
             windows: vec![Window {
                 id: WindowId::MANAGER,
                 open_revision: 0,
@@ -209,7 +211,7 @@ impl Desktop {
             }
             return Ok(existing);
         }
-        if kind == WindowKind::Game {
+        if matches!(kind, WindowKind::Plugin(_)) {
             if let Some(old) = self.id(kind) {
                 self.close(old);
             }
@@ -253,6 +255,14 @@ impl Desktop {
             return;
         }
         let active = self.active().id;
+        if let Some(binding) = self
+            .plugins
+            .bound()
+            .into_iter()
+            .find(|b| b.owner == crate::plugins::Owner::Document(id))
+        {
+            self.plugins.retire(binding);
+        }
         self.native.remove(id);
         self.windows.retain(|w| w.id != id);
         self.reservations.retain(|_, owner| *owner != id);
@@ -468,7 +478,13 @@ impl Desktop {
         self.install(Content::Viewer(Box::new(viewer)), true)
     }
     pub fn open_game(&mut self, game: Game) -> io::Result<WindowId> {
-        self.install(Content::Game(Box::new(game)), true)
+        let id = self.open_plugin(crate::plugins::TETRIS)?;
+        self.plugins.install_game(game);
+        self.plugins.bind(crate::plugins::Binding {
+            plugin: crate::plugins::TETRIS,
+            owner: crate::plugins::Owner::Document(id),
+        });
+        Ok(id)
     }
     pub fn close_editor(&mut self) {
         let id = self.target();
@@ -483,7 +499,7 @@ impl Desktop {
         }
     }
     pub fn close_game(&mut self) {
-        if let Some(id) = self.id(WindowKind::Game) {
+        if let Some(id) = self.id(WindowKind::Plugin(crate::plugins::TETRIS)) {
             self.close(id);
         }
     }
@@ -501,17 +517,14 @@ impl Desktop {
         let id = self.target();
         self.viewer_mut(id)
     }
+    pub(crate) fn open_plugin(&mut self, id: crate::plugins::PluginId) -> io::Result<WindowId> {
+        self.install(Content::Plugin(id), true)
+    }
     pub fn game(&self) -> Option<&Game> {
-        self.windows.iter().find_map(|w| match &w.content {
-            Content::Game(g) => Some(g.as_ref()),
-            _ => None,
-        })
+        self.plugins.game()
     }
     pub fn game_mut(&mut self) -> Option<&mut Game> {
-        self.windows.iter_mut().find_map(|w| match &mut w.content {
-            Content::Game(g) => Some(g.as_mut()),
-            _ => None,
-        })
+        self.plugins.game_mut()
     }
 }
 

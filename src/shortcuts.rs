@@ -206,7 +206,7 @@ pub fn key(app: &mut App, key: KeyEvent) -> Option<KeyEvent> {
                 'e' => Some(Action::Columns),
                 'p' => Some(Action::ExportList),
                 'o' => Some(Action::OpenExternal),
-                'y' => Some(Action::Game),
+                'y' => Some(Action::Plugin(crate::plugins::TETRIS)),
                 'j' => Some(Action::History(
                     crate::file_tools::history::HistoryKind::Directory,
                 )),
@@ -227,13 +227,11 @@ pub fn key(app: &mut App, key: KeyEvent) -> Option<KeyEvent> {
                 'm' => mapped(K::F(9), M::NONE),
                 'x' => mapped(K::F(10), M::NONE),
                 'z' => {
-                    crate::menu::open(app, 3);
-                    if let Some(row) = crate::menu::items(3)
-                        .iter()
-                        .position(|i| i.action == Action::Submenu(crate::menu::MenuId::Sort))
-                    {
-                        crate::menu::activate(app, 0, row);
-                    }
+                    crate::menu::open_submenu(
+                        app,
+                        crate::menu::RootId::Panel,
+                        crate::menu::MenuId::Sort,
+                    );
                     None
                 }
                 _ => None,
@@ -272,7 +270,7 @@ pub fn key(app: &mut App, key: KeyEvent) -> Option<KeyEvent> {
                 _ => None,
             },
         },
-        Screen::Game => None,
+        Screen::Plugin(_) => None,
     }
 }
 
@@ -333,7 +331,7 @@ pub fn label(profile: Profile, screen: Screen, classic: &str) -> Cow<'_, str> {
             "C-F7" | "Ctrl+F7" => "^Op",
             _ => classic,
         },
-        Screen::Game => classic,
+        Screen::Plugin(_) => classic,
     };
     Cow::Borrowed(value)
 }

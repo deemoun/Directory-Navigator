@@ -153,7 +153,7 @@ fn tetris_hides_manager_menus_and_uses_dn_faces_mnemonics_and_offset_shadows() -
                 .mouse
                 .regions
                 .iter()
-                .find(|(r, t)| *t == Target::Game(action) && r.width == 11)
+                .find(|(r, t)| *t == dn::tetris::target(action) && r.width == 11)
                 .unwrap()
                 .0;
             for x in r.x + 1..r.right() - 1 {

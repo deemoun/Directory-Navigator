@@ -68,6 +68,12 @@ pub(crate) fn windows_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
                     )
                 )
             }
+            Some(WindowKind::Plugin(id)) => app
+                .desktop
+                .plugins
+                .definition(id)
+                .map(|d| language.text(d.title).to_owned())
+                .unwrap_or_else(|| id.0.to_owned()),
             _ => continue,
         };
         let row_area = Rect::new(

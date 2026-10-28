@@ -570,3 +570,9 @@ Tab switches panels. Arrows and page keys move through entries. Insert/Space mar
 Tab chooses · Enter activates · Esc cancels	Tab chooses · Enter activates · Esc cancels
 Enter continues · Esc cancels	Enter continues · Esc cancels
 Enter opens/runs · → submenu · Ctrl+R reload	Enter opens/runs · → submenu · Ctrl+R reload
+
+~P~lugins...	~P~lugins...
+Plugins	Plugins
+Enabled plugins	Enabled plugins
+Disabling closes open plugin windows.	Disabling closes open plugin windows.
+Plugin is disabled. Enable it in Options > Configuration > Plugins.	Plugin is disabled. Enable it in Options > Configuration > Plugins.
