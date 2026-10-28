@@ -1,3 +1,4 @@
+use crate::dialog_theme as theme;
 use crate::painting::{Frame, Paragraph};
 use crate::presentation::{layout::Rect, text::Line};
 use crate::turbo::dialog_spec::{centered, scope, Control, ControlKind, DialogSpec};
@@ -34,7 +35,7 @@ pub(crate) fn tools_spec(
             Target::CancelPattern,
         );
         spec.caption(
-            Paragraph::new(app.config.language.text("Name pattern")).style(dos(0x7f)),
+            Paragraph::new(app.config.language.text("Name pattern")).style(dos(theme::FRAME)),
             Rect::new(rect.x + 2, rect.y + 1, rect.width - 4, 1),
         );
         let input = Rect::new(rect.x + 2, rect.y + 2, rect.width - 4, 1);
@@ -60,7 +61,7 @@ pub(crate) fn tools_spec(
             Paragraph::new(app.config.language.text(
                 "* any sequence · ? one character\nVisible files and folders only · case-sensitive",
             ))
-            .style(dos(0x70)),
+            .style(dos(theme::TEXT)),
             Rect::new(rect.x + 2, rect.y + 3, rect.width - 4, 2),
         );
         for (id, label, x, target) in [
@@ -99,7 +100,7 @@ pub(crate) fn tools_spec(
                 } else {
                     "Right panel"
                 }))
-                .style(dos(0x71)),
+                .style(dos(theme::HEADING)),
                 Rect::new(x, rect.y + 2, 31, 1),
             );
             for (row, preset) in ColumnPreset::ALL.into_iter().enumerate() {
@@ -134,7 +135,7 @@ pub(crate) fn tools_spec(
                     .language
                     .text("Tab chooses panel · Arrows change · Esc restores"),
             )
-            .style(dos(0x70)),
+            .style(dos(theme::TEXT)),
             Rect::new(rect.x + 3, rect.y + 9, rect.width - 6, 1),
         );
         for (id, label, x, target) in [
@@ -191,7 +192,7 @@ pub(crate) fn tools_spec(
                     .language
                     .text("↑↓ / PgUp/PgDn scroll · ←→ long lines · Home resets"),
             )
-            .style(dos(0x70)),
+            .style(dos(theme::TEXT)),
             Rect::new(rect.x + 2, rect.bottom() - 3, rect.width - 4, 1),
         );
         spec.control(Control::new(

@@ -15,9 +15,7 @@ pub struct State {
 }
 impl State {
     pub fn record(&mut self, path: PathBuf) {
-        self.history.retain(|p| p != &path);
-        self.history.insert(0, path);
-        self.history.truncate(16);
+        crate::history::remember(&mut self.history, path, 16);
     }
 }
 #[derive(Default)]
@@ -41,12 +39,13 @@ impl History {
         self.keep_visible();
     }
     pub fn keep_visible(&mut self) {
-        if self.cursor < self.offset {
-            self.offset = self.cursor;
-        } else if self.cursor >= self.offset + self.rows {
-            self.offset = self.cursor + 1 - self.rows;
-        }
-        self.offset = self.offset.min(self.paths.len().saturating_sub(self.rows));
+        crate::list_state::ListViewport::fit(
+            &mut self.cursor,
+            &mut self.offset,
+            self.rows,
+            None,
+            Some(self.paths.len().saturating_sub(self.rows)),
+        );
     }
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -181,20 +180,14 @@ pub fn key(app: &mut App, key: KeyEvent) {
             }
         });
     if let Some(p) = proposal {
-        if !p.current(app) {
-            return;
-        }
-        if let Some(prompt) = app.modals.prompt_mut() {
-            prompt.focus = p.focus;
-        }
-        match p.action {
+        crate::dialog_controls::apply(app, p, |app, target| match Some(target) {
             Some(Target::SubmitPrompt) => app.submit_prompt(),
             Some(Target::CancelPrompt) => app.modals.set_prompt(None),
             Some(Target::PromptHelp) => crate::dialog::prompt_help(app),
             Some(Target::Copy(a)) => action(app, a),
             Some(Target::PromptField) => action(app, Action::Field),
             _ => {}
-        }
+        });
         return;
     }
     if key.modifiers.contains(M::ALT) {

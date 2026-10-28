@@ -7,7 +7,7 @@ use crate::{
     task::Task,
 };
 use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
-use std::{io, path::PathBuf, sync::mpsc};
+use std::{io, path::PathBuf};
 
 pub struct Preview {
     pub(crate) requests: crate::requests::RequestScope,
@@ -113,15 +113,10 @@ pub fn poll(app: &mut App) -> bool {
     let Some(preview) = app.modals.config_import_mut() else {
         return false;
     };
-    let Some(task) = &preview.pending else {
+    let Some(reply) = crate::task::take_reply(&mut preview.pending) else {
         return false;
     };
-    let result = match task.try_recv() {
-        Ok(result) => result,
-        Err(mpsc::TryRecvError::Empty) => return false,
-        Err(mpsc::TryRecvError::Disconnected) => Err("Import worker stopped.".into()),
-    };
-    preview.pending = None;
+    let result = reply.unwrap_or_else(|_| Err("Import worker stopped.".into()));
     preview.result = Some(result);
     preview.focus = usize::from(!preview.can_apply());
     true

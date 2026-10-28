@@ -147,7 +147,7 @@ pub fn level_items(app: &App, depth: usize) -> Vec<Item> {
                     }
                 }
                 entries.retain(|entry| match entry.action {
-                    Action::Plugin(id) => app.config.plugin_enabled(id),
+                    Action::Plugin(_) => crate::commands::manager_available(app, entry.action),
                     _ => true,
                 });
                 entries

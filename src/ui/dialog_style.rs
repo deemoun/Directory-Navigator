@@ -1,4 +1,5 @@
 //! Shared Turbo Vision dialog chrome; dimensions remain content-specific.
+use crate::dialog_theme as theme;
 use crate::painting::{Block, BorderType, Borders, Frame, Paragraph};
 use crate::palette::PaletteProfile;
 use crate::presentation::{
@@ -15,14 +16,7 @@ pub(super) fn window(
     title: &str,
 ) -> Rect {
     let _ = profile;
-    let width = width.min(area.width);
-    let height = height.min(area.height);
-    let rect = Rect::new(
-        area.x + (area.width - width) / 2,
-        area.y + (area.height - height) / 2,
-        width,
-        height,
-    );
+    let rect = theme::centered(area, width, height);
     frame.render_widget(crate::turbo::widgets::dialog(title), rect);
     rect
 }
@@ -33,7 +27,7 @@ pub(super) fn close_button(
     rect: Rect,
     target: crate::mouse::Target,
 ) {
-    close_control(frame, profile, rect, target, 0x7a);
+    close_control(frame, profile, rect, target, theme::MODAL_CLOSE);
 }
 
 fn close_control(
@@ -47,12 +41,12 @@ fn close_control(
         return;
     }
     let close = Rect::new(rect.x + 2, rect.y, 3, 1);
-    if color != 0x7a {
+    if color != theme::MODAL_CLOSE {
         frame.render_widget(
             Paragraph::new(Line::from(vec![
-                Span::styled("[", profile.dos(0x7f)),
+                Span::styled("[", profile.dos(theme::FRAME)),
                 Span::styled("■", profile.dos(color)),
-                Span::styled("]", profile.dos(0x7f)),
+                Span::styled("]", profile.dos(theme::FRAME)),
             ])),
             close,
         );
@@ -73,12 +67,12 @@ pub(super) fn document_header(
         Block::default()
             .borders(Borders::TOP)
             .border_type(BorderType::Double)
-            .border_style(profile.dos(0x7f))
+            .border_style(profile.dos(theme::FRAME))
             .title(title)
             .title_alignment(Alignment::Center)
-            .title_style(profile.dos(0x7f))
-            .style(profile.dos(0x70)),
+            .title_style(profile.dos(theme::FRAME))
+            .style(profile.dos(theme::TEXT)),
         rect,
     );
-    close_control(frame, profile, rect, target, 0x7b);
+    close_control(frame, profile, rect, target, theme::DOCUMENT_CLOSE);
 }

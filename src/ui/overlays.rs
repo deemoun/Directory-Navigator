@@ -1,3 +1,4 @@
+use crate::dialog_theme as theme;
 use crate::painting::{Frame, Paragraph};
 use crate::presentation::{
     layout::Rect,
@@ -67,7 +68,7 @@ pub(crate) fn prompt_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
             ));
         }
         spec.caption(
-            Paragraph::new(lines.join("\n")).style(dos(0x70)),
+            Paragraph::new(lines.join("\n")).style(dos(theme::TEXT)),
             Rect::new(rect.x + 2, rect.y + 2, rect.width - 4, 5),
         );
     } else {
@@ -85,7 +86,7 @@ pub(crate) fn prompt_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
         spec.caption(
             Paragraph::new(Line::from(vec![
                 Span::styled(&label[..first], dos(0x7e)),
-                Span::styled(&label[first..], dos(0x7f)),
+                Span::styled(&label[first..], dos(theme::FRAME)),
             ])),
             Rect::new(rect.x + 2, rect.y + 1, rect.width - 4, 1),
         );
@@ -114,7 +115,7 @@ pub(crate) fn prompt_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
                         .language
                         .text("Existing destinations are refused."),
                 )
-                .style(dos(0x70)),
+                .style(dos(theme::TEXT)),
                 Rect::new(rect.x + 2, rect.y + 3, rect.width - 4, 1),
             );
             let mut lines = vec![format!("{} item(s):", prompt.sources.len())];
@@ -125,7 +126,7 @@ pub(crate) fn prompt_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
                 ));
             }
             spec.caption(
-                Paragraph::new(lines.join("\n")).style(dos(0x70)),
+                Paragraph::new(lines.join("\n")).style(dos(theme::TEXT)),
                 Rect::new(rect.x + 2, rect.y + 4, rect.width - 4, 4),
             );
         }
@@ -208,7 +209,7 @@ pub(crate) fn message_spec<'a>(
     if message.maximum > 0 {
         s.caption(
             Paragraph::new(app.config.language.text("↑↓ / PgUp/PgDn scroll"))
-                .style(profile.dos(0x70)),
+                .style(profile.dos(theme::TEXT)),
             Rect::new(rect.x + 2, rect.bottom() - 3, rect.width - 4, 1),
         );
     }
@@ -270,7 +271,7 @@ pub(crate) fn job_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
         )
     );
     s.caption(
-        Paragraph::new(text).style(app.config.palette.dos(0x70)),
+        Paragraph::new(text).style(app.config.palette.dos(theme::TEXT)),
         Rect::new(rect.x + 2, rect.y + 1, rect.width - 4, 4),
     );
     s.native(

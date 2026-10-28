@@ -1,3 +1,4 @@
+use crate::dialog_theme as theme;
 use crate::painting::{Frame, Paragraph};
 use crate::presentation::layout::Rect;
 use crate::turbo::dialog_spec::{centered, scope, Control, ControlKind, DialogSpec};
@@ -32,20 +33,8 @@ pub(crate) fn settings_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
     if settings.kind == SettingsKind::Plugins {
         return plugins_spec(app, area);
     }
-    let width = if settings.kind == SettingsKind::FileManager {
-        74
-    } else {
-        60
-    };
-    let height = match settings.kind {
-        SettingsKind::Keyboard => 20,
-        SettingsKind::Regional => 17,
-        SettingsKind::System => 14,
-        SettingsKind::Interface => 13,
-        SettingsKind::FileManager => 14,
-        SettingsKind::Highlight => 18,
-        SettingsKind::Plugins => unreachable!("registry dialog handled above"),
-    };
+    let form = settings.kind.definition();
+    let (width, height) = (form.width, form.height);
     let rect = centered(area, width, height);
     let mut spec = DialogSpec::new(
         rect,
@@ -55,41 +44,24 @@ pub(crate) fn settings_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
         Target::AcceptSettings,
         Target::CancelSettings,
     );
-    let two_columns = settings.kind == SettingsKind::FileManager;
+    let two_columns = form.columns;
     spec.caption(
         Paragraph::new(
             app.config
                 .language
                 .text(if two_columns { "Behavior" } else { "Options" }),
         )
-        .style(dos(0x71)),
+        .style(dos(theme::HEADING)),
         Rect::new(rect.x + 3, rect.y + 2, 30, 1),
     );
     if two_columns {
         spec.caption(
-            Paragraph::new(app.config.language.text("Display")).style(dos(0x71)),
+            Paragraph::new(app.config.language.text("Display")).style(dos(theme::HEADING)),
             Rect::new(rect.x + 39, rect.y + 2, 26, 1),
         );
     }
     for (index, setting) in settings.rows().iter().enumerate() {
-        let trash = matches!(setting, crate::settings::Setting::Trash);
-        let right = two_columns && index >= 3 && !trash;
-        let row = Rect::new(
-            rect.x + if right { 39 } else { 3 },
-            rect.y
-                + 4
-                + if right {
-                    index as u16 - 3
-                } else {
-                    if trash {
-                        3
-                    } else {
-                        index as u16
-                    }
-                },
-            if two_columns { 32 } else { width - 6 },
-            1,
-        );
+        let row = form.bounds(rect, index);
         let caption = app.config.language.text(setting.label());
         let mut control = Control::new(
             index,
@@ -122,7 +94,7 @@ pub(crate) fn settings_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
             );
         }
     } else if settings.kind == SettingsKind::System {
-        spec.caption(Paragraph::new(app.config.language.text("Existing destinations are always refused.\nTrash and permanent deletion require confirmation.")).style(dos(0x70)), Rect::new(rect.x + 3, rect.y + 7, width - 6, 2));
+        spec.caption(Paragraph::new(app.config.language.text("Existing destinations are always refused.\nTrash and permanent deletion require confirmation.")).style(dos(theme::TEXT)), Rect::new(rect.x + 3, rect.y + 7, width - 6, 2));
     }
     spec.caption(
         Paragraph::new(
@@ -130,8 +102,8 @@ pub(crate) fn settings_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
                 .language
                 .text("Tab / ↑↓ choose · Space toggle · Enter OK · Esc Cancel"),
         )
-        .style(dos(0x70)),
-        Rect::new(rect.x + 3, rect.bottom() - 5, width - 6, 1),
+        .style(dos(theme::TEXT)),
+        Rect::new(rect.x + 3, rect.bottom() - theme::HINT_BOTTOM, width - 6, 1),
     );
     let count = spec.controls.len();
     for (index, (label, target)) in [
@@ -141,12 +113,7 @@ pub(crate) fn settings_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
     .iter()
     .enumerate()
     {
-        let button = Rect::new(
-            rect.x + width / 2 - 15 + index as u16 * 18,
-            rect.bottom() - 3,
-            14,
-            1,
-        );
+        let button = theme::button(rect, width / 2 - 15, index);
         spec.control(Control::new(
             count + index,
             button,
@@ -162,10 +129,11 @@ fn plugins_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
     let language = app.config.language;
     let palette = app.config.palette;
     let count = settings.plugins.len();
+    let form = settings.kind.definition();
     let rect = centered(
         area,
-        64,
-        ((count + 10).min(usize::from(area.height.saturating_sub(2)))) as u16,
+        form.width,
+        ((count + usize::from(form.height)).min(usize::from(area.height.saturating_sub(2)))) as u16,
     );
     let rows = usize::from(rect.height.saturating_sub(9)).max(1);
     let offset = settings
@@ -181,7 +149,7 @@ fn plugins_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
         Target::CancelSettings,
     );
     spec.caption(
-        Paragraph::new(language.text("Enabled plugins")).style(palette.dos(0x71)),
+        Paragraph::new(language.text("Enabled plugins")).style(palette.dos(theme::HEADING)),
         Rect::new(rect.x + 3, rect.y + 2, rect.width - 6, 1),
     );
     for (index, (id, title)) in settings.plugins.iter().enumerate() {
@@ -215,8 +183,13 @@ fn plugins_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
     }
     spec.caption(
         Paragraph::new(language.text("Disabling closes open plugin windows."))
-            .style(palette.dos(0x78)),
-        Rect::new(rect.x + 3, rect.bottom() - 5, rect.width - 6, 1),
+            .style(palette.dos(theme::DISABLED)),
+        Rect::new(
+            rect.x + 3,
+            rect.bottom() - theme::HINT_BOTTOM,
+            rect.width - 6,
+            1,
+        ),
     );
     for (index, label, target) in [
         (0, " [ OK ] ", Target::AcceptSettings),
@@ -224,7 +197,7 @@ fn plugins_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
     ] {
         spec.control(Control::new(
             count + index,
-            Rect::new(rect.x + 17 + index as u16 * 18, rect.bottom() - 3, 14, 1),
+            theme::button(rect, 17, index),
             ControlKind::Button(language.text(label).into()),
             target,
         ));
@@ -236,7 +209,8 @@ fn regional_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
     let settings = app.modals.settings()?;
     let profile = app.config.palette;
     let language = app.config.language;
-    let rect = centered(area, 68, 17);
+    let form = settings.kind.definition();
+    let rect = centered(area, form.width, form.height);
     let mut spec = DialogSpec::new(
         rect,
         scope(app, crate::focus::Focus::Settings)?,
@@ -246,17 +220,11 @@ fn regional_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
         Target::CancelSettings,
     );
     let format = settings.draft.datetime;
-    let labels = [
-        "Language",
-        "Date order",
-        "Date separator",
-        "Time format",
-        "Time separator",
-    ];
-    for (i, label) in labels.into_iter().enumerate() {
+    for (i, choice) in settings.choice_fields().iter().enumerate() {
+        let label = choice.definition().caption;
         let row = Rect::new(rect.x + 3, rect.y + 2 + i as u16, rect.width - 6, 1);
         spec.caption(
-            Paragraph::new(language.text(label)).style(profile.dos(0x70)),
+            Paragraph::new(language.text(label)).style(profile.dos(theme::TEXT)),
             Rect::new(row.x, row.y, 24, 1),
         );
         let field = Rect::new(row.x + 24, row.y, row.width - 24, 1);
@@ -283,16 +251,17 @@ fn regional_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
             language.text("Preview"),
             format.stamp(now, false, true)
         ))
-        .style(profile.dos(0x71)),
+        .style(profile.dos(theme::HEADING)),
         Rect::new(rect.x + 3, rect.y + 9, rect.width - 6, 1),
     );
     spec.caption(
         Paragraph::new(language.text("←/→ or Space changes · Tab/↑↓ chooses"))
-            .style(profile.dos(0x70)),
+            .style(profile.dos(theme::TEXT)),
         Rect::new(rect.x + 3, rect.y + 11, rect.width - 6, 1),
     );
     spec.caption(
-        Paragraph::new(language.text("Enter applies · Esc cancels")).style(profile.dos(0x70)),
+        Paragraph::new(language.text("Enter applies · Esc cancels"))
+            .style(profile.dos(theme::TEXT)),
         Rect::new(rect.x + 3, rect.y + 12, rect.width - 6, 1),
     );
     for (i, (label, target)) in [

@@ -4,11 +4,14 @@ pub const DISPLAY_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub mod app;
 pub mod associations;
 pub mod columns;
+pub mod commands;
 pub mod config;
 pub mod config_import;
 pub mod desktop;
 pub mod dialog;
+pub(crate) mod dialog_adapter;
 pub(crate) mod dialog_controls;
+pub(crate) mod dialog_theme;
 pub mod editor;
 pub mod file_info;
 pub mod file_tools;
@@ -43,7 +46,9 @@ pub mod screensaver;
 
 pub mod focus;
 
+pub(crate) mod history;
 pub mod layout;
+pub(crate) mod list_state;
 
 pub mod task;
 

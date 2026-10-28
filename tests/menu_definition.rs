@@ -6,9 +6,8 @@ use dn::{
     shortcuts::Profile,
 };
 use std::{
-    fs, io,
+    io,
     path::PathBuf,
-    sync::atomic::{AtomicUsize, Ordering},
     time::{Duration, Instant},
 };
 
@@ -31,28 +30,10 @@ fn hierarchy_has_unique_roots_and_acyclic_submenus() {
     }
 }
 
-struct Temp(PathBuf);
-impl Drop for Temp {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.0);
-    }
-}
-fn fixture() -> io::Result<(Temp, App)> {
-    static NEXT: AtomicUsize = AtomicUsize::new(0);
-    let t = Temp(std::env::temp_dir().join(format!(
-        "dn-menu-definition-{}-{}",
-        std::process::id(),
-        NEXT.fetch_add(1, Ordering::Relaxed)
-    )));
-    fs::create_dir(&t.0)?;
-    let mut a = App::new(t.0.clone())?;
-    a.config.save_on_exit = false;
-    let deadline = Instant::now() + Duration::from_secs(5);
-    while a.panels.iter().any(|p| p.loading) {
-        a.poll();
-        assert!(Instant::now() < deadline);
-        std::thread::sleep(Duration::from_millis(1));
-    }
+mod support;
+fn fixture() -> io::Result<(support::Fixture, App)> {
+    let t = support::Fixture::new("menu-definition")?;
+    let a = t.app()?;
     Ok((t, a))
 }
 #[test]

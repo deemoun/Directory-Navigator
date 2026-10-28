@@ -117,8 +117,63 @@ impl<T: Send + 'static> Task<T> {
         Ok(value)
     }
 }
+/// Poll a one-shot task without consuming a pending slot. Completed/disconnected
+/// slots retire once; stale-owner/generation checks remain in Task::try_recv.
+/// None means no reply yet (or no task); Some(Err) is always Disconnected.
+pub fn take_reply<T: Send + 'static>(
+    pending: &mut Option<Task<T>>,
+) -> Option<Result<T, TryRecvError>> {
+    match pending.as_ref()?.try_recv() {
+        Err(TryRecvError::Empty) => None,
+        reply => {
+            *pending = None;
+            Some(reply)
+        }
+    }
+}
 impl<T> Drop for Task<T> {
     fn drop(&mut self) {
         self.cancel.cancel();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn channel() -> (SyncSender<u32>, Option<Task<u32>>) {
+        let (send, reply) = mpsc::sync_channel(1);
+        let scope = crate::requests::RequestScope::new(crate::requests::Owner::Workspace);
+        let request = scope.lease("test");
+        (
+            send,
+            Some(Task {
+                reply,
+                cancel: Cancellation::default(),
+                request,
+                scope: Some(scope),
+            }),
+        )
+    }
+    #[test]
+    fn one_shot_keeps_pending_and_consumes_completion_once() {
+        let (send, mut task) = channel();
+        assert_eq!(take_reply(&mut task), None);
+        assert!(task.is_some());
+        send.send(42).unwrap();
+        assert_eq!(take_reply(&mut task), Some(Ok(42)));
+        assert!(task.is_none());
+        assert_eq!(take_reply(&mut task), None);
+    }
+    #[test]
+    fn one_shot_disconnect_and_replaced_generation_retire_without_applying_reply() {
+        let (send, mut task) = channel();
+        drop(send);
+        assert_eq!(take_reply(&mut task), Some(Err(TryRecvError::Disconnected)));
+        assert!(task.is_none());
+        let (send, mut task) = channel();
+        send.send(42).unwrap();
+        task.as_ref().unwrap().scope.as_ref().unwrap().start("test");
+        assert_eq!(take_reply(&mut task), Some(Err(TryRecvError::Disconnected)));
+        assert!(task.is_none());
     }
 }

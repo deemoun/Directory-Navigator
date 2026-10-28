@@ -1,86 +1,21 @@
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+use crossterm::event::{KeyCode, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use dn::testing::{backend::TestBackend, layout::Rect, Terminal};
 use dn::{
     app::App,
-    input,
     mouse::{self, Target},
     palette::PaletteProfile,
     panel_layout::{scroll_position, PanelGeometry, PanelLayout, ScrollAction},
     ui,
 };
-use std::{
-    fs, io,
-    path::PathBuf,
-    sync::atomic::{AtomicU64, Ordering},
-    thread,
-    time::{Duration, Instant},
-};
-struct Temp(PathBuf);
-impl Temp {
-    fn new() -> io::Result<Self> {
-        static NEXT: AtomicU64 = AtomicU64::new(0);
-        let path = std::env::temp_dir().join(format!(
-            "dn-scroll-{}-{}",
-            std::process::id(),
-            NEXT.fetch_add(1, Ordering::Relaxed)
-        ));
-        fs::create_dir(&path)?;
-        Ok(Self(path))
-    }
-    fn app(&self) -> io::Result<App> {
-        let mut app = App::new(self.0.clone())?;
-        wait(&mut app, |a| a.panels.iter().all(|p| !p.loading));
-        Ok(app)
-    }
-}
-impl Drop for Temp {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.0);
-    }
-}
-fn wait(app: &mut App, done: impl Fn(&App) -> bool) {
-    let deadline = Instant::now() + Duration::from_secs(5);
-    while !done(app) {
-        app.poll();
-        assert!(Instant::now() < deadline, "background timeout");
-        thread::sleep(Duration::from_millis(1));
-    }
-}
-fn key(app: &mut App, code: KeyCode, modifiers: KeyModifiers) {
-    input::handle(app, KeyEvent::new(code, modifiers));
-}
+use std::time::Instant;
+use std::{fs, io};
+mod support;
+use support::{click, modified as key, Fixture as Temp};
+
 fn draw(app: &mut App, w: u16, h: u16) -> io::Result<String> {
-    let mut terminal = Terminal::new(TestBackend::new(w, h))?;
-    terminal.draw(|f| ui::draw(f, app))?;
-    for (r, _) in &app.mouse.regions {
-        assert!(r.right() <= w && r.bottom() <= h);
-    }
-    Ok(terminal
-        .backend()
-        .buffer()
-        .content
-        .iter()
-        .map(|c| c.symbol())
-        .collect())
+    support::text(app, w, h)
 }
-fn click(app: &mut App, target: Target) {
-    let r = app
-        .mouse
-        .regions
-        .iter()
-        .find(|(_, t)| *t == target)
-        .expect("mouse target")
-        .0;
-    mouse::handle(
-        app,
-        MouseEvent {
-            kind: MouseEventKind::Down(MouseButton::Left),
-            column: r.x,
-            row: r.y,
-            modifiers: KeyModifiers::NONE,
-        },
-    );
-}
+
 fn mouse_event(app: &mut App, kind: MouseEventKind, x: u16, y: u16) {
     mouse::handle(
         app,
@@ -141,7 +76,7 @@ fn geometry_reserves_track_and_thumb_matches_entry_position() {
 }
 #[test]
 fn fixed_scrollbar_both_layouts_profiles_and_no_listing_reflow() -> io::Result<()> {
-    let temp = Temp::new()?;
+    let temp = Temp::new("scrollbar")?;
     let mut app = populated(&temp)?;
     for profile in [PaletteProfile::ClassicDn, PaletteProfile::Terminal] {
         app.config.palette = profile;
@@ -217,7 +152,7 @@ fn fixed_scrollbar_both_layouts_profiles_and_no_listing_reflow() -> io::Result<(
 }
 #[test]
 fn arrows_page_clicks_drag_wheel_and_selection_preservation() -> io::Result<()> {
-    let temp = Temp::new()?;
+    let temp = Temp::new("scrollbar")?;
     let mut app = populated(&temp)?;
     draw(&mut app, 80, 25)?;
     app.panels[0].cursor = 1;
@@ -283,7 +218,7 @@ fn arrows_page_clicks_drag_wheel_and_selection_preservation() -> io::Result<()> 
 }
 #[test]
 fn dragging_cancels_on_key_resize_and_modal_controls_stay_on_top() -> io::Result<()> {
-    let temp = Temp::new()?;
+    let temp = Temp::new("scrollbar")?;
     let mut app = populated(&temp)?;
     draw(&mut app, 80, 25)?;
     click(&mut app, Target::Scrollbar(0, ScrollAction::Thumb));

@@ -6,7 +6,7 @@ use crate::{
     mouse::Target,
 };
 use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 pub struct WindowList {
     pub ids: Vec<WindowId>,
@@ -18,13 +18,13 @@ pub struct WindowList {
 }
 impl WindowList {
     pub fn keep_visible(&mut self) {
-        self.cursor = self.cursor.min(self.ids.len().saturating_sub(1));
-        if self.cursor < self.offset {
-            self.offset = self.cursor;
-        }
-        if self.cursor >= self.offset + self.rows.max(1) {
-            self.offset = self.cursor + 1 - self.rows.max(1);
-        }
+        crate::list_state::ListViewport::fit(
+            &mut self.cursor,
+            &mut self.offset,
+            self.rows.max(1),
+            Some(self.ids.len().saturating_sub(1)),
+            None,
+        );
     }
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -174,9 +174,8 @@ pub fn mouse(app: &mut App, event: MouseEvent, target: Option<Target>) {
             return;
         };
         let now = Instant::now();
-        let double = list.last_click.is_some_and(|(last, time)| {
-            last == id && now.duration_since(time) < Duration::from_millis(400)
-        });
+        let double =
+            crate::list_state::ClickTracker::STRICT.matches(list.last_click.as_ref(), &id, now);
         list.last_click = Some((id, now));
         double
     } else {

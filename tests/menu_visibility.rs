@@ -1,74 +1,25 @@
-use crossterm::event::{
-    KeyCode as K, KeyEvent, KeyModifiers as M, MouseButton, MouseEvent, MouseEventKind,
-};
+use crossterm::event::{KeyCode as K, KeyModifiers as M};
 use dn::{
     app::App,
     config::Config,
-    input,
-    mouse::{self, Target},
+    mouse::Target,
     settings::{self, Setting, SettingsKind},
-    testing::{backend::TestBackend, Buffer, Terminal},
+    testing::Buffer,
     ui,
 };
-use std::{
-    fs, io,
-    path::PathBuf,
-    sync::atomic::{AtomicU64, Ordering},
-    time::{Duration, Instant},
-};
-struct Temp(PathBuf);
-impl Drop for Temp {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.0);
-    }
-}
+use std::{fs, io, time::Instant};
+mod support;
+use support::{click, modified as key, Fixture as Temp};
 fn fixture() -> io::Result<(Temp, App)> {
-    static NEXT: AtomicU64 = AtomicU64::new(0);
-    let temp = Temp(std::env::temp_dir().join(format!(
-        "dn-menu-hide-{}-{}",
-        std::process::id(),
-        NEXT.fetch_add(1, Ordering::Relaxed)
-    )));
-    fs::create_dir(&temp.0)?;
+    let temp = Temp::new("menu-hide")?;
     for i in 0..80 {
         fs::write(temp.0.join(format!("item-{i:03}")), "fixture")?;
     }
-    let mut app = App::new(temp.0.clone())?;
-    let deadline = Instant::now() + Duration::from_secs(5);
-    while app.panels.iter().any(|p| p.loading) {
-        app.poll();
-        assert!(Instant::now() < deadline);
-        std::thread::sleep(Duration::from_millis(1));
-    }
-    app.config.save_on_exit = false;
+    let app = temp.app()?;
     Ok((temp, app))
 }
 fn draw(app: &mut App) -> io::Result<Buffer> {
-    let mut t = Terminal::new(TestBackend::new(80, 25))?;
-    t.draw(|f| ui::draw(f, app))?;
-    Ok(t.backend().buffer().clone())
-}
-fn key(app: &mut App, code: K, mods: M) {
-    input::handle(app, KeyEvent::new(code, mods));
-}
-fn click(app: &mut App, target: Target) {
-    let r = app
-        .mouse
-        .regions
-        .iter()
-        .rev()
-        .find(|(_, t)| *t == target)
-        .unwrap()
-        .0;
-    mouse::handle(
-        app,
-        MouseEvent {
-            kind: MouseEventKind::Down(MouseButton::Left),
-            column: r.x,
-            row: r.y,
-            modifiers: M::NONE,
-        },
-    );
+    support::draw(app, 80, 25)
 }
 fn top(buffer: &Buffer) -> String {
     (0..80).map(|x| buffer[(x, 0)].symbol()).collect()

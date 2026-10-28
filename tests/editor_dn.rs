@@ -1,5 +1,4 @@
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
-use dn::testing::{backend::TestBackend, Terminal};
+use crossterm::event::{KeyCode, KeyModifiers};
 use dn::{
     app::App,
     config::Config,
@@ -10,59 +9,11 @@ use dn::{
         search::{self, ReplaceSession, SearchOptions},
         EditorAction as A, Modal,
     },
-    input,
-    mouse::{self, Target},
-    ui,
+    mouse::Target,
 };
-use std::{
-    fs, io,
-    path::PathBuf,
-    sync::atomic::{AtomicU64, Ordering},
-    thread,
-    time::{Duration, Instant},
-};
-struct Temp(PathBuf);
-impl Temp {
-    fn new() -> io::Result<Self> {
-        static NEXT: AtomicU64 = AtomicU64::new(0);
-        let path = std::env::temp_dir().join(format!(
-            "dn-editor-tools-{}-{}",
-            std::process::id(),
-            NEXT.fetch_add(1, Ordering::Relaxed)
-        ));
-        fs::create_dir(&path)?;
-        Ok(Self(path))
-    }
-    fn app(&self) -> io::Result<App> {
-        let mut app = App::new(self.0.clone())?;
-        wait(&mut app);
-        Ok(app)
-    }
-}
-impl Drop for Temp {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.0);
-    }
-}
-fn wait(app: &mut App) {
-    let deadline = Instant::now() + Duration::from_secs(5);
-    while app.panels.iter().any(|panel| panel.loading)
-        || app
-            .desktop
-            .active_editor()
-            .is_some_and(|editor| editor.busy())
-    {
-        app.poll();
-        assert!(Instant::now() < deadline);
-        thread::sleep(Duration::from_millis(1));
-    }
-}
-fn key(app: &mut App, code: KeyCode) {
-    modified(app, code, KeyModifiers::NONE);
-}
-fn modified(app: &mut App, code: KeyCode, modifiers: KeyModifiers) {
-    input::handle(app, KeyEvent::new(code, modifiers));
-}
+use std::{fs, io};
+mod support;
+use support::{key, modified, render, wait, Fixture as Temp};
 fn buffer(app: &App) -> &Buffer {
     app.desktop
         .active_editor()
@@ -75,34 +26,10 @@ fn begin(app: &mut App, text: &str) {
     editor::open(app, true);
     editor::paste(app, text);
 }
-fn render(app: &mut App, width: u16, height: u16) -> io::Result<Terminal<TestBackend>> {
-    let mut terminal = Terminal::new(TestBackend::new(width, height))?;
-    terminal.draw(|frame| ui::draw(frame, app))?;
-    assert!(app
-        .mouse
-        .regions
-        .iter()
-        .all(|(r, _)| r.right() <= width && r.bottom() <= height));
-    Ok(terminal)
-}
 fn click(app: &mut App, command: A) {
-    let rect = app
-        .mouse
-        .regions
-        .iter()
-        .find(|(_, t)| *t == Target::Editor(command))
-        .unwrap()
-        .0;
-    mouse::handle(
-        app,
-        MouseEvent {
-            kind: MouseEventKind::Down(MouseButton::Left),
-            column: rect.x,
-            row: rect.y,
-            modifiers: KeyModifiers::NONE,
-        },
-    );
+    support::click(app, Target::Editor(command));
 }
+
 fn search_field(app: &mut App, query: &str, replacement: Option<&str>) {
     if let Some(Modal::Search(dialog)) = app
         .desktop
@@ -280,7 +207,7 @@ fn replacement_snapshot_wrap_skip_growth_empty_and_atomic_all_undo() {
 
 #[test]
 fn original_keys_menu_precedence_and_deferred_function_keys() -> io::Result<()> {
-    let temp = Temp::new()?;
+    let temp = Temp::new("editor-tools")?;
     let mut app = temp.app()?;
     begin(&mut app, "one two");
     key(&mut app, KeyCode::F(10));
@@ -362,7 +289,7 @@ fn original_keys_menu_precedence_and_deferred_function_keys() -> io::Result<()> 
 
 #[test]
 fn multiple_open_documents_preserve_close_guards_and_shared_clipboard() -> io::Result<()> {
-    let temp = Temp::new()?;
+    let temp = Temp::new("editor-tools")?;
     fs::write(temp.0.join("second"), "second\r\n")?;
     let mut app = temp.app()?;
     begin(&mut app, "original");
@@ -400,7 +327,7 @@ fn multiple_open_documents_preserve_close_guards_and_shared_clipboard() -> io::R
 
 #[test]
 fn save_as_and_failed_save_affect_only_their_document() -> io::Result<()> {
-    let temp = Temp::new()?;
+    let temp = Temp::new("editor-tools")?;
     fs::write(temp.0.join("second"), "second")?;
     let mut app = temp.app()?;
     begin(&mut app, "first");
@@ -442,7 +369,7 @@ fn save_as_and_failed_save_affect_only_their_document() -> io::Result<()> {
 
 #[test]
 fn find_scope_reverse_origin_and_prompted_replace_cancel() -> io::Result<()> {
-    let temp = Temp::new()?;
+    let temp = Temp::new("editor-tools")?;
     let mut app = temp.app()?;
     begin(&mut app, "foo x foo y foo");
     key(&mut app, KeyCode::F(7));
@@ -492,7 +419,7 @@ fn find_scope_reverse_origin_and_prompted_replace_cancel() -> io::Result<()> {
 
 #[test]
 fn change_all_single_undo_and_search_options_disabled_without_selection() -> io::Result<()> {
-    let temp = Temp::new()?;
+    let temp = Temp::new("editor-tools")?;
     let mut app = temp.app()?;
     begin(&mut app, "a a a");
     modified(&mut app, KeyCode::F(7), KeyModifiers::CONTROL);
@@ -526,7 +453,7 @@ fn change_all_single_undo_and_search_options_disabled_without_selection() -> io:
 
 #[test]
 fn editor_preferences_tabs_menu_mouse_and_configuration_roundtrip() -> io::Result<()> {
-    let temp = Temp::new()?;
+    let temp = Temp::new("editor-tools")?;
     let path = temp.0.join("config");
     fs::write(
         &path,
@@ -578,7 +505,7 @@ fn editor_preferences_tabs_menu_mouse_and_configuration_roundtrip() -> io::Resul
 
 #[test]
 fn all_editor_menu_roots_mnemonics_mouse_targets_and_clipboard_modern_aliases() -> io::Result<()> {
-    let temp = Temp::new()?;
+    let temp = Temp::new("editor-tools")?;
     let mut app = temp.app()?;
     begin(&mut app, "alpha beta");
     for root in [0, 1, 2, 4, 5, 6] {
@@ -619,7 +546,7 @@ fn all_editor_menu_roots_mnemonics_mouse_targets_and_clipboard_modern_aliases() 
 
 #[test]
 fn block_menu_reuses_selection_clipboard_actions_and_keeps_paragraph_dimmed() -> io::Result<()> {
-    let temp = Temp::new()?;
+    let temp = Temp::new("editor-tools")?;
     let mut app = temp.app()?;
     begin(&mut app, "alpha beta");
     assert_eq!(

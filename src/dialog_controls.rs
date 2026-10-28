@@ -47,91 +47,87 @@ pub(crate) fn key(app: &mut App, event: KeyEvent, scope: Focus) -> bool {
     let Some(p) = proposal else {
         return false;
     };
-    if !p.current(app) {
-        return true;
+    apply(app, p, tool_action);
+    true
+}
+
+/// Common proposal application. State and semantic actions stay controller-owned.
+pub(crate) fn apply(
+    app: &mut App,
+    proposal: crate::turbo::dialog_spec::Proposal,
+    action: impl FnOnce(&mut App, Target),
+) {
+    proposal.deliver(app, |app, focus, target| {
+        set_focus(app, crate::focus::current(app), focus);
+        if let Some(target) = target {
+            action(app, target);
+        }
+    });
+}
+fn set_focus(app: &mut App, scope: Focus, next: usize) {
+    if let Some(adapter) = crate::dialog_adapter::get(scope) {
+        (adapter.set_focus)(app, next);
+        return;
     }
     match scope {
-        Focus::ConfigImport => {
-            if let Some(m) = app.modals.config_import_mut() {
-                m.focus = p.focus;
+        Focus::Settings => {
+            if let Some(m) = app.modals.settings_mut() {
+                m.cursor = next;
+            }
+        }
+        Focus::Prompt => {
+            if let Some(m) = app.modals.prompt_mut() {
+                m.focus = next;
+            }
+        }
+        Focus::EditorModal => {
+            if let Some(e) = app.desktop.active_editor_mut() {
+                match e.modals.editor_modal_mut() {
+                    Some(crate::editor::Modal::Search(d)) => d.focus = next,
+                    Some(crate::editor::Modal::Replace(d)) => d.focus = next,
+                    Some(
+                        crate::editor::Modal::Prompt { focus: f, .. }
+                        | crate::editor::Modal::ConfirmClose { focus: f },
+                    ) => *f = next,
+                    _ => {}
+                }
+            }
+        }
+        Focus::ViewerSearch => {
+            if let Some(d) = app
+                .desktop
+                .active_viewer_mut()
+                .and_then(|v| v.modals.viewer_search_mut())
+            {
+                d.focus = next;
             }
         }
         Focus::Pattern => {
             if let Some(m) = app.modals.pattern_mut() {
-                m.focus = p.focus;
+                m.focus = next;
             }
         }
         Focus::Columns => {
             if let Some(m) = app.modals.columns_dialog_mut() {
-                m.cursor = p.focus;
-            }
-        }
-        Focus::Tree => {
-            if let Some(m) = app.modals.directory_tree_mut() {
-                m.focus = p.focus;
-            }
-        }
-        Focus::UserMenu => {
-            if let Some(m) = app.user_menu.modals.user_menu_mut() {
-                m.focus = p.focus;
-            }
-        }
-        Focus::Utility => match app.utilities.modals.utility_dialog() {
-            Some(crate::utilities::Kind::Characters) => app.utilities.chart.focus = p.focus,
-            _ => app.utilities.focus = p.focus,
-        },
-        Focus::WindowList => {
-            if let Some(m) = app.modals.window_list_mut() {
-                m.focus = p.focus;
-            }
-        }
-        Focus::CommandHistory => {
-            if let Some(m) = app.command_line.modals.command_history_mut() {
-                m.focus = p.focus;
+                m.cursor = next;
             }
         }
         Focus::Colors => {
             if let Some(m) = app.modals.color_dialog_mut() {
-                m.cursor = p.focus;
+                m.cursor = next;
             }
         }
         Focus::SaverSetup => {
             if let Some(m) = app.screensaver.modals.screensaver_mut() {
-                m.cursor = p.focus;
-            }
-        }
-        Focus::FileTools => {
-            if let Some(
-                crate::file_tools::ToolDialog::History { focus, .. }
-                | crate::file_tools::ToolDialog::Compare { focus }
-                | crate::file_tools::ToolDialog::Export { focus, .. },
-            ) = app.file_tools.modals.file_tools_mut()
-            {
-                *focus = p.focus;
-            }
-        }
-        Focus::Archive => {
-            if let Some(m) = app.modals.archive_mut() {
-                m.focus = p.focus;
-            }
-        }
-        Focus::Discovery => {
-            if let Some(m) = app.discovery.modals.discovery_mut() {
-                m.focus = p.focus;
-            }
-        }
-        Focus::Navigation => {
-            if let Some(
-                crate::navigation_tools::Modal::Bookmarks { focus, .. }
-                | crate::navigation_tools::Modal::Filter { focus, .. },
-            ) = app.modals.navigation_dialog_mut()
-            {
-                *focus = p.focus;
+                m.cursor = next;
             }
         }
         _ => {}
     }
-    match p.action {
+}
+
+pub(crate) fn tool_action(app: &mut App, target: Target) {
+    match Some(target) {
         Some(Target::CloseDialog) => {
             app.pop_dialog();
         }
@@ -166,5 +162,4 @@ pub(crate) fn key(app: &mut App, event: KeyEvent, scope: Focus) -> bool {
         Some(Target::Navigation(a)) => crate::navigation_tools::action(app, a),
         _ => {}
     }
-    true
 }

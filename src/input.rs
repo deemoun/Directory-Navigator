@@ -1,5 +1,5 @@
+use crate::app::App;
 use crate::focus::{self, Focus};
-use crate::{app::App, operations::Kind, panel::SortMode};
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 
 pub fn handle(app: &mut App, mut key: KeyEvent) {
@@ -42,7 +42,7 @@ fn handle_key(app: &mut App, key: KeyEvent) {
         return;
     }
     if focus == Focus::WindowList {
-        crate::windowing::key(app, key);
+        crate::dialog_adapter::key(app, key, focus);
         return;
     }
     if key.code == KeyCode::Char('0') && key.modifiers == KeyModifiers::ALT {
@@ -72,16 +72,11 @@ fn handle_key(app: &mut App, key: KeyEvent) {
         crate::dialog::message_key(app, key.code);
         return;
     }
-    if focus == Focus::ConfigImport {
-        crate::config_import::key(app, key);
+    if crate::dialog_adapter::key(app, key, focus) {
         return;
     }
     if focus == Focus::Welcome {
         crate::welcome::key(app, key);
-        return;
-    }
-    if focus == Focus::CommandHistory {
-        crate::command_line::history::key(app, key);
         return;
     }
     if focus == Focus::SaverSetup {
@@ -114,34 +109,6 @@ fn handle_key(app: &mut App, key: KeyEvent) {
     }
     if focus == Focus::Colors {
         crate::palette::key(app, key.code);
-        return;
-    }
-    if focus == Focus::Navigation {
-        crate::navigation_tools::key(app, key);
-        return;
-    }
-    if focus == Focus::Utility {
-        crate::utilities::key(app, key);
-        return;
-    }
-    if focus == Focus::FileTools {
-        crate::file_tools::key(app, key);
-        return;
-    }
-    if focus == Focus::Archive {
-        crate::archive::key(app, key);
-        return;
-    }
-    if focus == Focus::UserMenu {
-        crate::user_menu::key(app, key);
-        return;
-    }
-    if focus == Focus::Tree {
-        crate::directory_tree::key(app, key);
-        return;
-    }
-    if focus == Focus::Discovery {
-        crate::discovery::key(app, key);
         return;
     }
     if focus == Focus::Settings {
@@ -220,38 +187,12 @@ fn handle_key(app: &mut App, key: KeyEvent) {
         return;
     }
     if key.modifiers.contains(KeyModifiers::ALT) {
+        if crate::commands::manager_modified(app, key) {
+            return;
+        }
         match key.code {
             KeyCode::Char(c) if ('1'..='9').contains(&c) => {
                 crate::navigation_tools::go(app, c as usize - '1' as usize)
-            }
-            KeyCode::Delete => crate::navigation_tools::open_filter(app),
-            KeyCode::Char('y') => crate::utilities::open(app, crate::utilities::Kind::Memory),
-            KeyCode::Backspace => crate::file_tools::open_history(
-                app,
-                crate::file_tools::history::HistoryKind::Directory,
-            ),
-            KeyCode::PageUp => {
-                crate::file_tools::open_history(app, crate::file_tools::history::HistoryKind::Edit)
-            }
-            KeyCode::PageDown => {
-                crate::file_tools::open_history(app, crate::file_tools::history::HistoryKind::View)
-            }
-            KeyCode::F(8) => crate::command_line::history::open(app),
-            KeyCode::Char('l') => crate::file_tools::open_export(app),
-            KeyCode::F(9) => crate::plugins::host::open(app, crate::plugins::TETRIS),
-            KeyCode::F(7) => crate::quick_search::open(app),
-            KeyCode::Char('x') => app.request_exit(),
-            KeyCode::Char('e') => app.open_file_info(),
-            KeyCode::Char('k') => app.open_columns(),
-            KeyCode::Char('t') => app.prompt_goto(),
-            KeyCode::Char('r') => app.panels[app.active].refresh(app.config.show_hidden),
-            KeyCode::Char('s') => app.open_settings(crate::settings::SettingsKind::FileManager),
-            KeyCode::Char('b') => {
-                crate::menu::open_submenu(
-                    app,
-                    crate::menu::RootId::Panel,
-                    crate::menu::MenuId::Sort,
-                );
             }
             KeyCode::Char(c) => {
                 crate::menu::open_mnemonic(app, c);
@@ -261,27 +202,11 @@ fn handle_key(app: &mut App, key: KeyEvent) {
         return;
     }
     if key.modifiers.contains(KeyModifiers::CONTROL) {
-        match key.code {
-            KeyCode::Enter => app.open_external_current(),
-            KeyCode::Char(c) if ('1'..='9').contains(&c) => {
-                crate::navigation_tools::assign(app, c as usize - '1' as usize)
-            }
-            KeyCode::Char('k') => crate::plugins::host::open(app, crate::plugins::CALCULATOR),
-            KeyCode::Char('b') => crate::utilities::open(app, crate::utilities::Kind::Characters),
-            KeyCode::Char('c') => crate::file_tools::open_compare(app),
-            KeyCode::Char('t') => crate::directory_tree::open(app),
-            KeyCode::Char('q') => crate::quick_view::toggle(app),
-            KeyCode::F(7) => crate::discovery::open_find(app),
-            KeyCode::F(3) => app.panels[app.active].set_sort(SortMode::Name),
-            KeyCode::F(4) => app.panels[app.active].set_sort(SortMode::Extension),
-            KeyCode::F(5) => app.panels[app.active].set_sort(SortMode::Date),
-            KeyCode::F(6) => app.panels[app.active].set_sort(SortMode::Size),
-            KeyCode::Char('h') => app.toggle_hidden(),
-            KeyCode::Char('l') => app.prompt_goto(),
-            KeyCode::Char('a') => app.panels[app.active].select_visible(),
-            KeyCode::Char('u') => app.panels[app.active].selected.clear(),
-            KeyCode::Char('r') => app.panels[app.active].refresh(app.config.show_hidden),
-            _ => {}
+        if crate::commands::manager_modified(app, key) {
+            return;
+        }
+        if let KeyCode::Char(c @ '1'..='9') = key.code {
+            crate::navigation_tools::assign(app, c as usize - '1' as usize);
         }
         return;
     }
@@ -289,37 +214,7 @@ fn handle_key(app: &mut App, key: KeyEvent) {
         return;
     }
 
-    let panel = &mut app.panels[app.active];
-    match key.code {
-        KeyCode::Char('+') => app.open_pattern(true),
-        KeyCode::Char('-') => app.open_pattern(false),
-
-        KeyCode::Char('*') => crate::menu::execute(app, crate::menu::Action::InvertSelection),
-        KeyCode::F(2) if key.modifiers.contains(KeyModifiers::SHIFT) => {
-            let next = match panel.sort {
-                SortMode::Name => SortMode::Extension,
-                SortMode::Extension => SortMode::Size,
-                SortMode::Size => SortMode::Date,
-                SortMode::Date => SortMode::Name,
-            };
-            panel.set_sort(next);
-        }
-        KeyCode::F(2) => crate::user_menu::open(app, crate::user_menu::Source::Auto),
-        KeyCode::F(4) => crate::editor::open(app, key.modifiers.contains(KeyModifiers::SHIFT)),
-        KeyCode::F(5) => app.prompt_operation(Kind::Copy, false),
-        KeyCode::F(3) => app.open_viewer(),
-        KeyCode::F(6) => {
-            app.prompt_operation(Kind::Move, key.modifiers.contains(KeyModifiers::SHIFT))
-        }
-        KeyCode::F(7) => app.prompt_operation(Kind::Mkdir, false),
-        KeyCode::F(8) => app.prompt_operation(Kind::Delete, false),
-        KeyCode::Delete if app.config.delete_key => app.prompt_operation(Kind::Delete, false),
-        KeyCode::F(9) => {
-            crate::menu::open_root(app, crate::menu::RootId::File);
-        }
-        KeyCode::F(1) => crate::dialog::keyboard_help(app),
-        _ => {}
-    }
+    crate::commands::manager_key(app, key);
 }
 
 /// Paste uses the same topmost recipient as keyboard and mouse input.

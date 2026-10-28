@@ -1,3 +1,4 @@
+use crate::dialog_theme as theme;
 use crate::turbo::dialog_spec::{scope, Control, ControlKind, DialogSpec};
 pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
     if let Some(s) = colors_spec(app, area) {
@@ -51,7 +52,7 @@ pub(crate) fn colors_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
         ));
     }
     spec.caption(
-        Paragraph::new(app.config.language.text("Preview")).style(dos(0x70)),
+        Paragraph::new(app.config.language.text("Preview")).style(dos(theme::TEXT)),
         Rect::new(rect.x + 3, rect.y + 6, 65, 1),
     );
     for (i, attr, label) in [
@@ -67,7 +68,7 @@ pub(crate) fn colors_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
         );
     }
     spec.caption(
-        Paragraph::new(" 12:34:56 ").style(dos(0x71)),
+        Paragraph::new(" 12:34:56 ").style(dos(theme::HEADING)),
         Rect::new(rect.right() - 17, rect.y + 7, 10, 1),
     );
     spec.caption(
@@ -80,7 +81,7 @@ pub(crate) fn colors_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
                 .language
                 .text("C/T or Space chooses · Enter applies · Esc restores"),
         )
-        .style(dos(0x70)),
+        .style(dos(theme::TEXT)),
         Rect::new(rect.x + 3, rect.y + 14, 66, 1),
     );
     for (index, (label, target, x)) in [

@@ -86,7 +86,9 @@ pub(super) fn draw_viewer(frame: &mut impl Frame, app: &App, area: Rect) {
     let entries = crate::menu::definition::VIEWER_BAR;
     let cells = Layout::horizontal(entries.iter().map(|entry| entry.width)).split(regions[3]);
     for (i, entry) in entries.iter().enumerate() {
-        let enabled = viewer.text_ready() && entry.action.is_some();
+        let enabled = entry
+            .action
+            .is_some_and(|action| crate::commands::viewer_available(viewer, action));
         let key = format!(
             "{} ",
             crate::shortcuts::label(

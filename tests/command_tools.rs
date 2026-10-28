@@ -1,5 +1,4 @@
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
-use dn::testing::{backend::TestBackend, Terminal};
+use crossterm::event::{KeyCode, KeyModifiers};
 use dn::{
     app::App,
     command_line::{
@@ -9,47 +8,12 @@ use dn::{
     file_tools::clipboard,
     focus::{self, Focus},
     input, menu,
-    mouse::{self, Target},
-    ui,
+    mouse::Target,
 };
-use std::{
-    fs, io,
-    path::{Path, PathBuf},
-    sync::atomic::{AtomicU64, Ordering},
-    thread,
-    time::{Duration, Instant},
-};
-struct Temp(PathBuf);
-impl Temp {
-    fn new() -> io::Result<Self> {
-        static NEXT: AtomicU64 = AtomicU64::new(0);
-        let p = std::env::temp_dir().join(format!(
-            "dn-command-tools-{}-{}",
-            std::process::id(),
-            NEXT.fetch_add(1, Ordering::Relaxed)
-        ));
-        fs::create_dir(&p)?;
-        Ok(Self(p))
-    }
-    fn app(&self) -> io::Result<App> {
-        let mut a = App::new(self.0.clone())?;
-        let end = Instant::now() + Duration::from_secs(5);
-        while a.panels.iter().any(|p| p.loading) {
-            a.poll();
-            assert!(Instant::now() < end);
-            thread::sleep(Duration::from_millis(1));
-        }
-        Ok(a)
-    }
-}
-impl Drop for Temp {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.0);
-    }
-}
-fn key(a: &mut App, c: KeyCode, m: KeyModifiers) {
-    input::handle(a, KeyEvent::new(c, m));
-}
+use std::{fs, io, path::Path};
+mod support;
+use support::{click, modified as key, Fixture as Temp};
+
 fn plain(a: &mut App, c: KeyCode) {
     key(a, c, KeyModifiers::NONE);
 }
@@ -58,40 +22,13 @@ fn remember(a: &mut App, s: &str) {
     plain(a, KeyCode::Enter);
     a.command_line.pending = None;
 }
-fn draw(a: &mut App, w: u16, h: u16) -> io::Result<String> {
-    let mut t = Terminal::new(TestBackend::new(w, h))?;
-    t.draw(|f| ui::draw(f, a))?;
-    for (r, _) in &a.mouse.regions {
-        assert!(r.right() <= w && r.bottom() <= h, "{r:?}");
-    }
-    Ok(t.backend()
-        .buffer()
-        .content
-        .iter()
-        .map(|c| c.symbol())
-        .collect())
+fn draw(app: &mut App, w: u16, h: u16) -> io::Result<String> {
+    support::text(app, w, h)
 }
-fn click(a: &mut App, t: Target) {
-    let r = a
-        .mouse
-        .regions
-        .iter()
-        .find(|(_, v)| *v == t)
-        .expect("target")
-        .0;
-    mouse::handle(
-        a,
-        MouseEvent {
-            kind: MouseEventKind::Down(MouseButton::Left),
-            column: r.x,
-            row: r.y,
-            modifiers: KeyModifiers::NONE,
-        },
-    );
-}
+
 #[test]
 fn history_order_dedup_limit_filter_and_safe_recall() -> io::Result<()> {
-    let t = Temp::new()?;
+    let t = Temp::new("command-tools")?;
     let mut a = t.app()?;
     for i in 0..105 {
         remember(&mut a, &format!("echo {i}"));
@@ -145,7 +82,7 @@ fn history_order_dedup_limit_filter_and_safe_recall() -> io::Result<()> {
 }
 #[test]
 fn history_empty_editing_navigation_resize_mouse_and_modal_precedence() -> io::Result<()> {
-    let t = Temp::new()?;
+    let t = Temp::new("command-tools")?;
     let mut a = t.app()?;
     history::open(&mut a);
     assert!(draw(&mut a, 80, 25)?.contains("No commands"));
@@ -211,7 +148,7 @@ fn history_empty_editing_navigation_resize_mouse_and_modal_precedence() -> io::R
 }
 #[test]
 fn copy_selection_order_filters_and_clipboard_failures() -> io::Result<()> {
-    let t = Temp::new()?;
+    let t = Temp::new("command-tools")?;
     fs::create_dir(t.0.join("folder"))?;
     fs::write(t.0.join("a 世界.txt"), "")?;
     fs::write(t.0.join("b.txt"), "")?;
@@ -272,7 +209,7 @@ fn copy_selection_order_filters_and_clipboard_failures() -> io::Result<()> {
 #[test]
 fn undecodable_and_newline_native_entries_do_not_replace_clipboard() -> io::Result<()> {
     use std::{ffi::OsString, os::unix::ffi::OsStringExt};
-    let t = Temp::new()?;
+    let t = Temp::new("command-tools")?;
     let bad = OsString::from_vec(vec![b'x', 0xff]);
     fs::write(t.0.join("normal"), "")?;
     fs::write(t.0.join("newline\nfile"), "")?;
@@ -302,7 +239,7 @@ fn undecodable_and_newline_native_entries_do_not_replace_clipboard() -> io::Resu
 }
 #[test]
 fn menu_actions_and_translated_geometry() -> io::Result<()> {
-    let t = Temp::new()?;
+    let t = Temp::new("command-tools")?;
     let mut a = t.app()?;
     assert!(menu::items(2)
         .iter()

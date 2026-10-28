@@ -4,11 +4,7 @@ use crate::{
     traversal::{self, Event, Hit, Job, Request, Size, Stats},
 };
 use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
-use std::{
-    path::PathBuf,
-    sync::mpsc::TryRecvError,
-    time::{Duration, Instant},
-};
+use std::{path::PathBuf, sync::mpsc::TryRecvError, time::Instant};
 #[derive(Clone)]
 pub struct Preferences {
     pub pattern: String,
@@ -109,14 +105,14 @@ impl Modal {
     }
     pub fn keep_visible(&mut self) {
         self.rows = self.rows.max(1);
-        self.cursor = self.cursor.min(self.count().saturating_sub(1));
-        if self.cursor < self.offset {
-            self.offset = self.cursor;
-        }
-        if self.cursor >= self.offset + self.rows {
-            self.offset = self.cursor + 1 - self.rows;
-        }
-        self.offset = self.offset.min(self.count().saturating_sub(1));
+        let last = self.count().saturating_sub(1);
+        crate::list_state::ListViewport::fit(
+            &mut self.cursor,
+            &mut self.offset,
+            self.rows,
+            Some(last),
+            Some(last),
+        );
     }
 }
 fn prepare(app: &mut App) {
@@ -240,9 +236,11 @@ pub fn action(app: &mut App, command: Action) {
             if index < m.count() {
                 m.cursor = index;
                 let now = Instant::now();
-                let double = m.last_click.is_some_and(|(old, when)| {
-                    old == index && now.duration_since(when) <= Duration::from_millis(400)
-                });
+                let double = crate::list_state::ClickTracker::DISCOVERY.matches(
+                    m.last_click.as_ref(),
+                    &index,
+                    now,
+                );
                 m.last_click = Some((index, now));
                 if double && m.kind == Kind::FindResults {
                     action(app, Action::Jump);
@@ -336,11 +334,7 @@ pub fn mouse(app: &mut App, event: MouseEvent, target: Option<crate::mouse::Targ
         }
         MouseEventKind::ScrollUp | MouseEventKind::ScrollDown => {
             if let Some(m) = app.discovery.modals.discovery_mut() {
-                m.step(if event.kind == MouseEventKind::ScrollUp {
-                    -3
-                } else {
-                    3
-                });
+                m.step(crate::list_state::wheel_delta(event.kind));
             }
         }
         _ => {}

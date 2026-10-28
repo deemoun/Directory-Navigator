@@ -187,6 +187,19 @@ pub(crate) struct Proposal {
     pub action: Option<Target>,
 }
 impl Proposal {
+    /// The shared ownership gate: focus and action are delivered together only
+    /// while the originating modal/document is still the foreground owner.
+    pub fn deliver(
+        self,
+        app: &mut App,
+        apply: impl FnOnce(&mut App, usize, Option<Target>),
+    ) -> bool {
+        if !self.current(app) {
+            return false;
+        }
+        apply(app, self.focus, self.action);
+        true
+    }
     pub fn current(&self, app: &App) -> bool {
         match self.scope {
             ControlScope::Modal(scope) => app
@@ -207,14 +220,7 @@ pub(crate) fn scope(app: &App, focus: Focus) -> Option<ModalInfo> {
     app.visible_modals().into_iter().find(|m| m.focus == focus)
 }
 pub(crate) fn centered(area: Rect, width: u16, height: u16) -> Rect {
-    let width = width.min(area.width);
-    let height = height.min(area.height);
-    Rect::new(
-        area.x + (area.width - width) / 2,
-        area.y + (area.height - height) / 2,
-        width,
-        height,
-    )
+    crate::dialog_theme::centered(area, width, height)
 }
 pub(crate) fn input_area(app: &App) -> Rect {
     // Keyboard input can arrive before the first frame. Geometry is also valid
@@ -767,11 +773,23 @@ mod tests {
             app.modals.set_prompt(None);
             app.prompt_goto();
             assert!(!proposal.current(&app));
+            assert!(!proposal.deliver(&mut app, |_, _, _| panic!("retired proposal applied")));
+            let live = crate::ui::prompt_spec(&app, input_area(&app))
+                .unwrap()
+                .proposal(Some(Target::PromptHelp));
+            assert!(live.deliver(&mut app, |app, _, action| {
+                assert_eq!(action, Some(Target::PromptHelp));
+                app.notice = "live proposal".into();
+            }));
+            assert_eq!(app.notice, "live proposal");
             let next = crate::ui::prompt_spec(&app, input_area(&app))
                 .unwrap()
                 .proposal(Some(Target::SubmitPrompt));
             app.modals.retire(next.scope.owner());
             assert!(!next.current(&app));
+            assert!(!next.deliver(&mut app, |_, _, _| panic!(
+                "retired owner received an action"
+            )));
             Ok(())
         })();
         std::fs::remove_dir_all(root)?;

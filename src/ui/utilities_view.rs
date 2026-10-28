@@ -1,10 +1,7 @@
+use crate::dialog_theme as theme;
 use crate::turbo::dialog_spec::{scope, Control, ControlKind, DialogSpec};
-pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
-    if let Some(s) = utility_spec(app, area) {
-        s.paint(frame, app);
-    }
-}
-use crate::painting::{Frame, Paragraph, Wrap};
+
+use crate::painting::{Paragraph, Wrap};
 use crate::presentation::layout::Rect;
 use crate::{
     app::App,
@@ -234,7 +231,7 @@ pub(crate) fn utility_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
                             display_name(value)
                         ))
                         .scroll((0, info.horizontal))
-                        .style(dos(0x70)),
+                        .style(dos(theme::TEXT)),
                         Rect::new(x, rect.y + 1 + (index - info.offset) as u16, w, 1),
                     );
                 }

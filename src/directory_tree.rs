@@ -9,7 +9,7 @@ use std::{
     fs, io,
     path::{Path, PathBuf},
     sync::mpsc::TryRecvError,
-    time::{Duration, Instant},
+    time::Instant,
 };
 pub const BRANCH_LIMIT: usize = 10_000;
 pub const CACHE_LIMIT: usize = 20_000;
@@ -251,14 +251,14 @@ impl Tree {
     }
     pub fn keep_visible(&mut self) {
         self.page_rows = self.page_rows.max(1);
-        self.cursor = self.cursor.min(self.rows.len().saturating_sub(1));
-        if self.cursor < self.offset {
-            self.offset = self.cursor;
-        }
-        if self.cursor >= self.offset + self.page_rows {
-            self.offset = self.cursor + 1 - self.page_rows;
-        }
-        self.offset = self.offset.min(self.rows.len().saturating_sub(1));
+        let last = self.rows.len().saturating_sub(1);
+        crate::list_state::ListViewport::fit(
+            &mut self.cursor,
+            &mut self.offset,
+            self.page_rows,
+            Some(last),
+            Some(last),
+        );
     }
     pub fn step(&mut self, delta: isize) {
         self.cursor = self
@@ -571,9 +571,11 @@ pub fn action(app: &mut App, command: Action) {
             tree.keep_visible();
             let now = Instant::now();
             let path = tree.rows[index].path.clone();
-            let double = tree.last_click.as_ref().is_some_and(|(old, when)| {
-                old == &path && now.duration_since(*when) < Duration::from_millis(400)
-            });
+            let double = crate::list_state::ClickTracker::STRICT.matches(
+                tree.last_click.as_ref(),
+                &path,
+                now,
+            );
             tree.last_click = Some((path, now));
             if double {
                 action(app, Action::Open);
@@ -625,11 +627,7 @@ pub fn mouse(app: &mut App, event: MouseEvent, target: Option<crate::mouse::Targ
         }
         MouseEventKind::ScrollUp | MouseEventKind::ScrollDown => {
             if let Some(tree) = app.modals.directory_tree_mut() {
-                tree.step(if event.kind == MouseEventKind::ScrollUp {
-                    -3
-                } else {
-                    3
-                });
+                tree.step(crate::list_state::wheel_delta(event.kind));
             }
         }
         _ => {}

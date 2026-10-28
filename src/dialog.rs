@@ -117,8 +117,14 @@ pub fn message_key(app: &mut crate::app::App, code: crossterm::event::KeyCode) {
 
 /// File-manager help is also available from the welcome window.
 pub fn keyboard_help(app: &mut crate::app::App) {
-    app.push_dialog(Dialog { title: " Directory Navigator — Help ",
-            message: if app.config.shortcuts.is_mac() { crate::shortcuts::MANAGER_HELP.into() } else { "Tab panels · Arrows/PgUp/PgDn/Home/End navigate\nAlt+F/U/P/M/O menus · Alt+0 windows · Alt+X exits\nEnter app/dir/archive · Ctrl+Enter OS app · F3 view · F4 edit · BS parent\nIns / Space marks · Ctrl+A all · Ctrl+U clear\n+ / - group · Alt+E info · Alt+K columns\nAlt+F7 quick search · Ctrl+F7 recursive Find\nCtrl+Q quick view · Ctrl+T tree · Alt+F9 Tetris\nCtrl+1–9 bookmarks set · Alt+1–9 go · Alt+Del filter\nCtrl+K calculator · Ctrl+B ASCII · Alt+Y memory\nCtrl+C compare · Alt+L list file\nAlt+BS directories · Alt+PgUp edits / PgDn views\nF2 user menu · Shift+F2 sort · Ctrl+F3 name / F4 ext / F5 date / F6 size\nF5 copy · F6 move · Shift+F6 rename here\nF7 mkdir · F8 Trash/delete · F9 menu · F10 exit\nCtrl+H hidden · Ctrl+L go to · Ctrl+R refresh\nClick row · Ctrl+click mark · Double-click open\nWheel scrolls · Esc cancels dialogs/operations\nType commands · Enter runs · Esc clears · Ctrl+E/X history · Alt+F8 list\nFile menu: Copy names / paths uses internal clipboard\nOptions: File associations configures Enter actions\nOptions: Import DOS settings previews DN.CFG preferences\nColors: white dirs · green exec · cyan source\nMagenta archives · blue links · yellow marks\nTrash by default; File Manager Setup changes mode.\nExisting destinations are refused; no overwrites.".into() } });
+    app.push_dialog(Dialog {
+        title: " Directory Navigator — Help ",
+        message: if app.config.shortcuts.is_mac() {
+            crate::shortcuts::MANAGER_HELP.into()
+        } else {
+            crate::commands::help::CLASSIC_MANAGER.into()
+        },
+    });
     if app.config.shortcuts.is_mac() {
         let language = app.config.language;
         if let Some(help) = app.last_dialog_mut() {

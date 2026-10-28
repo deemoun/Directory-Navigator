@@ -326,19 +326,11 @@ pub fn key(app: &mut App, key: KeyEvent) {
         })
     };
     if let Some(proposal) = proposal {
-        if !proposal.current(app) {
-            return;
-        }
-        if let Some(dialog) = app
-            .desktop
-            .active_viewer_mut()
-            .and_then(|v| v.modals.viewer_search_mut())
-        {
-            dialog.focus = proposal.focus;
-        }
-        if let Some(crate::mouse::Target::Viewer(command)) = proposal.action {
-            action(app, command);
-        }
+        crate::dialog_controls::apply(app, proposal, |app, target| {
+            if let crate::mouse::Target::Viewer(command) = target {
+                action(app, command);
+            }
+        });
         return;
     }
     let Some(viewer) = app.desktop.active_viewer_mut() else {
@@ -355,16 +347,11 @@ pub fn key(app: &mut App, key: KeyEvent) {
         return;
     }
 
+    if let Some(command) = crate::commands::viewer_key(key) {
+        action(app, command);
+        return;
+    }
     let command = match key.code {
-        KeyCode::Esc | KeyCode::F(3) => Some(Action::Close),
-        KeyCode::F(2) => Some(Action::Wrap),
-        KeyCode::F(7) => Some(if key.modifiers.contains(KeyModifiers::CONTROL) {
-            Action::Reverse
-        } else if key.modifiers.contains(KeyModifiers::SHIFT) {
-            Action::Next
-        } else {
-            Action::Find
-        }),
         KeyCode::Up => {
             viewer.step(-1);
             None

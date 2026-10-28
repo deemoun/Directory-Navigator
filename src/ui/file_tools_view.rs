@@ -1,4 +1,4 @@
-use crate::painting::{Frame, Paragraph};
+use crate::painting::Paragraph;
 use crate::presentation::{layout::Rect, text::Line};
 use crate::turbo::dialog_spec::{scope, Control, ControlKind, DialogSpec};
 use crate::{
@@ -9,11 +9,6 @@ use crate::{
     mouse::Target,
 };
 
-pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
-    if let Some(spec) = file_tools_spec(app, area) {
-        spec.paint(frame, app);
-    }
-}
 pub(crate) fn file_tools_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
     let profile = app.config.palette;
     let modal = app.file_tools.modals.file_tools()?;

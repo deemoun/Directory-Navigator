@@ -1,12 +1,9 @@
-use crate::painting::{Frame, Paragraph};
+use crate::dialog_theme as theme;
+use crate::painting::Paragraph;
 use crate::presentation::layout::Rect;
 use crate::turbo::dialog_spec::{centered, scope, Control, ControlKind, DialogSpec};
 use crate::{app::App, mouse::Target};
-pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
-    if let Some(s) = import_spec(app, area) {
-        s.paint(frame, app);
-    }
-}
+
 pub(crate) fn import_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
     let preview = app.modals.config_import()?;
     let profile = app.config.palette;
@@ -41,7 +38,7 @@ pub(crate) fn import_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
         Rect::new(rect.x + 2, rect.y + 1, rect.width - 4, rect.height - 5),
     );
     spec.caption(
-        Paragraph::new(lang.text("↑↓ / PgUp/PgDn scroll")).style(profile.dos(0x70)),
+        Paragraph::new(lang.text("↑↓ / PgUp/PgDn scroll")).style(profile.dos(theme::TEXT)),
         Rect::new(rect.x + 2, rect.bottom() - 4, rect.width - 4, 1),
     );
     let enabled = preview.can_apply();
