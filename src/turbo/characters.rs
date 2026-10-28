@@ -18,7 +18,7 @@ use turbo_vision::{
 const COLUMNS: usize = 16;
 const CELL_WIDTH: u16 = 4;
 
-fn table(chart: &Chart) -> Table {
+pub(super) fn table(chart: &Chart) -> Table {
     let rows = usize::from(chart.limit()) / COLUMNS + 1;
     let mut table = Table::new(TvRect::new(0, 0, 64, rows as i16), 0);
     table.set_show_header(false);

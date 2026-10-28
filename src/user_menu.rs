@@ -594,6 +594,9 @@ pub fn action(app: &mut App, action: Action) {
     }
 }
 pub fn key(app: &mut App, key: KeyEvent) {
+    if crate::dialog_controls::key(app, key, crate::focus::Focus::UserMenu) {
+        return;
+    }
     let Some(m) = app.user_menu.modals.user_menu_mut() else {
         return;
     };
@@ -604,17 +607,12 @@ pub fn key(app: &mut App, key: KeyEvent) {
     let review = m.review.is_some();
     match key.code {
         KeyCode::F(1) => app.push_dialog(crate::dialog::Dialog {title:" User menu help ",message:"Arrows/Page keys move; Enter activates; Right opens a submenu.\nLeft/Esc returns; ~letters~ are hotkeys.\nF2 switches local/global; F4 edits the definition.\nCtrl+R reloads after external changes.\nCommands use separate arguments, with quotes for spaces.\nWhole arguments: {file}, {name}, {dir}, {other_file},\n{other_dir}, {selected}, {shell}.\nUse an explicit shell for pipelines and scripts.\nEvery command action is reviewed before Run; arrows scroll.\nPrograms run in the normal terminal; Enter returns to DN.".into()}),
-        KeyCode::Esc => action(app, if review { Action::Cancel } else { Action::Back }),
         KeyCode::Up => m.step(-1),
         KeyCode::Down => m.step(1),
         KeyCode::PageUp => m.step(-(m.rows as isize)),
         KeyCode::PageDown => m.step(m.rows as isize),
         KeyCode::Home => m.step(isize::MIN),
         KeyCode::End => m.step(isize::MAX),
-        KeyCode::Tab => m.focus = crate::control_focus::cycle(m.focus, if review { 3 } else { 4 }, false),
-        KeyCode::BackTab => {
-            m.focus = crate::control_focus::cycle(m.focus, if review { 3 } else { 4 }, true)
-        }
         KeyCode::F(2) if !review => action(app, Action::Switch),
         KeyCode::F(4) if !review => action(app, Action::Edit),
         KeyCode::Left | KeyCode::Backspace if !review => action(app, Action::Back),
@@ -623,23 +621,6 @@ pub fn key(app: &mut App, key: KeyEvent) {
             if m.items().get(i).is_some_and(|i| !i.children.is_empty()) {
                 action(app, Action::Choose(i));
             }
-        }
-        KeyCode::Enter => {
-            let a = if review {
-                if m.focus == 2 {
-                    Action::Cancel
-                } else {
-                    Action::Run
-                }
-            } else {
-                match m.focus {
-                    1 => Action::Switch,
-                    2 => Action::Edit,
-                    3 => Action::Close,
-                    _ => Action::Choose(m.cursor),
-                }
-            };
-            action(app, a);
         }
         KeyCode::Char(c) if !review => {
             if let Some(i) = m.items().iter().position(|i| {

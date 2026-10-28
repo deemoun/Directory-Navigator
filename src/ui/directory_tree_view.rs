@@ -1,5 +1,6 @@
 use crate::painting::{Frame, Paragraph};
 use crate::presentation::layout::Rect;
+use crate::turbo::dialog_spec::{centered, scope, Control, ControlKind, DialogSpec};
 use crate::{
     app::App,
     directory_tree::{geometry, Action},
@@ -8,41 +9,52 @@ use crate::{
     mouse::Target,
 };
 pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
+    if let Some(s) = tree_spec(app, area) {
+        s.paint(frame, app);
+    }
+}
+pub(crate) fn tree_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
     let profile = app.config.palette;
     let dos = profile.styles();
-    let Some(tree) = app.modals.directory_tree() else {
-        return;
-    };
+    let tree = app.modals.directory_tree()?;
     let g = geometry(area);
-    let rect = super::dialog_style::window(
-        frame,
-        profile,
-        area,
-        g.width,
-        g.height,
+    let rect = centered(area, g.width, g.height);
+    let mut spec = DialogSpec::new(
+        rect,
+        scope(app, crate::focus::Focus::Tree)?,
+        tree.focus,
         app.config.language.text(" Directory tree "),
+        Target::Tree(Action::Open),
+        Target::Tree(Action::Close),
     );
-    frame.regions().clear();
-    super::dialog_style::close_button(frame, profile, rect, Target::Tree(Action::Close));
     let x = rect.x + 2;
     let w = rect.width - 5;
     let top = rect.y + 3;
     let root = tree.root.as_ref().unwrap_or(&tree.original);
-    frame.render_widget(
+    spec.caption(
         Paragraph::new(tail(&display_name(&root.to_string_lossy()), w)).style(dos(0x70)),
         Rect::new(x, rect.y + 1, w, 1),
     );
-    frame.render_widget(
+    spec.native(
         crate::turbo::widgets::outline(tree),
         Rect::new(x, top, w, tree.page_rows as u16),
     );
+    let mut outline = Control::new(
+        0,
+        Rect::new(x, top, w, tree.page_rows as u16),
+        ControlKind::Outline,
+        Target::Tree(Action::Open),
+    );
+    outline.paint = false;
+    outline.hits.clear();
+    spec.control(outline);
     for (row, index) in (tree.offset..tree.rows.len())
         .take(tree.page_rows)
         .enumerate()
     {
         let entry = &tree.rows[index];
         let r = Rect::new(x, top + row as u16, w, 1);
-        frame.regions().push((r, Target::Tree(Action::Row(index))));
+        spec.hit(r, Target::Tree(Action::Row(index)));
         let marker = (entry.depth * 2 + if entry.depth > 0 { 2 } else { 0 }) as u16;
         let branch = tree.marker(entry) == "+"
             || tree
@@ -50,10 +62,10 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
                 .get(index + 1)
                 .is_some_and(|next| next.depth > entry.depth);
         if branch && !entry.link && marker < w {
-            frame.regions().push((
+            spec.hit(
                 Rect::new(x + marker, r.y, 3.min(w - marker), 1),
                 Target::Tree(Action::Toggle(index)),
-            ));
+            );
         }
     }
     let rows = tree.page_rows as u16;
@@ -64,7 +76,7 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
         } else {
             0
         };
-        frame.render_widget(
+        spec.native(
             crate::turbo::widgets::scrollbar(
                 tree.cursor,
                 tree.rows.len().saturating_sub(1),
@@ -86,7 +98,7 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
             };
             let r = Rect::new(rect.right() - 2, top + row, 1, 1);
             let _ = glyph;
-            frame.regions().push((r, Target::Tree(command)));
+            spec.hit(r, Target::Tree(command));
         }
     }
     let path = tree
@@ -110,7 +122,7 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
             0x78,
         ),
     ] {
-        frame.render_widget(
+        spec.caption(
             Paragraph::new(text).style(dos(color)),
             Rect::new(x, y, w, 1),
         );
@@ -136,14 +148,12 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
         (4, "Close".to_string(), Action::Close),
     ] {
         let r = Rect::new(x + (index as u16 - 1) * bw, rect.bottom() - 2, bw - 1, 1);
-        super::dialog_style::button_with_default(
-            frame,
-            profile,
+        spec.control(Control::new(
+            index,
             r,
-            app.config.language.text(&label),
-            tree.focus == index,
-            index == 1 && tree.focus == 0,
-        );
-        frame.regions().push((r, Target::Tree(command)));
+            ControlKind::Button(app.config.language.text(&label).into()),
+            Target::Tree(command),
+        ));
     }
+    Some(spec)
 }

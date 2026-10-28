@@ -300,29 +300,10 @@ pub fn action(app: &mut App, action: ToolAction) {
     }
 }
 pub fn key(app: &mut App, key: KeyEvent) {
-    if key.code == KeyCode::Esc {
-        action(app, ToolAction::Cancel);
-        return;
+    if let Some(ToolDialog::History { last_click, .. }) = app.file_tools.modals.file_tools_mut() {
+        *last_click = None;
     }
-    if key.code == KeyCode::Enter {
-        if matches!(app.file_tools.modals.file_tools(), Some(ToolDialog::History { paths, focus, .. }) if paths.is_empty() && *focus != 2)
-        {
-            return;
-        }
-        let cancel = match app.file_tools.modals.file_tools() {
-            Some(ToolDialog::History { focus, .. }) => *focus == 2,
-            Some(ToolDialog::Compare { focus }) => *focus == 5,
-            Some(ToolDialog::Export { focus, .. }) => *focus == 4,
-            _ => false,
-        };
-        action(
-            app,
-            if cancel {
-                ToolAction::Cancel
-            } else {
-                ToolAction::Accept
-            },
-        );
+    if crate::dialog_controls::key(app, key, crate::focus::Focus::FileTools) {
         return;
     }
     let mut choice = None;
@@ -336,16 +317,6 @@ pub fn key(app: &mut App, key: KeyEvent) {
             ..
         }) => {
             *last_click = None;
-            if matches!(key.code, KeyCode::Tab | KeyCode::BackTab) {
-                let choices: &[usize] = if paths.is_empty() {
-                    &[0, 2]
-                } else {
-                    &[0, 1, 2]
-                };
-                *focus =
-                    crate::control_focus::select(*focus, choices, key.code == KeyCode::BackTab);
-                return;
-            }
             if *focus != 0 {
                 return;
             }
@@ -362,30 +333,23 @@ pub fn key(app: &mut App, key: KeyEvent) {
                 .saturating_add_signed(amount)
                 .min(paths.len().saturating_sub(1));
         }
-        Some(ToolDialog::Compare { focus }) => match key.code {
-            KeyCode::Tab | KeyCode::Down => *focus = crate::control_focus::cycle(*focus, 6, false),
-            KeyCode::BackTab | KeyCode::Up => *focus = crate::control_focus::cycle(*focus, 6, true),
-            KeyCode::Char(' ') if *focus < 4 => choice = Some(*focus),
-            KeyCode::Char(c) => {
+        Some(ToolDialog::Compare { .. }) => {
+            if let KeyCode::Char(c) = key.code {
                 choice = match c.to_ascii_lowercase() {
                     's' => Some(0),
                     't' => Some(1),
                     'e' => Some(2),
                     'u' => Some(3),
                     _ => None,
-                }
+                };
             }
-            _ => {}
-        },
+        }
         Some(ToolDialog::Export {
             field,
             cursor,
             focus,
             ..
         }) => match key.code {
-            KeyCode::Tab => *focus = crate::control_focus::cycle(*focus, 5, false),
-            KeyCode::BackTab => *focus = crate::control_focus::cycle(*focus, 5, true),
-            KeyCode::Char(' ') if *focus == 1 || *focus == 2 => choice = Some(*focus - 1),
             code if *focus == 0
                 && !key
                     .modifiers

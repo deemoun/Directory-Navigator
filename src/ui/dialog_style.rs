@@ -26,33 +26,6 @@ pub(super) fn window(
     frame.render_widget(crate::turbo::widgets::dialog(title), rect);
     rect
 }
-pub(super) fn button(
-    frame: &mut impl Frame,
-    profile: PaletteProfile,
-    rect: Rect,
-    label: &str,
-    focused: bool,
-) {
-    let _ = profile;
-    frame.render_widget(crate::turbo::widgets::button(label, focused), rect);
-}
-
-/// Highlight the actual Enter action while retaining the controller's focus.
-pub(super) fn button_with_default(
-    frame: &mut impl Frame,
-    profile: PaletteProfile,
-    rect: Rect,
-    label: &str,
-    focused: bool,
-    default_active: bool,
-) {
-    let _ = profile;
-    frame.render_widget(
-        crate::turbo::widgets::button_with_default(label, focused, default_active),
-        rect,
-    );
-}
-
 /// Attach the border control to the modal's existing Cancel/Close action.
 pub(super) fn close_button(
     frame: &mut impl Frame,

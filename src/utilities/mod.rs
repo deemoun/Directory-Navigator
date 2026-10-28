@@ -204,9 +204,11 @@ pub const CALCULATOR_HELP: &str = "Enter evaluates · Tab / Shift+Tab move focus
 pub fn key(app: &mut App, key: KeyEvent) {
     if app.utilities.modals.utility_dialog() == Some(Kind::Calculator) {
         if app.utilities.calculator.history_open {
+            if crate::dialog_controls::key(app, key, crate::focus::Focus::Utility) {
+                return;
+            }
             let calc = &mut app.utilities.calculator;
             match key.code {
-                KeyCode::Esc => calc.history_open = false,
                 KeyCode::Up => calc.history_selection = calc.history_selection.saturating_sub(1),
                 KeyCode::Down => {
                     calc.history_selection =
@@ -220,10 +222,6 @@ pub fn key(app: &mut App, key: KeyEvent) {
                 KeyCode::PageDown => {
                     calc.history_selection =
                         (calc.history_selection + 6).min(calc.history.len().saturating_sub(1))
-                }
-                KeyCode::Enter => {
-                    let index = calc.history_selection;
-                    action(app, Action::CalculatorRecall(index));
                 }
                 _ => {}
             }
@@ -248,8 +246,7 @@ pub fn key(app: &mut App, key: KeyEvent) {
             return;
         }
     }
-    if key.code == KeyCode::Esc {
-        action(app, Action::Close);
+    if crate::dialog_controls::key(app, key, crate::focus::Focus::Utility) {
         return;
     }
     if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c') {
@@ -261,8 +258,6 @@ pub fn key(app: &mut App, key: KeyEvent) {
         Some(Kind::Calculator) => {
             let calc = &mut app.utilities.calculator;
             match key.code {
-                KeyCode::Tab => calc.focus = crate::control_focus::cycle(calc.focus, 10, false),
-                KeyCode::BackTab => calc.focus = crate::control_focus::cycle(calc.focus, 10, true),
                 KeyCode::Up if calc.focus == 0 => {
                     calc.recall(true);
                     calc.result = None;
@@ -280,17 +275,6 @@ pub fn key(app: &mut App, key: KeyEvent) {
                         key.code == KeyCode::Up,
                     );
                     command = Some(Action::Base(calc.focus - 1));
-                }
-                KeyCode::Enter => {
-                    command = Some(match calc.focus {
-                        7 => Action::Copy,
-                        8 => Action::Close,
-                        9 => Action::CalculatorHelp,
-                        _ => Action::Evaluate,
-                    })
-                }
-                KeyCode::Char(' ') if (1..=5).contains(&calc.focus) => {
-                    command = Some(Action::Base(calc.focus - 1))
                 }
                 code if calc.focus == 0
                     && !key
@@ -315,26 +299,6 @@ pub fn key(app: &mut App, key: KeyEvent) {
         Some(Kind::Characters) => {
             let chart = &mut app.utilities.chart;
             match key.code {
-                KeyCode::Tab | KeyCode::BackTab => {
-                    let choices: &[usize] = if chart.copy_text().is_some() {
-                        &[0, 1, 2, 3, 4]
-                    } else {
-                        &[0, 1, 2, 4]
-                    };
-                    chart.focus = crate::control_focus::select(
-                        chart.focus,
-                        choices,
-                        key.code == KeyCode::BackTab,
-                    );
-                }
-                KeyCode::Enter | KeyCode::Char(' ') => {
-                    command = Some(match chart.focus {
-                        1 => Action::Page(Page::Ascii),
-                        2 => Action::Page(Page::Cp437),
-                        4 => Action::Close,
-                        _ => Action::Copy,
-                    })
-                }
                 code if chart.focus == 0 => {
                     crate::turbo::characters::key(chart, code);
                 }
@@ -342,17 +306,7 @@ pub fn key(app: &mut App, key: KeyEvent) {
             }
         }
         Some(Kind::System | Kind::Memory) => match key.code {
-            KeyCode::Tab | KeyCode::BackTab => {
-                app.utilities.focus = crate::control_focus::cycle(app.utilities.focus, 2, false)
-            }
             KeyCode::Char('r') | KeyCode::F(5) => command = Some(Action::Refresh),
-            KeyCode::Enter => {
-                command = Some(if app.utilities.focus == 0 {
-                    Action::Refresh
-                } else {
-                    Action::Close
-                })
-            }
             code => {
                 if let Some(info) = &mut app.utilities.information {
                     match code {

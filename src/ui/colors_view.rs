@@ -1,10 +1,14 @@
+use crate::turbo::dialog_spec::{scope, Control, ControlKind, DialogSpec};
+pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
+    if let Some(s) = colors_spec(app, area) {
+        s.paint(frame, app);
+    }
+}
 use crate::painting::{Frame, Paragraph};
 use crate::presentation::layout::Rect;
 use crate::{app::App, mouse::Target, palette::PaletteProfile};
-pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
-    let Some(dialog) = app.modals.color_dialog() else {
-        return;
-    };
+pub(crate) fn colors_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
+    let dialog = app.modals.color_dialog()?;
     let cursor = dialog.cursor;
     let profile = app.config.palette;
     let dos = profile.styles();
@@ -14,16 +18,14 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
         72,
         18,
     );
-    super::dialog_style::window(
-        frame,
-        profile,
+    let mut spec = DialogSpec::new(
         rect,
-        rect.width,
-        rect.height,
+        scope(app, crate::focus::Focus::Colors)?,
+        cursor,
         app.config.language.text(" Colors "),
+        Target::AcceptColors,
+        Target::CancelColors,
     );
-    frame.regions().clear();
-    super::dialog_style::close_button(frame, profile, rect, Target::CancelColors);
     for (i, label, value) in [
         (
             0,
@@ -38,13 +40,17 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
     ] {
         let row = Rect::new(rect.x + 3, rect.y + 2 + i as u16 * 2, 66, 1);
         let label = app.config.language.text(label);
-        frame.render_widget(
-            crate::turbo::widgets::radio(label, profile == value, cursor == i),
+        spec.control(Control::new(
+            i as usize,
             row,
-        );
-        frame.regions().push((row, Target::ColorChoice(value)));
+            ControlKind::Radio {
+                caption: label.into(),
+                checked: profile == value,
+            },
+            Target::ColorChoice(value),
+        ));
     }
-    frame.render_widget(
+    spec.caption(
         Paragraph::new(app.config.language.text("Preview")).style(dos(0x70)),
         Rect::new(rect.x + 3, rect.y + 6, 65, 1),
     );
@@ -55,20 +61,20 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
         (3, 0x8b, " source.rs"),
         (4, 0x30, " selected file"),
     ] {
-        frame.render_widget(
+        spec.caption(
             Paragraph::new(app.config.language.text(label)).style(dos(attr)),
             Rect::new(rect.x + 4, rect.y + 7 + i, 38, 1),
         );
     }
-    frame.render_widget(
+    spec.caption(
         Paragraph::new(" 12:34:56 ").style(dos(0x71)),
         Rect::new(rect.right() - 17, rect.y + 7, 10, 1),
     );
-    frame.render_widget(
+    spec.caption(
         Paragraph::new(profile.function(5, "Copy", true)).style(profile.bar(true)),
         Rect::new(rect.x + 4, rect.y + 12, 62, 1),
     );
-    frame.render_widget(
+    spec.caption(
         Paragraph::new(
             app.config
                 .language
@@ -77,23 +83,20 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
         .style(dos(0x70)),
         Rect::new(rect.x + 3, rect.y + 14, 66, 1),
     );
-    for (label, target, selected, x) in [
-        ("[ Apply ]", Target::AcceptColors, cursor != 3, rect.x + 12),
-        (
-            "[ Cancel ]",
-            Target::CancelColors,
-            cursor == 3,
-            rect.right() - 26,
-        ),
-    ] {
+    for (index, (label, target, x)) in [
+        ("[ Apply ]", Target::AcceptColors, rect.x + 12),
+        ("[ Cancel ]", Target::CancelColors, rect.right() - 26),
+    ]
+    .into_iter()
+    .enumerate()
+    {
         let row = Rect::new(x, rect.bottom() - 2, 16, 1);
-        super::dialog_style::button(
-            frame,
-            profile,
+        spec.control(Control::new(
+            index + 2,
             row,
-            app.config.language.text(label),
-            selected,
-        );
-        frame.regions().push((row, target));
+            ControlKind::Button(app.config.language.text(label).into()),
+            target,
+        ));
     }
+    Some(spec)
 }

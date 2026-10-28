@@ -1,3 +1,9 @@
+use crate::turbo::dialog_spec::{scope, Control, ControlKind, DialogSpec};
+pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
+    if let Some(s) = command_history_spec(app, area) {
+        s.paint(frame, app);
+    }
+}
 use crate::painting::{Frame, Paragraph};
 use crate::presentation::{layout::Rect, text::Line};
 use crate::{
@@ -6,45 +12,43 @@ use crate::{
     filesystem::display_name,
     mouse::Target,
 };
-pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
-    let Some(d) = app.command_line.modals.command_history() else {
-        return;
-    };
+pub(crate) fn command_history_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
+    let d = app.command_line.modals.command_history()?;
     let language = app.config.language;
     let profile = app.config.palette;
     let dos = profile.styles();
     let (rect, _) = history::geometry(area);
-    super::dialog_style::window(
-        frame,
-        profile,
+    let mut spec = DialogSpec::new(
         rect,
-        rect.width,
-        rect.height,
+        scope(app, crate::focus::Focus::CommandHistory)?,
+        d.focus,
         language.text("Commands History"),
+        Target::CommandHistory(Action::Use),
+        Target::CommandHistory(Action::Cancel),
     );
-    frame.regions().clear();
-    super::dialog_style::close_button(frame, profile, rect, Target::CommandHistory(Action::Cancel));
     let x = rect.x + 2;
     let width = rect.width - 4;
-    frame.render_widget(
+    spec.caption(
         Paragraph::new(language.text("Filter commands")).style(dos(0x70)),
         Rect::new(x, rect.y + 1, width, 1),
     );
     let field = Rect::new(x, rect.y + 2, width, 1);
     let column = Line::from(&d.query[..d.input_cursor]).width();
     let scroll = column.saturating_sub(usize::from(width.saturating_sub(1)));
-    frame.render_widget(
-        crate::turbo::widgets::input_scrolled(d.query.as_str(), scroll, d.focus == 0),
+    spec.control(Control::new(
+        0,
         field,
-    );
+        ControlKind::ScrolledInput {
+            value: d.query.clone(),
+            scroll,
+        },
+        Target::CommandHistory(Action::Field),
+    ));
     if d.focus == 0 {
-        frame.set_cursor_position((field.x + (column - scroll) as u16, field.y));
+        spec.cursor = Some((field.x + (column - scroll) as u16, field.y));
     }
-    frame
-        .regions()
-        .push((field, Target::CommandHistory(Action::Field)));
     if d.matches.is_empty() {
-        frame.render_widget(
+        spec.caption(
             Paragraph::new(language.text(if app.command_line.history().is_empty() {
                 "No commands in this session."
             } else {
@@ -60,19 +64,26 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
         .filter_map(|i| app.command_line.history().get(*i))
         .map(|s| display_name(s))
         .collect();
-    if !d.matches.is_empty() {
-        frame.render_widget(
-            crate::turbo::widgets::list(items, d.cursor, d.offset, d.focus == 1),
-            Rect::new(x, rect.y + 4, width, d.rows as u16),
-        );
-    }
+    let mut list = Control::new(
+        1,
+        Rect::new(x, rect.y + 4, width, d.rows as u16),
+        ControlKind::List {
+            items,
+            cursor: d.cursor,
+            offset: d.offset,
+        },
+        Target::CommandHistory(Action::Use),
+    );
+    list.hits.clear();
+    list.paint = !d.matches.is_empty();
+    spec.control(list);
     for i in d.offset..d.matches.len().min(d.offset + d.rows) {
-        frame.regions().push((
+        spec.hit(
             Rect::new(x, rect.y + 4 + (i - d.offset) as u16, width, 1),
             Target::CommandHistory(Action::Row(i)),
-        ));
+        );
     }
-    frame.render_widget(
+    spec.caption(
         Paragraph::new(language.text("Enter recalls without running · Tab moves · Esc cancels"))
             .style(dos(0x70)),
         Rect::new(x, rect.bottom() - 3, width, 1),
@@ -82,21 +93,14 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
         ("[ Cancel ]", Action::Cancel, 3, rect.right() - 26),
     ] {
         let button = Rect::new(button_x, rect.bottom() - 2, 16, 1);
-        if a == Action::Use && d.matches.is_empty() {
-            frame.render_widget(
-                crate::turbo::widgets::disabled_button(language.text(label)),
-                button,
-            );
-        } else {
-            super::dialog_style::button_with_default(
-                frame,
-                profile,
-                button,
-                language.text(label),
-                d.focus == focus,
-                focus == 2 && d.focus < 2,
-            );
-            frame.regions().push((button, Target::CommandHistory(a)));
-        }
+        let mut control = Control::new(
+            focus,
+            button,
+            ControlKind::Button(language.text(label).into()),
+            Target::CommandHistory(a),
+        );
+        control.enabled = a != Action::Use || !d.matches.is_empty();
+        spec.control(control);
     }
+    Some(spec)
 }

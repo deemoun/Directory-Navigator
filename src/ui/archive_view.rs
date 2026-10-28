@@ -1,3 +1,9 @@
+use crate::turbo::dialog_spec::{centered, scope, Control, ControlKind, DialogSpec};
+pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
+    if let Some(spec) = archive_spec(app, area) {
+        spec.paint(frame, app);
+    }
+}
 use crate::painting::{Frame, Paragraph};
 use crate::presentation::{layout::Rect, text::Span};
 use crate::{
@@ -7,25 +13,26 @@ use crate::{
     formatting::tail,
     mouse::Target,
 };
-pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
-    let Some(b) = app.modals.archive() else {
-        return;
-    };
+pub(crate) fn archive_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
+    let b = app.modals.archive()?;
     let profile = app.config.palette;
     let dos = profile.styles();
-    let rect = super::dialog_style::window(
-        frame,
-        profile,
+    let rect = centered(
         area,
         area.width.saturating_sub(4).min(110),
         area.height.saturating_sub(4).min(30),
-        app.config.language.text(" Archive browser — read-only "),
     );
-    frame.regions().clear();
-    super::dialog_style::close_button(frame, profile, rect, Target::Archive(Action::Close));
+    let mut spec = DialogSpec::new(
+        rect,
+        scope(app, crate::focus::Focus::Archive)?,
+        b.focus,
+        app.config.language.text(" Archive browser — read-only "),
+        Target::Archive(Action::Open),
+        Target::Archive(Action::Close),
+    );
     let x = rect.x + 2;
     let w = rect.width - 5;
-    frame.render_widget(
+    spec.caption(
         Paragraph::new(tail(&display_name(&b.path.to_string_lossy()), w)).style(dos(0x70)),
         Rect::new(x, rect.y + 1, w, 1),
     );
@@ -35,11 +42,11 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
         .and_then(|c| c.nodes.get(b.directory))
         .map(|n| format!("/{}", display_name(&String::from_utf8_lossy(&n.path))))
         .unwrap_or_else(|| "/".into());
-    frame.render_widget(
+    spec.caption(
         Paragraph::new(tail(&directory, w)).style(dos(0x71)),
         Rect::new(x, rect.y + 2, w, 1),
     );
-    frame.render_widget(
+    spec.caption(
         Paragraph::new(format!(
             "{:<width$}{:>12}  Type",
             "Name",
@@ -92,19 +99,26 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
             continue;
         }
         let r = Rect::new(x, rect.y + 4 + (index - b.offset) as u16, w, 1);
-        frame
-            .regions()
-            .push((r, Target::Archive(Action::Row(index))));
+        spec.hit(r, Target::Archive(Action::Row(index)));
     }
-    frame.render_widget(
-        crate::turbo::widgets::list(items, b.cursor, b.offset, true),
-        Rect::new(x, rect.y + 4, w, b.rows as u16),
+    let list = Rect::new(x, rect.y + 4, w, b.rows as u16);
+    let mut control = Control::new(
+        0,
+        list,
+        ControlKind::List {
+            items,
+            cursor: b.cursor,
+            offset: b.offset,
+        },
+        Target::Archive(Action::Open),
+    );
+    control.hits.clear();
+    spec.control(control);
+    spec.native(
+        crate::turbo::widgets::scrollbar(b.cursor, b.children().len(), b.rows),
+        Rect::new(rect.right() - 2, rect.y + 4, 1, b.rows as u16),
     );
     let rows = b.rows as u16;
-    frame.render_widget(
-        crate::turbo::widgets::scrollbar(b.cursor, b.children().len(), b.rows),
-        Rect::new(rect.right() - 2, rect.y + 4, 1, rows),
-    );
     for row in 0..rows {
         let thumb = if b.children().is_empty() {
             0
@@ -125,7 +139,7 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
         let r = Rect::new(rect.right() - 2, rect.y + 4 + row, 1, 1);
         let _ = glyph;
         if glyph != "■" {
-            frame.regions().push((r, Target::Archive(a)));
+            spec.hit(r, Target::Archive(a));
         }
     }
     let details = b
@@ -141,15 +155,15 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
             )
         })
         .unwrap_or_else(|| "Enter opens · Backspace parent · Esc closes".into());
-    frame.render_widget(
+    spec.caption(
         Paragraph::new(details).style(dos(0x71)),
         Rect::new(x, rect.bottom() - 5, w, 1),
     );
-    frame.render_widget(
+    spec.caption(
         Paragraph::new(display_name(&b.status)).style(dos(0x70)),
         Rect::new(x, rect.bottom() - 4, w, 1),
     );
-    frame.render_widget(
+    spec.caption(
         Paragraph::new(
             app.config
                 .language
@@ -173,21 +187,14 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
             Action::Stop => b.loading(),
             _ => true,
         };
-        if enabled {
-            super::dialog_style::button_with_default(
-                frame,
-                profile,
-                r,
-                app.config.language.text(label),
-                b.focus == i,
-                i == 1 && b.focus == 0,
-            );
-            frame.regions().push((r, Target::Archive(a)));
-        } else {
-            frame.render_widget(
-                crate::turbo::widgets::disabled_button(app.config.language.text(label)),
-                r,
-            );
-        }
+        let mut control = Control::new(
+            i,
+            r,
+            ControlKind::Button(app.config.language.text(label).into()),
+            Target::Archive(a),
+        );
+        control.enabled = enabled;
+        spec.control(control);
     }
+    Some(spec)
 }

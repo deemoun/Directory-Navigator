@@ -100,29 +100,17 @@ pub fn paste(app: &mut App, text: &str) {
     }
 }
 pub fn key(app: &mut App, key: KeyEvent) {
-    if key.code == KeyCode::Esc {
-        app.modals.set_navigation_dialog(None);
+    if crate::dialog_controls::key(app, key, crate::focus::Focus::Navigation) {
         return;
     }
-    let mut command = None;
     match app.modals.navigation_dialog_mut() {
-        Some(Modal::Bookmarks { slot, focus }) => {
+        Some(Modal::Bookmarks { slot, .. }) => {
             if let Some(row) = crate::turbo::widgets::list_key(*slot, 9, 9, key.code) {
                 *slot = row;
                 return;
             }
             match key.code {
-                KeyCode::Tab => *focus = crate::control_focus::cycle(*focus, 5, false),
-                KeyCode::BackTab => *focus = crate::control_focus::cycle(*focus, 5, true),
                 KeyCode::Char(c) if ('1'..='9').contains(&c) => *slot = c as usize - '1' as usize,
-                KeyCode::Enter => {
-                    command = Some(match *focus {
-                        2 => Action::Set,
-                        3 => Action::Clear,
-                        4 => Action::Close,
-                        _ => Action::Go,
-                    })
-                }
                 _ => {}
             }
         }
@@ -131,15 +119,6 @@ pub fn key(app: &mut App, key: KeyEvent) {
             cursor,
             focus,
         }) => match key.code {
-            KeyCode::Tab => *focus = crate::control_focus::cycle(*focus, 3, false),
-            KeyCode::BackTab => *focus = crate::control_focus::cycle(*focus, 3, true),
-            KeyCode::Enter => {
-                command = Some(if *focus == 2 {
-                    Action::Close
-                } else {
-                    Action::ApplyFilter
-                })
-            }
             code if *focus == 0
                 && !key
                     .modifiers
@@ -150,9 +129,6 @@ pub fn key(app: &mut App, key: KeyEvent) {
             _ => {}
         },
         _ => {}
-    }
-    if let Some(command) = command {
-        action(app, command);
     }
 }
 pub fn mouse(app: &mut App, event: MouseEvent, target: Option<crate::mouse::Target>) {

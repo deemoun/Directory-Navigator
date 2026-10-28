@@ -8,7 +8,6 @@ pub const DELAYS: [u8; 7] = [0, 1, 2, 5, DEFAULT_DELAY, 30, 60];
 pub const PREVIEW: usize = DELAYS.len();
 pub const ACCEPT: usize = PREVIEW + 1;
 pub const CANCEL: usize = PREVIEW + 2;
-const CONTROL_COUNT: usize = CANCEL + 1;
 pub const GLYPHS: [char; 6] = [' ', '·', '∙', '•', '♦', '☼'];
 #[derive(Default)]
 pub struct Setup {
@@ -212,30 +211,14 @@ pub fn command(app: &mut App, index: usize) {
     }
 }
 pub fn key(app: &mut App, code: KeyCode) {
-    let Some(setup) = app.screensaver.modals.screensaver_mut() else {
+    if crate::dialog_controls::key(
+        app,
+        crossterm::event::KeyEvent::new(code, crossterm::event::KeyModifiers::NONE),
+        crate::focus::Focus::SaverSetup,
+    ) {
         return;
-    };
-    match code {
-        KeyCode::Esc => command(app, CANCEL),
-        KeyCode::Tab | KeyCode::Down | KeyCode::Right => {
-            setup.cursor = crate::control_focus::cycle(setup.cursor, CONTROL_COUNT, false)
-        }
-        KeyCode::BackTab | KeyCode::Up | KeyCode::Left => {
-            setup.cursor = crate::control_focus::cycle(setup.cursor, CONTROL_COUNT, true)
-        }
-        KeyCode::Enter => {
-            let i = if setup.cursor < PREVIEW {
-                ACCEPT
-            } else {
-                setup.cursor
-            };
-            command(app, i);
-        }
-        KeyCode::Char(' ') => {
-            let i = setup.cursor;
-            command(app, i);
-        }
-        KeyCode::Char('p' | 'P') => command(app, PREVIEW),
-        _ => {}
+    }
+    if let KeyCode::Char('p' | 'P') = code {
+        command(app, PREVIEW);
     }
 }

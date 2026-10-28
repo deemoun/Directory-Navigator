@@ -1,19 +1,24 @@
 use crate::painting::{Frame, Paragraph};
 use crate::presentation::layout::Rect;
+use crate::turbo::dialog_spec::{centered, scope, Control, ControlKind, DialogSpec};
 use crate::{app::App, mouse::Target};
 pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
-    let Some(preview) = app.modals.config_import() else {
-        return;
-    };
+    if let Some(s) = import_spec(app, area) {
+        s.paint(frame, app);
+    }
+}
+pub(crate) fn import_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
+    let preview = app.modals.config_import()?;
     let profile = app.config.palette;
     let lang = app.config.language;
-    let rect = super::dialog_style::window(
-        frame,
-        profile,
-        area,
-        76,
-        21,
+    let rect = centered(area, 76, 21);
+    let mut spec = DialogSpec::new(
+        rect,
+        scope(app, crate::focus::Focus::ConfigImport)?,
+        preview.focus,
         lang.text(" Import DOS settings "),
+        Target::ApplyImport,
+        Target::CancelImport,
     );
     let rows = usize::from(rect.height.saturating_sub(5));
     let lines = preview.lines(lang);
@@ -25,7 +30,7 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
         .map(|line| crate::filesystem::display_name(line))
         .collect::<Vec<_>>()
         .join("\n");
-    frame.render_widget(
+    spec.native(
         crate::turbo::widgets::memo(
             &body
                 .lines()
@@ -35,7 +40,7 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
         ),
         Rect::new(rect.x + 2, rect.y + 1, rect.width - 4, rect.height - 5),
     );
-    frame.render_widget(
+    spec.caption(
         Paragraph::new(lang.text("↑↓ / PgUp/PgDn scroll")).style(profile.dos(0x70)),
         Rect::new(rect.x + 2, rect.bottom() - 4, rect.width - 4, 1),
     );
@@ -50,28 +55,14 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
             14,
             1,
         );
-        if index == 0 && !enabled {
-            frame.render_widget(
-                crate::turbo::widgets::disabled_button(lang.text(label)),
-                button,
-            );
-        } else {
-            super::dialog_style::button(
-                frame,
-                profile,
-                button,
-                lang.text(label),
-                preview.focus == usize::from(index),
-            );
-        }
-        if index == 0 && !enabled {
-            continue;
-        }
-        frame.regions().push((button, target));
+        let mut c = Control::new(
+            usize::from(index),
+            button,
+            ControlKind::Button(lang.text(label).into()),
+            target,
+        );
+        c.enabled = index != 0 || enabled;
+        spec.control(c);
     }
-    // Remove every background target while retaining only this modal's buttons.
-    frame
-        .regions()
-        .retain(|(_, target)| matches!(target, Target::ApplyImport | Target::CancelImport));
-    super::dialog_style::close_button(frame, profile, rect, Target::CancelImport);
+    Some(spec)
 }

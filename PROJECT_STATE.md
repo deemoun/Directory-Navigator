@@ -20,13 +20,28 @@
 
 ## Implemented
 
+- Remaining shared controls: advanced Copy/Move, destination history, archive and
+  discovery tools, compare/export/file histories, navigation, window/command lists,
+  calculator/history, character chart, information tools, colors/screensaver,
+  import preview, pattern/columns/file info, messages and progress derive native
+  widgets, traversal and mouse bindings from `DialogSpec`. Tetris pages use
+  document-owned definitions while retaining the custom board/rules. Controllers
+  retain drafts, validation, asynchronous work, source-removal and no-overwrite
+  safeguards. Disabled focus cannot submit an unrelated default; changed action
+  availability retires stale mouse frames without invalidating stable radio hits.
+  Tetris uses the native DN status footer and export choices use native radios.
+  macOS ARM64: 512 tests pass (one opt-in native Trash test ignored), formatting,
+  all-target Clippy, release and no-default-features checks pass. 128 pre/post
+  dialog captures match except the native export radio marker. Isolated release
+  terminal checks cover Copy/Move, tools, histories, Tetris, resize and restoration.
+  Windows/Linux validation remains skipped.
+
 - Document-dialog shared controls: editor search/replace, replacement confirmations,
   unsaved guards, Go To/tab-width prompts and legacy editor help, plus viewer search,
   derive painting, traversal and semantic hits from `DialogSpec`. Search flags,
   Unicode field editing, undo, replacement sessions and save/close safeguards stay
   document-owned. Invalid guard focus falls back to Cancel; native file pickers
-  remain on their existing path. Advanced file-operation forms/tools/Tetris remain
-  separate increments.
+  remain on their existing path. The remaining forms are consolidated above.
 
 - Shared-control pilot: generic prompts and configuration settings derive native
   painting, traversal, default/cancel proposals and mouse bounds from one internal
@@ -34,7 +49,7 @@
   duplicate traversal construction; existing controllers retain values, Unicode
   editing/limits, validation, drafts and file-operation safeguards. Modal/owner
   receipts reject stale proposals. Keyboard/regional choice children stay owned;
-  advanced Copy/Move, tool dialogs and Tetris remain later increments.
+  advanced Copy/Move, tool dialogs and Tetris now share the structure as well.
 
 - F2 user-menu native painting keeps the application menu palette when embedded
   in a dialog, so rows use grey/red DN colours and full-width green selection.

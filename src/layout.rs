@@ -25,9 +25,20 @@ pub(crate) struct ViewportState {
     copy_history: Option<(usize, usize)>,
     submenus: Vec<(crate::menu::MenuId, usize)>,
     modal_offsets: Vec<usize>,
+    controls: Vec<(bool, Rect, crate::mouse::Target)>,
+    calculator_history: bool,
 }
 fn viewport_state(app: &App) -> ViewportState {
+    let area = crate::turbo::dialog_spec::input_area(app);
+    let focus = crate::focus::current(app);
+    let spec = if focus == crate::focus::Focus::Prompt {
+        crate::ui::copy_spec(app, area)
+    } else {
+        crate::ui::remaining_spec(app, area, focus)
+    };
     ViewportState {
+        controls: spec.map_or_else(Vec::new, |s| s.interaction_state()),
+        calculator_history: app.utilities.calculator.history_open,
         panels: std::array::from_fn(|i| {
             let p = &app.panels[i];
             (

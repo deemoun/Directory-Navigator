@@ -165,6 +165,12 @@ pub fn paste(app: &mut App, text: &str) {
     }
 }
 pub fn key(app: &mut App, key: KeyEvent) {
+    if let Some(m) = app.command_line.modals.command_history_mut() {
+        m.last_click = None;
+    }
+    if crate::dialog_controls::key(app, key, crate::focus::Focus::CommandHistory) {
+        return;
+    }
     let Some(d) = app.command_line.modals.command_history_mut() else {
         return;
     };
@@ -176,31 +182,6 @@ pub fn key(app: &mut App, key: KeyEvent) {
         return;
     }
     match key.code {
-        KeyCode::Esc => action(app, Action::Cancel),
-        KeyCode::Enter => {
-            let a = if d.focus == 3 {
-                Action::Cancel
-            } else {
-                Action::Use
-            };
-            action(app, a);
-        }
-        KeyCode::Tab | KeyCode::BackTab => {
-            let choices: &[usize] = if d.matches.is_empty() {
-                &[0, 1, 3]
-            } else {
-                &[0, 1, 2, 3]
-            };
-            d.focus = crate::control_focus::select(d.focus, choices, key.code == KeyCode::BackTab);
-        }
-        KeyCode::Char(' ') if d.focus >= 2 => {
-            let a = if d.focus == 3 {
-                Action::Cancel
-            } else {
-                Action::Use
-            };
-            action(app, a);
-        }
         code if !key
             .modifiers
             .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) =>

@@ -29,6 +29,7 @@ mod utilities_view;
 mod viewer_view;
 mod welcome_view;
 mod windows_view;
+pub(crate) use copy_dialog_view::copy_spec;
 pub(crate) use editor_dialogs::editor_spec;
 pub(crate) use overlays::prompt_spec;
 use overlays::{draw_info_dialog, draw_operation_overlays};
@@ -252,5 +253,50 @@ fn draw_layers(
             _ => {}
         }
         frame.modal_scope(None);
+    }
+}
+
+pub(crate) fn remaining_spec(
+    app: &App,
+    area: crate::presentation::layout::Rect,
+    focus: crate::focus::Focus,
+) -> Option<crate::turbo::dialog_spec::DialogSpec<'_>> {
+    use crate::focus::Focus;
+    match focus {
+        Focus::Game => crate::turbo::tetris::spec(app, area),
+        Focus::Message if app.modals.native_help(app.desktop.active().id).is_none() => {
+            let d = app.last_dialog()?;
+            let m = crate::layout::message_layout(
+                area,
+                app.config.language.text(d.title),
+                &app.config.language.message(&d.message),
+            );
+            overlays::message_spec(app, &m)
+        }
+        Focus::Job => overlays::job_spec(app, area),
+        Focus::CopyHistory => copy_dialog_view::history_spec(app, area),
+        Focus::ConfigImport => config_import_view::import_spec(app, area),
+        Focus::Pattern | Focus::Columns | Focus::FileInfo => {
+            tools_view::tools_spec(app, area, focus)
+        }
+        Focus::Tree => directory_tree_view::tree_spec(app, area),
+        Focus::UserMenu => user_menu_view::user_menu_spec(app, area),
+        Focus::Utility
+            if app.utilities.modals.utility_dialog()
+                == Some(crate::utilities::Kind::Calculator)
+                && app.utilities.calculator.history_open =>
+        {
+            calculator_view::history_spec(app, area)
+        }
+        Focus::Utility => utilities_view::utility_spec(app, area),
+        Focus::WindowList => windows_view::windows_spec(app, area),
+        Focus::CommandHistory => command_history_view::command_history_spec(app, area),
+        Focus::Colors => colors_view::colors_spec(app, area),
+        Focus::SaverSetup => screensaver_view::saver_spec(app, area),
+        Focus::FileTools => file_tools_view::file_tools_spec(app, area),
+        Focus::Archive => archive_view::archive_spec(app, area),
+        Focus::Discovery => discovery_view::discovery_spec(app, area),
+        Focus::Navigation => navigation_view::navigation_spec(app, area),
+        _ => None,
     }
 }

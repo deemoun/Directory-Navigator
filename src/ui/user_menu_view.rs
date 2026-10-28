@@ -1,14 +1,18 @@
 use crate::painting::{Frame, Paragraph};
 use crate::presentation::{layout::Rect, text::Span};
+use crate::turbo::dialog_spec::{centered, scope, Control, ControlKind, DialogSpec};
 use crate::{
     app::App, filesystem::display_name, formatting::tail, mouse::Target, user_menu::Action,
 };
 pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
+    if let Some(s) = user_menu_spec(app, area) {
+        s.paint(frame, app);
+    }
+}
+pub(crate) fn user_menu_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
     let profile = app.config.palette;
     let dos = profile.styles();
-    let Some(m) = app.user_menu.modals.user_menu() else {
-        return;
-    };
+    let m = app.user_menu.modals.user_menu()?;
     let review = m.review.is_some();
     let width = if review {
         76
@@ -27,29 +31,26 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
             .clamp(10, 24)
             .min(area.height.saturating_sub(4) as usize) as u16
     };
-    let rect = super::dialog_style::window(
-        frame,
-        profile,
-        area,
-        width,
-        height,
+    let rect = centered(area, width, height);
+    let mut spec = DialogSpec::new(
+        rect,
+        scope(app, crate::focus::Focus::UserMenu)?,
+        m.focus,
         app.config.language.text(if review {
             " Run user command "
         } else {
             " User menu "
         }),
-    );
-    frame.regions().clear();
-    super::dialog_style::close_button(
-        frame,
-        profile,
-        rect,
         Target::UserMenu(if review {
-            Action::Cancel
+            Action::Run
         } else {
-            Action::Close
+            Action::Choose(m.cursor)
         }),
+        Target::UserMenu(if review { Action::Cancel } else { Action::Back }),
     );
+    if !review {
+        spec.close_action = Target::UserMenu(Action::Close);
+    }
     let x = rect.x + 2;
     let w = rect.width - 4;
     let source = m
@@ -67,14 +68,16 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
             )
         })
         .unwrap_or_default();
-    frame.render_widget(
+    spec.caption(
         Paragraph::new(tail(&source, w)).style(dos(0x70)),
         Rect::new(x, rect.y + 1, w, 1),
     );
     if review {
-        frame.render_widget(
-            crate::turbo::widgets::memo(
-                &m.review_lines
+        let mut memo = Control::new(
+            0,
+            Rect::new(x, rect.y + 3, w, m.rows as u16),
+            ControlKind::Memo(
+                m.review_lines
                     .iter()
                     .skip(m.offset)
                     .take(m.rows)
@@ -82,8 +85,11 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
                     .collect::<Vec<_>>()
                     .join("\n"),
             ),
-            Rect::new(x, rect.y + 3, w, m.rows as u16),
+            Target::UserMenu(Action::Run),
         );
+        memo.hits.clear();
+        memo.enter_action = true;
+        spec.control(memo);
     } else {
         let items = m
             .items()
@@ -102,21 +108,29 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
                 submenu: !item.children.is_empty(),
             })
             .collect();
-        frame.render_widget(
-            crate::turbo::widgets::menu(items, m.cursor.saturating_sub(m.offset)),
+        let mut control = Control::new(
+            0,
             Rect::new(x - 1, rect.y + 2, w + 2, m.rows as u16 + 2),
+            ControlKind::Menu {
+                items,
+                cursor: m.cursor.saturating_sub(m.offset),
+            },
+            Target::UserMenu(Action::Choose(m.cursor)),
         );
+        control.hits.clear();
+        control.enter_action = true;
+        spec.control(control);
         for (index, item) in m.items().iter().enumerate().skip(m.offset).take(m.rows) {
             if !item.separator() {
-                frame.regions().push((
+                spec.hit(
                     Rect::new(x, rect.y + 3 + (index - m.offset) as u16, w, 1),
                     Target::UserMenu(Action::Choose(index)),
-                ));
+                );
             }
         }
     }
     if !review {
-        frame.render_widget(
+        spec.caption(
             Paragraph::new(display_name(app.config.language.text(&m.status))).style(dos(0x78)),
             Rect::new(x, rect.bottom() - 3, w, 1),
         );
@@ -149,14 +163,12 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
         } else {
             translated.to_owned()
         };
-        super::dialog_style::button_with_default(
-            frame,
-            profile,
+        spec.control(Control::new(
+            i + 1,
             r,
-            &caption,
-            m.focus == i + 1,
-            review && i == 0 && m.focus == 0,
-        );
-        frame.regions().push((r, Target::UserMenu(action)));
+            ControlKind::Button(caption),
+            Target::UserMenu(action),
+        ));
     }
+    Some(spec)
 }

@@ -1,11 +1,7 @@
 //! Game pages drawn with native cells; actions still use the guarded game controller.
 use super::Scene;
 use crate::presentation::layout::Rect;
-use crate::{
-    app::App,
-    mouse::Target,
-    tetris::{GameAction, Screen},
-};
+use crate::{app::App, tetris::Screen};
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
 
@@ -72,38 +68,6 @@ impl Scene {
     fn window(&mut self, r: Rect, title: &str) {
         crate::turbo::widgets::paint_into(self, crate::turbo::widgets::dialog(title), r);
     }
-    fn close(&mut self, r: Rect, _app: &App) {
-        self.regions.push((
-            Rect::new(r.x + 2, r.y, 3, 1),
-            Target::Game(GameAction::Back),
-        ));
-    }
-    fn plain_button(&mut self, app: &App, r: Rect, label: &str, action: GameAction) {
-        let game = app.desktop.game().unwrap();
-        let (focused, default_active) = match action {
-            GameAction::SubmitName => (game.page_focus == 1, game.page_focus == 0),
-            GameAction::SkipName => (game.page_focus == 2, false),
-            _ => (true, false),
-        };
-        crate::turbo::widgets::paint_into(
-            self,
-            crate::turbo::widgets::button_with_default(
-                app.config.language.text(label),
-                focused,
-                default_active,
-            ),
-            r,
-        );
-        self.regions.push((r, Target::Game(action)));
-    }
-    fn classic(&mut self, app: &App, r: Rect, label: &str, action: GameAction, focused: bool) {
-        crate::turbo::widgets::paint_into(
-            self,
-            crate::turbo::widgets::button(app.config.language.text(label), focused),
-            Rect::new(r.x, r.y, r.width, 2),
-        );
-        self.regions.push((r, Target::Game(action)));
-    }
 }
 
 pub(super) fn draw(scene: &mut Scene, app: &App, game_y: u16) {
@@ -115,86 +79,21 @@ pub(super) fn draw(scene: &mut Scene, app: &App, game_y: u16) {
     scene.regions.clear();
     let lang = app.config.language;
     match screen {
-        Screen::Setup { level, preview } => {
+        Screen::Setup { .. } => {
             let r = Rect::new((scene.width - 72) / 2, (scene.height - 18) / 2, 72, 18);
             scene.window(r, lang.text("Setup game"));
-            scene.close(r, app);
-            let focus = app.desktop.game().unwrap().setup_focus;
             let right = r.x + 42;
             scene.paragraph(Rect::new(r.x + 4, r.y + 2, 34, 1), lang.text("Level"), 0x7f);
-            for (i, label) in [
-                "Baby",
-                "Little fella",
-                "Big child",
-                "It's easy",
-                "Never mind",
-                "I'm powerful !",
-                "Insanity coming",
-                "So what ?..",
-                "Madness",
-                "Sanitarium",
-            ]
-            .iter()
-            .enumerate()
-            {
-                let selected = level == i as u8 + 1;
-                let row = Rect::new(r.x + 4, r.y + 3 + i as u16, 35, 1);
-                crate::turbo::widgets::paint_into(
-                    scene,
-                    crate::turbo::widgets::radio(
-                        &format!("{:>2} — {}", i + 1, lang.text(label)),
-                        selected,
-                        selected && focus == 0,
-                    ),
-                    row,
-                );
-                scene
-                    .regions
-                    .push((row, Target::Game(GameAction::SetLevel(i as u8 + 1))));
-            }
             scene.paragraph(
                 Rect::new(right, r.y + 2, 26, 1),
                 lang.text("Game style"),
                 0x70,
             );
-            crate::turbo::widgets::paint_into(
-                scene,
-                crate::turbo::widgets::radio(lang.text("Classic Tetris"), true, false),
-                Rect::new(right, r.y + 3, 26, 1),
-            );
             scene.paragraph(Rect::new(right, r.y + 6, 26, 1), lang.text("Options"), 0x70);
-            let check = Rect::new(right, r.y + 7, 26, 1);
-            crate::turbo::widgets::paint_into(
-                scene,
-                crate::turbo::widgets::checkbox(
-                    lang.text("Piece preview"),
-                    preview,
-                    focus == 1,
-                    true,
-                ),
-                check,
-            );
-            scene
-                .regions
-                .push((check, Target::Game(GameAction::Preview)));
             scene.paragraph(
                 Rect::new(r.x + 4, r.y + 16, 64, 1),
                 lang.text("OK starts a new game · Esc cancels"),
                 0x78,
-            );
-            scene.classic(
-                app,
-                Rect::new(right + 7, r.y + 11, 16, 1),
-                "OK",
-                GameAction::Apply,
-                focus != 3,
-            );
-            scene.classic(
-                app,
-                Rect::new(right + 7, r.y + 14, 16, 1),
-                "Cancel",
-                GameAction::Back,
-                focus == 3,
             );
         }
         Screen::Scores => scores(scene, app),
@@ -228,35 +127,6 @@ pub(super) fn draw(scene: &mut Scene, app: &App, game_y: u16) {
                         lang.text("Your name (30 characters)"),
                         0x70,
                     );
-                    let col = game.name[..game.name_cursor].width();
-                    let scroll = col.saturating_sub(43);
-                    let mut skipped = 0;
-                    let mut visible = String::new();
-                    for glyph in game.name.graphemes(true) {
-                        if skipped + glyph.width() <= scroll {
-                            skipped += glyph.width();
-                            continue;
-                        }
-                        skipped = scroll;
-                        visible.push_str(glyph);
-                    }
-                    let input = if game.replace_name {
-                        crate::turbo::widgets::selected_input(&visible, game.page_focus == 0)
-                    } else {
-                        crate::turbo::widgets::input(&visible, game.page_focus == 0)
-                    };
-                    crate::turbo::widgets::paint_into(
-                        scene,
-                        input,
-                        Rect::new(r.x + 3, r.y + 7, 44, 1),
-                    );
-                    scene.regions.push((
-                        Rect::new(r.x + 3, r.y + 7, 44, 1),
-                        Target::Game(GameAction::NameField),
-                    ));
-                    if game.page_focus == 0 {
-                        scene.cursor = Some((r.x + 3 + (col - scroll) as u16, r.y + 7));
-                    }
                     scene.paragraph(
                         Rect::new(r.x + 3, r.y + 9, 44, 1),
                         lang.text("Tab chooses · Enter activates · Esc cancels"),
@@ -267,39 +137,15 @@ pub(super) fn draw(scene: &mut Scene, app: &App, game_y: u16) {
                         &crate::filesystem::display_name(lang.text(&game.notice)),
                         0x74,
                     );
-                    scene.plain_button(
-                        app,
-                        Rect::new(r.x + 5, r.bottom() - 2, 16, 1),
-                        "OK",
-                        GameAction::SubmitName,
-                    );
-                    scene.plain_button(
-                        app,
-                        Rect::new(r.x + 27, r.bottom() - 2, 18, 1),
-                        "Skip name",
-                        GameAction::SkipName,
-                    );
                 } else {
                     scene.paragraph(
                         Rect::new(r.x + 3, r.y + 7, 44, 2),
                         lang.text("Enter continues · Esc cancels"),
                         0x70,
                     );
-                    scene.plain_button(
-                        app,
-                        Rect::new(r.x + 16, r.bottom() - 2, 18, 1),
-                        "Continue",
-                        GameAction::Continue,
-                    );
                 }
             } else {
                 scene.paragraph(Rect::new(r.x+2,r.y+1,46,13),lang.text("←/Home left · →/PgUp right · ↑ rotate\n↓/Space drop · F2 new game · F3 pause\nF4 high scores · F5 setup\n+ increase level · * toggle next preview\n\nAlt+N new · Alt+P pause · Alt+T scores\nAlt+S setup · Esc returns to files\n\nHigh scores save in tetris.conf."),0x70);
-                scene.plain_button(
-                    app,
-                    Rect::new(r.x + 16, r.bottom() - 2, 18, 1),
-                    " Enter / Esc: Back ",
-                    GameAction::Back,
-                );
             }
         }
     }
@@ -308,7 +154,6 @@ fn scores(scene: &mut Scene, app: &App) {
     let lang = app.config.language;
     let r = Rect::new((scene.width - 72) / 2, (scene.height - 20) / 2, 72, 20);
     scene.window(r, lang.text("Tetris Top Ten"));
-    scene.close(r, app);
     let body = Rect::new(r.x + 2, r.y + 3, 68, 12);
     crate::turbo::widgets::paint_into(scene, crate::turbo::widgets::group_box(""), body);
     let x = body.x + 1;
@@ -387,21 +232,4 @@ fn scores(scene: &mut Scene, app: &App) {
             0x74,
         );
     }
-    let retry = app.game_scores.has_pending();
-    if retry {
-        scene.classic(
-            app,
-            Rect::new(r.x + 8, r.y + 17, 20, 1),
-            "Retry save",
-            GameAction::RetrySave,
-            game.page_focus == 1,
-        );
-    }
-    scene.classic(
-        app,
-        Rect::new(r.x + if retry { 43 } else { 29 }, r.y + 17, 14, 1),
-        "OK",
-        GameAction::Back,
-        !retry || game.page_focus == 0,
-    );
 }

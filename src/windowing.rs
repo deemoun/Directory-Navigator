@@ -136,6 +136,12 @@ pub fn action(app: &mut App, action: Action) {
     app.mouse.reset_click();
 }
 pub fn key(app: &mut App, key: KeyEvent) {
+    if let Some(m) = app.modals.window_list_mut() {
+        m.last_click = None;
+    }
+    if crate::dialog_controls::key(app, key, crate::focus::Focus::WindowList) {
+        return;
+    }
     let Some(list) = app.modals.window_list_mut() else {
         return;
     };
@@ -152,20 +158,6 @@ pub fn key(app: &mut App, key: KeyEvent) {
         list.focus = 0;
         list.keep_visible();
         return;
-    }
-    match key.code {
-        KeyCode::Esc => action(app, Action::Cancel),
-        KeyCode::Enter => {
-            let command = if list.focus == 2 {
-                Action::Cancel
-            } else {
-                Action::Switch
-            };
-            action(app, command);
-        }
-        KeyCode::Tab => list.focus = crate::control_focus::cycle(list.focus, 3, false),
-        KeyCode::BackTab => list.focus = crate::control_focus::cycle(list.focus, 3, true),
-        _ => {}
     }
     if let Some(list) = app.modals.window_list_mut() {
         list.keep_visible();

@@ -1,26 +1,34 @@
+use crate::turbo::dialog_spec::{scope, Control, ControlKind, DialogSpec};
+pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
+    if let Some(s) = windows_spec(app, area) {
+        s.paint(frame, app);
+    }
+}
 use crate::painting::{Frame, Paragraph};
 use crate::presentation::layout::Rect;
 use crate::{
     app::App, desktop::WindowKind, filesystem::display_name, mouse::Target, windowing::Action,
 };
 
-pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
-    let Some(list) = app.modals.window_list() else {
-        return;
-    };
+pub(crate) fn windows_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
+    let list = app.modals.window_list()?;
     let profile = app.config.palette;
     let language = app.config.language;
-    let rect = super::dialog_style::window(
-        frame,
-        profile,
+    let rect = crate::turbo::dialog_spec::centered(
         area,
         72,
         (list.ids.len() + 6)
             .max(12)
             .min(usize::from(area.height.saturating_sub(2))) as u16,
-        language.text("Open windows"),
     );
-    super::dialog_style::close_button(frame, profile, rect, Target::Window(Action::Cancel));
+    let mut spec = DialogSpec::new(
+        rect,
+        scope(app, crate::focus::Focus::WindowList)?,
+        list.focus,
+        language.text("Open windows"),
+        Target::Window(Action::Switch),
+        Target::Window(Action::Cancel),
+    );
     let mut labels = Vec::with_capacity(list.ids.len());
     for (row, id) in list.ids.iter().enumerate() {
         let kind = app.desktop.windows().find(|w| w.id == *id).map(|w| w.kind);
@@ -81,15 +89,21 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
         if row < list.offset || row >= list.offset + list.rows {
             continue;
         }
-        frame
-            .regions()
-            .push((row_area, Target::Window(Action::Row(*id))));
+        spec.hit(row_area, Target::Window(Action::Row(*id)));
     }
-    frame.render_widget(
-        crate::turbo::widgets::list(labels, list.cursor, list.offset, list.focus == 0),
+    let mut control = Control::new(
+        0,
         Rect::new(rect.x + 2, rect.y + 2, rect.width - 4, list.rows as u16),
+        ControlKind::List {
+            items: labels,
+            cursor: list.cursor,
+            offset: list.offset,
+        },
+        Target::Window(Action::Switch),
     );
-    frame.render_widget(
+    control.hits.clear();
+    spec.control(control);
+    spec.caption(
         Paragraph::new(language.text("Switching keeps documents open")).style(profile.dos(0x70)),
         Rect::new(rect.x + 2, rect.bottom() - 4, rect.width - 4, 1),
     );
@@ -98,14 +112,12 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
         ("Cancel", Action::Cancel, 2, rect.right() - 30),
     ] {
         let button = Rect::new(x, rect.bottom() - 2, 16, 1);
-        super::dialog_style::button_with_default(
-            frame,
-            profile,
+        spec.control(Control::new(
+            focus,
             button,
-            language.text(label),
-            list.focus == focus,
-            focus == 1 && list.focus == 0,
-        );
-        frame.regions().push((button, Target::Window(command)));
+            ControlKind::Button(language.text(label).into()),
+            Target::Window(command),
+        ));
     }
+    Some(spec)
 }

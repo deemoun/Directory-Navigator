@@ -93,28 +93,16 @@ pub fn cancel(app: &mut crate::app::App) {
     }
 }
 pub fn key(app: &mut crate::app::App, code: crossterm::event::KeyCode) {
-    use crossterm::event::KeyCode;
-    let Some(dialog) = app.modals.color_dialog_mut() else {
+    if crate::dialog_controls::key(
+        app,
+        crossterm::event::KeyEvent::new(code, crossterm::event::KeyModifiers::NONE),
+        crate::focus::Focus::Colors,
+    ) {
         return;
-    };
+    }
+
+    use crossterm::event::KeyCode;
     match code {
-        KeyCode::Esc => cancel(app),
-        KeyCode::Tab | KeyCode::Down => {
-            dialog.cursor = crate::control_focus::cycle(dialog.cursor, 4, false)
-        }
-        KeyCode::BackTab | KeyCode::Up => {
-            dialog.cursor = crate::control_focus::cycle(dialog.cursor, 4, true)
-        }
-        KeyCode::Enter if dialog.cursor == 3 => cancel(app),
-        KeyCode::Enter => app.modals.set_color_dialog(None),
-        KeyCode::Char(' ') if dialog.cursor < 2 => {
-            let profile = if dialog.cursor == 0 {
-                PaletteProfile::ClassicDn
-            } else {
-                PaletteProfile::Terminal
-            };
-            choose(app, profile);
-        }
         KeyCode::Char('c') => choose(app, PaletteProfile::ClassicDn),
         KeyCode::Char('t') => choose(app, PaletteProfile::Terminal),
         _ => {}

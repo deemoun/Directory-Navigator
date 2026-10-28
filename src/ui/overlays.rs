@@ -1,4 +1,3 @@
-use super::dialog_style;
 use crate::painting::{Frame, Paragraph};
 use crate::presentation::{
     layout::Rect,
@@ -171,59 +170,55 @@ pub(super) fn draw_info_dialog(
         }
         return;
     }
-    let profile = app.config.palette;
-    if let Some(dialog) = app.last_dialog() {
-        let Some(message) = message else {
-            return;
-        };
-        let rect = dialog_style::window(
-            frame,
-            profile,
-            message.rect,
-            message.rect.width,
-            message.rect.height,
-            app.config.language.text(dialog.title),
-        );
-        let lines = &message.lines;
-        let visible = message.visible;
-        let maximum = message.maximum;
-        let body = crate::turbo::widgets::memo(
-            &lines
-                .iter()
-                .skip(app.message_offset())
-                .take(visible)
-                .cloned()
-                .collect::<Vec<_>>()
-                .join("\n"),
-        );
-        frame.render_widget(
-            body,
-            Rect::new(
-                rect.x + 2,
-                rect.y + 1,
-                rect.width - 4,
-                rect.height.saturating_sub(4),
-            ),
-        );
-        if maximum > 0 {
-            frame.render_widget(
-                Paragraph::new(app.config.language.text("↑↓ / PgUp/PgDn scroll"))
-                    .style(profile.dos(0x70)),
-                Rect::new(rect.x + 2, rect.bottom() - 3, rect.width - 4, 1),
-            );
-        }
-        let close = Rect::new(rect.x + (rect.width - 12) / 2, rect.bottom() - 2, 12, 1);
-        dialog_style::button(
-            frame,
-            profile,
-            close,
-            app.config.language.text("[ Close ]"),
-            true,
-        );
-        frame.regions().clear();
-        super::dialog_style::close_button(frame, profile, rect, Target::CloseDialog);
-        frame.regions().push((close, Target::CloseDialog));
+    if let Some(s) = message.and_then(|m| message_spec(app, m)) {
+        s.paint(frame, app);
     }
+}
+pub(crate) fn message_spec<'a>(
+    app: &'a App,
+    message: &crate::layout::MessageLayout,
+) -> Option<DialogSpec<'a>> {
+    let dialog = app.last_dialog()?;
+    let profile = app.config.palette;
+    let rect = message.rect;
+    let mut s = DialogSpec::new(
+        rect,
+        scope(app, crate::focus::Focus::Message)?,
+        0,
+        app.config.language.text(dialog.title),
+        Target::CloseDialog,
+        Target::CloseDialog,
+    );
+    s.memo(
+        &message
+            .lines
+            .iter()
+            .skip(app.message_offset())
+            .take(message.visible)
+            .cloned()
+            .collect::<Vec<_>>()
+            .join("\n"),
+        Rect::new(
+            rect.x + 2,
+            rect.y + 1,
+            rect.width - 4,
+            rect.height.saturating_sub(4),
+        ),
+    );
+    if message.maximum > 0 {
+        s.caption(
+            Paragraph::new(app.config.language.text("↑↓ / PgUp/PgDn scroll"))
+                .style(profile.dos(0x70)),
+            Rect::new(rect.x + 2, rect.bottom() - 3, rect.width - 4, 1),
+        );
+    }
+    s.control(Control::new(
+        0,
+        Rect::new(rect.x + (rect.width - 12) / 2, rect.bottom() - 2, 12, 1),
+        ControlKind::Button(app.config.language.text("[ Close ]").into()),
+        Target::CloseDialog,
+    ));
+    Some(s)
 }
 
 pub(super) fn draw_operation_overlays(
@@ -232,8 +227,6 @@ pub(super) fn draw_operation_overlays(
     area: Rect,
     layer: crate::focus::Focus,
 ) {
-    let profile = app.config.palette;
-    let dos = profile.styles();
     if let Some(prompt) = app
         .modals
         .prompt()
@@ -249,40 +242,48 @@ pub(super) fn draw_operation_overlays(
         }
     }
 
-    if let Some(job) = app
-        .job
-        .as_ref()
-        .filter(|_| layer == crate::focus::Focus::Job)
-    {
-        let rect = dialog_style::window(
-            frame,
-            profile,
-            area,
-            59,
-            9,
-            app.config.language.text(" File operation "),
-        );
-        let text=format!("{:?} in progress…\n{} items · {} bytes\n{}\nEsc cancels; completed items are retained.",job.kind,job.progress.files,job.progress.bytes,formatting::tail(&display_name(&job.progress.path.to_string_lossy()),rect.width-4));
-        frame.render_widget(
-            Paragraph::new(text).style(dos(0x70)),
-            Rect::new(rect.x + 2, rect.y + 1, rect.width - 4, 4),
-        );
-        frame.render_widget(
-            crate::turbo::widgets::busy(),
-            Rect::new(rect.x + 2, rect.bottom() - 4, rect.width - 4, 1),
-        );
-        let cancel = Rect::new(rect.x + (rect.width - 12) / 2, rect.bottom() - 2, 12, 1);
-        dialog_style::button(
-            frame,
-            profile,
-            cancel,
-            app.config.language.text("[ Cancel ]"),
-            true,
-        );
-        frame.regions().clear();
-        super::dialog_style::close_button(frame, profile, rect, Target::CancelJob);
-        frame.regions().push((cancel, Target::CancelJob));
+    if layer == crate::focus::Focus::Job {
+        if let Some(s) = job_spec(app, area) {
+            s.paint(frame, app);
+        }
     }
+}
+pub(crate) fn job_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
+    let job = app.job.as_ref()?;
+    let rect = centered(area, 59, 9);
+    let mut s = DialogSpec::new(
+        rect,
+        scope(app, crate::focus::Focus::Job)?,
+        0,
+        app.config.language.text(" File operation "),
+        Target::CancelJob,
+        Target::CancelJob,
+    );
+    let text = format!(
+        "{:?} in progress…\n{} items · {} bytes\n{}\nEsc cancels; completed items are retained.",
+        job.kind,
+        job.progress.files,
+        job.progress.bytes,
+        formatting::tail(
+            &display_name(&job.progress.path.to_string_lossy()),
+            rect.width - 4
+        )
+    );
+    s.caption(
+        Paragraph::new(text).style(app.config.palette.dos(0x70)),
+        Rect::new(rect.x + 2, rect.y + 1, rect.width - 4, 4),
+    );
+    s.native(
+        crate::turbo::widgets::busy(),
+        Rect::new(rect.x + 2, rect.bottom() - 4, rect.width - 4, 1),
+    );
+    s.control(Control::new(
+        0,
+        Rect::new(rect.x + (rect.width - 12) / 2, rect.bottom() - 2, 12, 1),
+        ControlKind::Button(app.config.language.text("[ Cancel ]").into()),
+        Target::CancelJob,
+    ));
+    Some(s)
 }
 
 /// DN's help context replaces the manager's file-operation hints.

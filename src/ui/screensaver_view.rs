@@ -1,5 +1,6 @@
 use crate::painting::{Block, Frame, Paragraph};
 use crate::presentation::layout::Rect;
+use crate::turbo::dialog_spec::{scope, Control, ControlKind, DialogSpec};
 use crate::{
     app::App,
     mouse::Target,
@@ -17,9 +18,12 @@ pub(super) fn draw_sky(frame: &mut impl Frame, app: &App, area: Rect) {
     }
 }
 pub(super) fn draw_setup(frame: &mut impl Frame, app: &App, area: Rect) {
-    let Some(setup) = app.screensaver.modals.screensaver() else {
-        return;
-    };
+    if let Some(s) = saver_spec(app, area) {
+        s.paint(frame, app);
+    }
+}
+pub(crate) fn saver_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
+    let setup = app.screensaver.modals.screensaver()?;
     let dos = app.config.palette.styles();
     let rect = Rect::new(
         area.x + (area.width - 58) / 2,
@@ -27,24 +31,22 @@ pub(super) fn draw_setup(frame: &mut impl Frame, app: &App, area: Rect) {
         58,
         20,
     );
-    super::dialog_style::window(
-        frame,
-        app.config.palette,
+    let mut spec = DialogSpec::new(
         rect,
-        rect.width,
-        rect.height,
+        scope(app, crate::focus::Focus::SaverSetup)?,
+        setup.cursor,
         app.config.language.text(" Screen savers "),
+        Target::Screensaver(ACCEPT),
+        Target::Screensaver(CANCEL),
     );
-    frame.render_widget(
+    spec.caption(
         Paragraph::new(app.config.language.text("Selected saver: Star Sky")).style(dos(0x70)),
         Rect::new(rect.x + 3, rect.y + 2, 52, 1),
     );
-    frame.render_widget(
+    spec.caption(
         Paragraph::new(app.config.language.text("Time before screen rest")).style(dos(0x70)),
         Rect::new(rect.x + 3, rect.y + 4, 52, 1),
     );
-    frame.regions().clear();
-    super::dialog_style::close_button(frame, app.config.palette, rect, Target::Screensaver(CANCEL));
     for (i, minutes) in DELAYS.iter().enumerate() {
         let label = if *minutes == 0 {
             app.config.language.text("Never").to_string()
@@ -57,13 +59,17 @@ pub(super) fn draw_setup(frame: &mut impl Frame, app: &App, area: Rect) {
             )
         };
         let row = Rect::new(rect.x + 4, rect.y + 6 + i as u16, 48, 1);
-        frame.render_widget(
-            crate::turbo::widgets::radio(&label, setup.delay == *minutes, setup.cursor == i),
+        spec.control(Control::new(
+            i,
             row,
-        );
-        frame.regions().push((row, Target::Screensaver(i)));
+            ControlKind::Radio {
+                caption: label,
+                checked: setup.delay == *minutes,
+            },
+            Target::Screensaver(i),
+        ));
     }
-    frame.render_widget(
+    spec.caption(
         Paragraph::new(
             app.config
                 .language
@@ -78,14 +84,12 @@ pub(super) fn draw_setup(frame: &mut impl Frame, app: &App, area: Rect) {
         (CANCEL, 39, "[ Cancel ]"),
     ] {
         let row = Rect::new(rect.x + x, rect.y + 17, 12, 1);
-        super::dialog_style::button_with_default(
-            frame,
-            app.config.palette,
+        spec.control(Control::new(
+            i,
             row,
-            app.config.language.text(label),
-            setup.cursor == i,
-            i == ACCEPT && setup.cursor < PREVIEW,
-        );
-        frame.regions().push((row, Target::Screensaver(i)));
+            ControlKind::Button(app.config.language.text(label).into()),
+            Target::Screensaver(i),
+        ));
     }
+    Some(spec)
 }

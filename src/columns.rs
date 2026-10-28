@@ -73,15 +73,17 @@ pub fn accept(app: &mut App) {
     app.notice = "Columns applied · Saved on exit when enabled; Save desktop saves now".into();
 }
 pub fn key(app: &mut App, code: KeyCode) {
+    if crate::dialog_controls::key(
+        app,
+        crossterm::event::KeyEvent::new(code, crossterm::event::KeyModifiers::NONE),
+        crate::focus::Focus::Columns,
+    ) {
+        return;
+    }
     let Some(dialog) = app.modals.columns_dialog_mut() else {
         return;
     };
     match code {
-        KeyCode::Esc => cancel(app),
-        KeyCode::Enter if dialog.cursor == 3 => cancel(app),
-        KeyCode::Enter => accept(app),
-        KeyCode::Tab => dialog.cursor = crate::control_focus::cycle(dialog.cursor, 4, false),
-        KeyCode::BackTab => dialog.cursor = crate::control_focus::cycle(dialog.cursor, 4, true),
         KeyCode::Left | KeyCode::Right | KeyCode::Up | KeyCode::Down | KeyCode::Char(' ')
             if dialog.cursor < 2 =>
         {
@@ -94,8 +96,6 @@ pub fn key(app: &mut App, code: KeyCode) {
             app.config.columns[panel] =
                 ColumnPreset::ALL[(app.config.columns[panel].index() + delta) % 3];
         }
-        KeyCode::Char(' ') if dialog.cursor == 3 => cancel(app),
-        KeyCode::Char(' ') => accept(app),
         _ => {}
     }
 }

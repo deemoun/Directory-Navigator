@@ -66,6 +66,9 @@ fn handle_key(app: &mut App, key: KeyEvent) {
             }
             return;
         }
+        if crate::dialog_controls::key(app, key, focus) {
+            return;
+        }
         crate::dialog::message_key(app, key.code);
         return;
     }
@@ -97,6 +100,9 @@ fn handle_key(app: &mut App, key: KeyEvent) {
     }
     if focus == Focus::Game {
         crate::tetris::key(app, key);
+        return;
+    }
+    if focus == Focus::Job && crate::dialog_controls::key(app, key, focus) {
         return;
     }
     if let Some(job) = app.job.as_ref().filter(|_| focus == Focus::Job) {
@@ -148,6 +154,9 @@ fn handle_key(app: &mut App, key: KeyEvent) {
     }
     if focus == Focus::Columns {
         crate::columns::key(app, key.code);
+        return;
+    }
+    if focus == Focus::FileInfo && crate::dialog_controls::key(app, key, focus) {
         return;
     }
     if let Some(info) = app

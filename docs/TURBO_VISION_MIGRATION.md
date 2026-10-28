@@ -138,8 +138,30 @@ controls, while text editing, option shortcuts, replacement sessions and saving
 stay in their existing document controllers. Disabled search options are excluded
 from traversal and mouse targets. Invalid focus retains the declared safe default
 in unsaved/replacement guards. Native FileDialog and HelpWindow integrations remain.
-Advanced Copy/Move forms, tools and Tetris retain their existing integrations for
-later increments. No dependency, configuration format or public API changes are needed.
+Advanced Copy/Move and destination history now use these definitions, including
+conditional verification/source-removal controls, native history arrows and the
+original focus order. Localized mnemonics come from the same control captions.
+Archive/discovery, compare/export/file histories, bookmarks/filters, window and
+command lists, calculator/history, character chart, information tools,
+colors/screensaver, import preview, pattern/columns/file info, messages and file
+progress share the structure too. Lists, menus, memos, radios, outlines and the
+character table participate in native traversal as their actual control types.
+Decorative/read-only content stays separate from focusable controls.
+
+Tetris uses document-owned control definitions for Play, Setup, score/name,
+game-over and Help pages, retaining its custom board, physics and score safeguards.
+Its shared proposals check document identity and layout revision. The game footer
+uses native StatusLine styling; export format choices use native RadioButton
+markers. Tetris page Space shortcuts retain their existing game meaning.
+
+Enabled button resolution cannot be bypassed by a list sharing the default action,
+and a disabled focused control cannot submit an unrelated default. Tab recovers
+to an enabled endpoint. Layout preparation tracks the definition's mouse geometry
+and enabled states, retiring stale frames after asynchronous capability changes.
+Radio selection does not invalidate stable row targets merely because the native
+focus widget moves. No dependency, configuration format or public API change is
+introduced; native FileDialog, HelpWindow and owned settings choice integrations
+remain unchanged.
 
 ## Menu visibility
 
@@ -215,8 +237,16 @@ commands accept Ctrl+O/Esc/Enter with raw, atomic paste handling.
 
 Local macOS ARM64 validation covers:
 
-- 506 native Rust tests pass; the existing opt-in native Trash check stays ignored.
+- 512 native Rust tests pass; the existing opt-in native Trash check stays ignored.
 - Formatting, all-target Clippy, release build and a no-default-features check.
+- Remaining-control coverage includes 128 before/after cell/style captures in
+  both palettes/languages at 80×25 and 132×40: 120 match exactly; the other eight
+  differ only in the native export radio marker. Repeated painting, translated
+  bounds, clipping, disabled focus, stale discovery actions, calculator child
+  history and retired document proposals have regressions. Private fixture tests
+  preserve no-overwrite/source-removal rules. Release PTYs exercise Copy/Move
+  history/Help/Tree, refusal/skip/verification, tools and histories, native mouse
+  controls, Tetris page navigation/name cancellation, resize and terminal restoration.
 - Document-dialog shared controls preserve 144 before/after cell/style/hit/cursor
   captures across both palettes/languages and two sizes; the pilot's 72 captures
   also still match. Traversal, unavailable search options, paste isolation, undo,

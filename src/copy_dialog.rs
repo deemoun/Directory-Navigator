@@ -160,14 +160,6 @@ pub fn key(app: &mut App, key: KeyEvent) {
         return;
     };
     let focus = prompt.focus;
-    let moving = matches!(
-        prompt.kind,
-        crate::dialog::PromptKind::Operation(crate::operations::Kind::Move)
-    );
-    let forced_verification = prompt
-        .copy
-        .as_ref()
-        .is_some_and(|c| c.options.remove_sources);
     if key.code == K::F(1) {
         crate::dialog::prompt_help(app);
         return;
@@ -176,53 +168,36 @@ pub fn key(app: &mut App, key: KeyEvent) {
         action(app, Action::History);
         return;
     }
-    if key.modifiers.contains(M::ALT) {
-        if let K::Char(c) = key.code {
-            let language = app.config.language;
-            if let Some((_, command)) = [
-                ("~R~efuse existing destinations", Action::Refuse),
-                ("~S~kip all existing files", Action::Skip),
-                ("Check ~f~ree disk space", Action::CheckSpace),
-                ("~V~erify disk writes", Action::Verify),
-                ("Remove so~u~rce files", Action::RemoveSources),
-                ("~T~ree", Action::Tree),
-            ]
-            .into_iter()
-            .find(|(label, _)| language.matches(label, c))
-            {
-                action(app, command);
-            } else if language.matches("~H~elp", c) {
-                crate::dialog::prompt_help(app);
-            } else if language.matches("~C~ancel", c) {
-                app.modals.set_prompt(None);
-            } else if language.matches("O~K~", c) {
-                app.submit_prompt();
-            } else if c.eq_ignore_ascii_case(&'d') {
-                action(app, Action::Field);
+    let proposal =
+        crate::ui::copy_spec(app, crate::turbo::dialog_spec::input_area(app)).and_then(|s| {
+            if key.modifiers.contains(M::ALT) {
+                if let K::Char(c) = key.code {
+                    s.mnemonic(c).map(|id| s.activate(id))
+                } else {
+                    None
+                }
+            } else {
+                s.key(key)
             }
+        });
+    if let Some(p) = proposal {
+        if !p.current(app) {
+            return;
+        }
+        if let Some(prompt) = app.modals.prompt_mut() {
+            prompt.focus = p.focus;
+        }
+        match p.action {
+            Some(Target::SubmitPrompt) => app.submit_prompt(),
+            Some(Target::CancelPrompt) => app.modals.set_prompt(None),
+            Some(Target::PromptHelp) => crate::dialog::prompt_help(app),
+            Some(Target::Copy(a)) => action(app, a),
+            Some(Target::PromptField) => action(app, Action::Field),
+            _ => {}
         }
         return;
     }
-    if matches!(key.code, K::Tab | K::BackTab) {
-        let choices = FOCUS
-            .iter()
-            .copied()
-            .filter(|id| (*id != 4 || !forced_verification) && (*id != 5 || !moving))
-            .collect::<Vec<_>>();
-        let index = choices.iter().position(|v| *v == focus).unwrap_or(0);
-        let reverse = key.code == K::BackTab || key.modifiers.contains(M::SHIFT);
-        let index = crate::control_focus::cycle(index, choices.len(), reverse);
-        app.modals.prompt_mut().unwrap().focus = choices[index];
-        return;
-    }
-    if key.code == K::Enter {
-        match focus {
-            7 => app.modals.set_prompt(None),
-            8 => action(app, Action::Tree),
-            9 => crate::dialog::prompt_help(app),
-            10 => action(app, Action::History),
-            _ => app.submit_prompt(),
-        };
+    if key.modifiers.contains(M::ALT) {
         return;
     }
     if (focus == 1 || focus == 2) && matches!(key.code, K::Up | K::Down | K::Left | K::Right) {
@@ -236,39 +211,16 @@ pub fn key(app: &mut App, key: KeyEvent) {
         );
         return;
     }
-    if key.code == K::Char(' ') && focus != 0 {
-        match focus {
-            1 => action(app, Action::Refuse),
-            2 => action(app, Action::Skip),
-            3 => action(app, Action::CheckSpace),
-            4 => action(app, Action::Verify),
-            5 => action(app, Action::RemoveSources),
-            6 => app.submit_prompt(),
-            7 => app.modals.set_prompt(None),
-            8 => action(app, Action::Tree),
-            9 => crate::dialog::prompt_help(app),
-            10 => action(app, Action::History),
-            _ => {}
-        };
-        return;
-    }
     if focus == 0 && !key.modifiers.intersects(M::CONTROL | M::SUPER) {
         app.modals.prompt_mut().unwrap().edit(key.code);
     }
 }
 pub fn history_key(app: &mut App, key: KeyEvent) {
+    if crate::dialog_controls::key(app, key, crate::focus::Focus::CopyHistory) {
+        return;
+    }
     match key.code {
         K::Esc => app.modals.set_copy_history(None),
-        K::Enter => {
-            let selected = app
-                .modals
-                .copy_history()
-                .and_then(|h| h.paths.get(h.cursor).cloned().map(|p| (h.parent, p)));
-            app.modals.set_copy_history(None);
-            if let Some((owner, path)) = selected {
-                pick(app, owner, path);
-            }
-        }
         code => {
             if let Some(h) = app.modals.copy_history_mut() {
                 match code {
@@ -289,14 +241,7 @@ pub fn history_mouse(app: &mut App, event: MouseEvent, target: Option<Target>) {
         MouseEventKind::Down(MouseButton::Left) => match target {
             Some(Target::CloseCopyHistory) => app.modals.set_copy_history(None),
             Some(Target::CopyHistory(row)) => {
-                let selected = app
-                    .modals
-                    .copy_history()
-                    .and_then(|h| h.paths.get(row).cloned().map(|p| (h.parent, p)));
-                app.modals.set_copy_history(None);
-                if let Some((owner, path)) = selected {
-                    pick(app, owner, path);
-                }
+                select_history(app, row);
             }
             _ => {}
         },
@@ -310,5 +255,16 @@ pub fn history_mouse(app: &mut App, event: MouseEvent, target: Option<Target>) {
             }
         }
         _ => {}
+    }
+}
+
+pub(crate) fn select_history(app: &mut App, row: usize) {
+    let selected = app
+        .modals
+        .copy_history()
+        .and_then(|h| h.paths.get(row).cloned().map(|p| (h.parent, p)));
+    app.modals.set_copy_history(None);
+    if let Some((owner, path)) = selected {
+        pick(app, owner, path);
     }
 }

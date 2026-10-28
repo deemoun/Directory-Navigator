@@ -583,6 +583,12 @@ pub fn action(app: &mut App, command: Action) {
     }
 }
 pub fn key(app: &mut App, key: KeyEvent) {
+    if let Some(tree) = app.modals.directory_tree_mut() {
+        tree.last_click = None;
+    }
+    if crate::dialog_controls::key(app, key, crate::focus::Focus::Tree) {
+        return;
+    }
     let Some(tree) = app.modals.directory_tree_mut() else {
         return;
     };
@@ -604,10 +610,9 @@ pub fn key(app: &mut App, key: KeyEvent) {
         return;
     }
     match key.code{
-        KeyCode::Esc=>app.modals.set_directory_tree(None),KeyCode::Tab=>tree.focus = crate::control_focus::cycle(tree.focus, 5, false),KeyCode::BackTab=>tree.focus = crate::control_focus::cycle(tree.focus, 5, true),
         KeyCode::Left|KeyCode::Backspace|KeyCode::Char('-')=>tree.left(),KeyCode::Right|KeyCode::Char('+')=>tree.right(),
         KeyCode::Char(' ') if tree.focus==0=>tree.toggle(),
-        KeyCode::Enter|KeyCode::Char(' ')=>{let command=match tree.focus{2=>Action::Refresh,3=>Action::Hidden,4=>Action::Close,_=>Action::Open};action(app,command);},
+
         KeyCode::F(1)=>app.push_dialog(crate::dialog::Dialog{title:" Directory tree help ",message:"Up/Down and Page keys move through visible directories.\nRight/+ expands; Left/− collapses or selects the parent.\nSpace toggles a branch; Enter/double-click opens it.\nCtrl+R refreshes the selected branch; Ctrl+H shows hidden.\nLinks are leaves: Enter follows one explicitly.\nEsc/Ctrl+F4 closes without changing either panel.".into()}),_=>{}
     }
 }

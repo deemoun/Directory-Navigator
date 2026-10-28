@@ -320,7 +320,7 @@ impl Widget for Native {
         }
     }
 }
-fn native(view: impl View + 'static, text: TextCells) -> Native {
+pub(super) fn native(view: impl View + 'static, text: TextCells) -> Native {
     Native {
         view: Box::new(view),
         text,
@@ -602,6 +602,7 @@ pub(crate) fn edit_input(
     *field = result;
 }
 
+#[derive(Clone)]
 pub(crate) struct MenuEntry {
     pub label: String,
     pub shortcut: String,
@@ -930,6 +931,52 @@ pub(crate) fn text_view(lines: &[String], horizontal: usize, attribute: u8) -> N
     let mut result = native(control, text);
     result.appearance = Appearance::Preview(attribute);
     result
+}
+
+/// Focus boundary for custom document surfaces; it never draws over their cells.
+pub(super) fn surface() -> Native {
+    struct Surface {
+        core: turbo_vision::views::ViewCore,
+    }
+    impl View for Surface {
+        fn get_palette(&self) -> Option<turbo_vision::core::palette::Palette> {
+            None
+        }
+        fn core(&self) -> &turbo_vision::views::ViewCore {
+            &self.core
+        }
+        fn core_mut(&mut self) -> &mut turbo_vision::views::ViewCore {
+            &mut self.core
+        }
+        fn as_any(&self) -> &dyn std::any::Any {
+            self
+        }
+        fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+            self
+        }
+        fn can_focus(&self) -> bool {
+            true
+        }
+        fn draw(&mut self, _: &mut turbo_vision::terminal::Terminal) {}
+        fn handle_event(&mut self, _: &mut Event) {}
+    }
+    native(
+        Surface {
+            core: turbo_vision::views::ViewCore::new(TvRect::new(0, 0, 1, 1)),
+        },
+        TextCells::default(),
+    )
+}
+
+/// The same native outline type participates in traversal; its populated tree is
+/// painted separately so the controller retains expansion and selection state.
+pub(super) fn outline_focus() -> Native {
+    native(
+        turbo_vision::views::outline::OutlineViewer::new(TvRect::new(0, 0, 1, 1), |s: &String| {
+            s.clone()
+        }),
+        TextCells::default(),
+    )
 }
 
 #[cfg(test)]

@@ -1,3 +1,9 @@
+use crate::turbo::dialog_spec::{scope, Control, ControlKind, DialogSpec};
+pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
+    if let Some(spec) = navigation_spec(app, area) {
+        spec.paint(frame, app);
+    }
+}
 use crate::painting::{Frame, Paragraph};
 use crate::presentation::{layout::Rect, text::Line};
 use crate::{
@@ -7,12 +13,10 @@ use crate::{
     mouse::Target,
     navigation_tools::{Action, Modal},
 };
-pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
+pub(crate) fn navigation_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
     let profile = app.config.palette;
     let dos = profile.styles();
-    let Some(modal) = app.modals.navigation_dialog() else {
-        return;
-    };
+    let modal = app.modals.navigation_dialog()?;
     let height = if matches!(modal, Modal::Bookmarks { .. }) {
         18
     } else {
@@ -30,16 +34,22 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
     } else {
         " Filename filter "
     };
-    super::dialog_style::window(
-        frame,
-        profile,
+    let focus = match modal {
+        Modal::Bookmarks { focus, .. } | Modal::Filter { focus, .. } => *focus,
+    };
+    let default = if matches!(modal, Modal::Bookmarks { .. }) {
+        Action::Go
+    } else {
+        Action::ApplyFilter
+    };
+    let mut spec = DialogSpec::new(
         rect,
-        rect.width,
-        rect.height,
+        scope(app, crate::focus::Focus::Navigation)?,
+        focus,
         app.config.language.text(title),
+        Target::Navigation(default),
+        Target::Navigation(Action::Close),
     );
-    frame.regions().clear();
-    super::dialog_style::close_button(frame, profile, rect, Target::Navigation(Action::Close));
     let x = rect.x + 2;
     let w = rect.width - 4;
     let mut buttons = Vec::new();
@@ -54,17 +64,25 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
                     format!("{}  {}", i + 1, tail(&value, w - 3))
                 })
                 .collect();
-            frame.render_widget(
-                crate::turbo::widgets::list(items, *slot, 0, *focus == 0),
+            let mut control = Control::new(
+                0,
                 Rect::new(x, rect.y + 1, w, 9),
+                ControlKind::List {
+                    items,
+                    cursor: *slot,
+                    offset: 0,
+                },
+                Target::Navigation(Action::Go),
             );
+            control.hits.clear();
+            spec.control(control);
             for i in 0..9 {
-                frame.regions().push((
+                spec.hit(
                     Rect::new(x, rect.y + 1 + i as u16, w, 1),
                     Target::Navigation(Action::Slot(i)),
-                ));
+                );
             }
-            frame.render_widget(
+            spec.caption(
                 Paragraph::new(
                     app.config
                         .language
@@ -92,19 +110,21 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
             cursor,
             focus,
         } => {
-            frame.render_widget(Paragraph::new(app.config.language.text("Visible cached filenames · case-sensitive * and ?\nEmpty or * clears · Parent stays visible\nFiltered marks are preserved; operations use visible marks")).style(dos(0x70)),Rect::new(x,rect.y+1,w,3));
+            spec.caption(Paragraph::new(app.config.language.text("Visible cached filenames · case-sensitive * and ?\nEmpty or * clears · Parent stays visible\nFiltered marks are preserved; operations use visible marks")).style(dos(0x70)),Rect::new(x,rect.y+1,w,3));
             let input = Rect::new(x, rect.y + 5, w, 1);
             let column = Line::from(&field[..*cursor]).width();
             let scroll = column.saturating_sub(w.saturating_sub(1) as usize);
-            frame.render_widget(
-                crate::turbo::widgets::input_scrolled(&display_name(field), scroll, *focus == 0),
+            spec.control(Control::new(
+                0,
                 input,
-            );
-            frame
-                .regions()
-                .push((input, Target::Navigation(Action::FilterField)));
+                ControlKind::ScrolledInput {
+                    value: display_name(field),
+                    scroll,
+                },
+                Target::Navigation(Action::FilterField),
+            ));
             if *focus == 0 {
-                frame.set_cursor_position((x + (column - scroll) as u16, input.y));
+                spec.cursor = Some((x + (column - scroll) as u16, input.y));
             }
             buttons.push((
                 Rect::new(x + 8, rect.bottom() - 2, 16, 1),
@@ -120,19 +140,13 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
             ));
         }
     }
-    for (rect, label, action, focus) in buttons {
-        let default_active = match modal {
-            Modal::Bookmarks { focus, .. } => *focus == 0 && action == Action::Go,
-            Modal::Filter { focus, .. } => *focus == 0 && action == Action::ApplyFilter,
-        };
-        super::dialog_style::button_with_default(
-            frame,
-            profile,
+    for (i, (rect, label, action, _)) in buttons.into_iter().enumerate() {
+        spec.control(Control::new(
+            i + 1,
             rect,
-            app.config.language.text(label),
-            focus,
-            default_active,
-        );
-        frame.regions().push((rect, Target::Navigation(action)));
+            ControlKind::Button(app.config.language.text(label).into()),
+            Target::Navigation(action),
+        ));
     }
+    Some(spec)
 }

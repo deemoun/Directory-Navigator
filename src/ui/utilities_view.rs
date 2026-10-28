@@ -1,3 +1,9 @@
+use crate::turbo::dialog_spec::{scope, Control, ControlKind, DialogSpec};
+pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
+    if let Some(s) = utility_spec(app, area) {
+        s.paint(frame, app);
+    }
+}
 use crate::painting::{Frame, Paragraph, Wrap};
 use crate::presentation::layout::Rect;
 use crate::{
@@ -7,47 +13,42 @@ use crate::{
     utilities::{characters::Page, Action, Kind},
 };
 fn text(
-    frame: &mut impl Frame,
+    spec: &mut DialogSpec<'_>,
     profile: crate::palette::PaletteProfile,
     rect: Rect,
     value: &str,
     focused: bool,
 ) {
     let dos = profile.styles();
-    frame.render_widget(
-        Paragraph::new(value)
+    spec.caption(
+        Paragraph::new(value.to_owned())
             .style(dos(if focused { 0x30 } else { 0x70 }))
             .wrap(Wrap { trim: false }),
         rect,
     );
 }
-fn button(
-    frame: &mut impl Frame,
-    app: &App,
-    rect: Rect,
-    label: &str,
-    action: Action,
-    focused: bool,
-) {
-    let profile = app.config.palette;
-    super::dialog_style::button(
-        frame,
-        profile,
+fn button(spec: &mut DialogSpec<'_>, app: &App, rect: Rect, label: &str, action: Action) {
+    let id = match action {
+        Action::Page(Page::Ascii) => 1,
+        Action::Page(Page::Cp437) => 2,
+        Action::Copy => 3,
+        Action::Close if app.utilities.modals.utility_dialog() == Some(Kind::Characters) => 4,
+        Action::Close => 1,
+        _ => 0,
+    };
+    spec.control(Control::new(
+        id,
         rect,
-        app.config.language.text(label),
-        focused,
-    );
-    frame.regions().push((rect, Target::Utility(action)));
+        ControlKind::Button(app.config.language.text(label).into()),
+        Target::Utility(action),
+    ));
 }
-pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
+pub(crate) fn utility_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
     let profile = app.config.palette;
     let dos = profile.styles();
-    let Some(kind) = app.utilities.modals.utility_dialog() else {
-        return;
-    };
+    let kind = app.utilities.modals.utility_dialog()?;
     if kind == Kind::Calculator {
-        super::calculator_view::draw(frame, app, area);
-        return;
+        return super::calculator_view::calculator_spec(app, area);
     }
     let height = match kind {
         Kind::Characters => 24,
@@ -67,42 +68,50 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
         Kind::System => " System Information ",
         Kind::Memory => " Memory Information ",
     };
-    super::dialog_style::window(
-        frame,
-        profile,
+    let focus = if kind == Kind::Characters {
+        app.utilities.chart.focus
+    } else {
+        app.utilities.focus
+    };
+    let default = if kind == Kind::Characters {
+        Action::Copy
+    } else {
+        Action::Refresh
+    };
+    let mut spec = DialogSpec::new(
         rect,
-        rect.width,
-        rect.height,
+        scope(app, crate::focus::Focus::Utility)?,
+        focus,
         app.config.language.text(title),
+        Target::Utility(default),
+        Target::Utility(Action::Close),
     );
-    frame.regions().clear();
-    super::dialog_style::close_button(frame, profile, rect, Target::Utility(Action::Close));
+    if kind == Kind::Characters {
+        spec.tab_order = vec![0, 1, 2, 3, 4];
+    }
     let x = rect.x + 2;
     let w = rect.width - 4;
     match kind {
         Kind::Calculator => {}
         Kind::Characters => {
             let page = app.utilities.chart.page;
-            let focus = app.utilities.chart.focus;
             button(
-                frame,
+                &mut spec,
                 app,
                 Rect::new(x, rect.y + 1, 18, 1),
                 " [ ASCII ] ",
                 Action::Page(Page::Ascii),
-                focus == 1,
             );
             button(
-                frame,
+                &mut spec,
                 app,
                 Rect::new(x + 20, rect.y + 1, 22, 1),
                 " [ DOS CP437 ] ",
                 Action::Page(Page::Cp437),
-                focus == 2,
             );
             for col in 0..16u16 {
                 text(
-                    frame,
+                    &mut spec,
                     profile,
                     Rect::new(x + 4 + col * 4, rect.y + 2, 4, 1),
                     &format!(" {col:X} "),
@@ -112,28 +121,41 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
             let chart = &app.utilities.chart;
             for row in 0..if page == Page::Ascii { 8 } else { 16 } {
                 text(
-                    frame,
+                    &mut spec,
                     profile,
                     Rect::new(x, rect.y + 3 + row, 4, 1),
                     &format!("{row:X}_"),
                     false,
                 );
             }
-            frame.compose(crate::turbo::characters::draw(
+            let grid = Rect::new(
+                x + 4,
+                rect.y + 3,
+                64,
+                if page == Page::Ascii { 8 } else { 16 },
+            );
+            let mut control = Control::new(
+                0,
+                grid,
+                ControlKind::CharacterGrid {
+                    page,
+                    cells: chart.cells,
+                },
+                Target::Utility(Action::Copy),
+            );
+            control.paint = false;
+            control.hits.clear();
+            spec.control(control);
+            spec.scene(crate::turbo::characters::draw(
                 chart,
-                Rect::new(
-                    x + 4,
-                    rect.y + 3,
-                    64,
-                    if page == Page::Ascii { 8 } else { 16 },
-                ),
+                grid,
                 crate::presentation::layout::Size::new(area.width, area.height),
                 profile,
             ));
             let detail = chart.details();
             let copyable = chart.copy_text().is_some();
             text(
-                frame,
+                &mut spec,
                 profile,
                 Rect::new(x, rect.y + 19, w, 1),
                 &detail,
@@ -146,19 +168,33 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
             } else {
                 "ASCII controls are shown as dots and cannot be copied"
             };
-            text(frame, profile, Rect::new(x, rect.y + 20, w, 1), note, false);
+            text(
+                &mut spec,
+                profile,
+                Rect::new(x, rect.y + 20, w, 1),
+                note,
+                false,
+            );
             if copyable {
                 button(
-                    frame,
+                    &mut spec,
                     app,
                     Rect::new(x + 10, rect.bottom() - 2, 16, 1),
                     " [ Copy ] ",
                     Action::Copy,
-                    focus == 0 || focus == 3,
                 );
             } else {
+                let mut disabled = Control::new(
+                    3,
+                    Rect::new(x + 10, rect.bottom() - 2, 16, 1),
+                    ControlKind::Button("Copy".into()),
+                    Target::Utility(Action::Copy),
+                );
+                disabled.enabled = false;
+                disabled.paint = false;
+                spec.control(disabled);
                 text(
-                    frame,
+                    &mut spec,
                     profile,
                     Rect::new(x + 10, rect.bottom() - 2, 16, 1),
                     app.config.language.text(" Copy disabled "),
@@ -166,19 +202,18 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
                 );
             }
             button(
-                frame,
+                &mut spec,
                 app,
                 Rect::new(rect.right() - 24, rect.bottom() - 2, 16, 1),
                 " [ Close ] ",
                 Action::Close,
-                focus == 4,
             );
         }
         Kind::System | Kind::Memory => {
             if let Some(info) = &app.utilities.information {
                 if info.loading() {
                     text(
-                        frame,
+                        &mut spec,
                         profile,
                         Rect::new(x, rect.y + 2, w, 1),
                         app.config.language.text("Loading native information…"),
@@ -192,7 +227,7 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
                     .skip(info.offset)
                     .take(info.rows)
                 {
-                    frame.render_widget(
+                    spec.caption(
                         Paragraph::new(format!(
                             "{}: {}",
                             app.config.language.text(name),
@@ -205,7 +240,7 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
                 }
             }
             text(
-                frame,
+                &mut spec,
                 profile,
                 Rect::new(x, rect.bottom() - 4, w, 1),
                 app.config
@@ -213,23 +248,21 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
                     .text("Snapshot · R/F5 Refresh · ↑↓ PgUp/PgDn scroll · ←→ pan"),
                 false,
             );
-            let focus = app.utilities.focus;
             button(
-                frame,
+                &mut spec,
                 app,
                 Rect::new(x + 8, rect.bottom() - 2, 16, 1),
                 " [ Refresh ] ",
                 Action::Refresh,
-                focus == 0,
             );
             button(
-                frame,
+                &mut spec,
                 app,
                 Rect::new(rect.right() - 24, rect.bottom() - 2, 16, 1),
                 " [ Close ] ",
                 Action::Close,
-                focus == 1,
             );
         }
     }
+    Some(spec)
 }

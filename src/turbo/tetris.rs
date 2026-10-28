@@ -4,22 +4,13 @@
 use super::scene::Scene;
 use crate::{
     app::App,
-    mouse::Target,
-    tetris::{GameAction, FIGURES, HEIGHT, WIDTH},
+    tetris::{FIGURES, HEIGHT, WIDTH},
 };
 use std::collections::BTreeMap;
 use unicode_width::UnicodeWidthStr;
+mod controls;
 mod pages;
-
-impl Scene {
-    pub(crate) fn button(&mut self, x: u16, y: u16, label: &str, focused: bool) {
-        super::widgets::paint_into(
-            self,
-            super::widgets::button(label, focused),
-            crate::presentation::layout::Rect::new(x, y, 11, 2),
-        );
-    }
-}
+pub(crate) use controls::spec;
 
 pub(crate) fn prepare(app: &App, width: u16, height: u16) -> Scene {
     assert!(width >= 80 && height >= 25);
@@ -45,10 +36,6 @@ pub(crate) fn prepare(app: &App, width: u16, height: u16) -> Scene {
     scene.text(x + 2, y, 1, "[", 0x7f);
     scene.text(x + 3, y, 1, "■", 0x7a);
     scene.text(x + 4, y, 1, "]", 0x7f);
-    let mut regions = vec![(
-        crate::presentation::layout::Rect::new(x + 2, y, 3, 1),
-        Target::Game(GameAction::Close),
-    )];
     let wx = x + 1;
     let wy = y + 1;
     scene.fill(wx, wy, WIDTH as u16 * 2 + 2, HEIGHT as u16 + 2, 0x0f);
@@ -61,10 +48,6 @@ pub(crate) fn prepare(app: &App, width: u16, height: u16) -> Scene {
             }
         }
     }
-    regions.push((
-        crate::presentation::layout::Rect::new(wx + 1, wy + 1, WIDTH as u16 * 2, HEIGHT as u16),
-        Target::Game(GameAction::BoardFocus),
-    ));
     if !game.over {
         for (col, row) in game.piece.positions().filter(|(col, row)| {
             (0..WIDTH as i32).contains(col) && (0..HEIGHT as i32).contains(row)
@@ -153,45 +136,17 @@ pub(crate) fn prepare(app: &App, width: u16, height: u16) -> Scene {
             0x3f,
         );
     }
-    for (index, (label, action)) in crate::tetris::BUTTONS.into_iter().enumerate() {
-        let bx = sx + (index as u16 % 2) * 11;
-        let by = y + 18 + (index as u16 / 2) * 2;
-        scene.button(bx, by, language.text(label), game.play_focus == index + 1);
-        regions.push((
-            crate::presentation::layout::Rect::new(bx, by, 11, 1),
-            Target::Game(action),
-        ));
-    }
-    // Match the established eight equal footer slots, including remainder cells.
-    // Layout allocation is kept at the mouse/legacy-shell boundary.
-    let slots = crate::presentation::layout::Layout::horizontal(
-        [crate::presentation::layout::Constraint::Fill(1); 8],
-    )
-    .split(crate::presentation::layout::Rect::new(
-        0,
-        height - 1,
-        width,
-        1,
-    ));
-    for (i, (label, action)) in [
-        ("F1 Help", GameAction::Help),
-        ("F2 New", GameAction::New),
-        ("F3 Pause", GameAction::Pause),
-        ("F4 Scores", GameAction::Scores),
-        ("F5 Setup", GameAction::Setup),
-        ("+ Level", GameAction::LevelUp),
-        ("* Preview", GameAction::Preview),
-        ("Esc Close", GameAction::Close),
-    ]
-    .into_iter()
-    .enumerate()
-    {
-        let slot = slots[i];
-        scene.fill(slot.x, slot.y, slot.width, 1, 0x30);
-        scene.text(slot.x, slot.y, slot.width, language.text(label), 0x30);
-        regions.push((slot, Target::Game(action)));
-    }
-    scene.regions = regions;
     pages::draw(&mut scene, app, y);
-    scene
+    let mut frame = crate::painting::NativeFrame::new(
+        crate::presentation::layout::Rect::new(0, 0, width, height),
+        app.config.palette,
+    );
+    frame.replace(scene);
+    if let Some(spec) = spec(
+        app,
+        crate::presentation::layout::Rect::new(0, 0, width, height),
+    ) {
+        spec.append(&mut frame);
+    }
+    frame.finish()
 }

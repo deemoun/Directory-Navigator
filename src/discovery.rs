@@ -286,33 +286,18 @@ pub fn action(app: &mut App, command: Action) {
     }
 }
 pub fn key(app: &mut App, event: KeyEvent) {
+    if let Some(m) = app.discovery.modals.discovery_mut() {
+        m.last_click = None;
+    }
+    if crate::dialog_controls::key(app, event, crate::focus::Focus::Discovery) {
+        return;
+    }
     let Some(m) = app.discovery.modals.discovery_mut() else {
         return;
     };
     m.last_click = None;
-    if event.code == KeyCode::Esc {
-        action(app, Action::Close);
-        return;
-    }
     if m.kind == Kind::FindForm {
         match event.code {
-            KeyCode::Tab => m.focus = crate::control_focus::cycle(m.focus, 5, false),
-            KeyCode::BackTab => m.focus = crate::control_focus::cycle(m.focus, 5, true),
-            KeyCode::Enter => {
-                let command = match m.focus {
-                    4 => Action::Close,
-                    _ => Action::Start,
-                };
-                action(app, command);
-            }
-            KeyCode::Char(' ') if m.focus != 0 => {
-                let command = match m.focus {
-                    1 | 2 => Action::Toggle(m.focus),
-                    3 => Action::Start,
-                    _ => Action::Close,
-                };
-                action(app, command);
-            }
             code if m.focus == 0 => {
                 if m.replace_input
                     && matches!(
@@ -329,28 +314,6 @@ pub fn key(app: &mut App, event: KeyEvent) {
             _ => {}
         }
     } else {
-        let buttons = if m.kind == Kind::Sizes { 3 } else { 5 };
-        let choices: Vec<usize> = (0..=buttons)
-            .filter(|i| {
-                if *i == 0 {
-                    return true;
-                }
-                if m.kind == Kind::Sizes {
-                    match *i {
-                        1 => m.job.is_none(),
-                        2 => m.job.is_some(),
-                        _ => true,
-                    }
-                } else {
-                    match *i {
-                        1 => !m.hits.is_empty(),
-                        2 | 3 => m.hits.get(m.cursor).is_some_and(|h| h.regular),
-                        4 => m.job.is_some(),
-                        _ => true,
-                    }
-                }
-            })
-            .collect();
         if let Some(row) = crate::turbo::widgets::list_key(m.cursor, m.count(), m.rows, event.code)
         {
             m.cursor = row;
@@ -358,33 +321,8 @@ pub fn key(app: &mut App, event: KeyEvent) {
             return;
         }
         match event.code {
-            KeyCode::Tab | KeyCode::BackTab => {
-                m.focus =
-                    crate::control_focus::select(m.focus, &choices, event.code == KeyCode::BackTab)
-            }
             KeyCode::F(3) => action(app, Action::View),
             KeyCode::F(4) => action(app, Action::Edit),
-            KeyCode::Enter | KeyCode::Char(' ') => {
-                if m.focus != 0 && !choices.contains(&m.focus) {
-                    return;
-                }
-                let command = if m.kind == Kind::Sizes {
-                    match m.focus.saturating_sub(1) {
-                        1 => Action::Stop,
-                        2 => Action::Close,
-                        _ => Action::Recalculate,
-                    }
-                } else {
-                    match m.focus.saturating_sub(1) {
-                        1 => Action::View,
-                        2 => Action::Edit,
-                        3 => Action::Stop,
-                        4 => Action::Close,
-                        _ => Action::Jump,
-                    }
-                };
-                action(app, command);
-            }
             _ => {}
         }
     }

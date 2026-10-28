@@ -8,6 +8,7 @@ pub mod config;
 pub mod config_import;
 pub mod desktop;
 pub mod dialog;
+pub(crate) mod dialog_controls;
 pub mod editor;
 pub mod file_info;
 pub mod file_tools;

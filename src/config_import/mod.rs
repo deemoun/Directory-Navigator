@@ -145,21 +145,13 @@ pub fn apply(app: &mut App) {
     }
 }
 pub fn key(app: &mut App, key: KeyEvent) {
+    if crate::dialog_controls::key(app, key, crate::focus::Focus::ConfigImport) {
+        return;
+    }
     let Some(preview) = app.modals.config_import_mut() else {
         return;
     };
     match key.code {
-        KeyCode::Esc => app.modals.set_config_import(None),
-        KeyCode::Tab | KeyCode::BackTab => {
-            if !preview.can_apply() {
-                preview.focus = 1;
-            } else {
-                preview.focus =
-                    crate::control_focus::cycle(preview.focus, 2, key.code == KeyCode::BackTab);
-            }
-        }
-        KeyCode::Enter if preview.focus == 0 => apply(app),
-        KeyCode::Enter => app.modals.set_config_import(None),
         KeyCode::Up => preview.step(&app.config, -1),
         KeyCode::Down => preview.step(&app.config, 1),
         KeyCode::PageUp => preview.step(&app.config, -8),

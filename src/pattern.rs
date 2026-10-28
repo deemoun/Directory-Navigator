@@ -143,17 +143,13 @@ pub fn accept(app: &mut App) {
 }
 
 pub fn key(app: &mut App, key: KeyEvent) {
+    if crate::dialog_controls::key(app, key, crate::focus::Focus::Pattern) {
+        return;
+    }
     let Some(prompt) = app.modals.pattern_mut() else {
         return;
     };
     match key.code {
-        KeyCode::Esc => app.modals.set_pattern(None),
-        KeyCode::Tab | KeyCode::BackTab => {
-            prompt.focus =
-                crate::control_focus::cycle(prompt.focus, 3, key.code == KeyCode::BackTab)
-        }
-        KeyCode::Enter if prompt.focus == 2 => app.modals.set_pattern(None),
-        KeyCode::Enter => accept(app),
         KeyCode::Char('a')
             if prompt.focus == 0 && key.modifiers.contains(KeyModifiers::CONTROL) =>
         {
