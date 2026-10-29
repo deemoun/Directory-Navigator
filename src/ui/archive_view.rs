@@ -170,26 +170,28 @@ pub(crate) fn archive_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
         Rect::new(x, rect.bottom() - 3, w, 1),
     );
     let bw = (rect.width - 4) / 6;
-    for (i, label, a) in [
+    let buttons = [
         (1, "Open", Action::Open),
         (2, "F3 View", Action::View),
         (3, "F9 Info", Action::Info),
         (4, "Refresh", Action::Refresh),
         (5, "Stop", Action::Stop),
         (6, "Close", Action::Close),
-    ] {
-        let r = Rect::new(x + (i as u16 - 1) * bw, rect.bottom() - 2, bw - 1, 1);
+    ];
+    let labels = buttons.map(|(_, label, _)| app.config.language.text(label));
+    let bounds = theme::button_row(
+        Rect::new(x, rect.bottom() - 2, bw * 6 - 1, 1),
+        &labels,
+        bw - 1,
+        1,
+    );
+    for ((i, _, a), (label, r)) in buttons.into_iter().zip(labels.into_iter().zip(bounds)) {
         let enabled = match a {
             Action::Open | Action::View | Action::Info => !b.loading() && b.catalog.is_some(),
             Action::Stop => b.loading(),
             _ => true,
         };
-        let mut control = Control::new(
-            i,
-            r,
-            ControlKind::Button(app.config.language.text(label).into()),
-            Target::Archive(a),
-        );
+        let mut control = Control::new(i, r, ControlKind::Button(label.into()), Target::Archive(a));
         control.enabled = enabled;
         spec.control(control);
     }

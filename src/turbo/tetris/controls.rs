@@ -64,21 +64,21 @@ pub(crate) fn spec(
             );
             board.paint = false;
             s.control(board);
-            for (i, (label, a)) in crate::tetris::BUTTONS.into_iter().enumerate() {
-                button(
-                    &mut s,
-                    ctx,
-                    i + 1,
-                    Rect::new(
-                        x + 28 + (i as u16 % 2) * 11,
-                        y + 18 + (i as u16 / 2) * 2,
-                        11,
-                        1,
-                    ),
-                    label,
-                    a,
-                    true,
+            for (row, pair) in crate::tetris::BUTTONS.chunks(2).enumerate() {
+                let labels: Vec<_> = pair.iter().map(|(label, _)| lang.text(label)).collect();
+                let width = labels
+                    .iter()
+                    .map(|label| crate::dialog_theme::minimum_button_width(label).max(11))
+                    .sum::<u16>();
+                let bounds = crate::dialog_theme::button_row(
+                    Rect::new(x + 28, y + 18 + row as u16 * 2, width, 1),
+                    &labels,
+                    11,
+                    0,
                 );
+                for (column, ((label, a), r)) in pair.iter().zip(bounds).enumerate() {
+                    button(&mut s, ctx, row * 2 + column + 1, r, label, *a, true);
+                }
             }
             let slots = Layout::horizontal([Constraint::Fill(1); 8]).split(Rect::new(
                 0,
@@ -259,16 +259,18 @@ pub(crate) fn spec(
                     false,
                 );
             } else {
+                let label = if screen == Screen::GameOver {
+                    "Continue"
+                } else {
+                    " Enter / Esc: Back "
+                };
+                let width = crate::dialog_theme::minimum_button_width(lang.text(label)).max(18);
                 button(
                     &mut s,
                     ctx,
                     0,
-                    Rect::new(r.x + 16, r.bottom() - 2, 18, 1),
-                    if screen == Screen::GameOver {
-                        "Continue"
-                    } else {
-                        " Enter / Esc: Back "
-                    },
+                    Rect::new(r.x + (r.width - width) / 2, r.bottom() - 2, width, 1),
+                    label,
                     if screen == Screen::GameOver {
                         A::Continue
                     } else {

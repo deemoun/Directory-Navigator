@@ -21,6 +21,16 @@
 
 ## Implemented
 
+- Compact dialog buttons reserve both DN focus arrows using translated Unicode
+  caption widths. Import/common prompts, Copy/Move, archive and game rows share
+  sizing with their mouse bounds; native captions, actions and safe defaults stay
+  unchanged. Regression coverage checks Tab/BackTab, cancellation and both markers
+  across English/Russian, both palettes and two terminal sizes. Private release
+  PTYs verify Import/Copy/Move cancellation, unchanged files and terminal recovery.
+  macOS ARM64: 542 tests pass, one opt-in native Trash test ignored; formatting,
+  all-target Clippy, release and no-default-features checks pass. Windows/Linux
+  validation remains deferred.
+
 - Further shared mechanics: seven list controllers use explicit viewport policies;
   double-click helpers preserve row/WindowId/path identity and distinct timeout
   boundaries. MRU histories share insertion with existing 16/100 limits. Profile/

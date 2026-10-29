@@ -131,7 +131,7 @@ pub(crate) fn prompt_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
             );
         }
     }
-    for (i, label, target) in [
+    let buttons = [
         (
             1,
             if deleting { "[ Delete ]" } else { "[ OK ]" },
@@ -139,12 +139,20 @@ pub(crate) fn prompt_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
         ),
         (2, "[ Cancel ]", Target::CancelPrompt),
         (3, "[ Help ]", Target::PromptHelp),
-    ] {
-        let button = Rect::new(rect.right() - 31 + (i - 1) * 10, rect.bottom() - 3, 9, 1);
+    ];
+    let labels = buttons.map(|(_, label, _)| app.config.language.text(label));
+    let bounds = theme::button_row(
+        Rect::new(rect.x + 2, rect.bottom() - 3, rect.width - 4, 1),
+        &labels,
+        9,
+        1,
+    );
+    for ((i, _, target), (label, button)) in buttons.into_iter().zip(labels.into_iter().zip(bounds))
+    {
         let mut control = Control::new(
             i as usize,
             button,
-            ControlKind::Button(app.config.language.text(label).into()),
+            ControlKind::Button(label.into()),
             target,
         );
         control.mnemonic = Some(match i {

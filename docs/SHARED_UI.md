@@ -28,6 +28,12 @@ frames and close markers. It provides the common centering and standard button-r
 metrics. Content-specific dimensions and native Turbo Vision control palettes stay
 explicit; no restyling or global palette replacement occurs.
 
+Compact prompt, Copy/Move, archive and game button rows reserve the translated
+caption width plus both DN focus markers. The same bounds drive native painting
+and mouse targets; compact rows redistribute padding rather than clipping a
+caption or overwriting its first character with the left arrow. Caption widths
+use Unicode screen cells and exclude mnemonic markers.
+
 `settings::definition` describes ordinary boolean fields once: localized caption,
 existing TOML group/key and typed Config accessors. Settings drafts and TOML read/
 write paths use the same descriptions. Form metadata supplies titles, dimensions,
