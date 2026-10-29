@@ -1,5 +1,58 @@
 # Directory Navigator — beta
 
+## Controller extraction and regression stabilization
+
+- Copy/Move draft option changes and child requests, editor Find/Replace input,
+  viewer search drafts and group-selection input use narrow state controllers.
+  Copy/Move keyboard and mouse actions share one host bridge. Existing hosts
+  retain validation, modal lifecycle, shared defaults and filesystem safeguards.
+- Added lifecycle sequences for real background loads, focus/resize, repeated
+  opens, guarded closes, nested Help and independent undo. Channel-gated running
+  workers verify stale generation/owner rejection and current background replies.
+- Added macOS PTY walkthroughs for floating windows, FileDialog/Help,
+  Tetris pages, settings cancellation, Unicode mkdir, movement/paste isolation,
+  resize, output handoff and terminal restoration. The Rust harness needs no
+  interpreter or new dependency and touches only temporary fixtures.
+- macOS validation: 595 tests passed across 64 native test executables, zero
+  failures and one existing opt-in Trash test ignored; all 320 frozen appearance
+  captures unchanged. Formatting, all-target Clippy with warnings denied,
+  release build, no-default-features check and doc tests pass. Both checked-in
+  PTY walkthroughs also pass against the optimized release binary.
+  Windows/Linux validation remains skipped.
+
+## Ownership and controller boundaries
+
+- Guarded document closes use one App retirement coordinator. Desktop removals
+  emit the same lifecycle notification for internal alias coalescing. Reconciliation
+  drops owned modals/requests, plugin bindings, native modal/page geometry, capture
+  and obsolete published hits. A running editor save prevents document removal.
+- Input eligibility shares live-owner, foreground, modal and frame-revision checks.
+  Modal proposals now carry their layout revision as document proposals already
+  did. Output mode, screensavers and manipulation block interactive delivery.
+- Settings and common prompt controllers accept draft state and explicit inputs,
+  returning typed effects. Only their host bridges commit configuration, submit
+  file operations, present Help or change modal lifetime. Existing appearance,
+  focus order, Unicode input, safe defaults and submission guards remain.
+- macOS validation: 584 tests passed, one existing opt-in test ignored; appearance
+  fixtures unchanged. Formatting, all-target Clippy, release/no-default-features
+  checks and release PTYs for floating windows, settings drafts, Unicode prompts,
+  cancellation, submission and terminal restoration pass. Windows/Linux skipped.
+
+## Stabilization: presentation, task pressure and App workflows
+
+- A shared internal placement adapter handles cells, cursor, hit regions and
+  pointer coordinates for root frames, floating documents, plugins and composed
+  dialogs. Existing native FileDialog/Help adapters and appearance are preserved.
+- The four-worker/sixteen-slot task pool prunes obsolete queued requests and
+  retains saturated work with its owning Task for nonblocking admission retries.
+  Cancellation, generations, draft/save guards and dedicated file jobs remain.
+- App's document, modal, polling, quit and configuration coordination lives in
+  focused modules. Polling order and public entry points remain unchanged.
+- Validation on macOS: 577 tests passed, one existing opt-in test ignored; all
+  320 frozen appearance captures unchanged. Formatting, all-target Clippy,
+  release/no-default-features checks and release PTY walkthrough pass.
+  Windows/Linux validation remains skipped.
+
 ## Floating desktop (macOS)
 
 - Native Window shells retain geometry for editor/viewer documents, the game,

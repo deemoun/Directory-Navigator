@@ -166,13 +166,7 @@ pub fn render(app: &App, snapshot: &crate::layout::LayoutSnapshot) -> RenderedFr
     let surface_frames = surfaces
         .iter()
         .map(|surface| {
-            let translated = Rect::new(
-                surface.bounds.x.saturating_add(snapshot.bounds.x),
-                surface.bounds.y.saturating_add(snapshot.bounds.y),
-                surface.bounds.width,
-                surface.bounds.height,
-            );
-            let clip = translated.intersection(snapshot.clip);
+            let clip = snapshot.to_screen(surface.bounds);
             let owner = match surface.id.key {
                 crate::windowing::geometry::SurfaceKey::Document(id)
                 | crate::windowing::geometry::SurfaceKey::Page(id, _) => id,

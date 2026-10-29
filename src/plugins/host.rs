@@ -2,7 +2,7 @@
 use super::*;
 use crate::{app::App, desktop::WindowKind, focus::Focus, painting::Frame};
 pub(crate) fn active(app: &App) -> Option<Binding> {
-    if app.output_visible || app.screensaver.active {
+    if !crate::eligibility::Gate::new(app).frame(None) {
         return None;
     }
     if let Some(m) = app.modal_top() {
@@ -11,17 +11,18 @@ pub(crate) fn active(app: &App) -> Option<Binding> {
             .plugin_dialog()
             .filter(|id| app.config.plugin_enabled(*id))
             .and_then(|id| app.desktop.plugins.binding(id))
-            .filter(|b| b.owner == Owner::Modal(m.id));
+            .filter(|b| {
+                b.owner == Owner::Modal(m.id) && crate::eligibility::Gate::new(app).modal(m)
+            });
     }
     if let WindowKind::Plugin(id) = app.desktop.active().kind {
         if !app.config.plugin_enabled(id) {
             return None;
         }
-        return app
-            .desktop
-            .plugins
-            .binding(id)
-            .filter(|b| b.owner == Owner::Document(app.desktop.active().id));
+        return app.desktop.plugins.binding(id).filter(|b| {
+            b.owner == Owner::Document(app.desktop.active().id)
+                && crate::eligibility::Gate::new(app).document(app.desktop.active().id, None)
+        });
     }
     None
 }
@@ -33,7 +34,9 @@ fn alive(app: &App, b: Binding) -> bool {
                 app.modals.plugin_dialog() == Some(b.plugin)
                     && app.modal_infos().iter().any(|m| m.id == id)
             }
-            Owner::Document(id) => app.desktop.contains(id),
+            Owner::Document(id) => {
+                crate::eligibility::Gate::new(app).live(crate::modals::ModalOwner::Document(id))
+            }
         }
 }
 pub(crate) fn context(app: &App, b: Binding, area: Rect, now: Instant) -> Option<Context> {
@@ -41,7 +44,10 @@ pub(crate) fn context(app: &App, b: Binding, area: Rect, now: Instant) -> Option
         return None;
     }
     let scope = match b.owner {
-        Owner::Modal(id) => ControlScope::Modal(*app.modal_infos().iter().find(|m| m.id == id)?),
+        Owner::Modal(id) => ControlScope::Modal {
+            info: *app.modal_infos().iter().find(|m| m.id == id)?,
+            revision: app.layout_revision,
+        },
         Owner::Document(window) => ControlScope::Document {
             window,
             revision: app.layout_revision,
@@ -187,9 +193,11 @@ fn apply(app: &mut App, b: Binding, effects: Vec<Effect>) {
             Effect::Close => match b.owner {
                 Owner::Modal(_) => {
                     app.modals.set_plugin_dialog(None);
-                    app.desktop.plugins.retire(b);
+                    app.sync_modals();
                 }
-                Owner::Document(w) => app.desktop.close(w),
+                Owner::Document(w) => {
+                    app.retire_document(w);
+                }
             },
             Effect::CopyText(text) => app.editor_clipboard = text,
             Effect::Help { title, text } => app.push_dialog(crate::dialog::Dialog {
@@ -331,12 +339,13 @@ pub(crate) fn apply_enabled(app: &mut App) {
     for b in app.desktop.plugins.bound() {
         if !app.config.plugin_enabled(b.plugin) {
             match b.owner {
-                Owner::Document(id) => app.desktop.close(id),
+                Owner::Document(id) => {
+                    app.retire_document(id);
+                }
                 Owner::Modal(_) => {
                     if app.modals.plugin_dialog() == Some(b.plugin) {
                         app.modals.set_plugin_dialog(None);
                     }
-                    app.desktop.plugins.retire(b);
                 }
             }
         }

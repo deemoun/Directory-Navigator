@@ -71,6 +71,7 @@ pub struct Desktop {
     context: std::cell::Cell<Option<WindowId>>,
     activation_revision: u64,
     reservations: std::collections::BTreeMap<std::path::PathBuf, WindowId>,
+    retired: Vec<WindowId>,
 }
 impl Default for Desktop {
     fn default() -> Self {
@@ -94,6 +95,7 @@ impl Default for Desktop {
             context: std::cell::Cell::new(None),
             activation_revision: 0,
             reservations: Default::default(),
+            retired: Vec::new(),
         }
     }
 }
@@ -251,7 +253,10 @@ impl Desktop {
         Ok(id)
     }
     pub fn close(&mut self, id: WindowId) {
-        if id == WindowId::MANAGER {
+        if id == WindowId::MANAGER
+            || !self.contains(id)
+            || self.editor(id).is_some_and(|e| e.saving())
+        {
             return;
         }
         let active = self.active().id;
@@ -266,11 +271,18 @@ impl Desktop {
         self.native.remove(id);
         self.windows.retain(|w| w.id != id);
         self.reservations.retain(|_, owner| *owner != id);
+        self.retired.push(id);
         if active == id {
             if let Some(next) = self.windows.last().map(|w| w.id) {
                 self.activate(next);
             }
         }
+    }
+    pub(crate) fn retirement_pending(&self) -> bool {
+        !self.retired.is_empty()
+    }
+    pub(crate) fn take_retired(&mut self) -> Vec<WindowId> {
+        std::mem::take(&mut self.retired)
     }
     pub(crate) fn set_context(&self, id: Option<WindowId>) -> Option<WindowId> {
         self.context.replace(id)

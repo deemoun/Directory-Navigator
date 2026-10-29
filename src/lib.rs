@@ -96,3 +96,6 @@ pub mod modals;
 pub mod copy_dialog;
 
 pub mod terminal_output;
+
+pub(crate) mod eligibility;
+pub(crate) mod retirement;

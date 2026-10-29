@@ -258,6 +258,22 @@ impl NativeDesktop {
             host.raise_modal();
         }
     }
+    pub(crate) fn retire_modal(&self, id: crate::modals::ModalId) {
+        let mut h = self.0.borrow_mut();
+        let matches = |key: SurfaceKey| matches!(key,SurfaceKey::Modal(owner)|SurfaceKey::ModalPage(owner,_) if owner==id);
+        h.auxiliary.retain(|key, _| !matches(*key));
+        if h.interaction
+            .capture
+            .as_ref()
+            .is_some_and(|c| matches(c.id.key))
+        {
+            h.interaction.capture = None;
+        }
+        if h.interaction.top.is_some_and(matches) {
+            h.interaction.top = None;
+        }
+        h.interaction.revision += 1;
+    }
     pub(crate) fn activate(&self, id: WindowId) -> bool {
         let mut host = self.0.borrow_mut();
         let Some((_, view)) = host.ids.iter().find(|(info, _)| info.id == id).copied() else {

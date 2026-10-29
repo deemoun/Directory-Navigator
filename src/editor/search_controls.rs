@@ -2,8 +2,8 @@ use super::{
     search::{self, ReplaceSession, SearchDialog, SearchMemory},
     *,
 };
-use crate::{app::App, dialog};
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use crate::app::App;
+use crossterm::event::KeyEvent;
 
 pub(super) fn open(editor: &mut Editor, replacing: bool) {
     let selection = editor.buffer.as_ref().map(Buffer::selected).unwrap_or(0..0);
@@ -172,64 +172,7 @@ pub(super) fn key(app: &mut App, key: KeyEvent) {
     let Some(editor) = app.desktop.active_editor_mut() else {
         return;
     };
-    let command = match editor.modals.editor_modal_mut() {
-        Some(Modal::Search(dialog)) => match key.code {
-            KeyCode::Char(c) if key.modifiers.contains(KeyModifiers::ALT) => {
-                match c.to_ascii_lowercase() {
-                    't' => dialog.focus = 0,
-                    'n' if dialog.replacing => dialog.focus = 1,
-                    'c' => dialog.options.case_sensitive = !dialog.options.case_sensitive,
-                    'w' => dialog.options.whole_words = !dialog.options.whole_words,
-                    'p' if dialog.replacing => dialog.options.prompt = !dialog.options.prompt,
-                    'b' => dialog.options.backward = true,
-                    'd' => dialog.options.backward = false,
-                    's' if dialog.selection.is_some() => dialog.options.selected_scope = true,
-                    'g' => dialog.options.selected_scope = false,
-                    'e' => dialog.options.entire_scope = true,
-                    'f' => dialog.options.entire_scope = false,
-                    _ => {}
-                };
-                None
-            }
-            KeyCode::Char('a')
-                if key.modifiers.contains(KeyModifiers::CONTROL) && dialog.focus < 2 =>
-            {
-                if dialog.focus == 0 {
-                    dialog.query.clear();
-                } else {
-                    dialog.replacement.clear();
-                }
-                dialog.cursors[dialog.focus] = 0;
-                None
-            }
-            _ if dialog.focus < 2
-                && !key
-                    .modifiers
-                    .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) =>
-            {
-                let field = if dialog.focus == 0 {
-                    &mut dialog.query
-                } else {
-                    &mut dialog.replacement
-                };
-                dialog::edit_input(field, &mut dialog.cursors[dialog.focus], key.code);
-                None
-            }
-            KeyCode::Left | KeyCode::Right | KeyCode::Up | KeyCode::Down => {
-                dialog.toggle(dialog.focus);
-                None
-            }
-            _ => None,
-        },
-        Some(Modal::Replace(_)) => match key.code {
-            KeyCode::Char('y' | 'Y') => Some(EditorAction::ReplaceYes),
-            KeyCode::Char('n' | 'N') => Some(EditorAction::ReplaceNo),
-            KeyCode::Char('a' | 'A') => Some(EditorAction::ReplaceAll),
-            KeyCode::Esc | KeyCode::Char('c' | 'C') => Some(EditorAction::Cancel),
-            _ => None,
-        },
-        _ => None,
-    };
+    let command = super::search_controller::key(editor.modals.editor_modal_mut(), key);
     if let Some(command) = command {
         super::action(app, command);
     }

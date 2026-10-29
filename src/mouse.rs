@@ -112,11 +112,7 @@ pub fn handle(app: &mut App, event: MouseEvent) {
         crate::layout::update(app);
         return;
     }
-    if app.mouse.frame.is_some_and(|frame| {
-        frame.owner != app.desktop.active().id
-            || frame.revision != app.layout_revision
-            || frame.modal != app.modal_top().map(|m| m.id)
-    }) {
+    if !crate::eligibility::Gate::new(app).frame(app.mouse.frame) {
         app.mouse.reset_click();
         return;
     }
@@ -127,6 +123,12 @@ pub fn handle(app: &mut App, event: MouseEvent) {
     let mut event = event;
     if event.kind == MouseEventKind::Down(MouseButton::Left) {
         let offset = app.layout_key.map_or((0, 0), |(_, r, _)| (r.x, r.y));
+        let local = crate::presentation::placement::Placement::translated(
+            i32::from(offset.0),
+            i32::from(offset.1),
+            Rect::default(),
+        )
+        .local_mouse(event);
         let top = app.modal_top().map(|m| m.id);
         let proposal = app
             .mouse
@@ -134,12 +136,7 @@ pub fn handle(app: &mut App, event: MouseEvent) {
             .iter()
             .rev()
             .find(|d| Some(d.borrow().scope.id) == top)
-            .and_then(|d| {
-                d.borrow_mut().button(
-                    event.column.saturating_sub(offset.0),
-                    event.row.saturating_sub(offset.1),
-                )
-            });
+            .and_then(|d| d.borrow_mut().button(local.column, local.row));
         if let Some((rect, _target)) = proposal {
             event.column = rect.x + offset.0;
             event.row = rect.y + offset.1;
@@ -401,7 +398,8 @@ fn handle_mouse(app: &mut App, event: MouseEvent) {
                 }
             }
             MouseEventKind::Down(MouseButton::Left) if target == Some(Target::CloseViewer) => {
-                app.desktop.close_viewer()
+                let id = app.desktop.target();
+                app.retire_document(id);
             }
             _ => {}
         }
@@ -424,32 +422,15 @@ fn handle_mouse(app: &mut App, event: MouseEvent) {
     }
     if focus == Focus::Prompt && app.modals.prompt().is_some_and(|p| p.copy.is_some()) {
         if event.kind == MouseEventKind::Down(MouseButton::Left) {
-            match target {
-                Some(Target::Copy(action)) => crate::copy_dialog::action(app, action),
-                Some(Target::PromptField) => {
-                    crate::copy_dialog::action(app, crate::copy_dialog::Action::Field)
-                }
-                Some(Target::SubmitPrompt) => app.submit_prompt(),
-                Some(Target::CancelPrompt) => app.modals.set_prompt(None),
-                Some(Target::PromptHelp) => crate::dialog::prompt_help(app),
-                _ => {}
+            if let Some(target) = target {
+                crate::copy_dialog::command(app, target);
             }
         }
         return;
     }
     if focus == Focus::Prompt {
         if event.kind == MouseEventKind::Down(MouseButton::Left) {
-            match target {
-                Some(Target::SubmitPrompt) => app.submit_prompt(),
-                Some(Target::PromptHelp) => crate::dialog::prompt_help(app),
-                Some(Target::PromptField) => {
-                    if let Some(prompt) = app.modals.prompt_mut() {
-                        prompt.focus = 0;
-                    }
-                }
-                Some(Target::CancelPrompt) => app.modals.set_prompt(None),
-                _ => {}
-            }
+            crate::dialog::prompt_action(app, None, target);
         }
         return;
     }

@@ -1,7 +1,7 @@
 use super::Viewer;
+use crate::app::App;
 use crate::presentation::text::Span;
-use crate::{app::App, dialog};
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{KeyCode, KeyEvent};
 use std::ops::Range;
 use unicode_segmentation::UnicodeSegmentation;
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -249,7 +249,10 @@ impl Viewer {
 }
 pub fn action(app: &mut App, action: Action) {
     if action == Action::Close {
-        app.desktop.close_viewer();
+        {
+            let id = app.desktop.target();
+            app.retire_document(id);
+        };
         return;
     }
     let Some(viewer) = app.desktop.active_viewer_mut() else {
@@ -268,16 +271,13 @@ pub fn action(app: &mut App, action: Action) {
                 viewer.notice = "Text search unavailable in Hex view or while loading".into();
             }
         }
-        Action::Cancel => viewer.modals.set_viewer_search(None),
-        Action::Case => {
+        Action::Cancel | Action::Case | Action::Field => {
             if let Some(dialog) = viewer.modals.viewer_search_mut() {
-                dialog.memory.case_sensitive ^= true;
-                dialog.focus = 1;
-            }
-        }
-        Action::Field => {
-            if let Some(dialog) = viewer.modals.viewer_search_mut() {
-                dialog.focus = 0;
+                if super::search_controller::action(dialog, action)
+                    == super::search_controller::Effect::Cancel
+                {
+                    viewer.modals.set_viewer_search(None);
+                }
             }
         }
         Action::Submit => {
@@ -305,9 +305,7 @@ pub fn paste(app: &mut App, text: &str) {
         .active_viewer_mut()
         .and_then(|v| v.modals.viewer_search_mut())
     {
-        if dialog.focus == 0 {
-            dialog::paste_input(&mut dialog.memory.query, &mut dialog.cursor, text);
-        }
+        super::search_controller::paste(dialog, text);
     }
 }
 pub fn key(app: &mut App, key: KeyEvent) {
@@ -337,13 +335,7 @@ pub fn key(app: &mut App, key: KeyEvent) {
         return;
     };
     if let Some(dialog) = viewer.modals.viewer_search_mut() {
-        if dialog.focus == 0
-            && !key
-                .modifiers
-                .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT)
-        {
-            dialog::edit_input(&mut dialog.memory.query, &mut dialog.cursor, key.code);
-        }
+        super::search_controller::edit(dialog, key);
         return;
     }
 

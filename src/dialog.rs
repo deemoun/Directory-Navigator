@@ -1,3 +1,4 @@
+pub(crate) mod prompt_controller;
 pub struct Dialog {
     pub title: &'static str,
     pub message: String,
@@ -133,5 +134,22 @@ pub fn keyboard_help(app: &mut crate::app::App) {
                 language.text("Options: Import DOS settings previews DN.CFG preferences"),
             );
         }
+    }
+}
+
+/// Host bridge: the prompt controller can propose effects but cannot touch files.
+pub(crate) fn prompt_action(
+    app: &mut crate::app::App,
+    focus: Option<usize>,
+    target: Option<crate::mouse::Target>,
+) {
+    let Some(prompt) = app.modals.prompt_mut() else {
+        return;
+    };
+    match prompt_controller::apply(prompt, focus, target) {
+        prompt_controller::Effect::None => {}
+        prompt_controller::Effect::Submit => app.submit_prompt(),
+        prompt_controller::Effect::Cancel => app.modals.set_prompt(None),
+        prompt_controller::Effect::Help => prompt_help(app),
     }
 }

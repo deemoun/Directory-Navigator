@@ -1,4 +1,5 @@
 mod navigation;
+mod search_controller;
 use crate::filesystem::open_regular;
 pub use navigation::{action, key, paste, Action, Match, SearchDialog, SearchMemory, VisualRow};
 use std::{

@@ -279,7 +279,7 @@ pub fn poll(app: &mut App) -> bool {
             .is_some_and(|editor| editor.buffer.is_none())
         {
             if app.desktop.active().id == id {
-                app.desktop.close(id);
+                app.retire_document(id);
                 let survivor = app.desktop.active().id;
                 app.with_document(survivor, |app| app.error(error));
             } else {
@@ -350,7 +350,10 @@ fn complete_pending(app: &mut App) {
         editor.closing.take()
     });
     match pending {
-        Some(PendingAction::Close) => app.desktop.close_editor(),
+        Some(PendingAction::Close) => {
+            let id = app.desktop.target();
+            app.retire_document(id);
+        }
         Some(PendingAction::Quit) => {
             app.approve_quit(app.desktop.target());
         }

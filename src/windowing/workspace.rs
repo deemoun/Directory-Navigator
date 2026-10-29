@@ -1,5 +1,6 @@
 //! Coordinate ownership and compositing for the native floating desktop.
 use super::geometry::{self, Capabilities, Definition, Surface, SurfaceKey};
+use crate::presentation::placement::Placement;
 use crate::{
     app::App,
     desktop::{WindowId, WindowKind},
@@ -26,48 +27,10 @@ pub(crate) fn move_plugin_scene(scene: &mut Scene, surface: Surface) {
     chrome(scene, surface);
 }
 pub(crate) fn translate_scene(scene: &mut Scene, dx: i32, dy: i32, clip: Rect, fixed_status: bool) {
-    let map = |x: u16, y: u16| -> Option<(u16, u16)> {
-        if fixed_status && y + 1 == scene.height {
-            return Some((x, y));
-        }
-        let x = i32::from(x) + dx;
-        let y = i32::from(y) + dy;
-        if x < 0 || y < 0 {
-            return None;
-        }
-        let p = (x as u16, y as u16);
-        clip.contains(p.into()).then_some(p)
-    };
-    scene.cells = std::mem::take(&mut scene.cells)
-        .into_iter()
-        .filter_map(|((x, y), g)| map(x, y).map(|p| (p, g)))
-        .collect();
-    scene.regions = std::mem::take(&mut scene.regions)
-        .into_iter()
-        .filter_map(|(r, t)| {
-            if r == Rect::new(0, 0, scene.width, scene.height)
-                && clip.x == 0
-                && clip.y == 1
-                && clip.width == scene.width
-            {
-                return Some((r, t));
-            }
-            map(r.x, r.y).map(|(x, y)| {
-                (
-                    Rect::new(x, y, r.width, r.height).intersection(
-                        if fixed_status && y + 1 == scene.height {
-                            Rect::new(0, y, scene.width, 1)
-                        } else {
-                            clip
-                        },
-                    ),
-                    t,
-                )
-            })
-        })
-        .filter(|(r, _)| !r.is_empty())
-        .collect();
-    scene.cursor = scene.cursor.and_then(|(x, y)| map(x, y));
+    Placement::translated(dx, dy, clip)
+        .with_workspace_hits()
+        .with_status_row(fixed_status.then_some(scene.height - 1))
+        .apply(scene);
 }
 pub(crate) fn chrome(scene: &mut Scene, s: Surface) {
     use super::geometry::Chrome;
@@ -337,35 +300,8 @@ pub(crate) fn float_document(
     border
         .cells
         .retain(|(x, y), _| desktop.contains((*x, *y).into()));
-    let map = |x: u16, y: u16| {
-        let y = if kind == WindowKind::Editor {
-            match y {
-                0 => 1,
-                1 => 0,
-                _ => y,
-            }
-        } else {
-            y
-        };
-        (s.bounds.x + 1 + x, s.bounds.y + y)
-    };
-    for ((x, y), g) in std::mem::take(&mut scene.cells) {
-        let p = map(x, y);
-        if p.1 > s.bounds.y && p.1 < s.bounds.bottom() - 1 && p.0 < s.bounds.right() - 1 {
-            border.cells.insert(p, g);
-        }
-    }
-    scene.regions = std::mem::take(&mut scene.regions)
-        .into_iter()
-        .filter_map(|(r, t)| {
-            let p = map(r.x, r.y);
-            (p.1 > s.bounds.y).then_some((
-                Rect::new(p.0, p.1, r.width, r.height).intersection(s.bounds),
-                t,
-            ))
-        })
-        .collect();
-    scene.cursor = scene.cursor.map(|(x, y)| map(x, y));
+    Placement::document(s.bounds, kind == WindowKind::Editor).apply(scene);
+    border.cells.extend(std::mem::take(&mut scene.cells));
     scene.cells = border.cells;
     scene.width = workspace.width;
     scene.height = workspace.height;
@@ -425,9 +361,8 @@ pub(crate) fn key(app: &mut App, key: crossterm::event::KeyEvent) -> bool {
 }
 pub(crate) fn capture_mouse(app: &mut App, event: crossterm::event::MouseEvent) -> bool {
     let offset = app.layout_key.map_or((0, 0), |(_, b, _)| (b.x, b.y));
-    let mut local = event;
-    local.column = local.column.saturating_sub(offset.0);
-    local.row = local.row.saturating_sub(offset.1);
+    let local = Placement::translated(i32::from(offset.0), i32::from(offset.1), Rect::default())
+        .local_mouse(event);
     app.desktop.native().geometry_mouse(local)
 }
 pub(crate) fn mouse(app: &mut App, event: crossterm::event::MouseEvent) -> bool {
@@ -439,23 +374,12 @@ pub(crate) fn mouse(app: &mut App, event: crossterm::event::MouseEvent) -> bool 
     let native = app.desktop.native();
     let target = native.mouse_target(&app.mouse.regions, event.column, event.row);
     let offset = app.layout_key.map_or((0, 0), |(_, b, _)| (b.x, b.y));
-    let mut local = event;
-    local.column = local.column.saturating_sub(offset.0);
-    local.row = local.row.saturating_sub(offset.1);
+    let local = Placement::translated(i32::from(offset.0), i32::from(offset.1), Rect::default())
+        .local_mouse(event);
     if let Some(crate::mouse::Target::Surface(id, command)) = target {
-        let Some(surface) = native.surface(id.key).filter(|s| s.id == id) else {
+        let Some(surface) = crate::eligibility::Gate::new(app).surface(id) else {
             return true;
         };
-        if let Some(top) = foreground(app).filter(|s| {
-            matches!(
-                s.id.key,
-                SurfaceKey::Modal(_) | SurfaceKey::ModalPage(..) | SurfaceKey::Page(..)
-            )
-        }) {
-            if top.id != id {
-                return true;
-            }
-        }
         if let SurfaceKey::Document(owner) | SurfaceKey::Page(owner, _) = id.key {
             if app.desktop.active().id != owner {
                 if app.modal_top().is_some() {
@@ -523,7 +447,9 @@ fn close(app: &mut App, surface: Surface) {
                 Some(WindowKind::Viewer) => {
                     crate::viewer::action(app, crate::viewer::Action::Close)
                 }
-                Some(WindowKind::Plugin(_)) => app.desktop.close(id),
+                Some(WindowKind::Plugin(_)) => {
+                    app.retire_document(id);
+                }
                 _ => {}
             }
         }

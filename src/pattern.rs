@@ -149,26 +149,46 @@ pub fn key(app: &mut App, key: KeyEvent) {
     let Some(prompt) = app.modals.pattern_mut() else {
         return;
     };
-    match key.code {
-        KeyCode::Char('a')
-            if prompt.focus == 0 && key.modifiers.contains(KeyModifiers::CONTROL) =>
-        {
-            prompt.replace_on_type = true
+    prompt.key(key);
+}
+impl PatternDialog {
+    fn key(&mut self, key: KeyEvent) {
+        match key.code {
+            KeyCode::Char('a')
+                if self.focus == 0 && key.modifiers.contains(KeyModifiers::CONTROL) =>
+            {
+                self.replace_on_type = true
+            }
+            code if self.focus == 0
+                && !key
+                    .modifiers
+                    .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) =>
+            {
+                self.edit(code)
+            }
+            _ => {}
         }
-        code if prompt.focus == 0
-            && !key
-                .modifiers
-                .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) =>
-        {
-            prompt.edit(code)
-        }
-        _ => {}
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn draft_keyboard_keeps_replacement_and_paste_local_to_the_field() {
+        let mut d = PatternDialog::new(0, PathBuf::from("fixture"), true);
+        d.key(KeyEvent::new(KeyCode::Char('界'), KeyModifiers::NONE));
+        assert_eq!(d.field, "界");
+        d.focus = 2;
+        d.key(KeyEvent::new(KeyCode::Char('x'), KeyModifiers::NONE));
+        d.paste("ignored");
+        assert_eq!(d.field, "界");
+        d.focus = 0;
+        d.key(KeyEvent::new(KeyCode::Char('a'), KeyModifiers::CONTROL));
+        d.paste("*.文");
+        assert_eq!(d.field, "*.文");
+        assert_eq!(d.path, PathBuf::from("fixture"));
+    }
     /// Independent, non-greedy dynamic-programming oracle for exhaustive small inputs.
     fn reference(pattern: &str, name: &str) -> bool {
         let name = name.chars().collect::<Vec<_>>();

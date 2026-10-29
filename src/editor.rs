@@ -6,6 +6,7 @@ pub mod highlight;
 mod keys;
 pub mod menus;
 pub mod search;
+mod search_controller;
 mod search_controls;
 pub mod storage;
 use buffer::Buffer;
@@ -154,6 +155,9 @@ impl Editor {
         if let Some(buffer) = &mut self.buffer {
             buffer.tab_size = usize::from(preferences.tab_size);
         }
+    }
+    pub(crate) fn saving(&self) -> bool {
+        self.saving
     }
     pub fn busy(&self) -> bool {
         self.worker.is_some() || self.save_prepare.is_some()

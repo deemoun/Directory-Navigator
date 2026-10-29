@@ -470,11 +470,7 @@ impl NativeFrame {
             {
                 let desktop=crate::windowing::geometry::workspace((self.scene.width,self.scene.height));
                 if let Some(background)=&self.dialog_background {
-                    let outside=self.scene.cells.keys().filter(|(x,y)|!desktop.contains((*x,*y).into())).copied().collect::<Vec<_>>();
-                    for point in outside {
-                        if let Some(glyph)=background.cells.get(&point) {self.scene.cells.insert(point,glyph.clone());}
-                        else {self.scene.cells.remove(&point);}
-                    }
+                    crate::presentation::placement::Placement::translated(0,0,desktop).restore_outside(&mut self.scene,background);
                 }
                 let from = dialog.bounds();
                 let to = surface.bounds;
@@ -484,16 +480,9 @@ impl NativeFrame {
                     layer
                         .cells
                         .retain(|(x, y), _| from.contains((*x, *y).into()));
-                    crate::windowing::workspace::translate_scene(
-                        &mut layer,
-                        i32::from(to.x) - i32::from(from.x),
-                        i32::from(to.y) - i32::from(from.y),
-                        crate::windowing::geometry::workspace((
-                            self.scene.width,
-                            self.scene.height,
-                        )),
-                        false,
-                    );
+                    let placement=crate::presentation::placement::Placement::translated(
+                        i32::from(to.x)-i32::from(from.x),i32::from(to.y)-i32::from(from.y),desktop).with_workspace_hits();
+                    placement.apply(&mut layer);
                     self.scene.cells = background.cells;
                     self.scene.cells.extend(layer.cells);
                     // The top modal alone owns client-area commands, including
@@ -503,10 +492,8 @@ impl NativeFrame {
                     self.scene.regions.extend(layer.regions);
                     self.scene.cursor = layer.cursor;
                     crate::turbo::composition::paint_shadow(&mut self.scene, to);
-                    dialog.translate_hits(
-                        i32::from(to.x) - i32::from(from.x),
-                        i32::from(to.y) - i32::from(from.y),
-                    );
+                    let (dx,dy)=placement.offset();
+                    dialog.translate_hits(dx,dy);
                 }
                 crate::windowing::workspace::chrome(&mut self.scene, surface);
             }

@@ -105,3 +105,77 @@ features checks apply. Release PTYs cover editor/viewer controls, prompt/setting
 navigation, Unicode, nested Help/choices, Copy safeguards/history/verification,
 plugin disable/re-enable, resizing and terminal restoration. File writes stay in
 private temporary fixtures. Windows/Linux validation remains deferred.
+
+## Surface placement and application coordination
+
+`presentation::placement::Placement` is the internal coordinate adapter for scene
+cells, hit regions, cursor projection and workspace pointer input. Document header
+mapping, fixed plugin status rows and workspace cancellation regions are explicit
+policies on that adapter. Root projection also clips wide characters and their
+continuations. Composed dialogs use the same adapter for relocation, shadow
+clipping and native button offsets; FileDialog and Help keep their toolkit-specific
+preparation adapters. Surface generations and frame revisions still gate input.
+
+`App` retains its state and existing entry points. Its implementation is separated
+into document opening/scoped access, configuration, owned modal reconciliation,
+quit lifecycle and polling modules. Polling delivers completions in the existing
+order through focused launch/editor/viewer/panel/file-operation helpers. Controllers
+still own validation, saves, reservations, drafts and file-operation safeguards.
+
+The short-task pool keeps four workers and at most sixteen queued jobs. Admission
+removes cancelled/superseded queued reads. If all slots are occupied, the returned
+`Task` retains one deferred closure; `try_recv` retries admission without blocking
+or rerunning work. Callers must retain and poll live tasks, including background
+documents, using their existing polling cycle. There is no global overflow queue
+or new worker per request. Dropping a task cancels deferred work, retired request
+generations reject results, and real pool failures still disconnect the task.
+In-flight saves and the dedicated file-operation workers keep their existing rules.
+
+## Owner retirement and input eligibility
+
+Production close paths call the App retirement coordinator after their existing
+save/discard guards. Desktop also emits retirement notifications when internal
+path resolution removes a placeholder, so both paths receive the same owned-modal,
+request, plugin and native-surface cleanup. Reconciliation occurs before background
+reply delivery; native capture and stale published hit caches retire with the owner.
+An in-flight editor save blocks even low-level removal until its result is handled.
+
+`eligibility::Gate` supplies the common owner/foreground/revision checks for dialog
+proposals, mouse frames, native window controls and plugin routing. Modal and document
+control scopes both carry a layout revision. Surface generations remain distinct
+from frame revisions; mouse capture keeps its existing dedicated route. Host output,
+screensaver, quit-wait and manipulation states cannot receive ordinary proposals.
+
+Settings and common prompts have local state/effect controllers without `App`
+access. They edit drafts, resolve native navigation and produce explicit accept,
+cancel, help, submit or child-choice effects. The host validates ownership before
+delivery and alone applies configuration, starts file operations or changes modal
+lifetime.
+
+The same boundary now covers Copy/Move option changes and destination-child
+requests, editor Find/Replace draft input, viewer search draft actions/input and
+group-selection field input. Copy/Move keyboard proposals and mouse bindings
+share one semantic host entry point. Filesystem submission, no-overwrite policy,
+verification, draft validation, shared search defaults and modal lifetime stay in
+the existing hosts; this is an incremental extraction, not a new command system.
+Other tool forms retain their existing controllers until they need changes.
+
+## Sequence and live-terminal regression coverage
+
+`tests/lifecycle_sequences.rs` combines actual document loading/identity work,
+background focus, viewport changes, repeated opening, targeted closing, dirty
+close cancellation, nested Help and independent undo state. Unit sequences in
+`retirement` hold already-running workers behind channels before resizing,
+replacing requests or retiring their document; late replies are rejected and
+current background replies remain deliverable without foreground activation.
+
+`tests/terminal_walkthrough.rs` checks the previously manual macOS walkthroughs
+through a real PTY using `tests/support/pty.rs`. The bounded harness decodes enough
+terminal output to wait for the visible screen rather than historical output,
+uses private files/configuration and a private child process group, and kills
+that group on failure. It covers Unicode mkdir submit/cancel, cancelled settings
+drafts, overlapping editor/viewer activation, native FileDialog and Help,
+Tetris page movement, manipulation paste isolation, resize, Ctrl+O handoff,
+terminal flags and input back in the parent shell. No Python, terminal emulator
+application or new dependency is required. Windows/Linux validation is deferred.
+Run these cases with `cargo test --test lifecycle_sequences --test terminal_walkthrough`.

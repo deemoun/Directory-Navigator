@@ -12,6 +12,7 @@ pub enum SettingsKind {
     Plugins,
 }
 pub(crate) mod choices;
+mod controller;
 pub(crate) mod definition;
 pub use definition::Setting;
 
@@ -104,46 +105,23 @@ pub fn key(app: &mut App, code: KeyCode) {
         choice_key(app, code);
         return;
     }
-    if code == KeyCode::F(4) {
-        if let Some(settings) = app.modals.settings() {
-            open_choice(app, settings.cursor);
-        }
-        return;
-    }
     let Some(settings) = app.modals.settings_mut() else {
         return;
     };
-    let count = settings.control_count();
-    if settings.kind == SettingsKind::Keyboard
-        && settings.cursor == 0
-        && matches!(
-            code,
-            KeyCode::Left | KeyCode::Right | KeyCode::Char(' ' | 'p' | 'P')
-        )
-    {
-        settings.keyboard_choice(code == KeyCode::Left);
-        return;
-    }
-    if settings.kind == SettingsKind::Regional {
-        match code {
-            KeyCode::Left | KeyCode::Right | KeyCode::Char(' ') if settings.cursor < count => {
-                settings.regional_choice(settings.cursor, code == KeyCode::Left);
-                return;
-            }
-            _ => {}
+    let navigation = match controller::key(settings, code) {
+        controller::Key::Handled => return,
+        controller::Key::Choice(row) => {
+            open_choice(app, row);
+            return;
         }
-    }
+        controller::Key::Controls(code) => code,
+    };
     // Build the same definition used by painting. Drop its immutable borrow
     // before applying any controller-owned draft or modal changes.
     let proposal = {
         let Some(spec) = crate::ui::settings_spec(app, crate::turbo::dialog_spec::input_area(app))
         else {
             return;
-        };
-        let navigation = match code {
-            KeyCode::Up => KeyCode::BackTab,
-            KeyCode::Down => KeyCode::Tab,
-            _ => code,
         };
         spec.key(crossterm::event::KeyEvent::new(
             navigation,
@@ -184,76 +162,38 @@ pub fn choice_items(
 }
 
 pub fn open_choice(app: &mut App, row: usize) {
-    let Some(settings) = app.modals.settings() else {
-        return;
-    };
-    if !matches!(
-        settings.kind,
-        SettingsKind::Keyboard | SettingsKind::Regional
-    ) || row >= settings.control_count()
-    {
-        return;
-    }
-    let items = choice_items(settings, row, app.config.language);
-    let kind = settings.kind;
-    app.modals.set_settings_choice(Some(ChoiceDialog {
-        kind,
-        row,
-        items,
-        cursor: 0,
-    }));
+    dispatch(app, controller::Action::OpenChoice(row));
 }
 pub fn choice_key(app: &mut App, code: KeyCode) {
     let Some(choice) = app.modals.settings_choice_mut() else {
         return;
     };
-    if let Some(row) =
-        crate::turbo::widgets::list_key(choice.cursor, choice.items.len(), choice.items.len(), code)
-    {
-        choice.cursor = row;
-        return;
-    }
-    match code {
-        KeyCode::Esc | KeyCode::F(4) => app.modals.set_settings_choice(None),
-        KeyCode::Enter | KeyCode::Char(' ') => {
+    match controller::choice_key(choice, code) {
+        controller::ChoiceKey::Handled => {}
+        controller::ChoiceKey::Cancel => app.modals.set_settings_choice(None),
+        controller::ChoiceKey::Accept => {
             let choice = app.modals.take_settings_choice().unwrap();
-            if let Some(settings) = app.modals.settings_mut().filter(|s| s.kind == choice.kind) {
-                for _ in 0..choice.cursor {
-                    if settings.kind == SettingsKind::Keyboard {
-                        settings.keyboard_choice(false);
-                    } else {
-                        settings.regional_choice(choice.row, false);
-                    }
-                }
-                settings.cursor = choice.row;
+            if let Some(settings) = app.modals.settings_mut() {
+                controller::apply_choice(settings, choice);
             }
         }
-        _ => {}
     }
 }
-
-/// Apply a semantic proposal through the existing settings draft transaction.
+/// The host alone commits configuration and owns the parent/child presentations.
+fn dispatch(app: &mut App, action: controller::Action) {
+    let Some(settings) = app.modals.settings_mut() else {
+        return;
+    };
+    let effect = controller::reduce(settings, action, app.config.language);
+    match effect {
+        controller::Effect::None => {}
+        controller::Effect::Choice(choice) => app.modals.set_settings_choice(Some(choice)),
+        controller::Effect::Accept => accept(app),
+        controller::Effect::Cancel => app.modals.set_settings(None),
+    }
+}
 pub(crate) fn action(app: &mut App, target: crate::mouse::Target) {
-    use crate::mouse::Target;
-    match target {
-        Target::OpenSettingsChoice(row) => open_choice(app, row),
-        Target::ShortcutProfile => {
-            if let Some(settings) = app.modals.settings_mut() {
-                settings.keyboard_choice(false);
-            }
-        }
-        Target::RegionalChoice(index) => {
-            if let Some(settings) = app.modals.settings_mut() {
-                settings.regional_choice(index, false);
-            }
-        }
-        Target::Setting(index) => {
-            if let Some(settings) = app.modals.settings_mut() {
-                settings.toggle(index);
-            }
-        }
-        Target::AcceptSettings => accept(app),
-        Target::CancelSettings => app.modals.set_settings(None),
-        _ => {}
+    if let Some(action) = controller::command(target) {
+        dispatch(app, action);
     }
 }

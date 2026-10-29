@@ -144,7 +144,10 @@ enum Part<'a> {
 }
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum ControlScope {
-    Modal(ModalInfo),
+    Modal {
+        info: ModalInfo,
+        revision: u64,
+    },
     Document {
         window: crate::desktop::WindowId,
         revision: u64,
@@ -152,7 +155,7 @@ pub(crate) enum ControlScope {
 }
 impl ControlScope {
     fn modal(self) -> Option<ModalInfo> {
-        if let Self::Modal(m) = self {
+        if let Self::Modal { info: m, .. } = self {
             Some(m)
         } else {
             None
@@ -161,7 +164,7 @@ impl ControlScope {
     #[cfg(test)]
     fn owner(self) -> crate::modals::ModalOwner {
         match self {
-            Self::Modal(m) => m.owner,
+            Self::Modal { info: m, .. } => m.owner,
             Self::Document { window, .. } => crate::modals::ModalOwner::Document(window),
         }
     }
@@ -201,23 +204,23 @@ impl Proposal {
         true
     }
     pub fn current(&self, app: &App) -> bool {
+        let gate = crate::eligibility::Gate::new(app);
         match self.scope {
-            ControlScope::Modal(scope) => app
-                .modal_top()
-                .is_some_and(|m| m.id == scope.id && m.owner == scope.owner),
-            ControlScope::Document { window, revision } => {
-                app.desktop.contains(window)
-                    && app.desktop.active().id == window
-                    && app.layout_revision == revision
-                    && app.modal_top().is_none()
-            }
+            ControlScope::Modal { info, revision } => gate.modal_at(info, revision),
+            ControlScope::Document { window, revision } => gate.document(window, Some(revision)),
         }
     }
 }
-pub(crate) fn scope(app: &App, focus: Focus) -> Option<ModalInfo> {
+pub(crate) fn scope(app: &App, focus: Focus) -> Option<ControlScope> {
     // Settings' choice child uses the same input scope. The first entry is the
     // parent whose controls this definition describes, not its owned child.
-    app.visible_modals().into_iter().find(|m| m.focus == focus)
+    app.visible_modals()
+        .into_iter()
+        .find(|m| m.focus == focus)
+        .map(|info| ControlScope::Modal {
+            info,
+            revision: app.layout_revision,
+        })
 }
 pub(crate) fn centered(area: Rect, width: u16, height: u16) -> Rect {
     crate::dialog_theme::centered(area, width, height)
@@ -235,20 +238,13 @@ pub(crate) fn input_area(app: &App) -> Rect {
 impl<'a> DialogSpec<'a> {
     pub fn new(
         bounds: Rect,
-        scope: ModalInfo,
+        scope: ControlScope,
         focus: usize,
         title: &str,
         default: Target,
         cancel: Target,
     ) -> Self {
-        Self::owned(
-            bounds,
-            ControlScope::Modal(scope),
-            focus,
-            title,
-            default,
-            cancel,
-        )
+        Self::owned(bounds, scope, focus, title, default, cancel)
     }
     pub(crate) fn owned(
         bounds: Rect,
@@ -599,12 +595,15 @@ mod tests {
     fn mixed() -> DialogSpec<'static> {
         let mut spec = DialogSpec::new(
             Rect::new(7, 3, 60, 15),
-            ModalInfo {
-                id: ModalId(1),
-                owner: ModalOwner::Workspace,
-                parent: None,
-                return_document: Some(WindowId::MANAGER),
-                focus: Focus::Settings,
+            ControlScope::Modal {
+                revision: 0,
+                info: ModalInfo {
+                    id: ModalId(1),
+                    owner: ModalOwner::Workspace,
+                    parent: None,
+                    return_document: Some(WindowId::MANAGER),
+                    focus: Focus::Settings,
+                },
             },
             0,
             "Test",

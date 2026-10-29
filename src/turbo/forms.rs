@@ -124,39 +124,19 @@ pub fn welcome_key(app: &mut App, key: KeyEvent) {
 }
 
 pub fn prompt_key(app: &mut App, key: KeyEvent) {
-    use crate::{mouse::Target, turbo::dialog_spec::input_area};
     let proposal = {
-        let Some(spec) = crate::ui::prompt_spec(app, input_area(app)) else {
+        let Some(spec) = crate::ui::prompt_spec(app, crate::turbo::dialog_spec::input_area(app))
+        else {
             return;
         };
-        if key.code == K::F(1) {
-            Some(spec.proposal(Some(Target::PromptHelp)))
-        } else if let K::Char(c) = key.code {
-            if key.modifiers.contains(M::ALT) {
-                spec.mnemonic(c).map(|id| spec.activate(id))
-            } else {
-                spec.key(key)
-            }
-        } else {
-            spec.key(key)
-        }
+        crate::dialog::prompt_controller::key(&spec, key)
     };
     if let Some(proposal) = proposal {
-        crate::dialog_controls::apply(app, proposal, |app, target| match Some(target) {
-            Some(Target::SubmitPrompt) => app.submit_prompt(),
-            Some(Target::CancelPrompt) => app.modals.set_prompt(None),
-            Some(Target::PromptHelp) => crate::dialog::prompt_help(app),
-            Some(Target::PromptField) => {
-                if let Some(prompt) = app.modals.prompt_mut() {
-                    prompt.focus = 0;
-                }
-            }
-            _ => {}
+        proposal.deliver(app, |app, focus, target| {
+            crate::dialog::prompt_action(app, Some(focus), target)
         });
-    } else if !key.modifiers.intersects(M::CONTROL | M::ALT) {
-        if let Some(prompt) = app.modals.prompt_mut().filter(|p| p.focus == 0) {
-            prompt.edit(key.code);
-        }
+    } else if let Some(prompt) = app.modals.prompt_mut() {
+        crate::dialog::prompt_controller::edit(prompt, key);
     }
 }
 

@@ -1,10 +1,6 @@
 //! Shared DN-style Copy and Rename/move controls; filesystem policy stays in operations.
-use crate::{
-    app::App,
-    modals::ModalId,
-    mouse::Target,
-    operations::{CopyOptions, ExistingDestination},
-};
+mod controller;
+use crate::{app::App, modals::ModalId, mouse::Target, operations::CopyOptions};
 use crossterm::event::{
     KeyCode as K, KeyEvent, KeyModifiers as M, MouseButton, MouseEvent, MouseEventKind,
 };
@@ -86,45 +82,10 @@ pub fn action(app: &mut App, action: Action) {
     let Some(prompt) = app.modals.prompt_mut() else {
         return;
     };
-    let moving = matches!(
-        prompt.kind,
-        crate::dialog::PromptKind::Operation(crate::operations::Kind::Move)
-    );
-    let Some(copy) = &mut prompt.copy else {
-        return;
-    };
-    match action {
-        Action::Field => prompt.focus = 0,
-        Action::Refuse => {
-            copy.options.existing = ExistingDestination::Refuse;
-            prompt.focus = 1;
-        }
-        Action::Skip => {
-            copy.options.existing = ExistingDestination::Skip;
-            prompt.focus = 2;
-        }
-        Action::CheckSpace => {
-            copy.options.check_free_space ^= true;
-            prompt.focus = 3;
-        }
-        Action::Verify => {
-            if !copy.options.remove_sources {
-                copy.options.verify_writes ^= true;
-                prompt.focus = 4;
-            }
-        }
-        Action::RemoveSources => {
-            if moving {
-                return;
-            }
-            copy.options.remove_sources ^= true;
-            if copy.options.remove_sources {
-                copy.options.verify_writes = true;
-            }
-            prompt.focus = 5;
-        }
-        Action::History => {
-            prompt.focus = 10;
+    let effect = controller::reduce(prompt, action);
+    match effect {
+        controller::Effect::None => {}
+        controller::Effect::History => {
             let paths = app.copy_dialog.history.clone();
             app.modals.set_copy_history(Some(History {
                 parent: owner,
@@ -134,9 +95,7 @@ pub fn action(app: &mut App, action: Action) {
                 rows: 6,
             }));
         }
-        Action::Tree => {
-            prompt.focus = 8;
-            let path = prompt.base.clone();
+        controller::Effect::Tree(path) => {
             match crate::directory_tree::Tree::new(app.active, path, app.config.show_hidden) {
                 Ok(mut tree) => {
                     tree.destination_prompt = Some(owner);
@@ -147,6 +106,19 @@ pub fn action(app: &mut App, action: Action) {
         }
     }
 }
+
+/// Both native keyboard proposals and published mouse targets enter here.
+pub(crate) fn command(app: &mut App, target: Target) {
+    match target {
+        Target::SubmitPrompt => app.submit_prompt(),
+        Target::CancelPrompt => app.modals.set_prompt(None),
+        Target::PromptHelp => crate::dialog::prompt_help(app),
+        Target::Copy(a) => action(app, a),
+        Target::PromptField => action(app, Action::Field),
+        _ => {}
+    }
+}
+
 pub fn key(app: &mut App, key: KeyEvent) {
     if key.code == K::Esc {
         app.modals.set_prompt(None);
@@ -155,10 +127,9 @@ pub fn key(app: &mut App, key: KeyEvent) {
     if app.utilities.size.0 < 80 || app.utilities.size.1 < 25 {
         return;
     }
-    let Some(prompt) = app.modals.prompt() else {
+    let Some(_) = app.modals.prompt() else {
         return;
     };
-    let focus = prompt.focus;
     if key.code == K::F(1) {
         crate::dialog::prompt_help(app);
         return;
@@ -180,34 +151,17 @@ pub fn key(app: &mut App, key: KeyEvent) {
             }
         });
     if let Some(p) = proposal {
-        crate::dialog_controls::apply(app, p, |app, target| match Some(target) {
-            Some(Target::SubmitPrompt) => app.submit_prompt(),
-            Some(Target::CancelPrompt) => app.modals.set_prompt(None),
-            Some(Target::PromptHelp) => crate::dialog::prompt_help(app),
-            Some(Target::Copy(a)) => action(app, a),
-            Some(Target::PromptField) => action(app, Action::Field),
-            _ => {}
-        });
+        crate::dialog_controls::apply(app, p, command);
         return;
     }
     if key.modifiers.contains(M::ALT) {
         return;
     }
-    if (focus == 1 || focus == 2) && matches!(key.code, K::Up | K::Down | K::Left | K::Right) {
-        action(
-            app,
-            if focus == 1 {
-                Action::Skip
-            } else {
-                Action::Refuse
-            },
-        );
-        return;
-    }
-    if focus == 0 && !key.modifiers.intersects(M::CONTROL | M::SUPER) {
-        app.modals.prompt_mut().unwrap().edit(key.code);
+    if let Some(prompt) = app.modals.prompt_mut() {
+        controller::edit(prompt, key);
     }
 }
+
 pub fn history_key(app: &mut App, key: KeyEvent) {
     if crate::dialog_controls::key(app, key, crate::focus::Focus::CopyHistory) {
         return;

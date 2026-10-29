@@ -440,46 +440,10 @@ pub(crate) fn wrap(text: &str, width: u16) -> Vec<String> {
 
 impl LayoutSnapshot {
     pub fn to_screen(&self, rect: Rect) -> Rect {
-        Rect::new(
-            self.bounds.x.saturating_add(rect.x),
-            self.bounds.y.saturating_add(rect.y),
-            rect.width,
-            rect.height,
-        )
-        .intersection(self.clip)
+        crate::presentation::placement::Placement::screen(self.bounds, self.clip).rect(rect)
     }
     pub(crate) fn transform(&self, scene: &mut crate::turbo::scene::Scene) {
-        scene.cells = std::mem::take(&mut scene.cells)
-            .into_iter()
-            .filter_map(|((x, y), mut glyph)| {
-                let x = x.saturating_add(self.bounds.x);
-                let y = y.saturating_add(self.bounds.y);
-                if !self.clip.contains((x, y).into()) {
-                    return None;
-                }
-                use unicode_width::UnicodeWidthStr;
-                if glyph.text.width() > usize::from(self.clip.right() - x)
-                    || (glyph.text.is_empty() && x == self.clip.x && self.clip.x > self.bounds.x)
-                {
-                    glyph.text = " ".into();
-                }
-                Some(((x, y), glyph))
-            })
-            .collect();
-        scene.regions = std::mem::take(&mut scene.regions)
-            .into_iter()
-            .filter_map(|(r, t)| {
-                let r = self.to_screen(r);
-                (!r.is_empty()).then_some((r, t))
-            })
-            .collect();
-        scene.cursor = scene.cursor.and_then(|(x, y)| {
-            let p = (
-                x.saturating_add(self.bounds.x),
-                y.saturating_add(self.bounds.y),
-            );
-            self.clip.contains(p.into()).then_some(p)
-        });
+        crate::presentation::placement::Placement::screen(self.bounds, self.clip).apply(scene);
         scene.width = self.screen.width;
         scene.height = self.screen.height;
     }
