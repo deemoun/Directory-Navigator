@@ -66,6 +66,7 @@ fn one_to_four_lines_compact_and_use_original_scoring() {
         }
         piece(&mut game, 2, 4, HEIGHT as i32 - 4);
         game.drop(now);
+        game.fall(now + game.delay());
         assert_eq!(game.lines, lines as u32);
         assert_eq!(game.score, 11 + (lines * lines * 30) as u64);
         assert_eq!(game.board[lines][0], 9);
@@ -82,11 +83,13 @@ fn game_over_records_restart_and_ceiling_collision() {
     game.next = 0;
     piece(&mut game, 2, 4, HEIGHT as i32 - 4);
     game.drop(now);
+    game.fall(now + game.delay());
     assert!(game.over);
     assert_eq!(game.screen, Screen::GameOver);
     assert!(game.records.is_empty());
     let board = game.board;
     game.drop(now);
+    game.fall(now + game.delay());
     game.rotate();
     assert!(!game.translate(1, 0));
     assert_eq!(game.board, board);
@@ -152,6 +155,7 @@ fn level_progression_preview_bonus_and_seeded_pieces() {
     game.board[HEIGHT - 1][5] = 0;
     piece(&mut game, 2, 4, HEIGHT as i32 - 4);
     game.drop(now);
+    game.fall(now + game.delay());
     assert_eq!(game.level, 2);
     assert_eq!(game.score, 46);
     game.lines = u32::MAX - 1;
@@ -163,6 +167,7 @@ fn level_progression_preview_bonus_and_seeded_pieces() {
     }
     piece(&mut game, 2, 4, HEIGHT as i32 - 4);
     game.drop(now);
+    game.fall(now + game.delay());
     assert_eq!(game.lines, u32::MAX);
     assert_eq!(game.score, u64::MAX);
     assert_eq!(game.level, 10);
@@ -332,6 +337,8 @@ fn game_dialog_mouse_setup_cancel_apply_scores_and_resize() -> io::Result<()> {
     render(&mut app, 80, 25)?;
     click(&mut app, GameAction::Setup);
     key(&mut app, KeyCode::Right);
+    key(&mut app, KeyCode::Tab);
+    key(&mut app, KeyCode::Tab);
     key(&mut app, KeyCode::Char(' '));
     key(&mut app, KeyCode::Enter);
     assert_eq!(app.desktop.game().unwrap().start_level, 2);
@@ -430,7 +437,7 @@ fn score_qualification_ties_anonymous_and_grapheme_name_limits() -> io::Result<(
     tetris::open(&mut app);
     ended(&mut app, 0);
     key(&mut app, KeyCode::Enter);
-    assert_eq!(app.desktop.game().unwrap().screen, Screen::Scores);
+    assert_eq!(app.desktop.game().unwrap().screen, Screen::Play);
     assert!(!t.0.join("tetris.conf").exists());
     ended(&mut app, 100);
     key(&mut app, KeyCode::Enter);
@@ -464,7 +471,7 @@ fn score_qualification_ties_anonymous_and_grapheme_name_limits() -> io::Result<(
     let threshold = app.desktop.game().unwrap().records.last().unwrap().score;
     ended(&mut app, threshold);
     key(&mut app, KeyCode::Enter);
-    assert_eq!(app.desktop.game().unwrap().screen, Screen::Scores);
+    assert_eq!(app.desktop.game().unwrap().screen, Screen::Play);
     ended(&mut app, threshold + 1);
     key(&mut app, KeyCode::Enter);
     assert_eq!(app.desktop.game().unwrap().screen, Screen::Name);
@@ -494,7 +501,7 @@ fn score_files_merge_instances_and_refuse_corruption_symlinks_and_readonly() -> 
     b.save()?;
     assert_eq!(Board::parse(&fs::read(&path)?)?.records.len(), 2);
     for invalid in [
-        b"tetris_version=3\n".as_slice(),
+        b"tetris_version=4\n".as_slice(),
         b"tetris_version=1\nscore=1,0,11,1,bad\n",
         b"tetris_version=1\nscore=18446744073709551616,0,1,1,bad\n",
         b"tetris_version=1\nlast_name=bad\tname\n",
@@ -689,13 +696,16 @@ fn reference_game_scores_and_setup_layouts_preserve_colors_values_and_mouse_boun
                 for label in [
                     "Setup game",
                     "Game style",
-                    "Classic Tetris",
-                    "Piece preview",
+                    "Classic ~t~etris",
+                    "~P~iece preview",
                     "Sanitarium",
                 ] {
-                    assert!(text.contains(language.text(label)), "{label}");
+                    assert!(
+                        text.contains(&language.text(label).replace('~', "")),
+                        "{label}"
+                    );
                 }
-                assert!(!text.contains("Pentix"));
+                assert!(text.contains(&language.text("Penti~x~").replace('~', "")));
                 for level in 1..=10 {
                     assert!(app
                         .mouse
@@ -750,6 +760,7 @@ fn setup_radio_choices_cancel_focus_and_apply_preserve_game_and_saved_records() 
         app.desktop.game().unwrap().screen,
         Screen::Setup {
             level: 10,
+            mode: dn::tetris::GameMode::Tetris,
             preview: false
         }
     );
@@ -758,11 +769,11 @@ fn setup_radio_choices_cancel_focus_and_apply_preserve_game_and_saved_records() 
         .game_mut()
         .unwrap()
         .tick(Instant::now() + Duration::from_secs(600)));
-    assert_eq!(app.desktop.game().unwrap().setup_focus, 1);
+    assert_eq!(app.desktop.game().unwrap().setup_focus, 2);
     for _ in 0..2 {
         key(&mut app, KeyCode::Tab);
     }
-    assert_eq!(app.desktop.game().unwrap().setup_focus, 3);
+    assert_eq!(app.desktop.game().unwrap().setup_focus, 4);
     key(&mut app, KeyCode::Enter);
     let game = app.desktop.game().unwrap();
     assert_eq!(game.screen, Screen::Play);
@@ -794,9 +805,10 @@ fn setup_radio_choices_cancel_focus_and_apply_preserve_game_and_saved_records() 
     key(&mut app, KeyCode::End);
     key(&mut app, KeyCode::Char('5'));
     key(&mut app, KeyCode::Tab);
+    key(&mut app, KeyCode::Tab);
     key(&mut app, KeyCode::Char(' '));
     key(&mut app, KeyCode::Tab);
-    assert_eq!(app.desktop.game().unwrap().setup_focus, 2);
+    assert_eq!(app.desktop.game().unwrap().setup_focus, 3);
     key(&mut app, KeyCode::Enter);
     let game = app.desktop.game().unwrap();
     assert_eq!(game.screen, Screen::Play);
@@ -812,7 +824,394 @@ fn setup_radio_choices_cancel_focus_and_apply_preserve_game_and_saved_records() 
         (5, 5, false, false, 0, 0)
     );
     assert_eq!(game.board, [[0; WIDTH]; HEIGHT]);
-    assert!(!temp.0.join("tetris.conf").exists());
+    assert!(temp.0.join("tetris.conf").exists());
     assert_eq!(fs::read(temp.0.join("keep.txt"))?, b"unchanged");
+    Ok(())
+}
+
+#[test]
+fn pentix_all_original_figures_rotate_collide_and_use_wrapped_colors() {
+    use tetris::{Figure, GameMode, DEFINITIONS};
+    let counts = [
+        4, 4, 4, 4, 4, 4, 4, 1, 2, 3, 3, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
+    ];
+    let rotations = [
+        4, 4, 4, 4, 3, 4, 4, 1, 2, 3, 2, 5, 3, 4, 4, 3, 3, 4, 4, 3, 3, 3, 3, 3, 4, 4, 3,
+    ];
+    let mut game = Game::with_seed(92, Instant::now());
+    game.mode = GameMode::Pentix;
+    for (kind, definition) in DEFINITIONS.iter().enumerate() {
+        assert_eq!(definition.count, counts[kind]);
+        assert_eq!(definition.rotation, rotations[kind]);
+        assert_eq!(Figure::color(kind), 15 - (kind % 7) as u8);
+        game.board = [[0; WIDTH]; HEIGHT];
+        piece(&mut game, kind, 4, 5);
+        let initial = game.piece.cells;
+        for _ in 0..4 {
+            assert_eq!(
+                game.piece
+                    .positions()
+                    .collect::<std::collections::BTreeSet<_>>()
+                    .len(),
+                counts[kind]
+            );
+            game.rotate();
+        }
+        assert_eq!(game.piece.cells, initial);
+        while game.translate(-1, 0) {}
+        assert!(game.piece.positions().all(|(x, _)| x >= 0));
+        while game.translate(1, 0) {}
+        assert!(game.piece.positions().all(|(x, _)| x < WIDTH as i32));
+        let candidate = game
+            .piece
+            .positions()
+            .map(|(x, y)| (x, y + 1))
+            .find(|p| !game.piece.positions().any(|c| c == *p))
+            .unwrap();
+        game.board[candidate.1 as usize][candidate.0 as usize] = 1;
+        assert!(!game.translate(0, 1));
+    }
+    let mut seen = std::collections::BTreeSet::new();
+    for n in 0..1000 {
+        game.restart(Instant::now());
+        seen.insert(game.piece.kind);
+        seen.insert(game.next);
+        assert_eq!(game.piece.y, 1, "initial spawn {n}");
+    }
+    assert_eq!(seen.len(), 27);
+}
+
+#[test]
+fn dos_drop_waits_one_tick_and_allows_adjustment_without_catchup() {
+    let now = Instant::now();
+    let mut game = Game::with_seed(7, now);
+    piece(&mut game, 3, 4, 1);
+    let kind = game.piece.kind;
+    game.drop(now);
+    assert_eq!(game.piece.kind, kind);
+    assert_eq!(game.board, [[0; WIDTH]; HEIGHT]);
+    assert!(game.translate(-1, 0));
+    game.rotate();
+    assert!(!game.tick(now + game.delay() - Duration::from_millis(1)));
+    assert!(game.tick(now + game.delay()));
+    assert_eq!(game.board.iter().flatten().filter(|c| **c != 0).count(), 4);
+    assert_eq!(game.piece.positions().next().unwrap().1, 0);
+    game.set_obscured(true, now);
+    assert!(!game.tick(now + Duration::from_secs(60)));
+    game.set_obscured(false, now + Duration::from_secs(60));
+    assert!(!game.tick(now + Duration::from_secs(60)));
+}
+
+#[test]
+fn pentix_can_clear_five_lines_with_original_scoring() {
+    let now = Instant::now();
+    let mut game = Game::with_seed(6, now);
+    game.mode = tetris::GameMode::Pentix;
+    for row in HEIGHT - 5..HEIGHT {
+        game.board[row] = [7; WIDTH];
+        game.board[row][6] = 0;
+    }
+    piece(&mut game, 11, 4, HEIGHT as i32 - 5);
+    game.drop(now);
+    assert_eq!(game.lines, 0);
+    game.fall(now + game.delay());
+    assert_eq!(game.lines, 5);
+    assert_eq!(game.board, [[0; WIDTH]; HEIGHT]);
+    // No invented all-clear bonus: Pascal's BW=Vis branch is unreachable.
+    assert_eq!(game.score, 12 + 5 * 5 * 30);
+}
+
+#[test]
+fn setup_mode_navigation_nested_help_and_preferences_survive_reopening() -> io::Result<()> {
+    use tetris::GameMode;
+    let temp = Temp::new()?;
+    let mut app = temp.app()?;
+    tetris::open(&mut app);
+    app.desktop.game_mut().unwrap().level = 4;
+    key(&mut app, KeyCode::F(5));
+    assert!(matches!(
+        app.desktop.game().unwrap().screen,
+        Screen::Setup { level: 4, .. }
+    ));
+    key(&mut app, KeyCode::Tab);
+    assert_eq!(app.desktop.game().unwrap().setup_focus, 1);
+    key(&mut app, KeyCode::Down);
+    assert!(matches!(
+        app.desktop.game().unwrap().screen,
+        Screen::Setup {
+            mode: GameMode::Pentix,
+            ..
+        }
+    ));
+    let draft = app.desktop.game().unwrap().screen;
+    key(&mut app, KeyCode::F(1));
+    assert_eq!(app.desktop.game().unwrap().screen, Screen::Help);
+    key(&mut app, KeyCode::Esc);
+    assert_eq!(app.desktop.game().unwrap().screen, draft);
+    assert_eq!(app.desktop.game().unwrap().setup_focus, 1);
+    key(&mut app, KeyCode::Tab);
+    key(&mut app, KeyCode::Char(' '));
+    key(&mut app, KeyCode::Tab);
+    assert_eq!(app.desktop.game().unwrap().setup_focus, 3);
+    key(&mut app, KeyCode::Enter);
+    assert_eq!(app.desktop.game().unwrap().mode, GameMode::Pentix);
+    assert!(!app.desktop.game().unwrap().preview);
+    key(&mut app, KeyCode::Esc);
+    tetris::open(&mut app);
+    assert_eq!(app.desktop.game().unwrap().mode, GameMode::Pentix);
+    assert_eq!(app.desktop.game().unwrap().start_level, 4);
+    assert!(!app.desktop.game().unwrap().preview);
+    // A separate application loads the same saved preferences.
+    let mut second = temp.app()?;
+    tetris::open(&mut second);
+    assert_eq!(second.desktop.game().unwrap().mode, GameMode::Pentix);
+    assert_eq!(fs::read(temp.0.join("keep.txt"))?, b"unchanged");
+    Ok(())
+}
+
+#[test]
+fn pentix_pages_keep_native_markers_targets_and_repeatable_frames() -> io::Result<()> {
+    use dn::{localization::Language, palette::PaletteProfile};
+    let temp = Temp::new()?;
+    for language in [Language::English, Language::Russian] {
+        for profile in [PaletteProfile::ClassicDn, PaletteProfile::Terminal] {
+            for (w, h) in [(80, 25), (132, 40)] {
+                let mut app = temp.app()?;
+                app.config.language = language;
+                app.config.palette = profile;
+                tetris::open(&mut app);
+                for screen in [
+                    Screen::Setup {
+                        level: 10,
+                        mode: tetris::GameMode::Pentix,
+                        preview: true,
+                    },
+                    Screen::GameOver,
+                    Screen::Name,
+                    Screen::Scores,
+                    Screen::Help,
+                ] {
+                    let g = app.desktop.game_mut().unwrap();
+                    g.screen = screen;
+                    g.mode = tetris::GameMode::Pentix;
+                    g.over = true;
+                    g.score = 12345;
+                    g.name = "界é".into();
+                    g.name_cursor = g.name.len();
+                    let first = render(&mut app, w, h)?;
+                    let regions = app.mouse.regions.clone();
+                    let second = render(&mut app, w, h)?;
+                    assert_eq!(first.backend().buffer(), second.backend().buffer());
+                    assert_eq!(regions, app.mouse.regions);
+                    assert_eq!(app.desktop.game().unwrap().screen, screen);
+                    let actions: &[GameAction] = match screen {
+                        Screen::Setup { .. } => &[GameAction::Apply, GameAction::Back],
+                        Screen::Name => &[
+                            GameAction::SubmitName,
+                            GameAction::Back,
+                            GameAction::Help,
+                            GameAction::SkipName,
+                        ],
+                        Screen::GameOver => &[GameAction::Continue],
+                        _ => &[GameAction::Back],
+                    };
+                    for action in actions {
+                        let g = app.desktop.game_mut().unwrap();
+                        match screen {
+                            Screen::Setup { .. } => {
+                                g.setup_focus = if *action == GameAction::Apply { 3 } else { 4 }
+                            }
+                            Screen::Name => {
+                                g.page_focus = match action {
+                                    GameAction::SubmitName => 1,
+                                    GameAction::Back => 2,
+                                    GameAction::Help => 3,
+                                    _ => 4,
+                                }
+                            }
+                            _ => g.page_focus = 0,
+                        }
+                        let term = render(&mut app, w, h)?;
+                        let buffer = term.backend().buffer();
+                        let r = app
+                            .mouse
+                            .regions
+                            .iter()
+                            .find(|(r, t)| {
+                                r.width > 3 && r.y < h - 1 && *t == dn::tetris::target(*action)
+                            })
+                            .unwrap()
+                            .0;
+                        assert_eq!(
+                            buffer[(r.x + 1, r.y)].symbol(),
+                            "►",
+                            "{language:?} {action:?} {screen:?}"
+                        );
+                        assert_eq!(buffer[(r.right() - 2, r.y)].symbol(), "◄");
+                    }
+                    render(&mut app, 40, 10)?;
+                    assert!(app.mouse.regions.is_empty());
+                    render(&mut app, w, h)?;
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn all_figures_match_independent_one_based_pascal_reference() {
+    let rows = include_str!("fixtures/dn-game-figures.txt")
+        .lines()
+        .filter(|l| !l.starts_with('#'));
+    assert_eq!(rows.clone().count(), 27);
+    for (figure, line) in tetris::DEFINITIONS.iter().zip(rows) {
+        let mut fields = line.split_whitespace();
+        assert_eq!(
+            figure.count,
+            fields.next().unwrap().parse::<usize>().unwrap()
+        );
+        assert_eq!(
+            figure.rotation,
+            fields.next().unwrap().parse::<i32>().unwrap()
+        );
+        let cells = fields
+            .map(|f| {
+                let (row, col) = f.split_once(',').unwrap();
+                (
+                    col.parse::<i32>().unwrap() - 1,
+                    row.parse::<i32>().unwrap() - 1,
+                )
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(&figure.cells[..figure.count], cells);
+    }
+}
+
+#[test]
+fn pentix_winner_cancel_help_skip_and_save_failure_keep_the_correct_mode() -> io::Result<()> {
+    use tetris::GameMode;
+    let temp = Temp::new()?;
+    let mut app = temp.app()?;
+    tetris::open(&mut app);
+    key(&mut app, KeyCode::F(5));
+    render(&mut app, 80, 25)?;
+    click(&mut app, GameAction::SetMode(GameMode::Pentix));
+    render(&mut app, 80, 25)?;
+    click(&mut app, GameAction::Apply);
+    assert_eq!(app.desktop.game().unwrap().mode, GameMode::Pentix);
+    ended(&mut app, 100);
+    key(&mut app, KeyCode::Enter);
+    input::paste(&mut app, "Юникод界é");
+    key(&mut app, KeyCode::Tab);
+    key(&mut app, KeyCode::Tab);
+    assert_eq!(app.desktop.game().unwrap().page_focus, 2);
+    key(&mut app, KeyCode::Enter);
+    assert_eq!(app.desktop.game().unwrap().screen, Screen::GameOver);
+    assert!(app
+        .desktop
+        .plugins
+        .scores_mut()
+        .board
+        .pentix_records
+        .is_empty());
+    key(&mut app, KeyCode::Enter);
+    render(&mut app, 80, 25)?;
+    click(&mut app, GameAction::Help);
+    assert_eq!(app.desktop.game().unwrap().help_mode(), GameMode::Pentix);
+    key(&mut app, KeyCode::Esc);
+    assert_eq!(app.desktop.game().unwrap().screen, Screen::Name);
+    assert_eq!(app.desktop.game().unwrap().name, "Юникод界é");
+    fs::write(temp.0.join("tetris.conf.lock"), b"busy")?;
+    tetris::action(&mut app, GameAction::SkipName);
+    assert!(app.desktop.plugins.scores_mut().has_pending());
+    assert!(app.desktop.plugins.scores_mut().board.records.is_empty());
+    assert_eq!(
+        app.desktop.plugins.scores_mut().board.pentix_records[0].name,
+        "Anonymous"
+    );
+    key(&mut app, KeyCode::Esc);
+    key(&mut app, KeyCode::Esc);
+    assert!(app.desktop.game().is_none());
+    tetris::open(&mut app);
+    key(&mut app, KeyCode::F(4));
+    render(&mut app, 80, 25)?;
+    assert!(app
+        .mouse
+        .regions
+        .iter()
+        .any(|(_, t)| *t == dn::tetris::target(GameAction::RetrySave)));
+    fs::remove_file(temp.0.join("tetris.conf.lock"))?;
+    click(&mut app, GameAction::RetrySave);
+    assert!(!app.desktop.plugins.scores_mut().has_pending());
+    let saved = tetris::scores::Board::parse(&fs::read(temp.0.join("tetris.conf"))?)?;
+    assert!(saved.records.is_empty());
+    assert_eq!(saved.pentix_records.len(), 1);
+    Ok(())
+}
+
+#[test]
+fn ten_score_rows_keep_gray_background_and_do_not_overwrite_footer_or_frame() -> io::Result<()> {
+    use dn::palette::PaletteProfile;
+    let temp = Temp::new()?;
+    let mut app = temp.app()?;
+    tetris::open(&mut app);
+    for profile in [PaletteProfile::ClassicDn, PaletteProfile::Terminal] {
+        app.config.palette = profile;
+        let g = app.desktop.game_mut().unwrap();
+        g.screen = Screen::Scores;
+        g.highlighted = Some(9);
+        g.records = (1..=10)
+            .map(|i| Record {
+                name: format!("Player {i}"),
+                score: i,
+                lines: Some(i as u32),
+                start_level: 1,
+                level: 1,
+            })
+            .collect();
+        let term = render(&mut app, 80, 25)?;
+        let b = term.backend().buffer();
+        // 72×19 page, centered at (4,3), list rows 7..16, bottom frame 17.
+        assert_eq!(b[(8, 16)].bg, profile.color(7));
+        assert_eq!(b[(8, 16)].fg, profile.color(15));
+        assert_eq!(b[(8, 17)].bg, profile.color(7));
+        assert_ne!(b[(8, 17)].symbol(), " ");
+        let text: String = b.content.iter().map(|c| c.symbol()).collect();
+        assert!(text.contains("Player 10"));
+        assert!(text.contains("Lines: 10"));
+    }
+    Ok(())
+}
+
+#[test]
+fn name_scroll_keeps_wide_graphemes_whole_and_cursor_after_the_actual_text() -> io::Result<()> {
+    let temp = Temp::new()?;
+    let mut app = temp.app()?;
+    tetris::open(&mut app);
+    for (w, h) in [(80, 25), (132, 40)] {
+        let g = app.desktop.game_mut().unwrap();
+        g.screen = Screen::Name;
+        g.page_focus = 0;
+        g.name = format!("{}a", "界".repeat(28));
+        g.name_cursor = g.name.len();
+        g.replace_name = false;
+        let term = render(&mut app, w, h)?;
+        let cursor = term.get_cursor_position()?;
+        let r = app
+            .mouse
+            .regions
+            .iter()
+            .find(|(_, t)| *t == dn::tetris::target(GameAction::NameField))
+            .unwrap()
+            .0;
+        assert_eq!(cursor.y, r.y);
+        assert_eq!(cursor.x, r.right() - 2);
+        assert_eq!(
+            term.backend().buffer()[(cursor.x - 1, cursor.y)].symbol(),
+            "a"
+        );
+        assert_eq!(term.backend().buffer()[(cursor.x, cursor.y)].symbol(), " ");
+    }
     Ok(())
 }

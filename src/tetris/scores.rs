@@ -1,5 +1,5 @@
 //! Separate, bounded UTF-8 score configuration; merge under the settings lock convention.
-use super::Record;
+use super::{GameMode, Preferences, Record};
 use std::{
     fs,
     io::{self, Write},
@@ -16,6 +16,8 @@ pub fn validate_name(name: &str) -> bool {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Board {
     pub records: Vec<Record>,
+    pub pentix_records: Vec<Record>,
+    pub preferences: Preferences,
     pub last_name: String,
     pub dos_encoding: Option<super::dos_scores::Encoding>,
 }
@@ -23,12 +25,27 @@ impl Default for Board {
     fn default() -> Self {
         Self {
             records: Vec::new(),
+            pentix_records: Vec::new(),
+            preferences: Preferences::default(),
             last_name: ANONYMOUS.into(),
             dos_encoding: None,
         }
     }
 }
 impl Board {
+    pub fn records_for(&self, mode: GameMode) -> &Vec<Record> {
+        match mode {
+            GameMode::Tetris => &self.records,
+            GameMode::Pentix => &self.pentix_records,
+        }
+    }
+    fn records_mut(&mut self, mode: GameMode) -> &mut Vec<Record> {
+        match mode {
+            GameMode::Tetris => &mut self.records,
+            GameMode::Pentix => &mut self.pentix_records,
+        }
+    }
+
     pub fn parse(bytes: &[u8]) -> io::Result<Self> {
         if bytes.len() > 16 * 1024 {
             return Err(io::Error::other("Tetris configuration exceeds 16 KiB"));
@@ -46,26 +63,57 @@ impl Board {
                 .ok_or_else(|| io::Error::other("Invalid Tetris configuration record"))?;
             // DOS names may have significant trailing spaces. Metadata can be
             // trimmed, but names must survive serialization and repeated import.
-            let v = if matches!(k, "score" | "last_name") {
+            let v = if matches!(k, "score" | "pentix_score" | "last_name") {
                 raw_value
             } else {
                 raw_value.trim()
             };
             match k {
-                "tetris_version" if matches!(v, "1" | "2") && version.is_none() => {
+                "tetris_version" if matches!(v, "1" | "2" | "3") && version.is_none() => {
                     version = Some(v)
                 }
                 "last_name" if validate_name(v) => board.last_name = v.to_owned(),
-                "dn_tet_encoding" if version == Some("2") && board.dos_encoding.is_none() => {
+                "dn_tet_encoding"
+                    if matches!(version, Some("2" | "3")) && board.dos_encoding.is_none() =>
+                {
                     board.dos_encoding = Some(super::dos_scores::Encoding::parse(v)?)
                 }
-                "score" => {
+                "mode" if version == Some("3") => {
+                    board.preferences.mode = match v {
+                        "tetris" => GameMode::Tetris,
+                        "pentix" => GameMode::Pentix,
+                        _ => return Err(io::Error::other("Invalid game mode")),
+                    }
+                }
+                "start_level" if version == Some("3") => {
+                    board.preferences.level = v.parse().map_err(io::Error::other)?;
+                    if !(1..=10).contains(&board.preferences.level) {
+                        return Err(io::Error::other("Invalid game level"));
+                    }
+                }
+                "preview" if version == Some("3") => {
+                    board.preferences.preview = match v {
+                        "true" => true,
+                        "false" => false,
+                        _ => return Err(io::Error::other("Invalid preview option")),
+                    }
+                }
+                "score" | "pentix_score" => {
+                    if k == "pentix_score" && version != Some("3") {
+                        return Err(io::Error::other("Pentix requires game format v3"));
+                    }
+                    let mode = if k == "pentix_score" {
+                        GameMode::Pentix
+                    } else {
+                        GameMode::Tetris
+                    };
+
                     let fields = v.splitn(5, ',').collect::<Vec<_>>();
-                    if fields.len() != 5 || board.records.len() >= 10 {
+                    if fields.len() != 5 || board.records_for(mode).len() >= 10 {
                         return Err(io::Error::other("Invalid Tetris score record"));
                     }
                     let score = fields[0].parse::<u64>().map_err(io::Error::other)?;
-                    let lines = if fields[1] == "-" && version == Some("2") {
+                    let lines = if fields[1] == "-" && matches!(version, Some("2" | "3")) {
                         None
                     } else {
                         Some(fields[1].parse::<u32>().map_err(io::Error::other)?)
@@ -79,7 +127,7 @@ impl Board {
                     {
                         return Err(io::Error::other("Invalid Tetris score/level"));
                     }
-                    board.records.push(Record {
+                    board.records_mut(mode).push(Record {
                         score,
                         lines,
                         start_level,
@@ -93,33 +141,38 @@ impl Board {
         if version.is_none() {
             return Err(io::Error::other("Missing Tetris configuration version"));
         }
-        board.records.sort_by_key(|r| std::cmp::Reverse(r.score));
+        for mode in GameMode::ALL {
+            board
+                .records_mut(mode)
+                .sort_by_key(|r| std::cmp::Reverse(r.score));
+        }
         Ok(board)
     }
     fn encode(&self) -> Vec<u8> {
-        let version =
-            if self.dos_encoding.is_some() || self.records.iter().any(|r| r.lines.is_none()) {
-                2
-            } else {
-                1
-            };
         let mut text = format!(
-            "# Directory Navigator Tetris leaderboard\ntetris_version={version}\nlast_name={}\n",
-            self.last_name
+            "# Directory Navigator game leaderboards\ntetris_version=3\nlast_name={}\nmode={}\nstart_level={}\npreview={}\n",
+            self.last_name, self.preferences.mode.key(), self.preferences.level, self.preferences.preview
         );
         if let Some(encoding) = self.dos_encoding {
             text.push_str(&format!("dn_tet_encoding={}\n", encoding.key()));
         }
-        for r in &self.records {
-            text.push_str(&format!(
-                "score={},{},{},{},{}\n",
-                r.score,
-                r.lines
-                    .map_or_else(|| "-".into(), |lines| lines.to_string()),
-                r.start_level,
-                r.level,
-                r.name
-            ));
+        for mode in GameMode::ALL {
+            for r in self.records_for(mode) {
+                text.push_str(&format!(
+                    "{}={},{},{},{},{}\n",
+                    if mode == GameMode::Tetris {
+                        "score"
+                    } else {
+                        "pentix_score"
+                    },
+                    r.score,
+                    r.lines
+                        .map_or_else(|| "-".into(), |lines| lines.to_string()),
+                    r.start_level,
+                    r.level,
+                    r.name
+                ));
+            }
         }
         text.into_bytes()
     }
@@ -128,13 +181,22 @@ impl Board {
 pub struct Store {
     pub board: Board,
     path: Option<PathBuf>,
-    imports: Vec<Record>,
+    imports: [Vec<Record>; 2],
     import_pending: bool,
-    pending: Vec<Record>,
+    pending: [Vec<Record>; 2],
+    preferences_pending: Option<Preferences>,
+    sync_pending: bool,
 }
 impl Store {
     pub fn has_pending(&self) -> bool {
-        !self.pending.is_empty() || self.import_pending
+        self.pending.iter().any(|p| !p.is_empty())
+            || self.import_pending
+            || self.preferences_pending.is_some()
+            || self.sync_pending
+    }
+    pub fn set_preferences(&mut self, preferences: Preferences) {
+        self.board.preferences = preferences;
+        self.preferences_pending = Some(preferences);
     }
     pub fn load(&mut self, path: Option<PathBuf>) -> io::Result<()> {
         self.load_with_encoding(path, super::dos_scores::Encoding::Cp437)
@@ -145,38 +207,48 @@ impl Store {
         encoding: super::dos_scores::Encoding,
     ) -> io::Result<()> {
         self.path = path;
-        self.imports.clear();
+        self.imports = Default::default();
         self.import_pending = false;
         let path = self
             .path
             .as_deref()
             .ok_or_else(|| io::Error::other("Tetris configuration directory is unavailable"))?;
         let mut board = read(path)?;
-        let last_name = if self.pending.is_empty() {
-            board.last_name.clone()
-        } else {
-            self.board.last_name.clone()
-        };
-        board.records.extend(self.pending.iter().cloned());
-        board.records.sort_by_key(|r| std::cmp::Reverse(r.score));
-        board.records.truncate(10);
-        board.last_name = last_name;
+        if self.pending.iter().any(|p| !p.is_empty()) {
+            board.last_name = self.board.last_name.clone();
+        }
+        for mode in GameMode::ALL {
+            let records = board.records_mut(mode);
+            records.extend(self.pending[mode.index()].iter().cloned());
+            records.sort_by_key(|r| std::cmp::Reverse(r.score));
+            records.truncate(10);
+        }
+        if let Some(preferences) = self.preferences_pending {
+            board.preferences = preferences;
+        }
         self.board = board;
-        // A corrupt import must not hide a valid modern leaderboard or overwrite it.
         let encoding = self.board.dos_encoding.unwrap_or(encoding);
         self.imports = super::dos_scores::read(path, encoding)?;
         let before = self.board.clone();
-        merge_imports(&mut self.board.records, &self.imports);
-        if !self.imports.is_empty() && self.board.records.iter().any(|r| r.lines.is_none()) {
+        for mode in GameMode::ALL {
+            merge_imports(self.board.records_mut(mode), &self.imports[mode.index()]);
+        }
+        if self.imports.iter().any(|r| !r.is_empty()) {
             self.board.dos_encoding = Some(encoding);
         }
         self.import_pending = self.board != before;
-        if self.import_pending && self.pending.is_empty() {
+        if self.import_pending
+            && self.pending.iter().all(Vec::is_empty)
+            && self.preferences_pending.is_none()
+        {
             self.save()?;
         }
         Ok(())
     }
     pub fn add(&mut self, record: Record) -> io::Result<()> {
+        self.add_for(GameMode::Tetris, record)
+    }
+    pub fn add_for(&mut self, mode: GameMode, record: Record) -> io::Result<()> {
         if !validate_name(&record.name)
             || record.score == 0
             || !(1..=10).contains(&record.start_level)
@@ -185,14 +257,14 @@ impl Store {
             return Err(io::Error::other("Invalid Tetris record"));
         }
         self.board.last_name = record.name.clone();
-        self.pending.push(record.clone());
-        self.pending.sort_by_key(|r| std::cmp::Reverse(r.score));
-        self.pending.truncate(10);
-        self.board.records.push(record);
-        self.board
-            .records
-            .sort_by_key(|r| std::cmp::Reverse(r.score));
-        self.board.records.truncate(10);
+        let pending = &mut self.pending[mode.index()];
+        pending.push(record.clone());
+        pending.sort_by_key(|r| std::cmp::Reverse(r.score));
+        pending.truncate(10);
+        let records = self.board.records_mut(mode);
+        records.push(record);
+        records.sort_by_key(|r| std::cmp::Reverse(r.score));
+        records.truncate(10);
         Ok(())
     }
     pub fn save(&mut self) -> io::Result<()> {
@@ -214,37 +286,54 @@ impl Store {
             .dos_encoding
             .filter(|e| Some(*e) != self.board.dos_encoding)
         {
-            // Another instance may have completed the initial import using a
-            // different interface language. Keep the first saved code page.
             self.imports = super::dos_scores::read(path, encoding)?;
         }
-        merge_imports(&mut disk.records, &self.imports);
+        for mode in GameMode::ALL {
+            let records = disk.records_mut(mode);
+            merge_imports(records, &self.imports[mode.index()]);
+            records.extend(self.pending[mode.index()].iter().cloned());
+            records.sort_by_key(|r| std::cmp::Reverse(r.score));
+            records.truncate(10);
+        }
         disk.dos_encoding = disk.dos_encoding.or(self.board.dos_encoding);
-        disk.records.extend(self.pending.iter().cloned());
-        disk.records.sort_by_key(|r| std::cmp::Reverse(r.score));
-        disk.records.truncate(10);
-        if !self.pending.is_empty() {
+        if self.pending.iter().any(|p| !p.is_empty()) {
             disk.last_name = self.board.last_name.clone();
         }
-        if disk == original {
-            self.board = disk;
-            self.pending.clear();
-            self.import_pending = false;
-            return Ok(());
+        if let Some(preferences) = self.preferences_pending {
+            disk.preferences = preferences;
         }
-        if let Ok(m) = fs::symlink_metadata(path) {
-            if m.permissions().readonly() {
-                return Err(io::Error::other("Tetris configuration is read-only"));
+        if disk != original {
+            if let Ok(m) = fs::symlink_metadata(path) {
+                if m.permissions().readonly() {
+                    return Err(io::Error::other("Tetris configuration is read-only"));
+                }
             }
+            let mut staged = crate::publication::StagedFile::create(path)?;
+            staged.file.write_all(&disk.encode())?;
+            staged.file.sync_all()?;
+            fs::rename(staged.path(), path)?;
+            // Publication succeeded: retries must not duplicate already published records,
+            // even when syncing the parent directory fails.
+            self.board = disk;
+            self.pending = Default::default();
+            self.import_pending = false;
+            self.preferences_pending = None;
+            self.sync_pending = true;
+            let result = crate::platform_fs::sync_parent(path);
+            if result.is_ok() {
+                self.sync_pending = false;
+            }
+            return result;
         }
-        let mut staged = crate::publication::StagedFile::create(path)?;
-        staged.file.write_all(&disk.encode())?;
-        staged.file.sync_all()?;
-        fs::rename(staged.path(), path)?;
         self.board = disk;
-        self.pending.clear();
+        self.pending = Default::default();
         self.import_pending = false;
-        crate::platform_fs::sync_parent(path)
+        self.preferences_pending = None;
+        if self.sync_pending {
+            crate::platform_fs::sync_parent(path)?;
+            self.sync_pending = false;
+        }
+        Ok(())
     }
 }
 // Imported entries have unknown line counts. Preserve duplicate slots from the
@@ -282,6 +371,7 @@ mod tests {
             records: vec![record(u64::MAX, "Дмитрий,世界=#"), record(1, "é 👩‍💻")],
             last_name: "Дмитрий,世界=#".into(),
             dos_encoding: None,
+            ..Board::default()
         };
         assert_eq!(Board::parse(&board.encode()).unwrap(), board);
     }
@@ -290,7 +380,7 @@ mod tests {
         for text in [
             "",
             "tetris_version=1\ntetris_version=1\n",
-            "tetris_version=3\n",
+            "tetris_version=4\n",
             "tetris_version=1\nfuture=1\n",
             "tetris_version=1\nscore=1,2,3,4\n",
             "tetris_version=1\nscore=0,0,1,1,zero\n",
@@ -343,7 +433,7 @@ mod tests {
                 .count(),
             2
         );
-        assert_eq!(store.pending.len(), 10);
+        assert_eq!(store.pending[0].len(), 10);
     }
     #[test]
     fn rejected_records_leave_all_pending_and_display_state_unchanged() {

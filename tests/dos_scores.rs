@@ -153,7 +153,7 @@ fn copied_files_merge_once_with_existing_unicode_scores_and_survive_restart() ->
     assert_eq!(store.board.last_name, "世界 👩‍💻");
     let saved = fs::read(&path)?;
     assert_eq!(Board::parse(&saved)?, store.board);
-    assert!(String::from_utf8_lossy(&saved).contains("tetris_version=2"));
+    assert!(String::from_utf8_lossy(&saved).contains("tetris_version=3"));
     for _ in 0..3 {
         store.load(Some(path.clone()))?;
         store.save()?;
@@ -309,6 +309,84 @@ fn significant_dos_name_spaces_survive_storage_and_do_not_duplicate() -> io::Res
         assert_eq!(store.board.records.len(), 1);
         assert_eq!(store.board.records[0].name, "  Player  ");
         assert_eq!(Board::parse(&fs::read(t.path())?)?, store.board);
+    }
+    Ok(())
+}
+
+#[test]
+fn both_dos_leaderboards_import_once_including_existing_v2_migrations() -> io::Result<()> {
+    use tetris::{dos_scores::decode_all, GameMode};
+    for width in [37, 38] {
+        let t = Temp::new()?;
+        let bytes = sample(width);
+        let decoded = decode_all(&bytes, Encoding::Cp437)?;
+        assert_eq!(decoded[0].len(), 2);
+        assert_eq!(decoded[1].len(), 1);
+        fs::write(t.0.join("dn.tet"), &bytes)?;
+        // An earlier DN build already imported the Classic half.
+        fs::write(t.path(),"tetris_version=2\nlast_name=Kept\ndn_tet_encoding=cp437\nscore=500,-,2,7,Café\nscore=100,-,1,3,Same\n")?;
+        let mut store = Store::default();
+        store.load(Some(t.path()))?;
+        assert_eq!(store.board.records.len(), 2);
+        assert_eq!(store.board.records_for(GameMode::Pentix)[0].name, "Pentix");
+        assert_eq!(store.board.last_name, "Kept");
+        let saved = fs::read(t.path())?;
+        assert!(String::from_utf8_lossy(&saved).contains("pentix_score="));
+        store.load(Some(t.path()))?;
+        store.save()?;
+        assert_eq!(fs::read(t.path())?, saved);
+        assert_eq!(fs::read(t.0.join("dn.tet"))?, bytes);
+    }
+    Ok(())
+}
+
+#[test]
+fn v3_modes_merge_independently_and_failed_preferences_retry_after_reopen() -> io::Result<()> {
+    use tetris::{GameMode, Preferences};
+    let t = Temp::new()?;
+    fs::write(
+        t.path(),
+        "tetris_version=1\nlast_name=Legacy\nscore=50,2,1,2,Old\n",
+    )?;
+    let mut a = Store::default();
+    let mut b = Store::default();
+    a.load(Some(t.path()))?;
+    b.load(Some(t.path()))?;
+    a.add_for(GameMode::Pentix, modern(500, "Пентикс 世界"))?;
+    let prefs = Preferences {
+        mode: GameMode::Pentix,
+        level: 7,
+        preview: false,
+    };
+    a.set_preferences(prefs);
+    fs::write(t.0.join("tetris.conf.lock"), b"busy")?;
+    assert!(a.save().is_err());
+    assert!(a.has_pending());
+    a.load(Some(t.path()))?;
+    assert_eq!(a.board.preferences, prefs);
+    assert_eq!(a.board.pentix_records[0].score, 500);
+    fs::remove_file(t.0.join("tetris.conf.lock"))?;
+    b.add(modern(100, "Classic"))?;
+    b.save()?;
+    a.save()?;
+    let parsed = Board::parse(&fs::read(t.path())?)?;
+    assert_eq!(parsed.preferences, prefs);
+    assert_eq!(parsed.records.len(), 2);
+    assert_eq!(parsed.records[0].score, 100);
+    assert_eq!(parsed.pentix_records.len(), 1);
+    assert_eq!(parsed.pentix_records[0].score, 500);
+    assert!(!a.has_pending());
+    let bytes = fs::read(t.path())?;
+    a.save()?;
+    assert_eq!(bytes, fs::read(t.path())?);
+    for bad in [
+        "mode=other",
+        "start_level=0",
+        "start_level=11",
+        "preview=yes",
+        "pentix_score=10,-,8,2,bad",
+    ] {
+        assert!(Board::parse(format!("tetris_version=3\n{bad}\n").as_bytes()).is_err());
     }
     Ok(())
 }

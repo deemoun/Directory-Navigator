@@ -576,3 +576,17 @@ Plugins	Plugins
 Enabled plugins	Enabled plugins
 Disabling closes open plugin windows.	Disabling closes open plugin windows.
 Plugin is disabled. Enable it in Options > Configuration > Plugins.	Plugin is disabled. Enable it in Options > Configuration > Plugins.
+Pentix	Pentix
+Classic ~t~etris	Classic ~t~etris
+Penti~x~	Penti~x~
+~P~iece preview	~P~iece preview
+Pentix Top Ten	Pentix Top Ten
+Pentix Help	Pentix Help
+You have entered Top Ten!	You have entered Top Ten!
+Enter your name:	Enter your name:
+Pentix: 27 figures, from one to five cells.	Pentix: 27 figures, from one to five cells.
+Classic Tetris: seven four-cell figures.	Classic Tetris: seven four-cell figures.
+←/Home left · →/PgUp right · ↑ rotate\n↓/Space drop; next tick locks the piece\nF2 new · F3 pause · F4 Top 10 · F5 setup\n+ level · * preview · Esc returns\nAlt+N new · Alt+P pause · Alt+T scores · Alt+S setup\n\nSeparate Top Ten for each game. Saved in tetris.conf.	←/Home left · →/PgUp right · ↑ rotate\n↓/Space drop; next tick locks the piece\nF2 new · F3 pause · F4 Top 10 · F5 setup\n+ level · * preview · Esc returns\nAlt+N new · Alt+P pause · Alt+T scores · Alt+S setup\n\nSeparate Top Ten for each game. Saved in tetris.conf.
+Not saved — F4 retry	Not saved — F4 retry
+Cannot load scores	Cannot load scores
+~G~ame style	~G~ame style

@@ -1,8 +1,10 @@
 //! Classic game adapted from TETRIS.PAS by RIT Research Labs.
-//! Retains the 12×19 well, seven figures, rotation sizes, delays and scoring.
+//! Copyright (C) 1991-99 RIT Research Labs; original terms in THIRD_PARTY_NOTICES.md.
+//! Retains the 12×19 well, all 27 Tetris/Pentix figures, delays and scoring.
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 mod controls;
 pub mod dos_scores;
+pub(crate) mod layout;
 pub mod scores;
 pub use controls::{action, key, open, paste, target, GameAction};
 
@@ -14,17 +16,205 @@ pub const BUTTONS: [(&str, GameAction); 4] = [
 ];
 pub const WIDTH: usize = 12;
 pub const HEIGHT: usize = 19;
-// Coordinates are (column, row), converted from the original one-based figures.
-pub const FIGURES: [[(i32, i32); 4]; 7] = [
-    [(2, 0), (2, 1), (2, 2), (1, 2)],
-    [(1, 0), (1, 1), (1, 2), (2, 2)],
-    [(1, 0), (1, 1), (1, 2), (1, 3)],
-    [(1, 1), (2, 1), (1, 2), (2, 2)],
-    [(1, 0), (1, 1), (2, 1), (1, 2)],
-    [(1, 0), (1, 1), (2, 1), (2, 2)],
-    [(2, 0), (2, 1), (1, 1), (1, 2)],
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum GameMode {
+    #[default]
+    Tetris,
+    Pentix,
+}
+impl GameMode {
+    pub const ALL: [Self; 2] = [Self::Tetris, Self::Pentix];
+    pub fn index(self) -> usize {
+        usize::from(self == Self::Pentix)
+    }
+    pub fn figure_count(self) -> usize {
+        if self == Self::Pentix {
+            27
+        } else {
+            7
+        }
+    }
+    pub fn key(self) -> &'static str {
+        if self == Self::Pentix {
+            "pentix"
+        } else {
+            "tetris"
+        }
+    }
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Preferences {
+    pub mode: GameMode,
+    pub level: u8,
+    pub preview: bool,
+}
+impl Default for Preferences {
+    fn default() -> Self {
+        Self {
+            mode: GameMode::Tetris,
+            level: 1,
+            preview: true,
+        }
+    }
+}
+#[derive(Clone, Copy, Debug)]
+pub struct Figure {
+    pub cells: [(i32, i32); 5],
+    pub count: usize,
+    pub rotation: i32,
+}
+impl Figure {
+    pub fn color(index: usize) -> u8 {
+        15 - (index % 7) as u8
+    }
+}
+// Converted from TETRIS.PAS (row,column), using only ColPo live cells.
+pub const DEFINITIONS: [Figure; 27] = [
+    Figure {
+        cells: [(2, 0), (2, 1), (2, 2), (1, 2), (0, 0)],
+        count: 4,
+        rotation: 4,
+    },
+    Figure {
+        cells: [(1, 0), (1, 1), (1, 2), (2, 2), (0, 0)],
+        count: 4,
+        rotation: 4,
+    },
+    Figure {
+        cells: [(1, 0), (1, 1), (1, 2), (1, 3), (0, 0)],
+        count: 4,
+        rotation: 4,
+    },
+    Figure {
+        cells: [(1, 1), (2, 1), (1, 2), (2, 2), (0, 0)],
+        count: 4,
+        rotation: 4,
+    },
+    Figure {
+        cells: [(1, 0), (1, 1), (2, 1), (1, 2), (0, 0)],
+        count: 4,
+        rotation: 3,
+    },
+    Figure {
+        cells: [(1, 0), (1, 1), (2, 1), (2, 2), (0, 0)],
+        count: 4,
+        rotation: 4,
+    },
+    Figure {
+        cells: [(2, 0), (2, 1), (1, 1), (1, 2), (0, 0)],
+        count: 4,
+        rotation: 4,
+    },
+    Figure {
+        cells: [(0, 0), (0, 0), (0, 0), (0, 0), (0, 0)],
+        count: 1,
+        rotation: 1,
+    },
+    Figure {
+        cells: [(0, 0), (0, 1), (0, 0), (0, 0), (0, 0)],
+        count: 2,
+        rotation: 2,
+    },
+    Figure {
+        cells: [(1, 0), (1, 1), (1, 2), (0, 0), (0, 0)],
+        count: 3,
+        rotation: 3,
+    },
+    Figure {
+        cells: [(0, 0), (0, 1), (1, 1), (0, 0), (0, 0)],
+        count: 3,
+        rotation: 2,
+    },
+    Figure {
+        cells: [(2, 0), (2, 1), (2, 2), (2, 3), (2, 4)],
+        count: 5,
+        rotation: 5,
+    },
+    Figure {
+        cells: [(1, 0), (0, 1), (1, 1), (2, 1), (1, 2)],
+        count: 5,
+        rotation: 3,
+    },
+    Figure {
+        cells: [(1, 1), (2, 1), (1, 2), (2, 2), (3, 2)],
+        count: 5,
+        rotation: 4,
+    },
+    Figure {
+        cells: [(1, 1), (2, 1), (0, 2), (1, 2), (2, 2)],
+        count: 5,
+        rotation: 4,
+    },
+    Figure {
+        cells: [(0, 0), (2, 0), (0, 1), (1, 1), (2, 1)],
+        count: 5,
+        rotation: 3,
+    },
+    Figure {
+        cells: [(0, 0), (0, 1), (1, 1), (1, 2), (2, 2)],
+        count: 5,
+        rotation: 3,
+    },
+    Figure {
+        cells: [(1, 0), (1, 1), (1, 2), (2, 2), (2, 3)],
+        count: 5,
+        rotation: 4,
+    },
+    Figure {
+        cells: [(2, 0), (2, 1), (1, 2), (2, 2), (1, 3)],
+        count: 5,
+        rotation: 4,
+    },
+    Figure {
+        cells: [(0, 0), (1, 0), (1, 1), (1, 2), (2, 2)],
+        count: 5,
+        rotation: 3,
+    },
+    Figure {
+        cells: [(1, 0), (2, 0), (1, 1), (0, 2), (1, 2)],
+        count: 5,
+        rotation: 3,
+    },
+    Figure {
+        cells: [(0, 0), (0, 1), (1, 1), (2, 1), (1, 2)],
+        count: 5,
+        rotation: 3,
+    },
+    Figure {
+        cells: [(2, 0), (0, 1), (1, 1), (2, 1), (1, 2)],
+        count: 5,
+        rotation: 3,
+    },
+    Figure {
+        cells: [(0, 0), (1, 0), (2, 0), (1, 1), (1, 2)],
+        count: 5,
+        rotation: 3,
+    },
+    Figure {
+        cells: [(1, 0), (1, 1), (2, 1), (1, 2), (1, 3)],
+        count: 5,
+        rotation: 4,
+    },
+    Figure {
+        cells: [(2, 0), (1, 1), (2, 1), (2, 2), (2, 3)],
+        count: 5,
+        rotation: 4,
+    },
+    Figure {
+        cells: [(0, 0), (0, 1), (0, 2), (1, 2), (2, 2)],
+        count: 5,
+        rotation: 3,
+    },
 ];
-const ROTATION_SIZES: [i32; 7] = [4, 4, 4, 4, 3, 4, 4];
+pub const FIGURES: [[(i32, i32); 5]; 27] = {
+    let mut figures = [[(0, 0); 5]; 27];
+    let mut i = 0;
+    while i < 27 {
+        figures[i] = DEFINITIONS[i].cells;
+        i += 1;
+    }
+    figures
+};
 const DELAYS_MS: [u64; 10] = [800, 600, 500, 300, 250, 200, 150, 100, 50, 40];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -34,12 +224,16 @@ pub enum Screen {
     Name,
     Help,
     Scores,
-    Setup { level: u8, preview: bool },
+    Setup {
+        level: u8,
+        mode: GameMode,
+        preview: bool,
+    },
 }
 #[derive(Clone, Copy, Debug)]
 pub struct Piece {
     pub kind: usize,
-    pub cells: [(i32, i32); 4],
+    pub cells: [(i32, i32); 5],
     pub x: i32,
     pub y: i32,
 }
@@ -53,7 +247,9 @@ impl Piece {
         }
     }
     pub fn positions(&self) -> impl Iterator<Item = (i32, i32)> + '_ {
-        self.cells.iter().map(|(x, y)| (x + self.x, y + self.y))
+        self.cells[..DEFINITIONS[self.kind].count]
+            .iter()
+            .map(|(x, y)| (x + self.x, y + self.y))
     }
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -66,6 +262,8 @@ pub struct Record {
 }
 
 pub struct Game {
+    pub mode: GameMode,
+    pub help_return: Option<(Screen, usize, usize)>,
     pub board: [[u8; WIDTH]; HEIGHT],
     pub piece: Piece,
     pub next: usize,
@@ -104,6 +302,8 @@ impl Default for Game {
 impl Game {
     pub fn with_seed(seed: u64, now: Instant) -> Self {
         let mut game = Self {
+            mode: GameMode::Tetris,
+            help_return: None,
             board: [[0; WIDTH]; HEIGHT],
             piece: Piece::new(0),
             next: 0,
@@ -132,16 +332,24 @@ impl Game {
         game.restart(now);
         game
     }
+    pub fn help_mode(&self) -> GameMode {
+        match self.help_return {
+            Some((Screen::Setup { mode, .. }, _, _)) => mode,
+            _ => self.mode,
+        }
+    }
     fn random_piece(&mut self) -> usize {
         // Independent pieces, like DN; this generator is only for the game.
         self.random ^= self.random << 13;
         self.random ^= self.random >> 7;
         self.random ^= self.random << 17;
-        (self.random % 7) as usize
+        (self.random % self.mode.figure_count() as u64) as usize
     }
     pub fn restart(&mut self, now: Instant) {
         self.board = [[0; WIDTH]; HEIGHT];
         self.piece = Piece::new(self.random_piece());
+        // NewGame starts one row lower than subsequent ReadFig spawns in DN.
+        self.piece.y = 1;
         self.next = self.random_piece();
         self.score = 0;
         self.lines = 0;
@@ -152,6 +360,7 @@ impl Game {
         self.submitted = false;
         self.highlighted = None;
         self.screen = Screen::Play;
+        self.help_return = None;
         self.page_focus = 0;
         self.play_focus = 0;
         self.last_tick = now;
@@ -191,8 +400,8 @@ impl Game {
             return;
         }
         let mut candidate = self.piece;
-        for (x, y) in &mut candidate.cells {
-            (*x, *y) = (*y, ROTATION_SIZES[candidate.kind] - 1 - *x);
+        for (x, y) in &mut candidate.cells[..DEFINITIONS[candidate.kind].count] {
+            (*x, *y) = (*y, DEFINITIONS[candidate.kind].rotation - 1 - *x);
         }
         // Original DN rejects a blocked rotation without moving the piece.
         if self.valid(&candidate) {
@@ -209,7 +418,7 @@ impl Game {
             return;
         }
         for (x, y) in self.piece.positions() {
-            self.board[y as usize][x as usize] = 15 - self.piece.kind as u8;
+            self.board[y as usize][x as usize] = Figure::color(self.piece.kind);
         }
         let multiplier = if self.preview { 7 } else { 10 };
         let height_score = (HEIGHT as i32 + 1 - self.piece.y).max(0) as u64 * 2;
@@ -259,7 +468,7 @@ impl Game {
             return;
         }
         while self.translate(0, 1) {}
-        self.lock();
+        // DN leaves the landed figure movable until the next gravity tick.
         self.last_tick = now;
     }
     pub fn delay(&self) -> Duration {

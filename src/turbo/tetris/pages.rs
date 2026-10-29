@@ -74,87 +74,90 @@ pub(super) fn draw(
     scene: &mut Scene,
     game: &Game,
     lang: crate::localization::Language,
-    game_y: u16,
+    pending: bool,
 ) {
     let screen = game.screen;
     if screen == Screen::Play {
         return;
     }
     scene.regions.clear();
+    let r = crate::tetris::layout::page(
+        Rect::new(0, 0, scene.width, scene.height),
+        game,
+        lang,
+        pending,
+    );
+    let title = match screen {
+        Screen::Setup { .. } => "Setup game",
+        Screen::Name => "You have entered Top Ten!",
+        Screen::GameOver => "Game over",
+        Screen::Help if game.help_mode() == crate::tetris::GameMode::Pentix => "Pentix Help",
+        Screen::Help => "Tetris Help",
+        _ => "",
+    };
+    if screen == Screen::Scores {
+        scores(scene, game, lang, pending);
+        return;
+    }
+    scene.window(r, lang.text(title));
     match screen {
         Screen::Setup { .. } => {
-            let r = Rect::new((scene.width - 72) / 2, (scene.height - 18) / 2, 72, 18);
-            scene.window(r, lang.text("Setup game"));
-            let right = r.x + 42;
-            scene.paragraph(Rect::new(r.x + 4, r.y + 2, 34, 1), lang.text("Level"), 0x7f);
-            scene.paragraph(
-                Rect::new(right, r.y + 2, 26, 1),
-                lang.text("Game style"),
-                0x70,
-            );
-            scene.paragraph(Rect::new(right, r.y + 6, 26, 1), lang.text("Options"), 0x70);
-            scene.paragraph(
-                Rect::new(r.x + 4, r.y + 16, 64, 1),
-                lang.text("OK starts a new game · Esc cancels"),
-                0x78,
-            );
-        }
-        Screen::Scores => scores(scene, game, lang),
-        _ => {
-            let r = Rect::new((scene.width - 50) / 2, game_y + 2, 50, 17);
-            let title = match screen {
-                Screen::Help => "Tetris Help",
-                Screen::Name => "New high score",
-                _ => "Game over",
-            };
-            scene.window(r, lang.text(title));
-            if matches!(screen, Screen::Name | Screen::GameOver) {
-                scene.paragraph(
-                    Rect::new(r.x + 3, r.y + 2, 44, 3),
-                    &format!(
-                        "{}: {}\n{}: {}    {}: {} → {}",
-                        lang.text("Final score"),
-                        game.score,
-                        lang.text("Lines"),
-                        game.lines,
-                        lang.text("Level"),
-                        game.start_level,
-                        game.level
-                    ),
-                    0x71,
-                );
-                if screen == Screen::Name {
-                    scene.paragraph(
-                        Rect::new(r.x + 3, r.y + 6, 44, 1),
-                        lang.text("Your name (30 characters)"),
-                        0x70,
-                    );
-                    scene.paragraph(
-                        Rect::new(r.x + 3, r.y + 9, 44, 1),
-                        lang.text("Tab chooses · Enter activates · Esc cancels"),
-                        0x70,
-                    );
-                    scene.wrapped(
-                        Rect::new(r.x + 3, r.y + 10, 44, 3),
-                        &crate::filesystem::display_name(lang.text(&game.notice)),
-                        0x74,
-                    );
-                } else {
-                    scene.paragraph(
-                        Rect::new(r.x + 3, r.y + 7, 44, 2),
-                        lang.text("Enter continues · Esc cancels"),
-                        0x70,
-                    );
-                }
-            } else {
-                scene.paragraph(Rect::new(r.x+2,r.y+1,46,13),lang.text("←/Home left · →/PgUp right · ↑ rotate\n↓/Space drop · F2 new game · F3 pause\nF4 high scores · F5 setup\n+ increase level · * toggle next preview\n\nAlt+N new · Alt+P pause · Alt+T scores\nAlt+S setup · Esc returns to files\n\nHigh scores save in tetris.conf."),0x70);
+            for (x, y, w, label) in [
+                (r.x + 3, r.y + 2, 26, "Level"),
+                (r.x + 30, r.y + 2, r.width - 33, "Game style"),
+                (r.x + 30, r.y + 6, r.width - 33, "Options"),
+            ] {
+                scene.paragraph(Rect::new(x, y, w, 1), lang.text(label), 0x70);
             }
         }
+        Screen::GameOver => scene.paragraph(
+            Rect::new(r.x + 3, r.y + 2, r.width - 6, 1),
+            &format!("{}: {}", lang.text("Final score"), game.score),
+            0x71,
+        ),
+        Screen::Name => {
+            scene.paragraph(
+                Rect::new(r.x + 2, r.y + 2, 18, 1),
+                lang.text("Enter your name:"),
+                0x70,
+            );
+            scene.paragraph(
+                Rect::new(r.x + 2, r.y + 3, r.width - 4, 1),
+                &crate::filesystem::display_name(lang.text(&game.notice)),
+                0x74,
+            );
+        }
+        Screen::Help => {
+            let rules = if game.help_mode() == crate::tetris::GameMode::Pentix {
+                "Pentix: 27 figures, from one to five cells."
+            } else {
+                "Classic Tetris: seven four-cell figures."
+            };
+            scene.wrapped(
+                Rect::new(r.x + 2, r.y + 2, r.width - 4, 2),
+                lang.text(rules),
+                0x71,
+            );
+            scene.wrapped(Rect::new(r.x+2,r.y+4,r.width-4,8),lang.text("←/Home left · →/PgUp right · ↑ rotate\n↓/Space drop; next tick locks the piece\nF2 new · F3 pause · F4 Top 10 · F5 setup\n+ level · * preview · Esc returns\nAlt+N new · Alt+P pause · Alt+T scores · Alt+S setup\n\nSeparate Top Ten for each game. Saved in tetris.conf."),0x70);
+        }
+        _ => {}
     }
 }
-fn scores(scene: &mut Scene, game: &Game, lang: crate::localization::Language) {
-    let r = Rect::new((scene.width - 72) / 2, (scene.height - 20) / 2, 72, 20);
-    scene.window(r, lang.text("Tetris Top Ten"));
+fn scores(scene: &mut Scene, game: &Game, lang: crate::localization::Language, pending: bool) {
+    let r = crate::tetris::layout::page(
+        Rect::new(0, 0, scene.width, scene.height),
+        game,
+        lang,
+        pending,
+    );
+    scene.window(
+        r,
+        lang.text(if game.mode == crate::tetris::GameMode::Pentix {
+            "Pentix Top Ten"
+        } else {
+            "Tetris Top Ten"
+        }),
+    );
     let body = Rect::new(r.x + 2, r.y + 3, 68, 12);
     crate::turbo::widgets::paint_into(scene, crate::turbo::widgets::group_box(""), body);
     let x = body.x + 1;
@@ -175,7 +178,7 @@ fn scores(scene: &mut Scene, game: &Game, lang: crate::localization::Language) {
         };
         scene.text(x + offset, r.y + 2, w - offset, label, 0x7e);
     }
-    let items = game
+    let items: Vec<String> = game
         .records
         .iter()
         .take(10)
@@ -193,14 +196,16 @@ fn scores(scene: &mut Scene, game: &Game, lang: crate::localization::Language) {
         .collect();
     crate::turbo::widgets::paint_into(
         scene,
-        crate::turbo::widgets::list_selection(
-            items,
-            game.highlighted,
-            0,
-            game.highlighted.is_some(),
-        ),
+        crate::turbo::widgets::text_view(&items, 0, 0x70),
         Rect::new(x, body.y + 1, width, 10),
     );
+    if let Some((index, record)) = game
+        .highlighted
+        .and_then(|index| game.records.get(index).map(|r| (index, r)))
+    {
+        let name = crate::formatting::tail(&crate::filesystem::display_name(&record.name), nw);
+        scene.text(x, body.y + 1 + index as u16, nw, &name, 0x7f);
+    }
     if game.records.is_empty() {
         scene.paragraph(
             Rect::new(x + 1, body.y + 1, width - 2, 1),
@@ -220,11 +225,6 @@ fn scores(scene: &mut Scene, game: &Game, lang: crate::localization::Language) {
                 0x78,
             );
         }
-        scene.paragraph(
-            Rect::new(x, r.y + 16, width, 1),
-            lang.text(&game.notice),
-            0x70,
-        );
     } else {
         scene.wrapped(
             Rect::new(x, r.y + 15, width, 2),

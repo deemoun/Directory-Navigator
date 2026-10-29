@@ -2,14 +2,18 @@
 //! The document paints these native cells
 //! through TV. The codec boundary preserves graphemes and terminal-theme colors.
 use super::scene::Scene;
-use crate::tetris::{FIGURES, HEIGHT, WIDTH};
+use crate::tetris::{Figure, DEFINITIONS, HEIGHT, WIDTH};
 use std::collections::BTreeMap;
 use unicode_width::UnicodeWidthStr;
 mod controls;
 mod pages;
 pub(crate) use controls::spec;
 
-pub(crate) fn prepare(game: &crate::tetris::Game, ctx: &crate::plugins::Context) -> Scene {
+pub(crate) fn prepare(
+    game: &crate::tetris::Game,
+    pending: bool,
+    ctx: &crate::plugins::Context,
+) -> Scene {
     let width = ctx.area.width;
     let height = ctx.area.height;
     assert!(width >= 80 && height >= 25);
@@ -55,7 +59,7 @@ pub(crate) fn prepare(game: &crate::tetris::Game, ctx: &crate::plugins::Context)
                 wy + 1 + row as u16,
                 2,
                 "██",
-                15 - game.piece.kind as u8,
+                Figure::color(game.piece.kind),
             );
         }
     }
@@ -63,7 +67,7 @@ pub(crate) fn prepare(game: &crate::tetris::Game, ctx: &crate::plugins::Context)
     for (top, h, title, attr) in [
         (y + 1, 5, "Info", 0x70),
         (y + 5, 7, "Next", 0x70),
-        (y + 13, 4, "Best", 0x7e),
+        (y + 12, 4, "Best", 0x7e),
     ] {
         scene.border(sx, top, 24, h, false, attr);
         scene.title(sx, top, 24, language.text(title));
@@ -81,19 +85,26 @@ pub(crate) fn prepare(game: &crate::tetris::Game, ctx: &crate::plugins::Context)
         let n = prefix.width().min(22) as u16;
         scene.text(sx + 1 + n, y + 2 + i as u16, 22 - n, &value, 0x7f);
     }
-    if game.preview {
-        for (col, row) in FIGURES[game.next] {
+    // DN's next-piece well is black, independently of the dialog palette.
+    scene.fill(sx + 1, y + 6, 22, 5, 0x0f);
+    if game.preview && !game.paused && !game.over {
+        let figure = &DEFINITIONS[game.next];
+        let cells = &figure.cells[..figure.count];
+        let min_x = cells.iter().map(|c| c.0).min().unwrap();
+        let max_x = cells.iter().map(|c| c.0).max().unwrap();
+        let min_y = cells.iter().map(|c| c.1).min().unwrap();
+        let max_y = cells.iter().map(|c| c.1).max().unwrap();
+        let left = sx + 1 + (22 - (max_x - min_x + 1) as u16 * 2) / 2;
+        let top = y + 6 + (5 - (max_y - min_y + 1) as u16) / 2;
+        for (col, row) in cells {
             scene.text(
-                sx + 7 + col as u16 * 2,
-                y + 6 + row as u16,
+                left + (col - min_x) as u16 * 2,
+                top + (row - min_y) as u16,
                 2,
                 "██",
-                0x70 | (15 - game.next as u8),
+                Figure::color(game.next),
             );
         }
-    } else {
-        scene.fill(sx + 2, y + 8, 20, 1, 0x78);
-        scene.text(sx + 2, y + 8, 20, language.text("Preview off"), 0x78);
     }
     let best = game.records.first();
     for (i, (label, value)) in [
@@ -111,13 +122,26 @@ pub(crate) fn prepare(game: &crate::tetris::Game, ctx: &crate::plugins::Context)
     {
         let prefix = format!("{}: ", language.text(label));
         let n = prefix.width().min(22) as u16;
-        scene.text(sx + 1, y + 14 + i as u16, 22, &prefix, 0x7f);
+        scene.text(sx + 1, y + 13 + i as u16, 22, &prefix, 0x7f);
         scene.text(
             sx + 1 + n,
-            y + 14 + i as u16,
+            y + 13 + i as u16,
             22 - n,
             &crate::formatting::tail(&value, 22 - n),
             0x7e,
+        );
+    }
+    if !game.notice.is_empty() && game.notice != "Scores saved" {
+        scene.text(
+            sx,
+            y + 16,
+            24,
+            language.text(if pending {
+                "Not saved — F4 retry"
+            } else {
+                "Cannot load scores"
+            }),
+            0x74,
         );
     }
     if game.paused || game.over {
@@ -134,6 +158,6 @@ pub(crate) fn prepare(game: &crate::tetris::Game, ctx: &crate::plugins::Context)
             0x3f,
         );
     }
-    pages::draw(&mut scene, game, ctx.language, y);
+    pages::draw(&mut scene, game, ctx.language, pending);
     scene
 }

@@ -434,6 +434,7 @@ fn native_tetris_matches_snapshot_colors_text_targets_and_transitions() -> io::R
                             4 => {
                                 game.screen = Screen::Setup {
                                     level: 3,
+                                    mode: dn::tetris::GameMode::Tetris,
                                     preview: false,
                                 }
                             }
@@ -462,6 +463,7 @@ fn native_tetris_matches_snapshot_colors_text_targets_and_transitions() -> io::R
                             21 => {
                                 game.screen = Screen::Setup {
                                     level: 10,
+                                    mode: dn::tetris::GameMode::Tetris,
                                     preview: true,
                                 };
                                 game.setup_focus = 1;

@@ -1,5 +1,5 @@
 //! Read-only DN score interchange, derived from the TETRIS.PAS record layout.
-//! Twenty DOS records: ten Tetris followed by ten Pentix; only Tetris is imported.
+//! Twenty DOS records: ten Tetris followed by ten Pentix; both modes are imported independently.
 use super::{scores, Record};
 use std::{
     io::{self, Read},
@@ -28,6 +28,9 @@ impl Encoding {
 }
 
 pub fn decode(bytes: &[u8], encoding: Encoding) -> io::Result<Vec<Record>> {
+    Ok(decode_all(bytes, encoding)?[0].clone())
+}
+pub fn decode_all(bytes: &[u8], encoding: Encoding) -> io::Result<[Vec<Record>; 2]> {
     // Borland records are byte packed. Also accept the word-aligned layout used
     // by compatible builds; no host-memory structs or native-endian casts.
     let width = match bytes.len() {
@@ -51,7 +54,7 @@ pub fn decode(bytes: &[u8], encoding: Encoding) -> io::Result<Vec<Record>> {
             // interpret a nonempty unencoded file as a scored original table.
             match parse(bytes, width, encoding) {
                 Ok(records)
-                    if records.is_empty()
+                    if records.iter().all(Vec::is_empty)
                         && bytes.chunks_exact(width).all(|r| r[width - 4..] == [0; 4]) =>
                 {
                     Ok(records)
@@ -61,8 +64,8 @@ pub fn decode(bytes: &[u8], encoding: Encoding) -> io::Result<Vec<Record>> {
         }
     }
 }
-fn parse(bytes: &[u8], width: usize, encoding: Encoding) -> io::Result<Vec<Record>> {
-    let mut records = Vec::new();
+fn parse(bytes: &[u8], width: usize, encoding: Encoding) -> io::Result<[Vec<Record>; 2]> {
+    let mut records: [Vec<Record>; 2] = Default::default();
     for (index, raw) in bytes.chunks_exact(width).enumerate() {
         let length = usize::from(raw[0]);
         let start_level = raw[31];
@@ -79,7 +82,7 @@ fn parse(bytes: &[u8], width: usize, encoding: Encoding) -> io::Result<Vec<Recor
         {
             return Err(io::Error::other("Invalid dn.tet record"));
         }
-        if index >= 10 || score == 0 {
+        if score == 0 {
             continue;
         }
         let name: String = raw[1..=length]
@@ -94,7 +97,7 @@ fn parse(bytes: &[u8], width: usize, encoding: Encoding) -> io::Result<Vec<Recor
         if !scores::validate_name(&name) {
             return Err(io::Error::other("Invalid name in dn.tet"));
         }
-        records.push(Record {
+        records[index / 10].push(Record {
             name,
             start_level,
             level,
@@ -102,7 +105,9 @@ fn parse(bytes: &[u8], width: usize, encoding: Encoding) -> io::Result<Vec<Recor
             lines: None,
         });
     }
-    records.sort_by_key(|r| std::cmp::Reverse(r.score));
+    for table in &mut records {
+        table.sort_by_key(|r| std::cmp::Reverse(r.score));
+    }
     Ok(records)
 }
 fn character(byte: u8, encoding: Encoding) -> char {
@@ -118,7 +123,7 @@ fn character(byte: u8, encoding: Encoding) -> char {
 
 /// Read only the settings directory, preferring lowercase on case-sensitive FSs.
 /// Original files are never renamed, rewritten or removed.
-pub(super) fn read(modern_path: &Path, encoding: Encoding) -> io::Result<Vec<Record>> {
+pub(super) fn read(modern_path: &Path, encoding: Encoding) -> io::Result<[Vec<Record>; 2]> {
     for name in ["dn.tet", "DN.TET"] {
         let path = modern_path.with_file_name(name);
         let file = match crate::filesystem::open_regular(&path) {
@@ -128,9 +133,9 @@ pub(super) fn read(modern_path: &Path, encoding: Encoding) -> io::Result<Vec<Rec
         };
         let mut bytes = Vec::new();
         file.take(761).read_to_end(&mut bytes)?;
-        return decode(&bytes, encoding);
+        return decode_all(&bytes, encoding);
     }
-    Ok(Vec::new())
+    Ok(Default::default())
 }
 
 // Unicode mapping of the DOS Russian/OEM code page; no locale-dependent decoding.

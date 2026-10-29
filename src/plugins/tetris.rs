@@ -1,6 +1,6 @@
 //! Built-in Tetris controller. No access to App or terminal ownership.
 use super::{Context, Definition, Effect, Event, Presentation, ToolPlugin, View};
-use crate::tetris::{Game, GameAction, Screen};
+use crate::tetris::{Game, GameAction, GameMode, Preferences, Screen};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEventKind};
 use std::{
     any::Any,
@@ -36,7 +36,12 @@ impl ToolPlugin for TetrisPlugin {
         };
         let error = self.scores.load_with_encoding(path, encoding).err();
         let mut game = Game::default();
-        game.records = self.scores.board.records.clone();
+        let preferences = self.scores.board.preferences;
+        game.mode = preferences.mode;
+        game.start_level = preferences.level;
+        game.preview = preferences.preview;
+        game.restart(ctx.now);
+        game.records = self.scores.board.records_for(game.mode).clone();
         game.name = self.scores.board.last_name.clone();
         game.name_cursor = game.name.len();
         game.notice = error.map_or_else(
@@ -105,7 +110,11 @@ impl ToolPlugin for TetrisPlugin {
     }
     fn view(&self, ctx: &Context) -> View<'_> {
         View::Surface(
-            crate::turbo::tetris::prepare(self.game.as_ref().expect("open game"), ctx),
+            crate::turbo::tetris::prepare(
+                self.game.as_ref().expect("open game"),
+                self.scores.has_pending(),
+                ctx,
+            ),
             self.controls(ctx),
         )
     }
@@ -136,10 +145,52 @@ fn action(plugin: &mut TetrisPlugin, action: GameAction, ctx: &Context, effects:
         submit(plugin, action == GameAction::SkipName);
         return;
     }
+    if action == GameAction::Apply {
+        let Some(game) = plugin.game.as_mut() else {
+            return;
+        };
+        if let Screen::Setup {
+            level,
+            mode,
+            preview,
+        } = game.screen
+        {
+            game.start_level = level;
+            game.mode = mode;
+            game.preview = preview;
+            game.records = plugin.scores.board.records_for(mode).clone();
+            game.restart(ctx.now);
+            plugin.scores.set_preferences(Preferences {
+                mode,
+                level,
+                preview,
+            });
+            persist(plugin);
+        }
+        return;
+    }
     let Some(game) = plugin.game.as_mut() else {
         return;
     };
     let now = ctx.now;
+    if action == GameAction::Help && game.screen != Screen::Help {
+        game.help_return = Some((game.screen, game.setup_focus, game.page_focus));
+        game.screen = Screen::Help;
+        game.page_focus = 0;
+        game.resume_clock(now);
+        return;
+    }
+    if action == GameAction::Back && game.screen == Screen::Help {
+        if let Some((screen, setup, page)) = game.help_return.take() {
+            game.screen = screen;
+            game.setup_focus = setup;
+            game.page_focus = page;
+        } else {
+            game.screen = Screen::Play;
+        }
+        game.resume_clock(now);
+        return;
+    }
     if game.screen == Screen::Name {
         match action {
             GameAction::NameField => game.page_focus = 0,
@@ -160,10 +211,13 @@ fn action(plugin: &mut TetrisPlugin, action: GameAction, ctx: &Context, effects:
         GameAction::Continue => {
             if qualifies(game) {
                 game.screen = Screen::Name;
+                if game.notice == "Scores saved" {
+                    game.notice.clear();
+                }
                 game.replace_name = true;
                 game.name_cursor = game.name.len();
             } else {
-                game.screen = Screen::Scores;
+                game.screen = Screen::Play;
             }
         }
         GameAction::Help => game.screen = Screen::Help,
@@ -171,7 +225,8 @@ fn action(plugin: &mut TetrisPlugin, action: GameAction, ctx: &Context, effects:
         GameAction::Setup => {
             game.setup_focus = 0;
             game.screen = Screen::Setup {
-                level: game.start_level,
+                level: game.level,
+                mode: game.mode,
                 preview: game.preview,
             }
         }
@@ -180,6 +235,12 @@ fn action(plugin: &mut TetrisPlugin, action: GameAction, ctx: &Context, effects:
         GameAction::New => game.restart(now),
         GameAction::Pause if game.screen == Screen::Play && !game.over => {
             game.paused = !game.paused
+        }
+        GameAction::SetMode(value) => {
+            if let Screen::Setup { mode, .. } = &mut game.screen {
+                *mode = value;
+                game.setup_focus = 1;
+            }
         }
         GameAction::LevelUp => {
             if let Screen::Setup { level, .. } = &mut game.screen {
@@ -204,16 +265,9 @@ fn action(plugin: &mut TetrisPlugin, action: GameAction, ctx: &Context, effects:
         GameAction::Preview => {
             if let Screen::Setup { preview, .. } = &mut game.screen {
                 *preview = !*preview;
-                game.setup_focus = 1;
+                game.setup_focus = 2;
             } else if game.screen == Screen::Play {
                 game.preview = !game.preview;
-            }
-        }
-        GameAction::Apply => {
-            if let Screen::Setup { level, preview } = game.screen {
-                game.start_level = level;
-                game.preview = preview;
-                game.restart(now);
             }
         }
         _ => {}
@@ -225,6 +279,10 @@ fn action(plugin: &mut TetrisPlugin, action: GameAction, ctx: &Context, effects:
 }
 
 fn key(plugin: &mut TetrisPlugin, key: KeyEvent, ctx: &Context, effects: &mut Vec<Effect>) {
+    if key.code == KeyCode::F(1) {
+        action(plugin, GameAction::Help, ctx, effects);
+        return;
+    }
     let screen = plugin.game.as_ref().map(|game| game.screen);
     if screen == Some(Screen::Play)
         && plugin.game.as_ref().is_some_and(|g| g.play_focus > 0)
@@ -243,17 +301,67 @@ fn key(plugin: &mut TetrisPlugin, key: KeyEvent, ctx: &Context, effects: &mut Ve
     }
     if matches!(screen, Some(Screen::Setup { .. })) {
         let focus = plugin.game.as_ref().map_or(0, |g| g.setup_focus);
+        if focus == 1 {
+            let selected = match screen {
+                Some(Screen::Setup { mode, .. }) => mode,
+                _ => unreachable!(),
+            };
+            match key.code {
+                KeyCode::Left
+                | KeyCode::Right
+                | KeyCode::Up
+                | KeyCode::Down
+                | KeyCode::Char(' ') => action(
+                    plugin,
+                    GameAction::SetMode(if selected == GameMode::Tetris {
+                        GameMode::Pentix
+                    } else {
+                        GameMode::Tetris
+                    }),
+                    ctx,
+                    effects,
+                ),
+                _ => {}
+            }
+            if matches!(
+                key.code,
+                KeyCode::Left | KeyCode::Right | KeyCode::Up | KeyCode::Down | KeyCode::Char(' ')
+            ) {
+                return;
+            }
+        }
+        if let KeyCode::Char(c) = key.code {
+            if ctx.language.matches("~G~ame style", c) {
+                plugin.game.as_mut().unwrap().setup_focus = 1;
+                return;
+            }
+            if ctx.language.matches("~O~ptions", c) {
+                plugin.game.as_mut().unwrap().setup_focus = 2;
+                return;
+            }
+            for (label, mode) in [
+                ("Classic ~t~etris", GameMode::Tetris),
+                ("Penti~x~", GameMode::Pentix),
+            ] {
+                if ctx.language.matches(label, c) {
+                    action(plugin, GameAction::SetMode(mode), ctx, effects);
+                    return;
+                }
+            }
+            if ctx.language.matches("~P~iece preview", c) {
+                action(plugin, GameAction::Preview, ctx, effects);
+                return;
+            }
+        }
         match key.code {
-            KeyCode::Right | KeyCode::Char('+') => {
-                action(plugin, GameAction::LevelUp, ctx, effects)
-            }
-            KeyCode::Left | KeyCode::Char('-') => {
-                action(plugin, GameAction::LevelDown, ctx, effects)
-            }
+            KeyCode::Right if focus == 0 => action(plugin, GameAction::LevelUp, ctx, effects),
+            KeyCode::Char('+') => action(plugin, GameAction::LevelUp, ctx, effects),
+            KeyCode::Left if focus == 0 => action(plugin, GameAction::LevelDown, ctx, effects),
+            KeyCode::Char('-') => action(plugin, GameAction::LevelDown, ctx, effects),
             KeyCode::Up if focus == 0 => action(plugin, GameAction::LevelDown, ctx, effects),
             KeyCode::Down if focus == 0 => action(plugin, GameAction::LevelUp, ctx, effects),
-            KeyCode::Home => action(plugin, GameAction::SetLevel(1), ctx, effects),
-            KeyCode::End => action(plugin, GameAction::SetLevel(10), ctx, effects),
+            KeyCode::Home if focus == 0 => action(plugin, GameAction::SetLevel(1), ctx, effects),
+            KeyCode::End if focus == 0 => action(plugin, GameAction::SetLevel(10), ctx, effects),
             KeyCode::Char(c @ '0'..='9') => action(
                 plugin,
                 GameAction::SetLevel(if c == '0' { 10 } else { c as u8 - b'0' }),
@@ -264,9 +372,13 @@ fn key(plugin: &mut TetrisPlugin, key: KeyEvent, ctx: &Context, effects: &mut Ve
             KeyCode::Char(' ') => action(
                 plugin,
                 match focus {
-                    2 => GameAction::Apply,
-                    3 => GameAction::Back,
-                    _ => GameAction::Preview,
+                    3 => GameAction::Apply,
+                    4 => GameAction::Back,
+                    2 => GameAction::Preview,
+                    _ => GameAction::SetLevel(match screen {
+                        Some(Screen::Setup { level, .. }) => level,
+                        _ => unreachable!(),
+                    }),
                 },
                 ctx,
                 effects,
@@ -330,7 +442,7 @@ fn qualifies(game: &Game) -> bool {
 fn persist(plugin: &mut TetrisPlugin) {
     let result = plugin.scores.save();
     if let Some(g) = plugin.game.as_mut() {
-        g.records = plugin.scores.board.records.clone();
+        g.records = plugin.scores.board.records_for(g.mode).clone();
         if g.submitted {
             g.highlighted = g
                 .records
@@ -367,7 +479,7 @@ fn submit(plugin: &mut TetrisPlugin, anonymous: bool) {
         start_level: g.start_level,
         level: g.level,
     };
-    if let Err(e) = plugin.scores.add(record) {
+    if let Err(e) = plugin.scores.add_for(g.mode, record) {
         g.notice = e.to_string();
         return;
     }
@@ -377,7 +489,7 @@ fn submit(plugin: &mut TetrisPlugin, anonymous: bool) {
         plugin
             .scores
             .board
-            .records
+            .records_for(g.mode)
             .iter()
             .rposition(|r| r.score == g.score && r.name == name)
             .unwrap_or(0),

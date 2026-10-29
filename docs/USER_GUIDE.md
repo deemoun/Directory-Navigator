@@ -560,7 +560,7 @@ directory changes and after Refresh. Rendering and clock ticks perform no volume
 queries or directory scans. Failed queries display “Volume space unavailable”.
 No drive selector or DOS drive-letter controls are added.
 
-## Tetris high scores
+## Tetris / Pentix and high scores
 
 The game uses a classic DN-style board with Info, Next and Best panels and
 New / Setup / Top 10 / Pause buttons. Tab/Shift+Tab cycle through the board and
@@ -571,45 +571,55 @@ entry's line count remains below the table. Pending scores keep a Retry save
 button; Tab/Shift+Tab choose Retry save or OK, and Enter activates that choice.
 Esc, OK or the title close control returns to the game.
 
-Setup provides ten named levels (1–9 and 0 for level 10) and a Piece preview
-checkbox. Arrows select levels; Tab/Shift+Tab move between levels, preview, OK
-and Cancel. Space toggles preview, Enter applies (or cancels on Cancel), and Esc
-cancels. Applying starts a new game; cancellation preserves the current board,
-score, level, preview and paused state. Classic Tetris is the only implemented
-style; Pentix is not offered.
+Setup provides ten named levels (1–9 and 0 for level 10), a Classic Tetris /
+Pentix radio group and Piece preview. Tab/Shift+Tab visit Level → Game style →
+Preview → OK → Cancel. Arrows select within the focused radio group; Space toggles
+the style or preview. Enter activates the focused button, otherwise the default
+OK; Esc cancels. Setup initially shows the current level. OK starts a new game and
+saves these choices; Cancel preserves the existing game and preferences.
 
-Alt+F9 opens Tetris. A finished game shows the final score, line count and
-starting/ending levels. Enter continues: positive scores qualifying for the
-top ten ask for a player name; other scores show the leaderboard directly.
-Esc dismisses game-over without submitting a score. Type or paste a Unicode name
-(up to 30 graphemes / 240 UTF-8 bytes). Tab/Shift+Tab cycle through the input, OK
-and Skip name. Enter activates the selected button; from the input it saves.
-Skip name explicitly records Anonymous; blank names also use Anonymous. Esc
-cancels name entry without saving and keeps its draft on the game-over page.
-The new entry is highlighted. F4 shows the top ten during play. Closing an
-unfinished game does not add a score.
+Classic uses seven four-cell figures. Pentix uses all 27 original DN figures,
+from one to five cells, with its own Top Ten. Both retain the 12×19 well, original
+rotation bounds, timing and scoring. Down/Space drops to the bottom and restarts
+the gravity timer: the next tick locks the piece. Horizontal adjustment and valid
+rotation remain possible until then. No wall kicks, seven-bag or all-clear bonus
+are added. The Next well is black and supports five-cell pieces.
 
-Names, scores, lines, start/end levels and the last player name are stored in
-`tetris.conf` beside `config.conf`, not in the program’s directory. This is a
-separate UTF-8 `key=value` file. Existing version 1 files remain readable;
-version 2 supports imported records with unknown line counts (`-`) and a remembered
-`dn_tet_encoding=cp437` or `cp866`. Both contain `last_name=...` and up to ten
-`score=points,lines,start,end,name` records. Names may contain commas; control
-characters are rejected.
+Alt+F9 opens the game. Game over shows a compact score message. Enter/OK asks for
+a name only when the score qualifies for the active mode's Top Ten; otherwise it
+returns to the completed board. Esc dismisses game-over without submitting.
+Type or paste a Unicode name (up to 30 graphemes / 240 UTF-8 bytes). Tab/Shift+Tab
+visit Input → OK → Cancel → Help → Skip name. Enter activates the selected button;
+from the input it saves. Cancel/Esc returns to game-over without recording the
+score. Skip name explicitly records Anonymous; blank names also use Anonymous.
+Accepted results open the active mode's Top Ten with the new entry highlighted.
+F1/Help preserves its parent page, draft and focus, including the selected Setup
+mode. F4 shows Top Ten during play. Closing an unfinished game adds no result.
+
+`tetris.conf` beside `config.conf` stores the two leaderboards, last player name
+and game preferences, independently of preference auto-save. Versions 1 and 2
+remain readable as Classic Tetris. Writes use version 3: existing `score` rows
+remain Classic; `pentix_score` rows use the same points,lines,start,end,name
+fields. Each table holds at most ten entries. `mode=tetris|pentix`,
+`start_level=1..10` and `preview=true|false` remember Setup. Defaults are Classic,
+level 1 and preview on. Imported line counts use `-`; `dn_tet_encoding` remembers
+the import encoding. Names may contain commas; control characters are rejected.
+Older builds that do not support v3 refuse this format rather than rewriting it.
 
 Accepted scores save immediately, even if preference auto-save is disabled.
 Writes use a private staging file and lock, merging the latest disk scores before
 keeping the top ten; equal scores retain existing order. Read-only, malformed,
 unsupported and symlinked files are not silently replaced. A failure leaves the
-score in memory and shows an error with Retry save. Unsaved scores remain available
+score or settings draft in memory and shows an error with Retry save in Top Ten.
+The play window points to F4 when a write is pending. Unsaved results remain available
 when closing/reopening the game during the session; retry after fixing the error.
 An explicitly abandoned name prompt or exiting the app before acceptance does not
 commit that result.
 
 To import original scores, copy `dn.tet` or `DN.TET` beside `config.conf`, then
 open/reopen Tetris. The original countdown-XOR binary format is read directly:
-20 short-string/level/signed-score records, of which only the ten Tetris slots
-are imported; the Pentix table is left alone. Packed 740-byte and word-aligned
+20 short-string/level/signed-score records: ten Classic and ten Pentix slots
+merge into their respective tables. Packed 740-byte and word-aligned
 760-byte tables are supported. The source file is never written, renamed or deleted.
 If both filenames exist on a case-sensitive filesystem, lowercase takes priority.
 

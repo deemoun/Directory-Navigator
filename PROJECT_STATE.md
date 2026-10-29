@@ -97,6 +97,18 @@
   window switching/inactive gravity, native controls, owned Help/paste isolation,
   score-name cancellation, resize and terminal restoration. Windows/Linux skipped.
   See docs/BUILTIN_PLUGINS.md for the contract and registration procedure.
+- Game-only DN 1.51 fidelity: Classic/Pentix share all 27 original figure
+  descriptions, rotations, wrapped colors and delayed-lock Down/Space behavior.
+  Setup adds mode selection and uses the current level; native pages share
+  geometry and preserve nested Help drafts/focus. Qualifying results follow
+  Game over → Name → mode-specific Top Ten; cancellation never submits a score.
+  Safe v3 tetris.conf reads v1/v2, retains separate bounded leaderboards and game
+  preferences, and imports both dn.tet halves without modifying the source.
+  Original-game license/attribution accompanies the port. Full macOS suite and
+  final game/native-renderer regressions, fmt, all-target Clippy, release and
+  no-default-features checks pass. English/Russian fixture-only release PTYs
+  cover both modes, nested Help, Cancel/Skip, independent scores, resizing and
+  terminal restoration. Windows/Linux validation remains deferred.
 
 - Remaining shared controls: advanced Copy/Move, destination history, archive and
   discovery tools, compare/export/file histories, navigation, window/command lists,

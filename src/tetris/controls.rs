@@ -1,3 +1,4 @@
+use super::GameMode;
 use crate::app::App;
 use crossterm::event::KeyEvent;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -16,6 +17,7 @@ pub enum GameAction {
     LevelUp,
     LevelDown,
     SetLevel(u8),
+    SetMode(GameMode),
     Preview,
     Apply,
     Back,
@@ -42,6 +44,8 @@ impl GameAction {
             Self::Apply => 14,
             Self::Back => 15,
             Self::Close => 16,
+            Self::SetMode(GameMode::Tetris) => 200,
+            Self::SetMode(GameMode::Pentix) => 201,
             Self::SetLevel(v) => 100 + usize::from(v),
         }
     }
@@ -64,6 +68,8 @@ impl GameAction {
             14 => Self::Apply,
             15 => Self::Back,
             16 => Self::Close,
+            200 => Self::SetMode(GameMode::Tetris),
+            201 => Self::SetMode(GameMode::Pentix),
             101..=110 => Self::SetLevel((id - 100) as u8),
             _ => return None,
         })

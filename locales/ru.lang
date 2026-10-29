@@ -576,3 +576,17 @@ Plugins	Плагины
 Enabled plugins	Включённые плагины
 Disabling closes open plugin windows.	Отключение закрывает окна плагинов.
 Plugin is disabled. Enable it in Options > Configuration > Plugins.	Плагин отключён. Включите его: Параметры > Конфигурация > Плагины.
+Pentix	Пентикс
+Classic ~t~etris	Классический ~т~етрис
+Penti~x~	Пенти~к~с
+~P~iece preview	~П~оказ следующей
+Pentix Top Ten	Пентикс: лучшие десять
+Pentix Help	Пентикс — справка
+You have entered Top Ten!	Вы вошли в десятку лучших!
+Enter your name:	Ваше имя:
+Pentix: 27 figures, from one to five cells.	Пентикс: 27 фигур, от одной до пяти клеток.
+Classic Tetris: seven four-cell figures.	Классический тетрис: семь фигур из четырёх клеток.
+←/Home left · →/PgUp right · ↑ rotate\n↓/Space drop; next tick locks the piece\nF2 new · F3 pause · F4 Top 10 · F5 setup\n+ level · * preview · Esc returns\nAlt+N new · Alt+P pause · Alt+T scores · Alt+S setup\n\nSeparate Top Ten for each game. Saved in tetris.conf.	←/Home влево · →/PgUp вправо · ↑ поворот\n↓/Пробел вниз; следующий такт закрепляет фигуру\nF2 новая · F3 пауза · F4 рекорды · F5 настройки\n+ уровень · * показ · Esc возврат\nAlt+N новая · Alt+P пауза · Alt+T рекорды · Alt+S настройки\n\nУ каждого режима своя десятка. Запись в tetris.conf.
+Not saved — F4 retry	Не сохранено — F4
+Cannot load scores	Ошибка чтения рекордов
+~G~ame style	Режим ~и~гры

@@ -39,7 +39,7 @@ and modern filesystem handling.
 - Classic panel footers show selection totals and available/total volume space.
 - Choose English or Russian, with independent date order and 12/24-hour time.
 - Recall commands through a searchable session history; copy filenames or paths to the internal clipboard.
-- Use the calculator, character table and configurable user menus—or play Tetris with named, persistent high scores.
+- Use the calculator, character table and configurable user menus—or play Tetris or Pentix with separate, persistent high scores.
 
 ## In action
 
@@ -201,12 +201,13 @@ workflows on copies and report problems with your OS, terminal and reproduction 
 For detailed shortcuts, limits and user-menu configuration, see the
 [user guide](docs/USER_GUIDE.md).
 
-### Original Tetris scores
+### Tetris, Pentix and original scores
 
 To import an old DOS Navigator leaderboard, copy **`dn.tet`** (or `DN.TET`) beside
-`config.conf`, then open/reopen Tetris. Its Tetris scores merge with modern scores
-in `tetris.conf`, keeping the highest ten and avoiding repeated imports. The
-original file stays untouched. Pentix scores are not imported.
+`config.conf`, then open/reopen the game. Both original tables merge into their
+respective Top Ten in `tetris.conf`, avoiding repeated imports. The original file
+stays untouched. Choose Classic Tetris or Pentix in Setup; Pentix uses all 27
+original figures, from one to five cells.
 
 DOS files do not identify their text encoding: the first import uses CP437 for
 English or CP866 for Russian, according to the selected interface language. That

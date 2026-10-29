@@ -73,7 +73,7 @@ fn tetris_name_cycles_both_directions_and_cancel_keeps_unsaved_score_and_draft()
     assert_eq!(app.desktop.game().unwrap().name, "Kept draft");
     key(&mut app, K::Tab);
     let b = draw(&mut app, 80, 25)?;
-    assert!(marked(&app, &b, dn::tetris::target(GameAction::SkipName)));
+    assert!(marked(&app, &b, dn::tetris::target(GameAction::Back)));
     assert!(!marked(
         &app,
         &b,
@@ -95,7 +95,7 @@ fn tetris_name_cycles_both_directions_and_cancel_keeps_unsaved_score_and_draft()
     ended(&mut app);
     key(&mut app, K::Enter);
     shift_tab(&mut app);
-    assert_eq!(app.desktop.game().unwrap().page_focus, 2);
+    assert_eq!(app.desktop.game().unwrap().page_focus, 4);
     key(&mut app, K::Enter);
     assert_eq!(app.desktop.game().unwrap().screen, Screen::Scores);
     assert_eq!(
@@ -131,7 +131,7 @@ fn tetris_main_buttons_setup_and_retry_have_real_focus_and_pause_gravity() -> io
         Screen::Setup { .. }
     ));
     shift_tab(&mut app);
-    assert_eq!(app.desktop.game().unwrap().setup_focus, 3);
+    assert_eq!(app.desktop.game().unwrap().setup_focus, 4);
     let b = draw(&mut app, 80, 25)?;
     assert!(marked(&app, &b, dn::tetris::target(GameAction::Back)));
     key(&mut app, K::Enter);

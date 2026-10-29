@@ -223,10 +223,17 @@ fn setup(a: &mut App, case: usize) -> (u16, u16) {
             tetris::open(a);
             if case == 14 {
                 tetris::action(a, tetris::GameAction::Setup);
-                (72, 18)
+                (
+                    if a.config.language == dn::localization::Language::Russian {
+                        68
+                    } else {
+                        53
+                    },
+                    15,
+                )
             } else {
                 a.desktop.game_mut().unwrap().screen = tetris::Screen::GameOver;
-                (50, 17)
+                (44, 7)
             }
         }
         _ => unreachable!(),
@@ -286,11 +293,7 @@ fn remaining_dialog_matrix_is_immutable_clipped_and_translated() -> io::Result<(
                     );
                     captures.push_str(&format!("{palette:?} {language:?} {w} {h} {case}\n"));
                     let x = 7 + (w - dw) / 2;
-                    let y = 3 + if case == 15 {
-                        (h - 23) / 2 + 2
-                    } else {
-                        (h - dh) / 2
-                    };
+                    let y = 3 + (h - dh) / 2;
                     for yy in y..y + dh {
                         for xx in x..x + dw {
                             captures.push_str(&format!("{:?}", b[(xx, yy)]));
