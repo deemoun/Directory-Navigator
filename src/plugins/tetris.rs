@@ -108,15 +108,74 @@ impl ToolPlugin for TetrisPlugin {
             ctx,
         )
     }
+    fn windows(&self, ctx: &Context) -> Vec<super::LocalWindow> {
+        use crate::windowing::geometry::Capabilities as C;
+        let g = self.game.as_ref().expect("open game");
+        let mut result = vec![super::LocalWindow {
+            id: 0,
+            parent: None,
+            bounds: crate::presentation::layout::Rect::new(
+                (ctx.area.width - 54) / 2,
+                (ctx.area.height - 23) / 2,
+                54,
+                23,
+            ),
+            caps: C::fixed(54, 23),
+        }];
+        for (id, page) in self.pages() {
+            let bounds = crate::tetris::layout::page(
+                ctx.area,
+                &page,
+                ctx.language,
+                self.scores.has_pending(),
+            );
+            result.push(super::LocalWindow {
+                id,
+                parent: Some(if page.screen == Screen::Help {
+                    g.help_return.map_or(0, |(screen, _, _)| page_id(screen))
+                } else if page.screen == Screen::Name {
+                    page_id(Screen::GameOver)
+                } else {
+                    0
+                }),
+                bounds,
+                caps: C::fixed(bounds.width, bounds.height),
+            });
+        }
+        result
+    }
     fn view(&self, ctx: &Context) -> View<'_> {
-        View::Surface(
-            crate::turbo::tetris::prepare(
-                self.game.as_ref().expect("open game"),
+        let g = self.game.as_ref().expect("open game");
+        let controls = if g.screen == Screen::Play {
+            Some(self.controls(ctx))
+        } else {
+            let mut parent = g.clone();
+            parent.screen = Screen::Play;
+            Some(crate::turbo::tetris::spec(
+                &parent,
                 self.scores.has_pending(),
                 ctx,
-            ),
-            self.controls(ctx),
-        )
+            ))
+        };
+        let mut result = vec![super::Layer {
+            interactive: g.screen == Screen::Play,
+            id: 0,
+            scene: crate::turbo::tetris::prepare(g, self.scores.has_pending(), ctx),
+            controls,
+        }];
+        for (id, page) in self.pages() {
+            result.push(super::Layer {
+                interactive: id == page_id(g.screen),
+                id,
+                scene: crate::turbo::tetris::page(&page, self.scores.has_pending(), ctx),
+                controls: Some(crate::turbo::tetris::spec(
+                    &page,
+                    self.scores.has_pending(),
+                    ctx,
+                )),
+            });
+        }
+        View::Layers(result)
     }
     fn next_wake(&self, now: Instant) -> Option<Duration> {
         let g = self.game.as_ref()?;
@@ -600,5 +659,47 @@ fn edit_name(plugin: &mut TetrisPlugin, key: KeyEvent) {
         .unwrap_or(g.name.len());
     if g.notice.starts_with("Name must fit") {
         g.notice.clear();
+    }
+}
+
+fn page_id(s: Screen) -> u64 {
+    match s {
+        Screen::Play => 0,
+        Screen::Setup { .. } => 1,
+        Screen::GameOver => 2,
+        Screen::Name => 3,
+        Screen::Scores => 4,
+        Screen::Help => 5,
+    }
+}
+impl TetrisPlugin {
+    fn pages(&self) -> Vec<(u64, Game)> {
+        let game = self.game.as_ref().expect("open game");
+        let mut result = Vec::new();
+        let parent = if game.screen == Screen::Help {
+            game.help_return.map(|(s, _, _)| s)
+        } else {
+            None
+        };
+        if game.screen == Screen::Name || parent == Some(Screen::Name) {
+            let mut p = game.clone();
+            p.screen = Screen::GameOver;
+            result.push((2, p));
+        }
+        if let Some(screen) = parent {
+            if screen != Screen::Play {
+                let mut p = game.clone();
+                p.screen = screen;
+                if let Some((_, setup, page)) = game.help_return {
+                    p.setup_focus = setup;
+                    p.page_focus = page;
+                }
+                result.push((page_id(screen), p));
+            }
+        }
+        if game.screen != Screen::Play {
+            result.push((page_id(game.screen), game.clone()));
+        }
+        result
     }
 }

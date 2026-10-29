@@ -261,6 +261,7 @@ pub struct Record {
     pub level: u8,
 }
 
+#[derive(Clone)]
 pub struct Game {
     pub mode: GameMode,
     pub help_return: Option<(Screen, usize, usize)>,

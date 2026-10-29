@@ -256,12 +256,19 @@ fn information_is_fresh_readonly_and_reports_missing_entries() -> io::Result<()>
     assert_eq!(offset.len(), 6);
     assert!(offset.starts_with(['+', '-']) && offset.contains(':'));
     render(&mut app, 80, 25)?;
-    assert_eq!(app.mouse.regions.len(), 2);
+    assert_eq!(
+        app.mouse
+            .regions
+            .iter()
+            .filter(|(_, t)| !matches!(t, Target::Surface(..)))
+            .count(),
+        2
+    );
     assert!(app
         .mouse
         .regions
         .iter()
-        .all(|(_, t)| *t == Target::CloseFileInfo));
+        .all(|(_, t)| *t == Target::CloseFileInfo || matches!(t, Target::Surface(..))));
     click(&mut app, Target::CloseFileInfo);
     assert!(app.modals.file_info().is_none());
     assert_eq!(fs::metadata(temp.0.join("file"))?.modified()?, original);

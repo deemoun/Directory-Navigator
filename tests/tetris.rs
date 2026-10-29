@@ -318,11 +318,24 @@ fn game_dialog_mouse_setup_cancel_apply_scores_and_resize() -> io::Result<()> {
             width >= 80 && height >= 25
         );
         if width >= 80 {
+            let game_bounds = dn::layout::prepare(
+                &mut app,
+                dn::presentation::layout::Rect::new(0, 0, width, height),
+            )
+            .surfaces
+            .into_iter()
+            .find(|s| matches!(s.id.key, dn::windowing::geometry::SurfaceKey::Document(_)))
+            .unwrap()
+            .bounds;
             assert!(app
                 .mouse
                 .regions
                 .iter()
-                .all(|(_, target)| matches!(target, Target::Plugin(dn::plugins::TETRIS, _))));
+                .filter(|(r, _)| game_bounds.contains((r.x, r.y).into()))
+                .all(|(_, target)| matches!(
+                    target,
+                    Target::Plugin(dn::plugins::TETRIS, _) | Target::Surface(_, _)
+                )));
         } else {
             assert!(app.mouse.regions.is_empty());
         }
@@ -349,11 +362,13 @@ fn game_dialog_mouse_setup_cancel_apply_scores_and_resize() -> io::Result<()> {
     assert!(app.desktop.game().unwrap().preview);
     key(&mut app, KeyCode::F(1));
     render(&mut app, 80, 25)?;
+    assert_eq!(app.desktop.game().unwrap().screen, Screen::Help);
+    // Exposed desktop regions coexist with the page; its input scope blocks them.
     assert!(app
         .mouse
         .regions
         .iter()
-        .all(|(_, target)| *target == dn::tetris::target(GameAction::Back)));
+        .any(|(_, target)| *target == dn::tetris::target(GameAction::Back)));
     click(&mut app, GameAction::Back);
     key(&mut app, KeyCode::F(4));
     render(&mut app, 80, 25)?;

@@ -590,3 +590,8 @@ Classic Tetris: seven four-cell figures.	Классический тетрис: 
 Not saved — F4 retry	Не сохранено — F4
 Cannot load scores	Ошибка чтения рекордов
 ~G~ame style	Режим ~и~гры
+Size/Move	Сдвиг/размер
+Zoom	Масштаб
+Si~z~e/Move	Сдвиг/~р~азмер
+Zoo~m~/Restore	Масшта~б~/возврат
+Arrows move · Shift+arrows size · Enter accepts · Esc cancels	Стрелки — сдвиг · Shift+стрелки — размер · Enter — OK · Esc — отмена

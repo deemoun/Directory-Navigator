@@ -27,6 +27,9 @@ fn handle_key(app: &mut App, key: KeyEvent) {
         app.mouse.reset_click();
         return;
     }
+    if crate::windowing::workspace::key(app, key) {
+        return;
+    }
     app.mouse.reset_click();
     let Some(key) = crate::shortcuts::key(app, key) else {
         return;
@@ -219,6 +222,9 @@ fn handle_key(app: &mut App, key: KeyEvent) {
 
 /// Paste uses the same topmost recipient as keyboard and mouse input.
 pub fn paste(app: &mut App, text: &str) {
+    if app.desktop.native().manipulating() {
+        return;
+    }
     if app.output_visible {
         return;
     }

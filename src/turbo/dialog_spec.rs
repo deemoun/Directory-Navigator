@@ -282,6 +282,36 @@ impl<'a> DialogSpec<'a> {
     pub fn native(&mut self, widget: super::widgets::Native, bounds: Rect) {
         self.parts.push(Part::Native(widget, bounds));
     }
+    pub(crate) fn native_bounds(&self, screen: Rect) -> Rect {
+        let mut r = self.bounds;
+        for c in &self.controls {
+            if matches!(c.kind, ControlKind::Button(_))
+                && c.bounds.y.saturating_add(3) <= screen.height
+            {
+                r.height = r.height.max(c.bounds.y + 3 - r.y);
+            }
+        }
+        r
+    }
+    pub(crate) fn windows(&self, area: Rect) -> Vec<(u64, Option<u64>, Rect)> {
+        fn walk(
+            s: &DialogSpec<'_>,
+            area: Rect,
+            parent: Option<u64>,
+            out: &mut Vec<(u64, Option<u64>, Rect)>,
+        ) {
+            let id = out.len() as u64;
+            out.push((id, parent, s.native_bounds(area)));
+            for p in &s.parts {
+                if let Part::Overlay(child) = p {
+                    walk(child, area, Some(id), out);
+                }
+            }
+        }
+        let mut out = Vec::new();
+        walk(self, area, None, &mut out);
+        out
+    }
     pub fn overlay(&mut self, child: DialogSpec<'a>) {
         self.parts.push(Part::Overlay(Box::new(child)));
     }

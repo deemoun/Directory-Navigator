@@ -1082,3 +1082,69 @@ fn native_requested_surfaces_match_headless_frames() -> io::Result<()> {
     }
     Ok(())
 }
+
+#[test]
+fn overlapping_document_frames_share_glyph_lifetimes_and_retire_without_stale_cells(
+) -> io::Result<()> {
+    use crossterm::event::{KeyCode as K, KeyEvent, KeyModifiers as M};
+    use dn::{
+        desktop::WindowId,
+        editor, input,
+        testing::{backend::TestBackend, Terminal},
+        ui,
+    };
+    let directory =
+        std::env::temp_dir().join(format!("dn-floating-transport-{}", std::process::id()));
+    std::fs::create_dir(&directory)?;
+    struct Cleanup(std::path::PathBuf);
+    impl Drop for Cleanup {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+    let _cleanup = Cleanup(directory.clone());
+    let mut app = dn::app::App::new(directory)?;
+    app.config.save_on_exit = false;
+    app.config.show_clock = false;
+    editor::open(&mut app, true);
+    let first = app.desktop.active().id;
+    let output = Output::default();
+    let size = Size::new(100, 32);
+    let mut native = TurboBackend::with_size(output.clone(), size)?;
+    let mut reference = Terminal::new(TestBackend::new(size.width, size.height))?;
+    reference.draw(|f| ui::draw(f, &mut app))?;
+    editor::paste(&mut app, "界 e\u{301} \u{f0000}");
+    input::handle(&mut app, KeyEvent::new(K::Char('z'), M::ALT));
+    editor::open(&mut app, true);
+    let second = app.desktop.active().id;
+    reference.draw(|f| ui::draw(f, &mut app))?;
+    editor::paste(&mut app, "🦀 e\u{308} \u{100000}");
+    reference.draw(|f| ui::draw(f, &mut app))?;
+    input::handle(&mut app, KeyEvent::new(K::Char('z'), M::ALT));
+    for step in 0..5 {
+        match step {
+            1 => {
+                app.desktop.activate(first);
+                editor::paste(&mut app, "👩‍💻");
+            }
+            2 => {
+                app.desktop.activate(WindowId::MANAGER);
+            }
+            3 => app.desktop.close(second),
+            4 => app.desktop.close(first),
+            _ => {}
+        }
+        reference.draw(|f| ui::draw(f, &mut app))?;
+        let targets = app.mouse.regions.clone();
+        native.draw_app(&mut app)?;
+        let bytes = output.0.lock().unwrap().clone();
+        let screen = colored_screen(&String::from_utf8(bytes).unwrap(), size);
+        assert_eq!(
+            snapshot_pixels(reference.backend().buffer()),
+            screen,
+            "overlap/retirement step {step}"
+        );
+        assert_eq!(targets, app.mouse.regions);
+    }
+    Ok(())
+}

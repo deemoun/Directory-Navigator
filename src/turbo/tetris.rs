@@ -158,6 +158,23 @@ pub(crate) fn prepare(
             0x3f,
         );
     }
+    let _ = pending;
+    scene
+}
+
+pub(crate) fn page(
+    game: &crate::tetris::Game,
+    pending: bool,
+    ctx: &crate::plugins::Context,
+) -> Scene {
+    let mut scene = Scene {
+        width: ctx.area.width,
+        height: ctx.area.height,
+        profile: ctx.palette,
+        cells: Default::default(),
+        regions: Vec::new(),
+        cursor: None,
+    };
     pages::draw(&mut scene, game, ctx.language, pending);
     scene
 }

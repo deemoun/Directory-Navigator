@@ -21,7 +21,7 @@ graphical frontend.
 
 [Turbo Vision for Rust](https://github.com/aovestdipaperino/turbo-vision-4-rust)
 powers the file panes, menus, dialogs, editors, viewers, utilities and Tetris.
-Its desktop and control system handles window selection, focus and input routing,
+Its desktop and control system handles movable windows, selection, focus and input routing,
 while Directory Navigator keeps the classic DN appearance and adds Unicode text
 and modern filesystem handling.
 

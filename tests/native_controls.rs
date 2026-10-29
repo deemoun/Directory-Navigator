@@ -73,11 +73,10 @@ fn native_choice_render_is_immutable_clipped_and_mouse_accepts_only_the_child() 
     let second = ui::render(&app, &snapshot);
     assert_eq!(Buffer::rendered(first), Buffer::rendered(second));
     render(&mut app);
-    assert!(app
-        .mouse
-        .regions
-        .iter()
-        .all(|(_, t)| matches!(t, Target::SettingsChoice(_) | Target::CancelSettingsChoice)));
+    assert!(app.mouse.regions.iter().all(|(_, t)| matches!(
+        t,
+        Target::SettingsChoice(_) | Target::CancelSettingsChoice | Target::Surface(..)
+    )));
     let row = app
         .mouse
         .regions

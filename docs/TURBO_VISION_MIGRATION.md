@@ -317,5 +317,27 @@ Local macOS ARM64 validation covers:
   disposable files, mouse actions, resize, shell input and terminal restoration.
 
 No Windows/Linux execution, Intel Mac runtime execution or remote CI runs are
-claimed. Movable/resizable/cascaded document windows remain a future product
-feature; they are separate from preserving the application's existing UI.
+claimed. Movable/resizable document windows now use native Window shells and a
+shared geometry adapter; cascaded/tiled layouts and workspace persistence remain
+deferred. See the user guide for movement and zoom shortcuts.
+
+## Floating geometry and owned layers
+
+`windowing::geometry` holds native shells and presentation capabilities;
+`windowing::workspace` prepares document-local viewports, converts coordinates,
+clips scenes/hits and routes manipulation. Shells are keyed by document, modal or
+plugin page, with fresh generations when an owner is replaced. Desktop native
+child order controls the document paint order. Selecting the manager changes
+focus without raising its background.
+
+Controllers still own buffers, drafts, saves and lifetime guards. Native geometry
+never closes a dirty editor directly. A capture consumes keys/paste and is retired
+on owner/modal changes or terminal resize. Its saved native rectangle and zoom
+state support Esc rollback. Small terminals retain the global 80×25 guard.
+
+Plugin views can supply page layers and presentation capabilities. Layers declare
+whether their controls are interactive; parents remain visible beneath children.
+Composed dialog children, native Help and FileDialog share placement adapters.
+Rendering publishes one combined immutable frame and per-surface bounds, clipping,
+revision, cursor and hit metadata. Obsolete native plane buffers are cleared before
+glyph tokens are reclaimed, so overlapping Unicode scenes share one encoding lifetime.

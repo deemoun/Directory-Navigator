@@ -121,6 +121,7 @@ fn calculator_history_is_a_blocking_shared_list_and_preserves_parent_focus() -> 
     assert!(a.mouse.regions.iter().all(|(_, t)| matches!(
         t,
         Target::Plugin(dn::plugins::CALCULATOR, dn::plugins::ActionId(5 | 1000..))
+            | Target::Surface(..)
     )));
     for k in [K::Tab, K::BackTab] {
         key(&mut a, k);

@@ -385,6 +385,8 @@ pub(crate) fn wrap_plain(value: &str, width: u16) -> Vec<String> {
 
 pub struct NativeFrame {
     scene: crate::turbo::scene::Scene,
+    placements: Vec<crate::windowing::geometry::Surface>,
+    dialog_background: Option<crate::turbo::scene::Scene>,
     composition: Option<crate::turbo::composition::DialogGroup>,
     scope: Option<crate::modals::ModalInfo>,
     dialogs: Vec<std::rc::Rc<std::cell::RefCell<crate::turbo::composition::DialogGroup>>>,
@@ -392,6 +394,8 @@ pub struct NativeFrame {
 impl NativeFrame {
     pub fn new(area: Rect, profile: crate::palette::PaletteProfile) -> Self {
         Self {
+            placements: Vec::new(),
+            dialog_background: None,
             composition: None,
             scope: None,
             dialogs: Vec::new(),
@@ -404,6 +408,9 @@ impl NativeFrame {
                 regions: Vec::new(),
             },
         }
+    }
+    pub(crate) fn placements(&mut self, surfaces: &[crate::windowing::geometry::Surface]) {
+        self.placements = surfaces.to_vec();
     }
     pub(crate) fn replace(&mut self, scene: crate::turbo::scene::Scene) {
         self.scene = scene;
@@ -431,6 +438,8 @@ impl NativeFrame {
         self.flush_dialog();
         // Captions paint sparsely. Their image children must capture the dialog
         // background, never file names or borders from the obscured document.
+        self.dialog_background = Some(self.scene.clone());
+        self.scene.cursor = None;
         self.scene
             .fill(area.x, area.y, area.width, area.height, 0x70);
         self.composition = Some(crate::turbo::composition::DialogGroup::new(
@@ -440,19 +449,79 @@ impl NativeFrame {
         ));
     }
     pub(crate) fn stage_control(&mut self, widget: crate::turbo::widgets::Native, area: Rect) {
-        self.composition
-            .as_mut()
-            .unwrap()
-            .control(widget, area, self.scene.height);
+        self.composition.as_mut().unwrap().control(
+            widget,
+            area,
+            self.scene.height.saturating_sub(1),
+        );
     }
     pub(crate) fn flush_dialog(&mut self) {
         if let Some(mut dialog) = self.composition.take() {
             dialog.paint(&mut self.scene);
+            if let Some(surface) = self
+                .placements
+                .iter()
+                .find(|s| {
+                    matches!(s.id.key,crate::windowing::geometry::SurfaceKey::Modal(id)|crate::windowing::geometry::SurfaceKey::ModalPage(id,_) if id==dialog.scope.id)
+                        && s.default.x==dialog.bounds().x && s.default.y==dialog.bounds().y
+                        && s.default.width==dialog.bounds().width
+                })
+                .copied()
+            {
+                let desktop=crate::windowing::geometry::workspace((self.scene.width,self.scene.height));
+                if let Some(background)=&self.dialog_background {
+                    let outside=self.scene.cells.keys().filter(|(x,y)|!desktop.contains((*x,*y).into())).copied().collect::<Vec<_>>();
+                    for point in outside {
+                        if let Some(glyph)=background.cells.get(&point) {self.scene.cells.insert(point,glyph.clone());}
+                        else {self.scene.cells.remove(&point);}
+                    }
+                }
+                let from = dialog.bounds();
+                let to = surface.bounds;
+                if from.x != to.x || from.y != to.y {
+                    let mut layer = self.scene.clone();
+                    let background = self.dialog_background.take().unwrap();
+                    layer
+                        .cells
+                        .retain(|(x, y), _| from.contains((*x, *y).into()));
+                    crate::windowing::workspace::translate_scene(
+                        &mut layer,
+                        i32::from(to.x) - i32::from(from.x),
+                        i32::from(to.y) - i32::from(from.y),
+                        crate::windowing::geometry::workspace((
+                            self.scene.width,
+                            self.scene.height,
+                        )),
+                        false,
+                    );
+                    self.scene.cells = background.cells;
+                    self.scene.cells.extend(layer.cells);
+                    // The top modal alone owns client-area commands, including
+                    // clicks outside a nested choice. Background images remain visible.
+                    self.scene.regions.clear();
+                    self.scene.regions.push((to,crate::mouse::Target::Surface(surface.id,crate::windowing::geometry::Chrome::Activate)));
+                    self.scene.regions.extend(layer.regions);
+                    self.scene.cursor = layer.cursor;
+                    crate::turbo::composition::paint_shadow(&mut self.scene, to);
+                    dialog.translate_hits(
+                        i32::from(to.x) - i32::from(from.x),
+                        i32::from(to.y) - i32::from(from.y),
+                    );
+                }
+                crate::windowing::workspace::chrome(&mut self.scene, surface);
+            }
+            self.dialog_background = None;
             self.dialogs
                 .push(std::rc::Rc::new(std::cell::RefCell::new(dialog)));
         }
     }
 
+    pub(crate) fn cursor(&self) -> Option<(u16, u16)> {
+        self.scene.cursor
+    }
+    pub(crate) fn clear_cursor(&mut self) {
+        self.scene.cursor = None;
+    }
     pub(crate) fn profile(&self) -> crate::palette::PaletteProfile {
         self.scene.profile
     }

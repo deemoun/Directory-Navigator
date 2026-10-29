@@ -30,6 +30,7 @@ pub struct Browser {
     text: TextCells,
     scene: Option<Scene>,
     rect: Rect,
+    placement: Option<Rect>,
     language: Option<Language>,
     pub revision: u64,
     last_link: Option<(String, std::time::Instant)>,
@@ -45,6 +46,7 @@ impl Browser {
             text: TextCells::default(),
             scene: None,
             rect: Rect::default(),
+            placement: None,
             language: None,
             revision: 0,
             last_link: None,
@@ -113,6 +115,12 @@ impl Browser {
             .as_ref()
             .map_or(0, |w| w.viewer().get_scroll_state().0.y.max(0) as usize)
     }
+    pub(crate) fn place(&mut self, r: Rect) {
+        if self.placement != Some(r) {
+            self.placement = Some(r);
+            self.revision += 1;
+        }
+    }
     pub(crate) fn bounds(&self) -> Rect {
         self.rect
     }
@@ -131,7 +139,12 @@ impl Browser {
             return;
         }
         // HELPFILE.PAS centers a 72×20 help window.
-        let rect = Rect::new((size.width - 72) / 2, (size.height - 20) / 2, 72, 20);
+        let rect = self.placement.unwrap_or(Rect::new(
+            (size.width - 72) / 2,
+            (size.height - 20) / 2,
+            72,
+            20,
+        ));
         if self.window.is_none() || self.language != Some(language) {
             self.text = TextCells::default();
             let body = crate::painting::wrap_plain(language.text(&self.body), 66).join("\n");
@@ -177,7 +190,7 @@ impl Browser {
             let file = Rc::new(RefCell::new(HelpFile::from_content(&encoded)));
             let title = self.text.text(language.text(&self.title));
             let mut window = HelpWindow::new(TvRect::new(0, 0, 72, 20), &title, file);
-            window.window_mut().set_resizable(false);
+            window.window_mut().set_resizable(self.landing.is_none());
             window.set_state_flag(State::MODAL, true);
             window.show_topic("context");
             self.window = Some(window);
@@ -197,7 +210,12 @@ impl Browser {
             rect.right() as i16,
             rect.bottom() as i16,
         ));
-        window.viewer_mut().set_bounds(TvRect::new(0, 0, 70, 18));
+        window.viewer_mut().set_bounds(TvRect::new(
+            0,
+            0,
+            (rect.width - 2) as i16,
+            (rect.height - 2) as i16,
+        ));
         window.viewer_mut().set_focus(true);
         let mut terminal = super::surface::terminal(size.width, size.height);
         terminal.draw_view(window);

@@ -2,6 +2,8 @@ use super::*;
 use crate::{app::App, dialog, menu};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EditorAction {
+    WindowMove,
+    WindowZoom,
     Open,
     FileDialog,
     Save,
@@ -521,6 +523,10 @@ fn submit_prompt(app: &mut App) -> Result<(), String> {
     Ok(())
 }
 pub fn action(app: &mut App, command: EditorAction) {
+    if matches!(command, EditorAction::WindowMove | EditorAction::WindowZoom) {
+        crate::windowing::move_active(app, command == EditorAction::WindowZoom);
+        return;
+    }
     app.sync_modals();
     use EditorAction as A;
     if command == A::Submit

@@ -114,9 +114,21 @@ pub(crate) enum Effect {
     CopyText(String),
     Help { title: &'static str, text: String },
 }
+pub(crate) struct LocalWindow {
+    pub id: u64,
+    pub parent: Option<u64>,
+    pub bounds: Rect,
+    pub caps: crate::windowing::geometry::Capabilities,
+}
+pub(crate) struct Layer<'a> {
+    pub interactive: bool,
+    pub id: u64,
+    pub scene: Scene,
+    pub controls: Option<DialogSpec<'a>>,
+}
 pub(crate) enum View<'a> {
-    Dialog(DialogSpec<'a>),
-    Surface(Scene, DialogSpec<'a>),
+    Layers(Vec<Layer<'a>>),
+    Dialog(Box<DialogSpec<'a>>),
 }
 pub(crate) trait ToolPlugin: Any {
     fn definition(&self) -> Definition;
@@ -130,9 +142,12 @@ pub(crate) trait ToolPlugin: Any {
         true
     }
     fn event(&mut self, event: Event<'_>, ctx: &Context) -> Vec<Effect>;
+    fn windows(&self, _ctx: &Context) -> Vec<LocalWindow> {
+        Vec::new()
+    }
     fn controls(&self, ctx: &Context) -> DialogSpec<'_>;
     fn view(&self, ctx: &Context) -> View<'_> {
-        View::Dialog(self.controls(ctx))
+        View::Dialog(Box::new(self.controls(ctx)))
     }
     fn next_wake(&self, _: Instant) -> Option<Duration> {
         None

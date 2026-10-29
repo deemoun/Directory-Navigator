@@ -100,7 +100,7 @@ fn dn_move_layout_locked_removal_focus_mouse_and_resize() -> io::Result<()> {
             .0;
         assert_eq!(
             (field.x, field.y, field.width),
-            ((w - 59) / 2 + 2, (h - 16) / 2 + 2, 53)
+            ((80 - 59) / 2 + 2, (25 - 16) / 2 + 2, 53)
         );
     }
     copy_dialog::action(&mut app, Action::RemoveSources);

@@ -224,7 +224,7 @@ impl ToolPlugin for CalculatorPlugin {
         view::history_spec(self, ctx).unwrap_or_else(|| view::calculator_spec(self, ctx))
     }
     fn view(&self, ctx: &Context) -> View<'_> {
-        View::Dialog(view::calculator_spec(self, ctx))
+        View::Dialog(Box::new(view::calculator_spec(self, ctx)))
     }
     fn close(&mut self) {
         self.state.history_open = false;

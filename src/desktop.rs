@@ -68,7 +68,7 @@ pub struct Desktop {
 
     native: crate::turbo::desktop::NativeDesktop,
     next_id: u64,
-    context: Option<WindowId>,
+    context: std::cell::Cell<Option<WindowId>>,
     activation_revision: u64,
     reservations: std::collections::BTreeMap<std::path::PathBuf, WindowId>,
 }
@@ -91,7 +91,7 @@ impl Default for Desktop {
             }),
 
             next_id: 1,
-            context: None,
+            context: std::cell::Cell::new(None),
             activation_revision: 0,
             reservations: Default::default(),
         }
@@ -272,11 +272,30 @@ impl Desktop {
             }
         }
     }
-    pub(crate) fn set_context(&mut self, id: Option<WindowId>) -> Option<WindowId> {
-        std::mem::replace(&mut self.context, id)
+    pub(crate) fn set_context(&self, id: Option<WindowId>) -> Option<WindowId> {
+        self.context.replace(id)
+    }
+    pub(crate) fn render_as<T>(&self, id: WindowId, run: impl FnOnce() -> T) -> T {
+        struct Reset<'a>(&'a std::cell::Cell<Option<WindowId>>, Option<WindowId>);
+        impl Drop for Reset<'_> {
+            fn drop(&mut self) {
+                self.0.set(self.1);
+            }
+        }
+        let reset = Reset(&self.context, self.context.replace(Some(id)));
+        let value = run();
+        drop(reset);
+        value
+    }
+    pub(crate) fn target_info(&self) -> WindowInfo {
+        self.windows
+            .iter()
+            .find(|w| w.id == self.target())
+            .unwrap()
+            .info()
     }
     pub fn target(&self) -> WindowId {
-        self.context.unwrap_or_else(|| self.active().id)
+        self.context.get().unwrap_or_else(|| self.active().id)
     }
     pub fn document_ids(&self, kind: WindowKind) -> Vec<WindowId> {
         self.windows()

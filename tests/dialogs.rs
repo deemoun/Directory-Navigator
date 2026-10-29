@@ -97,14 +97,17 @@ fn mkdir_original_dimensions_colors_buttons_and_resize() -> io::Result<()> {
             .0;
         let rect = Rect::new(field.x - 2, field.y - 2, field.width + 4, 7);
         assert_eq!(rect.width, 49);
-        assert_eq!(rect.x, (w - 49) / 2);
-        assert_eq!(rect.y, (h - 7) / 2);
+        assert_eq!(rect.x, (80 - 49) / 2);
+        assert_eq!(rect.y, (25 - 7) / 2);
         let b = terminal.backend().buffer();
         assert_eq!(b[(rect.x, rect.y)].symbol(), "╔");
         assert_eq!(b[(rect.right() - 1, rect.bottom() - 1)].symbol(), "╝");
         assert_eq!(b[(rect.x, rect.y)].fg, app.config.palette.color(15));
         assert_eq!(b[(field.x, field.y)].bg, app.config.palette.color(0));
         for (r, t) in &app.mouse.regions {
+            if matches!(t, Target::Surface(..)) {
+                continue;
+            }
             assert!(
                 r.x > rect.x
                     && r.y >= rect.y
@@ -142,7 +145,7 @@ fn prompt_tab_cancel_help_mouse_and_unicode_creation() -> io::Result<()> {
         .mouse
         .regions
         .iter()
-        .all(|(_, t)| *t == Target::CloseDialog));
+        .all(|(_, t)| *t == Target::CloseDialog || matches!(t, Target::Surface(..))));
     key(&mut app, KeyCode::Esc, KeyModifiers::NONE);
     assert_eq!(
         app.modals.prompt().expect("prompt").field,
@@ -188,7 +191,14 @@ fn compact_messages_scroll_and_restore_underlying_prompt() -> io::Result<()> {
     terminal.draw(|f| ui::draw(f, &mut app))?;
     // A short message occupies a small 36×6 window, not a fixed 66×17 one.
     let b = terminal.backend().buffer();
-    assert_eq!(b[(22, 9)].symbol(), "╔");
+    let surface = dn::layout::prepare(&mut app, Rect::new(0, 0, 80, 25))
+        .surfaces
+        .into_iter()
+        .find(|s| {
+            s.id.key == dn::windowing::geometry::SurfaceKey::Modal(app.modal_top().unwrap().id)
+        })
+        .unwrap();
+    assert_eq!(b[(surface.bounds.x, surface.bounds.y)].symbol(), "╔");
     key(&mut app, KeyCode::Enter, KeyModifiers::NONE);
     app.error(
         (0..100)
@@ -238,7 +248,7 @@ fn editor_small_prompts_and_unsaved_guard_remain_usable() -> io::Result<()> {
             .find(|(_, t)| *t == Target::Editor(dn::editor::EditorAction::Submit))
             .expect("OK")
             .0;
-        assert_eq!(ok.y, (h - 7) / 2 + 4);
+        assert_eq!(ok.y, (25 - 7) / 2 + 4);
     }
     key(&mut app, KeyCode::Esc, KeyModifiers::NONE);
     key(&mut app, KeyCode::Esc, KeyModifiers::NONE);
@@ -288,8 +298,8 @@ fn green_title_close_matches_dn_and_cancels_without_creating_directory() -> io::
             .expect("close")
             .0;
         let b = terminal.backend().buffer();
-        assert_eq!(r.x, (w - 49) / 2 + 2);
-        assert_eq!(r.y, (h - 7) / 2);
+        assert_eq!(r.x, (80 - 49) / 2 + 2);
+        assert_eq!(r.y, (25 - 7) / 2);
         for (dx, symbol, fg) in [(0, "[", 15), (1, "■", 10), (2, "]", 15)] {
             assert_eq!(b[(r.x + dx, r.y)].symbol(), symbol);
             assert_eq!(b[(r.x + dx, r.y)].fg, app.config.palette.color(fg));

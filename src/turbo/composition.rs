@@ -27,6 +27,7 @@ struct Plane {
     original: Rect,
 }
 pub(crate) struct DialogGroup {
+    offset: (i32, i32),
     root: Box<dyn View>,
     rect: Rect,
     planes: Vec<Plane>,
@@ -94,6 +95,7 @@ impl DialogGroup {
         dialog.set_close_on(CloseOn::Commands(Vec::new()));
         dialog.set_state_flag(State::MODAL, true);
         Self {
+            offset: (0, 0),
             root: control.view,
             rect,
             planes: vec![Plane {
@@ -299,7 +301,15 @@ impl DialogGroup {
     }
     /// Native Group performs the button hit and command proposal. The caller then
     /// invokes the existing guarded action at its original semantic target.
+    pub(crate) fn bounds(&self) -> Rect {
+        self.rect
+    }
+    pub(crate) fn translate_hits(&mut self, dx: i32, dy: i32) {
+        self.offset = (dx, dy);
+    }
     pub fn button(&mut self, x: u16, y: u16) -> Option<(Rect, Target)> {
+        let x = (i32::from(x) - self.offset.0).try_into().ok()?;
+        let y = (i32::from(y) - self.offset.1).try_into().ok()?;
         let (_, original, target) = self
             .buttons
             .iter()
@@ -314,8 +324,15 @@ impl DialogGroup {
         self.root.handle_event(&mut down);
         let mut up = Event::mouse(EventType::MouseUp, pos, 0, false);
         self.root.handle_event(&mut up);
-        (up.what == EventType::Command || down.what == EventType::Command)
-            .then_some((original, target))
+        (up.what == EventType::Command || down.what == EventType::Command).then_some((
+            Rect::new(
+                (i32::from(original.x) + self.offset.0) as u16,
+                (i32::from(original.y) + self.offset.1) as u16,
+                original.width,
+                original.height,
+            ),
+            target,
+        ))
     }
 }
 
@@ -339,7 +356,12 @@ pub(crate) fn paint_shadow(scene: &mut Scene, rect: Rect) {
     let (sx, sy) = turbo_vision::core::state::shadow_size();
     let sx = sx.max(0) as u16;
     let sy = sy.max(0) as u16;
-    for y in rect.y..rect.bottom().saturating_add(sy).min(scene.height) {
+    for y in rect.y
+        ..rect
+            .bottom()
+            .saturating_add(sy)
+            .min(scene.height.saturating_sub(1))
+    {
         for x in rect.x..rect.right().saturating_add(sx).min(scene.width) {
             if (x >= rect.right() && y >= rect.y + sy)
                 || (y >= rect.bottom() && x >= rect.x + sx && x < rect.right())

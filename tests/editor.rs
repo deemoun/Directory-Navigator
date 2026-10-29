@@ -471,7 +471,8 @@ fn selection_clipboard_search_goto_and_mouse_colored_rendering() -> io::Result<(
         .mouse
         .regions
         .iter()
-        .all(|(_, target)| *target == Target::Editor(A::Cancel)));
+        .all(|(_, target)| *target == Target::Editor(A::Cancel)
+            || matches!(target, Target::Surface(..))));
     click(&mut app, A::Cancel);
     key(&mut app, KeyCode::Esc);
     assert!(app.desktop.active_editor().is_none());

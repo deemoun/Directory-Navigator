@@ -275,7 +275,7 @@ fn localized_profiles_mouse_controls_and_small_terminal_retention() -> io::Resul
                     .mouse
                     .regions
                     .iter()
-                    .all(|(_, t)| matches!(t, Target::Welcome(_))));
+                    .all(|(_, t)| matches!(t, Target::Welcome(_) | Target::Surface(..))));
                 click(&mut a, Target::Welcome(Action::Keyboard));
                 draw(&mut a, w, h)?;
                 key(&mut a, K::Esc);

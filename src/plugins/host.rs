@@ -57,7 +57,8 @@ pub(crate) fn context(app: &App, b: Binding, area: Rect, now: Instant) -> Option
             && !app.output_visible
             && !app.screensaver.active
             && app.utilities.size.0 >= 80
-            && app.utilities.size.1 >= 25,
+            && app.utilities.size.1 >= 25
+            && !app.desktop.native().manipulating(),
         now,
         storage: app.config_store.path().ok().map(PathBuf::from),
     })
@@ -218,11 +219,39 @@ pub(crate) fn draw(frame: &mut impl Frame, app: &App, area: Rect, b: Binding) {
         return;
     };
     match e.tool.view(&ctx) {
-        View::Dialog(s) => s.paint(frame, app),
-        View::Surface(scene, s) => {
-            frame.compose(scene);
-            s.append(frame);
+        View::Layers(layers) => {
+            for layer in layers {
+                let mut isolated = crate::painting::NativeFrame::new(area, app.config.palette);
+                isolated.compose(layer.scene);
+                if let Some(controls) = layer.controls {
+                    controls.append(&mut isolated);
+                }
+                let mut scene = isolated.finish();
+                if !layer.interactive {
+                    scene.regions.clear();
+                    scene.cursor = None;
+                }
+                let key = if layer.id == 0 {
+                    match b.owner {
+                        Owner::Document(id) => crate::windowing::geometry::SurfaceKey::Document(id),
+                        Owner::Modal(id) => crate::windowing::geometry::SurfaceKey::Modal(id),
+                    }
+                } else {
+                    match b.owner {
+                        Owner::Document(id) => {
+                            crate::windowing::geometry::SurfaceKey::Page(id, layer.id)
+                        }
+                        Owner::Modal(_) => continue,
+                    }
+                };
+                if let Some(surface) = app.desktop.native().surface(key) {
+                    crate::windowing::workspace::move_plugin_scene(&mut scene, surface);
+                    crate::windowing::workspace::occlude(frame, surface.bounds);
+                }
+                frame.compose(scene);
+            }
         }
+        View::Dialog(s) => (*s).paint(frame, app),
     }
 }
 pub(crate) fn poll(app: &mut App, now: Instant) -> bool {
@@ -313,4 +342,55 @@ pub(crate) fn apply_enabled(app: &mut App) {
         }
     }
     app.sync_modals();
+}
+
+pub(crate) fn window_definitions(
+    app: &App,
+    area: Rect,
+) -> Vec<crate::windowing::geometry::Definition> {
+    use crate::windowing::geometry::{Definition, SurfaceKey};
+    let mut result = Vec::new();
+    for b in app.desktop.plugins.bound() {
+        if let Some(ctx) = context(app, b, area, app.desktop.plugins.now) {
+            if let Some(entry) = app.desktop.plugins.entries.get(&b.plugin) {
+                let mut windows = entry.tool.windows(&ctx);
+                if let View::Dialog(spec) = entry.tool.view(&ctx) {
+                    windows.extend(spec.windows(area).into_iter().map(|(id, parent, bounds)| {
+                        LocalWindow {
+                            id,
+                            parent,
+                            bounds,
+                            caps: crate::windowing::geometry::Capabilities::fixed(
+                                bounds.width,
+                                bounds.height,
+                            ),
+                        }
+                    }));
+                }
+                for window in windows {
+                    let key = match (b.owner, window.id) {
+                        (Owner::Document(id), 0) => SurfaceKey::Document(id),
+                        (Owner::Document(id), local) => SurfaceKey::Page(id, local),
+                        (Owner::Modal(id), 0) => SurfaceKey::Modal(id),
+                        (Owner::Modal(id), local) => SurfaceKey::ModalPage(id, local),
+                    };
+                    let parent = window.parent.map(|local| match b.owner {
+                        Owner::Document(id) if local == 0 => SurfaceKey::Document(id),
+                        Owner::Document(id) => SurfaceKey::Page(id, local),
+                        Owner::Modal(id) if local == 0 => SurfaceKey::Modal(id),
+                        Owner::Modal(id) => SurfaceKey::ModalPage(id, local),
+                    });
+                    result.push(Definition {
+                        key,
+                        bounds: window.bounds,
+                        caps: window.caps,
+                        maximized: false,
+                        title_row: 0,
+                        parent,
+                    });
+                }
+            }
+        }
+    }
+    result
 }

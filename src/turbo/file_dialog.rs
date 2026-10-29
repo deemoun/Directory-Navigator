@@ -51,6 +51,7 @@ pub struct Picker {
     widget: FileDialog,
     scene: Option<Scene>,
     size: Option<Size>,
+    placement: Option<Rect>,
     pub(crate) revision: u64,
     last_click: Option<(Point, Instant)>,
 }
@@ -111,6 +112,7 @@ impl Picker {
             widget,
             scene: None,
             size: None,
+            placement: None,
             revision: 0,
             last_click: None,
         };
@@ -334,14 +336,25 @@ impl Picker {
         if size.width < 80 || size.height < 25 {
             return;
         }
-        if self.size != Some(size) {
-            let x = (size.width - 76) / 2;
-            let y = (size.height - 20) / 2;
+        if self.size != Some(size)
+            || self.placement.is_some_and(|r| {
+                self.widget.bounds()
+                    != TvRect::new(r.x as i16, r.y as i16, r.right() as i16, r.bottom() as i16)
+            })
+        {
+            let r = self.placement.unwrap_or(Rect::new(
+                (size.width - 76) / 2,
+                (size.height - 20) / 2,
+                76,
+                20,
+            ));
+            let x = r.x;
+            let y = r.y;
             self.widget.set_bounds(TvRect::new(
                 x as i16,
                 y as i16,
-                (x + 76) as i16,
-                (y + 20) as i16,
+                (x + r.width) as i16,
+                (y + r.height) as i16,
             ));
             self.widget.window_mut().set_drag_limits(TvRect::new(
                 0,
@@ -437,6 +450,9 @@ impl Picker {
             }
         }
         self.scene = Some(scene);
+    }
+    pub(crate) fn place(&mut self, r: Rect) {
+        self.placement = Some(r);
     }
     pub(crate) fn bounds(&self) -> Rect {
         let b = self.widget.bounds();

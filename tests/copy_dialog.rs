@@ -95,7 +95,7 @@ fn dn_layout_disabled_choices_focus_resize_and_cancel_never_write() -> io::Resul
             .0;
         assert_eq!(
             (field.x, field.y, field.width),
-            ((w - 59) / 2 + 2, (h - 16) / 2 + 2, 53)
+            ((80 - 59) / 2 + 2, (25 - 16) / 2 + 2, 53)
         );
     }
     let mut focuses = Vec::new();

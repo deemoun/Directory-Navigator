@@ -456,8 +456,8 @@ them. Save/Load desktop continues to persist the selected palette and settings.
 
 Unsupported commands are not menu placeholders. Disk administration/recovery,
 DOS communications/country/printer setup and built-in printing are outside this
-app's scope. Save all and desktop window-management commands await a matching
-multi-document/window model. Future work is separate: safe archive extraction,
+app's scope. Save all remains outside this pass; desktop movement and zoom use
+the shared window controls described below. Future work is separate: safe archive extraction,
 disk/free-space information and permission editing; later,
 archive creation and palette editing.
 Split/combine and line drawing remain low priority. No settings format changes.
@@ -764,9 +764,28 @@ Cancel keeps all documents, including buffers already approved for discard;
 completed saves remain saved. Buffers also survive a settings-save failure.
 Dialogs block switching until closed, and nested help returns to its parent.
 
-Several editors and viewers can coexist. Games retain one instance and are not
-listed. Windows remain full-screen and session-only; open documents are not
-restored after restarting.
+Editors, viewers and the single game window share a floating desktop over the
+fixed file panels. Editors and viewers open maximized. Drag their title to restore
+and move them; drag the bottom-right corner to resize. Double-click the title,
+click its zoom control, or press **Alt+Z** to maximize or restore. The window list
+also offers **Size/Move** and **Zoom** when the selected window supports them.
+
+**Ctrl+F5** starts Size/Move for the active document or top dialog. Arrows move one
+cell; Shift+arrows resize supported windows; Ctrl+Left/Right move eight columns.
+Home/End align left/right, PgUp/PgDn align top/bottom, and Tab/Shift+Tab move
+horizontally. Enter accepts; Esc restores the starting geometry. Editing and paste
+are suspended during movement. Ctrl+F5 still sorts by date in the file manager.
+
+Clicking an exposed background document raises it; its first client-area click
+only activates it. Clicking exposed file panels selects the manager while leaving
+floating windows visible. Dialogs block the background, and new children center
+over their parent. Help can be resized; ordinary forms and game pages keep their
+sizes. Tetris pauses during movement and while another window has focus.
+
+Geometry lasts until a window closes. Terminal resizing clamps windows while
+retaining their preferred floating geometry for a later expansion. Open documents
+and window positions are not restored after restarting. File panes remain fixed;
+Tile and Cascade are not implemented.
 
 ## Context help
 

@@ -1,5 +1,28 @@
 # Directory Navigator — beta
 
+## Floating desktop (macOS)
+
+- Native Window shells retain geometry for editor/viewer documents, the game,
+  owned modals and plugin pages. The manager remains the fixed background.
+- Title dragging, corner resizing, maximize/restore and Ctrl+F5 Size/Move use
+  native geometry with typed, generation-checked surface targets. Manager focus
+  does not raise its background above floating documents. Close/save guards stay
+  in the existing controllers.
+- Each visible document prepares its own viewport. Immutable scene composition
+  publishes clipping, revision, cursor and hit metadata for each surface. Native
+  transport encodes the combined frame within one glyph-token lifetime.
+- Help and FileDialog use placement adapters; nested children have their own
+  placement. Tetris pages may extend beyond the game and pause gravity during
+  manipulation. Preferred floating rectangles survive terminal shrinking.
+- Geometry is session-only. Movable panes, tiling, cascading and persistence are
+  excluded. Windows/Linux validation is still skipped.
+- macOS validation: complete native suite (569 passed, one existing ignored),
+  doc tests, formatting, all-target Clippy with warnings denied, release build and
+  no-default-features check. Live release PTY checks cover overlapping documents,
+  mouse restore-and-drag, FileDialog/Help movement, game pages, paste isolation,
+  resize, output handoff and terminal restoration.
+
+
 ## Architecture
 - Native Rust `dn`: Turbo Vision/Crossterm/Chrono, Unicode segmentation, Unix libc;
   owned presentation geometry/styles/text and native headless test captures;
@@ -8,7 +31,7 @@
 - Session Desktop owns editor/viewer content, plugin window references, the built-in
   tool registry and stable WindowId values;
   default Turbo Vision build reads selection from the native Desktop/Window
-  registry. Multiple full-screen editors/viewers use ID-targeted access; the
+  registry. Multiple editors/viewers use ID-targeted access and session geometry; the
   permanent manager remains the base. Owned modal IDs gate native dispatch.
   Request scopes reject retired owners and replaced generations. Viewport
   preparation produces immutable layout snapshots; painting is read-only.
@@ -767,9 +790,8 @@ older increment entries below also record earlier migration stages.
   Linux/Windows remain untested locally.
 
 ## Limitations and next steps
-- Multiple full-screen documents and the window list are implemented. Overlapping
-  or movable windows, Cascade/Tile, shared-buffer views and workspace persistence
-  remain deferred. Command-routing redesign, panel-source abstraction and
+- Multiple documents and movable/resizable windows are implemented. Cascade/Tile,
+  shared-buffer views and workspace persistence remain deferred. Command-routing redesign, panel-source abstraction and
   large-file storage are outside this foundation.
 - Ancestor/entry snapshots detect replacements between operation stages, but
   path-based recursion still has check-to-use races; full descriptor-relative

@@ -229,7 +229,8 @@ fn mouse_menus_function_bar_and_modal_clicks() -> io::Result<()> {
             .mouse
             .regions
             .iter()
-            .all(|(_, target)| *target == Target::CloseDialog));
+            .all(|(_, target)| *target == Target::CloseDialog
+                || matches!(target, Target::Surface(..))));
         // Clicking the Quit position through the dialog must not exit.
         dn::mouse::handle(
             &mut app,
@@ -440,12 +441,20 @@ fn viewer_text_hex_bounds_and_mouse_close() -> io::Result<()> {
     // An asynchronous error must be visible and modal even over the viewer.
     app.error("test error");
     render(&mut app, 80, 25)?;
-    assert_eq!(app.mouse.regions.len(), 2);
+    assert_eq!(
+        app.mouse
+            .regions
+            .iter()
+            .filter(|(_, t)| !matches!(t, dn::mouse::Target::Surface(..)))
+            .count(),
+        2
+    );
     assert!(app
         .mouse
         .regions
         .iter()
-        .all(|(_, target)| *target == dn::mouse::Target::CloseDialog));
+        .all(|(_, target)| *target == dn::mouse::Target::CloseDialog
+            || matches!(target, dn::mouse::Target::Surface(..))));
     assert_eq!(app.mouse.regions[0].1, dn::mouse::Target::CloseDialog);
     input::handle(&mut app, KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
     render(&mut app, 120, 40)?;

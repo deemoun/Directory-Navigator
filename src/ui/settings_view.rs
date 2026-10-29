@@ -286,20 +286,13 @@ fn draw_choices(frame: &mut impl Frame, app: &App, area: Rect) {
     let Some(choice) = app.modals.settings_choice() else {
         return;
     };
-    let width = choice
-        .items
-        .iter()
-        .map(|s| crate::presentation::text::Span::raw(s).width())
-        .max()
-        .unwrap_or(20)
-        .clamp(24, 60) as u16
-        + 4;
+    let bounds = settings_choice_bounds(app, area).unwrap();
     let rect = super::dialog_style::window(
         frame,
         app.config.palette,
         area,
-        width,
-        choice.items.len() as u16 + 4,
+        bounds.width,
+        bounds.height,
         app.config
             .language
             .text(if choice.kind == SettingsKind::Keyboard {
@@ -326,4 +319,17 @@ fn draw_choices(frame: &mut impl Frame, app: &App, area: Rect) {
             Target::SettingsChoice(i),
         ));
     }
+}
+
+pub(crate) fn settings_choice_bounds(app: &App, area: Rect) -> Option<Rect> {
+    let choice = app.modals.settings_choice()?;
+    let width = choice
+        .items
+        .iter()
+        .map(|s| crate::presentation::text::Span::raw(s).width())
+        .max()
+        .unwrap_or(20)
+        .clamp(24, 60) as u16
+        + 4;
+    Some(centered(area, width, choice.items.len() as u16 + 4))
 }

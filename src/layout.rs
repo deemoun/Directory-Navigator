@@ -25,6 +25,7 @@ pub(crate) struct ViewportState {
     submenus: Vec<(crate::menu::MenuId, usize)>,
     modal_offsets: Vec<usize>,
     controls: Vec<(bool, Rect, crate::mouse::Target)>,
+    geometry: u64,
 }
 fn viewport_state(app: &App) -> ViewportState {
     let area = crate::turbo::dialog_spec::input_area(app);
@@ -42,6 +43,7 @@ fn viewport_state(app: &App) -> ViewportState {
         crate::ui::remaining_spec(app, area, focus)
     };
     ViewportState {
+        geometry: app.desktop.native().geometry_revision(),
         controls: spec.map_or_else(Vec::new, |s| s.interaction_state()),
         panels: std::array::from_fn(|i| {
             let p = &app.panels[i];
@@ -116,6 +118,7 @@ pub struct LayoutSnapshot {
     pub panel_areas: [Rect; 2],
     pub panels: [PanelGeometry; 2],
     pub message: Option<MessageLayout>,
+    pub surfaces: Vec<crate::windowing::geometry::Surface>,
 }
 pub fn editor_gutter(editor: &crate::editor::Editor) -> u16 {
     editor
@@ -335,6 +338,18 @@ pub fn prepare_window(
     }
     crate::command_line::prepare(app, regions[2]);
     app.command_line.translate_input(bounds.x);
+    let surfaces = if area.width >= 80 && area.height >= 25 {
+        crate::windowing::workspace::prepare(app, area)
+    } else {
+        app.desktop
+            .native()
+            .geometry_key(crossterm::event::KeyEvent::new(
+                crossterm::event::KeyCode::Esc,
+                crossterm::event::KeyModifiers::NONE,
+            ));
+        Vec::new()
+    };
+    crate::plugins::host::update_activity(app, now);
     let state = viewport_state(app);
     if app.layout_state.as_ref() != Some(&state) {
         app.layout_revision = app
@@ -350,6 +365,7 @@ pub fn prepare_window(
         clip,
         screen: crate::presentation::layout::Size::new(screen.right(), screen.bottom()),
         message,
+        surfaces,
         regions,
         panel_areas,
         panels,
@@ -385,7 +401,8 @@ pub fn message_layout(area: Rect, title: &str, text: &str) -> MessageLayout {
     .clamp(36, 76)
     .min(usize::from(area.width)) as u16;
     let lines = wrap(&text, width.saturating_sub(4));
-    let height = (lines.len() + 5).min(area.height.saturating_sub(2) as usize) as u16;
+    // Reserve the native button's shadow row inside the desktop, above its bar.
+    let height = (lines.len() + 5).min(area.height.saturating_sub(3) as usize) as u16;
     let rect = Rect::new(
         area.x + (area.width - width) / 2,
         area.y + (area.height - height) / 2,

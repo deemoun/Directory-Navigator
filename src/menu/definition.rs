@@ -146,6 +146,8 @@ pub const ROOTS: &[Root] = &[
             line(),
             item("~S~wap panels", "", SwapPanels),
             item("~W~indows...", "Alt+0", WindowList),
+            item("Si~z~e/Move", "Ctrl+F5", WindowMove),
+            item("Zoo~m~/Restore", "Alt+Z", WindowZoom),
         ],
     },
     Root {
@@ -339,7 +341,12 @@ pub const EDITOR_ROOTS: &[EditorRoot] = &[
         id: EditorRootId::Misc,
         label: "~M~isc",
         enabled: true,
-        entries: &[editor_item("~D~uplicate line", "F6", A::Duplicate)],
+        entries: &[
+            editor_item("~D~uplicate line", "F6", A::Duplicate),
+            editor_line(),
+            editor_item("Si~z~e/Move", "Ctrl+F5", A::WindowMove),
+            editor_item("Zoo~m~/Restore", "Alt+Z", A::WindowZoom),
+        ],
     },
     EditorRoot {
         id: EditorRootId::Options,

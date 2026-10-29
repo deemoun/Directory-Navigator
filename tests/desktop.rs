@@ -498,6 +498,9 @@ fn window_list_profiles_languages_resize_mouse_and_background_tools() -> io::Res
                 };
                 mouse::handle(&mut app, click);
                 assert!(app.modals.window_list().is_some());
+                // Row selection changes Size/Move/Zoom availability; publish its new revision.
+                let mut terminal = Terminal::new(TestBackend::new(80, 25))?;
+                terminal.draw(|f| dn::ui::draw(f, &mut app))?;
                 mouse::handle(&mut app, click);
                 assert!(app.modals.window_list().is_none());
                 assert_eq!(app.desktop.active().id, WindowId::MANAGER);

@@ -111,17 +111,36 @@ pub(crate) fn windows_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
             .style(profile.dos(theme::TEXT)),
         Rect::new(rect.x + 2, rect.bottom() - 4, rect.width - 4, 1),
     );
-    for (label, command, focus, x) in [
-        ("Switch", Action::Switch, 1, rect.x + 14),
-        ("Cancel", Action::Cancel, 2, rect.right() - 30),
-    ] {
-        let button = Rect::new(x, rect.bottom() - 2, 16, 1);
-        spec.control(Control::new(
-            focus,
-            button,
+    let selected = list.ids.get(list.cursor).copied();
+    let document = selected
+        .filter(|id| *id != crate::desktop::WindowId::MANAGER)
+        .and_then(|id| {
+            app.desktop
+                .native()
+                .surface(crate::windowing::geometry::SurfaceKey::Document(id))
+        });
+    for (index, (label, command, id)) in [
+        ("Switch", Action::Switch, 1),
+        ("Size/Move", Action::Move, 3),
+        ("Zoom", Action::Zoom, 4),
+        ("Cancel", Action::Cancel, 2),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let bounds = Rect::new(rect.x + 2 + index as u16 * 17, rect.bottom() - 2, 17, 1);
+        let mut control = Control::new(
+            id,
+            bounds,
             ControlKind::Button(language.text(label).into()),
             Target::Window(command),
-        ));
+        );
+        control.enabled = match command {
+            Action::Move => document.is_some(),
+            Action::Zoom => document.is_some_and(|s| s.caps.zoom),
+            _ => true,
+        };
+        spec.control(control);
     }
     Some(spec)
 }

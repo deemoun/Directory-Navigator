@@ -1,4 +1,6 @@
-//! Frozen before the shared-logic refactor: cells/styles, cursor and mouse hits.
+//! Frozen shared-dialog frames. Window chrome/window-list fixtures reflect the
+//! floating desktop; nested choices center over their parent. Surface targets
+//! are checked by floating_windows rather than mixed into legacy control hashes.
 mod support;
 use dn::{
     editor::{self, EditorAction as A},
@@ -45,6 +47,9 @@ fn shared_logic_preserves_native_frames() -> io::Result<()> {
                                 ViewMode::Text,
                             ),
                         ));
+                        // Establish the actual desktop before opening children; placement
+                        // now lasts for the presentation's lifetime.
+                        let _ = layout::prepare(&mut a, Rect::new(0, 0, w, h));
                         match case {
                             0..=5 => a.open_settings(
                                 [
@@ -108,7 +113,12 @@ fn shared_logic_preserves_native_frames() -> io::Result<()> {
                         let result = ui::render(&a, &snapshot);
                         let normalize = |result: dn::ui::RenderedFrame| {
                             let cursor = result.cursor();
-                            let hits = result.hit_regions().to_vec();
+                            let hits = result
+                                .hit_regions()
+                                .iter()
+                                .filter(|(_, t)| !matches!(t, dn::mouse::Target::Surface(..)))
+                                .copied()
+                                .collect::<Vec<_>>();
                             let mut buffer = Buffer::rendered(result);
                             if case == 19 {
                                 // The regional preview samples wall-clock time. Freeze only its

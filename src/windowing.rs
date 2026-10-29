@@ -1,4 +1,6 @@
 //! Session-only switching; content and asynchronous work remain owned by Desktop.
+pub mod geometry;
+pub(crate) mod workspace;
 use crate::{
     app::App,
     desktop::WindowId,
@@ -31,6 +33,8 @@ impl WindowList {
 pub enum Action {
     Row(WindowId),
     Switch,
+    Move,
+    Zoom,
     Cancel,
 }
 fn ids(app: &App) -> Vec<WindowId> {
@@ -97,6 +101,31 @@ pub fn poll(app: &mut App) -> bool {
 }
 pub fn action(app: &mut App, action: Action) {
     match action {
+        Action::Move | Action::Zoom => {
+            let id = app
+                .modals
+                .window_list()
+                .and_then(|l| l.ids.get(l.cursor))
+                .copied()
+                .unwrap_or_else(|| app.desktop.active().id);
+            if id == WindowId::MANAGER || !app.desktop.contains(id) {
+                return;
+            }
+            app.modals.set_window_list(None);
+            app.desktop.activate(id);
+            crate::layout::update(app);
+            if let Some(surface) = app
+                .desktop
+                .native()
+                .surface(geometry::SurfaceKey::Document(id))
+            {
+                if action == Action::Move {
+                    app.desktop.native().begin_move(surface.id, None);
+                } else {
+                    app.desktop.native().zoom_surface(surface.id);
+                }
+            }
+        }
         Action::Cancel => {
             app.modals.set_window_list(None);
         }
@@ -184,5 +213,21 @@ pub fn mouse(app: &mut App, event: MouseEvent, target: Option<Target>) {
     action(app, command);
     if double {
         action(app, Action::Switch);
+    }
+}
+
+pub(crate) fn move_active(app: &mut App, zoom: bool) {
+    crate::menu::close(app);
+    if let Some(editor) = app.desktop.active_editor_mut() {
+        editor.modals.set_editor_menu(None);
+    }
+    app.sync_modals();
+    crate::layout::update(app);
+    if let Some(s) = workspace::foreground(app) {
+        if zoom {
+            app.desktop.native().zoom_surface(s.id);
+        } else {
+            app.desktop.native().begin_move(s.id, None);
+        }
     }
 }

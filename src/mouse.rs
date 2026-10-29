@@ -13,6 +13,10 @@ use std::{
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Target {
+    Surface(
+        crate::windowing::geometry::SurfaceId,
+        crate::windowing::geometry::Chrome,
+    ),
     Window(crate::windowing::Action),
     ApplyImport,
     CancelImport,
@@ -72,6 +76,7 @@ pub enum Target {
 
 #[derive(Default)]
 pub struct MouseState {
+    pub(crate) surfaces: Vec<crate::windowing::geometry::Surface>,
     pub frame: Option<crate::layout::FrameContext>,
     pub regions: Vec<(Rect, Target)>,
     last_click: Option<(usize, PathBuf, Instant)>,
@@ -103,12 +108,20 @@ pub fn handle(app: &mut App, event: MouseEvent) {
     if app.exit_pending && app.quit_review.is_some() {
         return;
     }
+    if crate::windowing::workspace::capture_mouse(app, event) {
+        crate::layout::update(app);
+        return;
+    }
     if app.mouse.frame.is_some_and(|frame| {
         frame.owner != app.desktop.active().id
             || frame.revision != app.layout_revision
             || frame.modal != app.modal_top().map(|m| m.id)
     }) {
         app.mouse.reset_click();
+        return;
+    }
+    if crate::windowing::workspace::mouse(app, event) {
+        crate::layout::update(app);
         return;
     }
     let mut event = event;

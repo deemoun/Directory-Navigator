@@ -1,6 +1,9 @@
 //! Native desktop ownership. Application models own their data; TV owns the
 //! selected window, z-order and the modal input scope. Commands return to the
 //! existing controllers before any close/save/filesystem action is performed.
+use crate::windowing::geometry::{
+    self, Capabilities, Capture, Definition, Interaction, Shell, Surface, SurfaceId, SurfaceKey,
+};
 use crate::{
     desktop::{WindowId, WindowInfo},
     focus::Focus,
@@ -15,7 +18,7 @@ use turbo_vision::{
         state::State,
     },
     terminal::Terminal,
-    views::{desktop::Desktop, window::Window, View, ViewCore, ViewId},
+    views::{desktop::Desktop, View, ViewCore, ViewId},
 };
 
 pub(super) const INPUT: u16 = 0xff00;
@@ -56,7 +59,7 @@ pub struct Receipt {
 
 type Mailbox = Rc<RefCell<Option<Receipt>>>;
 struct Document {
-    window: Window,
+    shell: Shell,
     info: WindowInfo,
     scope: Scope,
     mailbox: Mailbox,
@@ -64,13 +67,45 @@ struct Document {
 }
 impl Document {
     fn new(bounds: Rect, info: WindowInfo, scope: Scope, mailbox: Mailbox) -> Self {
-        let mut window = Window::new(bounds, "");
-        window.set_auto_close(false);
+        let size = (bounds.width() as u16, bounds.height() as u16);
+        let maximal = matches!(
+            info.kind,
+            crate::desktop::WindowKind::Manager
+                | crate::desktop::WindowKind::Editor
+                | crate::desktop::WindowKind::Viewer
+        ) || scope != Scope::Content;
+        let caps = match info.kind {
+            crate::desktop::WindowKind::Editor => Capabilities::document(72, 12),
+            crate::desktop::WindowKind::Viewer => Capabilities::document(48, 10),
+            _ => Capabilities::fixed(54, 23),
+        };
+        let default = if maximal {
+            geometry::rect(bounds)
+        } else {
+            crate::presentation::layout::Rect::new(
+                size.0.saturating_sub(54) / 2,
+                size.1.saturating_sub(23) / 2,
+                54,
+                23,
+            )
+        };
+        let mut shell = Shell::new(
+            Definition {
+                key: SurfaceKey::Document(info.id),
+                bounds: default,
+                caps,
+                maximized: maximal,
+                title_row: u16::from(info.kind == crate::desktop::WindowKind::Editor),
+                parent: None,
+            },
+            0,
+            size,
+        );
         if scope != Scope::Content {
-            window.set_state_flag(State::MODAL, true);
+            shell.window.set_state_flag(State::MODAL, true);
         }
         Self {
-            window,
+            shell,
             info,
             scope,
             mailbox,
@@ -80,10 +115,10 @@ impl Document {
 }
 impl View for Document {
     fn core(&self) -> &ViewCore {
-        self.window.core()
+        self.shell.window.core()
     }
     fn core_mut(&mut self) -> &mut ViewCore {
-        self.window.core_mut()
+        self.shell.window.core_mut()
     }
     fn as_any(&self) -> &dyn std::any::Any {
         self
@@ -98,7 +133,7 @@ impl View for Document {
         true
     }
     fn set_focus(&mut self, focused: bool) {
-        self.window.set_focus(focused);
+        self.shell.window.set_focus(focused);
         self.set_state_flag(State::FOCUSED, focused);
     }
     // DN's fixed full-screen views retain their tested skin. They are custom
@@ -133,6 +168,9 @@ struct Host {
     modal: Option<(Scope, ViewId)>,
     mailbox: Mailbox,
     bounds: Rect,
+    auxiliary: std::collections::BTreeMap<SurfaceKey, Shell>,
+    interaction: Interaction,
+    next_surface: u64,
     scene: Option<Rc<super::scene::Scene>>,
     panes: super::panes::Controls,
     mouse: super::mouse::Router,
@@ -154,6 +192,12 @@ impl NativeDesktop {
             modal: None,
             mailbox,
             bounds,
+            auxiliary: Default::default(),
+            interaction: Interaction {
+                size: (80, 25),
+                ..Default::default()
+            },
+            next_surface: 1,
             scene: None,
             panes: super::panes::Controls::default(),
             mouse: super::mouse::Router::default(),
@@ -192,13 +236,25 @@ impl NativeDesktop {
         let document = Document::new(host.bounds, info, Scope::Content, host.mailbox.clone());
         let id = host.desktop.add(document);
         host.ids.push((info, id));
+        host.focus_content(info.id);
+        if let Some((_, modal)) = host.modal {
+            host.document_mut(modal).info = info;
+        }
         host.raise_modal();
     }
     pub(crate) fn remove(&self, id: WindowId) {
         let mut host = self.0.borrow_mut();
+        let active = host.active().id;
         if let Some(index) = host.ids.iter().position(|(info, _)| info.id == id) {
             let (_, view) = host.ids.remove(index);
             host.desktop.remove_child_by_id(view);
+            if active != id {
+                host.focus_content(active);
+            }
+            host.interaction.revision += 1;
+            host.auxiliary
+                .retain(|key, _| !matches!(key,SurfaceKey::Page(owner,_) if *owner==id));
+            if host.interaction.capture.as_ref().is_some_and(|c|matches!(c.id.key,SurfaceKey::Document(owner)|SurfaceKey::Page(owner,_) if owner==id)){host.interaction.capture=None;}
             host.raise_modal();
         }
     }
@@ -207,7 +263,17 @@ impl NativeDesktop {
         let Some((_, view)) = host.ids.iter().find(|(info, _)| info.id == id).copied() else {
             return false;
         };
-        let changed = host.desktop.bring_to_front(view);
+        let info = host.ids.iter().find(|(_, v)| *v == view).unwrap().0;
+        let changed = if id == WindowId::MANAGER {
+            host.select_manager();
+            true
+        } else {
+            host.desktop.bring_to_front(view)
+        };
+        host.focus_content(id);
+        if let Some((_, modal)) = host.modal {
+            host.document_mut(modal).info = info;
+        }
         host.raise_modal();
         changed
     }
@@ -235,7 +301,12 @@ impl NativeDesktop {
                 .find(|(info, _)| *info == active)
                 .expect("live selected window")
                 .1;
-            host.desktop.bring_to_front(id);
+            if active.id == WindowId::MANAGER {
+                host.select_manager();
+            } else {
+                host.desktop.bring_to_front(id);
+                host.focus_content(active.id);
+            }
         }
     }
     /// Dispatch through TV's focused child/modal scope before handing the full
@@ -244,7 +315,12 @@ impl NativeDesktop {
     pub fn dispatch(&self) -> Option<Receipt> {
         let mut host = self.0.borrow_mut();
         *host.mailbox.borrow_mut() = None;
-        host.desktop.handle_event(&mut Event::command(INPUT));
+        let id = host.modal.map(|(_, id)| id).unwrap_or_else(|| {
+            let active = host.active();
+            host.ids.iter().find(|(w, _)| *w == active).unwrap().1
+        });
+        host.document_mut(id)
+            .handle_event(&mut Event::command(INPUT));
         let receipt = host.mailbox.borrow_mut().take();
         receipt
     }
@@ -254,35 +330,73 @@ impl NativeDesktop {
             host.bounds = bounds;
             host.desktop.set_bounds(bounds);
         }
-        // Only the foreground full-screen surface is visible. Retired token
-        // cells must not survive in background windows after codec reclamation.
-        let count = host.desktop.child_count();
-        for i in 0..count {
-            let child = host.desktop.child_at_mut(i);
-            child.set_bounds(bounds);
-            let document = child
+        // The compositor encodes all visible layers together. Native window
+        // buffers cannot retain glyph tokens from an older frame generation.
+        for i in 0..host.desktop.child_count() {
+            if let Some(document) = host
+                .desktop
+                .child_at_mut(i)
                 .as_any_mut()
                 .downcast_mut::<Document>()
-                .expect("DN native window");
-            document.native.clear();
-            if i + 1 == count {
-                document.native.extend_from_slice(native);
+            {
+                document.native.clear();
             }
         }
-        terminal.draw_view(&mut host.desktop);
+        for &(x, y, cell) in native {
+            terminal.write_cell(x as i16, y as i16, cell);
+        }
     }
 }
 impl Host {
+    fn select_manager(&mut self) {
+        self.focus_content(WindowId::MANAGER);
+    }
+    fn focus_content(&mut self, id: WindowId) {
+        for i in 0..self.desktop.child_count() {
+            let child = self.desktop.child_at_mut(i);
+            if let Some(d) = child.as_any_mut().downcast_mut::<Document>() {
+                let selected = d.info.id == id && d.scope == Scope::Content;
+                d.set_focus(selected);
+                d.set_state_flag(State::ACTIVE, selected);
+            }
+        }
+    }
+    fn shell_mut(&mut self, key: SurfaceKey) -> Option<&mut Shell> {
+        if let SurfaceKey::Document(id) = key {
+            let view = self.ids.iter().find(|(w, _)| w.id == id)?.1;
+            Some(&mut self.document_mut(view).shell)
+        } else {
+            self.auxiliary.get_mut(&key)
+        }
+    }
     fn active(&self) -> WindowInfo {
-        // The modal is a child scope of this document, not a second document.
+        if let Some((_, id)) = self.modal {
+            return self
+                .desktop
+                .child_by_id(id)
+                .unwrap()
+                .as_any()
+                .downcast_ref::<Document>()
+                .unwrap()
+                .info;
+        }
         for i in (0..self.desktop.child_count()).rev() {
-            let document = self
+            let Some(document) = self.desktop.child_at(i).as_any().downcast_ref::<Document>()
+            else {
+                continue;
+            };
+            if document.scope == Scope::Content && document.state().contains(State::ACTIVE) {
+                return document.info;
+            }
+        }
+        for i in (0..self.desktop.child_count()).rev() {
+            if let Some(document) = self
                 .desktop
                 .child_at(i)
                 .as_any()
                 .downcast_ref::<Document>()
-                .expect("DN native window");
-            if document.scope == Scope::Content {
+                .filter(|d| d.scope == Scope::Content)
+            {
                 return document.info;
             }
         }
@@ -302,5 +416,284 @@ impl Host {
             self.document_mut(id).info = active;
             self.desktop.bring_to_front(id);
         }
+    }
+}
+
+impl NativeDesktop {
+    pub(crate) fn geometry_sync(
+        &self,
+        size: (u16, u16),
+        definitions: &[Definition],
+        modal: Option<crate::modals::ModalId>,
+    ) -> Vec<Surface> {
+        let mut h = self.0.borrow_mut();
+        let active = h.active().id;
+        let previous_surfaces = definitions
+            .iter()
+            .filter_map(|d| h.shell_mut(d.key).map(|s| s.surface))
+            .collect::<Vec<_>>();
+        if h.interaction.modal != modal {
+            if let Some(c) = h.interaction.capture.take() {
+                if let Some(s) = h.shell_mut(c.id.key) {
+                    s.end();
+                    s.rollback(c.saved, size);
+                }
+            }
+            h.interaction.modal = modal;
+            h.interaction.last_title = None;
+        }
+        let top = definitions
+            .iter()
+            .rev()
+            .find(|d| match d.key {
+                SurfaceKey::Modal(_) | SurfaceKey::ModalPage(..) => true,
+                SurfaceKey::Page(id, _) => id == active,
+                _ => false,
+            })
+            .map(|d| d.key)
+            .or(Some(SurfaceKey::Document(active)));
+        if h.interaction.top != top {
+            if let Some(c) = h.interaction.capture.take() {
+                if top != Some(c.id.key) {
+                    if let Some(s) = h.shell_mut(c.id.key) {
+                        s.end();
+                        s.rollback(c.saved, size);
+                    }
+                } else {
+                    h.interaction.capture = Some(c);
+                }
+            }
+            h.interaction.top = top;
+        }
+        let resized = h.interaction.size != size;
+        if resized {
+            if let Some(c) = h.interaction.capture.take() {
+                if let Some(s) = h.shell_mut(c.id.key) {
+                    s.end();
+                    s.rollback(c.saved, size);
+                }
+            }
+            h.interaction.size = size;
+            h.interaction.revision += 1;
+        }
+        let root = Rect::new(0, 0, size.0 as i16, size.1 as i16);
+        if h.bounds != root {
+            h.bounds = root;
+            h.desktop.set_bounds(root);
+        }
+        let previous = h.auxiliary.len();
+        h.auxiliary
+            .retain(|key, _| definitions.iter().any(|d| d.key == *key));
+        if previous != h.auxiliary.len() {
+            h.interaction.revision += 1;
+        }
+        for d in definitions {
+            if !matches!(d.key, SurfaceKey::Document(_)) && !h.auxiliary.contains_key(&d.key) {
+                let generation = h.next_surface;
+                h.next_surface += 1;
+                let mut shell = Shell::new(*d, generation, size);
+                if let Some(parent) = d.parent.and_then(|key| h.shell_mut(key).map(|s| s.surface)) {
+                    let w = d.bounds.width;
+                    let height = d.bounds.height;
+                    shell.preferred = geometry::clamp(
+                        if parent.maximized {
+                            d.bounds
+                        } else {
+                            crate::presentation::layout::Rect::new(
+                                (parent.bounds.x + parent.bounds.width / 2).saturating_sub(w / 2),
+                                (parent.bounds.y + parent.bounds.height / 2)
+                                    .saturating_sub(height / 2),
+                                w,
+                                height,
+                            )
+                        },
+                        geometry::workspace(size),
+                    );
+                    shell.sync(*d, size);
+                }
+                h.auxiliary.insert(d.key, shell);
+                h.interaction.revision += 1;
+            }
+            let captured = h
+                .interaction
+                .capture
+                .as_ref()
+                .is_some_and(|c| c.id.key == d.key);
+            if !captured {
+                if let Some(shell) = h.shell_mut(d.key) {
+                    shell.sync(*d, size);
+                }
+            }
+        }
+        if h.interaction.capture.as_ref().is_some_and(|c| {
+            !h.auxiliary.contains_key(&c.id.key) && !matches!(c.id.key, SurfaceKey::Document(_))
+        }) {
+            h.interaction.capture = None;
+        }
+        let surfaces = definitions
+            .iter()
+            .filter_map(|d| h.shell_mut(d.key).map(|s| s.surface))
+            .collect::<Vec<_>>();
+        if surfaces != previous_surfaces {
+            h.interaction.revision += 1;
+        }
+        surfaces
+    }
+    pub(crate) fn surface(&self, key: SurfaceKey) -> Option<Surface> {
+        let mut h = self.0.borrow_mut();
+        h.shell_mut(key).map(|s| s.surface)
+    }
+    pub(crate) fn z_order(&self) -> Vec<WindowId> {
+        let h = self.0.borrow();
+        (0..h.desktop.child_count())
+            .filter_map(|i| h.desktop.child_at(i).as_any().downcast_ref::<Document>())
+            .filter(|d| d.scope == Scope::Content)
+            .map(|d| d.info.id)
+            .collect()
+    }
+    pub(crate) fn top_surface(&self) -> Option<Surface> {
+        let mut h = self.0.borrow_mut();
+        let key = h.interaction.top?;
+        if key == SurfaceKey::Document(WindowId::MANAGER) {
+            return None;
+        }
+        h.shell_mut(key).map(|s| s.surface)
+    }
+    pub(crate) fn geometry_revision(&self) -> u64 {
+        self.0.borrow().interaction.revision
+    }
+    pub(crate) fn manipulating(&self) -> bool {
+        self.0.borrow().interaction.capture.is_some()
+    }
+    pub(crate) fn zoom_surface(&self, id: SurfaceId) -> bool {
+        let mut h = self.0.borrow_mut();
+        let size = h.interaction.size;
+        if let Some(s) = h
+            .shell_mut(id.key)
+            .filter(|s| s.surface.id == id && s.surface.caps.zoom)
+        {
+            s.zoom(size);
+            h.interaction.revision += 1;
+            true
+        } else {
+            false
+        }
+    }
+    pub(crate) fn begin_move(
+        &self,
+        id: SurfaceId,
+        mouse: Option<crossterm::event::MouseEvent>,
+    ) -> bool {
+        let mut h = self.0.borrow_mut();
+        let size = h.interaction.size;
+        let Some(shell) = h.shell_mut(id.key).filter(|s| s.surface.id == id) else {
+            return false;
+        };
+        let saved = shell.save();
+        let restored = shell.surface.maximized;
+        if restored {
+            shell.restore(size);
+            if let Some(e) = mouse {
+                let r = shell.surface.bounds;
+                let x = e.column.saturating_sub(r.width / 2);
+                shell.preferred = geometry::clamp(
+                    crate::presentation::layout::Rect::new(x, e.row, r.width, r.height),
+                    geometry::workspace(size),
+                );
+                shell.restore(size);
+            }
+        }
+        if let Some(mut e) = mouse {
+            if e.row < shell.surface.bounds.y {
+                e.row = shell.surface.bounds.y;
+            }
+            // The host classified this press using the maximized title.
+            // Restoring may place a different native zoom icon under the pointer;
+            // arm a drag rather than reinterpreting that press as a new control.
+            if restored {
+                shell.window.set_zoomable(false);
+            }
+            shell.native_mouse(e);
+            if restored {
+                shell.window.set_zoomable(shell.surface.caps.zoom);
+            }
+        } else {
+            shell.keyboard_start();
+        }
+        h.interaction.capture = Some(Capture {
+            id,
+            saved,
+            keyboard: mouse.is_none(),
+            dragged: false,
+        });
+        h.interaction.revision += 1;
+        true
+    }
+    pub(crate) fn geometry_key(&self, key: crossterm::event::KeyEvent) -> bool {
+        use crossterm::event::KeyCode;
+        let mut h = self.0.borrow_mut();
+        let Some(c) = h.interaction.capture.take() else {
+            return false;
+        };
+        let size = h.interaction.size;
+        if let Some(shell) = h.shell_mut(c.id.key).filter(|s| s.surface.id == c.id) {
+            match key.code {
+                KeyCode::Esc => {
+                    shell.end();
+                    shell.rollback(c.saved, size);
+                }
+                KeyCode::Enter => {
+                    shell.end();
+                    shell.commit();
+                }
+                _ => {
+                    if c.keyboard {
+                        shell.keyboard_step(key, size);
+                    }
+                    h.interaction.capture = Some(c);
+                }
+            }
+        }
+        h.interaction.revision += 1;
+        true
+    }
+    pub(crate) fn geometry_mouse(&self, e: crossterm::event::MouseEvent) -> bool {
+        let mut h = self.0.borrow_mut();
+        let Some(mut c) = h.interaction.capture.take() else {
+            return false;
+        };
+        if matches!(e.kind, crossterm::event::MouseEventKind::Drag(_)) {
+            h.interaction.last_title = None;
+            c.dragged = true;
+        }
+        let size = h.interaction.size;
+        if let Some(shell) = h.shell_mut(c.id.key).filter(|s| s.surface.id == c.id) {
+            if !c.keyboard && geometry::left(e) {
+                shell.native_mouse(e);
+                shell.commit();
+            }
+            if matches!(
+                e.kind,
+                crossterm::event::MouseEventKind::Up(crossterm::event::MouseButton::Left)
+            ) && !c.keyboard
+            {
+                shell.end();
+                if !c.dragged {
+                    shell.rollback(c.saved, size);
+                }
+            } else {
+                h.interaction.capture = Some(c);
+            }
+        }
+        h.interaction.revision += 1;
+        true
+    }
+    pub(crate) fn title_double(
+        &self,
+        id: SurfaceId,
+        point: (u16, u16),
+        now: std::time::Instant,
+    ) -> bool {
+        self.0.borrow_mut().interaction.double(id, point, now)
     }
 }

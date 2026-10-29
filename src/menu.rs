@@ -51,6 +51,8 @@ pub enum Action {
     InvertSelection,
     SwapPanels,
     WindowList,
+    WindowMove,
+    WindowZoom,
     SaveSettings,
     LoadSettings,
     About,
@@ -237,6 +239,8 @@ pub fn execute(app: &mut App, action: Action) {
         Action::ClearSelection => app.panels[app.active].selected.clear(),
         Action::InvertSelection => app.panels[app.active].invert_visible(),
         Action::WindowList => crate::windowing::open(app),
+        Action::WindowMove=>crate::windowing::move_active(app,false),
+        Action::WindowZoom=>crate::windowing::move_active(app,true),
         Action::SwapPanels => { app.panels.swap(0, 1); app.active ^= 1; }
         _ => {}
     }
