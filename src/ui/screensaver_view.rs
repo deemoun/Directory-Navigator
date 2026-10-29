@@ -1,3 +1,4 @@
+use crate::dialog_theme as theme;
 use crate::painting::{Block, Frame, Paragraph};
 use crate::presentation::layout::Rect;
 use crate::turbo::dialog_spec::{scope, Control, ControlKind, DialogSpec};
@@ -40,11 +41,12 @@ pub(crate) fn saver_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
         Target::Screensaver(CANCEL),
     );
     spec.caption(
-        Paragraph::new(app.config.language.text("Selected saver: Star Sky")).style(dos(0x70)),
+        Paragraph::new(app.config.language.text("Selected saver: Star Sky"))
+            .style(dos(theme::TEXT)),
         Rect::new(rect.x + 3, rect.y + 2, 52, 1),
     );
     spec.caption(
-        Paragraph::new(app.config.language.text("Time before screen rest")).style(dos(0x70)),
+        Paragraph::new(app.config.language.text("Time before screen rest")).style(dos(theme::TEXT)),
         Rect::new(rect.x + 3, rect.y + 4, 52, 1),
     );
     for (i, minutes) in DELAYS.iter().enumerate() {
@@ -75,7 +77,7 @@ pub(crate) fn saver_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
                 .language
                 .text("Any key or mouse input returns to DN"),
         )
-        .style(dos(0x70)),
+        .style(dos(theme::TEXT)),
         Rect::new(rect.x + 3, rect.y + 14, 52, 1),
     );
     for (i, x, label) in [

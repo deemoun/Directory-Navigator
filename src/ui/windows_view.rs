@@ -1,10 +1,7 @@
+use crate::dialog_theme as theme;
 use crate::turbo::dialog_spec::{scope, Control, ControlKind, DialogSpec};
-pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
-    if let Some(s) = windows_spec(app, area) {
-        s.paint(frame, app);
-    }
-}
-use crate::painting::{Frame, Paragraph};
+
+use crate::painting::Paragraph;
 use crate::presentation::layout::Rect;
 use crate::{
     app::App, desktop::WindowKind, filesystem::display_name, mouse::Target, windowing::Action,
@@ -110,7 +107,8 @@ pub(crate) fn windows_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
     control.hits.clear();
     spec.control(control);
     spec.caption(
-        Paragraph::new(language.text("Switching keeps documents open")).style(profile.dos(0x70)),
+        Paragraph::new(language.text("Switching keeps documents open"))
+            .style(profile.dos(theme::TEXT)),
         Rect::new(rect.x + 2, rect.bottom() - 4, rect.width - 4, 1),
     );
     for (label, command, focus, x) in [

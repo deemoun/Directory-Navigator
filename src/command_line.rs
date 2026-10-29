@@ -76,9 +76,7 @@ impl CommandLine {
         self.recalled = None;
     }
     fn remember(&mut self) {
-        self.history.retain(|s| s != &self.text);
-        self.history.insert(0, self.text.clone());
-        self.history.truncate(100);
+        crate::history::remember(&mut self.history, self.text.clone(), 100);
     }
     fn recall(&mut self, previous: bool) {
         if self.history.is_empty() {

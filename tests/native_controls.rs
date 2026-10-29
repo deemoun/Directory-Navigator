@@ -1,45 +1,22 @@
-use crossterm::event::{
-    KeyCode as K, KeyEvent, KeyModifiers as M, MouseButton, MouseEvent, MouseEventKind,
-};
+use crossterm::event::{KeyCode as K, KeyModifiers as M, MouseButton, MouseEvent, MouseEventKind};
 use dn::{
     app::App,
-    input, layout,
+    layout,
     mouse::{self, Target},
     presentation::layout::Rect,
     settings::{self, Settings, SettingsKind},
     testing::Buffer,
     ui,
 };
-use std::{
-    fs, io,
-    path::PathBuf,
-    sync::atomic::{AtomicU64, Ordering},
-    time::Instant,
-};
-struct Temp(PathBuf);
-impl Temp {
-    fn app() -> io::Result<(Self, App)> {
-        static NEXT: AtomicU64 = AtomicU64::new(0);
-        let root = std::env::temp_dir().join(format!(
-            "dn-native-controls-{}-{}",
-            std::process::id(),
-            NEXT.fetch_add(1, Ordering::Relaxed)
-        ));
-        fs::create_dir(&root)?;
-        let temp = Self(fs::canonicalize(root)?);
-        let mut app = App::new(temp.0.clone())?;
-        app.config.save_on_exit = false;
-        Ok((temp, app))
-    }
+use std::{fs, io, time::Instant};
+mod support;
+use support::{key, Fixture as Temp};
+fn fixture() -> io::Result<(Temp, App)> {
+    let t = Temp::new("native-controls")?.canonicalized()?;
+    let a = t.app()?;
+    Ok((t, a))
 }
-impl Drop for Temp {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.0);
-    }
-}
-fn key(app: &mut App, code: K) {
-    input::handle(app, KeyEvent::new(code, M::NONE));
-}
+
 fn render(app: &mut App) -> Buffer {
     let snapshot = layout::prepare_window(
         app,
@@ -54,7 +31,7 @@ fn render(app: &mut App) -> Buffer {
 }
 #[test]
 fn native_choice_cancel_and_accept_remain_inside_the_parent_draft() -> io::Result<()> {
-    let (_temp, mut app) = Temp::app()?;
+    let (_temp, mut app) = fixture()?;
     let original = app.config.shortcuts;
     app.modals
         .set_settings(Some(Settings::new(SettingsKind::Keyboard, &app.config)));
@@ -81,7 +58,7 @@ fn native_choice_cancel_and_accept_remain_inside_the_parent_draft() -> io::Resul
 }
 #[test]
 fn native_choice_render_is_immutable_clipped_and_mouse_accepts_only_the_child() -> io::Result<()> {
-    let (_temp, mut app) = Temp::app()?;
+    let (_temp, mut app) = fixture()?;
     app.modals
         .set_settings(Some(Settings::new(SettingsKind::Regional, &app.config)));
     settings::open_choice(&mut app, 1);
@@ -126,7 +103,7 @@ fn native_choice_render_is_immutable_clipped_and_mouse_accepts_only_the_child() 
 }
 #[test]
 fn retiring_a_parent_retires_choices_and_stale_mouse_cannot_edit_replacement() -> io::Result<()> {
-    let (_temp, mut app) = Temp::app()?;
+    let (_temp, mut app) = fixture()?;
     app.modals
         .set_settings(Some(Settings::new(SettingsKind::Keyboard, &app.config)));
     settings::open_choice(&mut app, 0);
@@ -162,7 +139,7 @@ fn retiring_a_parent_retires_choices_and_stale_mouse_cannot_edit_replacement() -
 
 #[test]
 fn native_outline_leaf_name_double_click_opens_the_directory() -> io::Result<()> {
-    let (temp, mut app) = Temp::app()?;
+    let (temp, mut app) = fixture()?;
     let leaf = temp.0.join("empty");
     fs::create_dir(&leaf)?;
     fn settle(app: &mut App) {
@@ -229,7 +206,7 @@ fn native_outline_leaf_name_double_click_opens_the_directory() -> io::Result<()>
 #[test]
 fn embedded_settings_rows_fill_the_whole_width_on_the_dialog_background() -> io::Result<()> {
     use dn::{localization::Language, palette::PaletteProfile};
-    let (_temp, mut app) = Temp::app()?;
+    let (_temp, mut app) = fixture()?;
     for palette in [PaletteProfile::ClassicDn, PaletteProfile::Terminal] {
         for language in [Language::English, Language::Russian] {
             app.config.palette = palette;

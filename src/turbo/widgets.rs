@@ -384,11 +384,7 @@ pub(crate) fn button(label: &str, selected: bool) -> Native {
 /// The Enter default is visible without taking focus from an input or list.
 pub(crate) fn button_with_default(label: &str, focused: bool, default_active: bool) -> Native {
     let mut text = TextCells::default();
-    let label = label
-        .trim()
-        .trim_start_matches('[')
-        .trim_end_matches(']')
-        .trim();
+    let label = crate::dialog_theme::button_caption(label);
     // Reserve the left owner-coloured cell and center within the actual face.
     let mut view = Button::new(
         TvRect::new(0, 0, 1, 1),
@@ -1074,6 +1070,24 @@ mod tests {
                 scene.cells[&(3, 7)].resolved(profile).fg,
                 Some(profile.color(11))
             );
+        }
+    }
+    #[test]
+    fn minimum_sized_buttons_keep_both_markers_and_unicode_captions() {
+        for profile in [PaletteProfile::ClassicDn, PaletteProfile::Terminal] {
+            for label in ["Cancel", "От~м~ена", "~界~e\u{301}"] {
+                let width = crate::dialog_theme::minimum_button_width(label);
+                let mut frame = NativeFrame::new(Rect::new(0, 0, width + 4, 5), profile);
+                frame.render_widget(button(label, true), Rect::new(2, 1, width, 2));
+                let scene = frame.finish();
+                assert_eq!(scene.cells[&(3, 1)].text, "►");
+                assert_eq!(scene.cells[&(width, 1)].text, "◄");
+                let text = (2..width + 2)
+                    .filter_map(|x| scene.cells.get(&(x, 1)))
+                    .map(|g| g.text.as_str())
+                    .collect::<String>();
+                assert!(text.contains(&label.replace('~', "")), "{text:?}");
+            }
         }
     }
     #[test]

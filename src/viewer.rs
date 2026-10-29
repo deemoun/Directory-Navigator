@@ -4,7 +4,6 @@ pub use navigation::{action, key, paste, Action, Match, SearchDialog, SearchMemo
 use std::{
     io::{self, Read},
     path::{Path, PathBuf},
-    sync::mpsc,
 };
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -201,22 +200,14 @@ impl Viewer {
     }
 
     pub fn poll(&mut self) -> Option<Result<(), String>> {
-        let result = self.pending.as_ref()?.try_recv();
-        match result {
-            Ok(result) => {
-                self.pending = None;
-                Some(result.map(|contents| {
-                    self.contents = Some(contents);
-                    self.layout_width = 0;
-                    self.rows.clear();
-                }))
-            }
-            Err(mpsc::TryRecvError::Disconnected) => {
-                self.pending = None;
-                Some(Err("Viewer worker stopped".into()))
-            }
-            Err(mpsc::TryRecvError::Empty) => None,
-        }
+        Some(match crate::task::take_reply(&mut self.pending)? {
+            Ok(result) => result.map(|contents| {
+                self.contents = Some(contents);
+                self.layout_width = 0;
+                self.rows.clear();
+            }),
+            Err(_) => Err("Viewer worker stopped".into()),
+        })
     }
 
     pub fn step(&mut self, amount: isize) {

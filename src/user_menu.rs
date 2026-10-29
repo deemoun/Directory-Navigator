@@ -91,19 +91,19 @@ impl Modal {
     }
     pub fn keep_visible(&mut self) {
         self.rows = self.rows.max(1);
-        let len = if self.review.is_some() {
+        let last = if self.review.is_some() {
             self.review_lines.len()
         } else {
             self.items().len()
-        };
-        self.cursor = self.cursor.min(len.saturating_sub(1));
-        if self.cursor < self.offset {
-            self.offset = self.cursor;
         }
-        if self.cursor >= self.offset + self.rows {
-            self.offset = self.cursor + 1 - self.rows;
-        }
-        self.offset = self.offset.min(len.saturating_sub(1));
+        .saturating_sub(1);
+        crate::list_state::ListViewport::fit(
+            &mut self.cursor,
+            &mut self.offset,
+            self.rows,
+            Some(last),
+            Some(last),
+        );
     }
     pub fn step(&mut self, delta: isize) {
         let count = self.items().len();
@@ -648,11 +648,7 @@ pub fn mouse(app: &mut App, event: MouseEvent, target: Option<crate::mouse::Targ
         }
         MouseEventKind::ScrollUp | MouseEventKind::ScrollDown => {
             if let Some(m) = app.user_menu.modals.user_menu_mut() {
-                m.step(if event.kind == MouseEventKind::ScrollUp {
-                    -3
-                } else {
-                    3
-                });
+                m.step(crate::list_state::wheel_delta(event.kind));
             }
         }
         _ => {}

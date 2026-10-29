@@ -116,7 +116,7 @@ failure recovery and cancellation.
 
 ## Validation
 
-macOS ARM64: 525 native Rust tests pass; the existing opt-in native Trash test is
+macOS ARM64: 538 native Rust tests pass; the existing opt-in native Trash test is
 ignored. Formatting, all-target Clippy, release and no-default-features checks pass.
 All 128 pre/post cell/style captures match across both palettes/languages and two
 terminal sizes. Release PTYs cover module/window switching, inactive gravity,

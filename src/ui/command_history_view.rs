@@ -1,10 +1,7 @@
+use crate::dialog_theme as theme;
 use crate::turbo::dialog_spec::{scope, Control, ControlKind, DialogSpec};
-pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
-    if let Some(s) = command_history_spec(app, area) {
-        s.paint(frame, app);
-    }
-}
-use crate::painting::{Frame, Paragraph};
+
+use crate::painting::Paragraph;
 use crate::presentation::{layout::Rect, text::Line};
 use crate::{
     app::App,
@@ -29,7 +26,7 @@ pub(crate) fn command_history_spec(app: &App, area: Rect) -> Option<DialogSpec<'
     let x = rect.x + 2;
     let width = rect.width - 4;
     spec.caption(
-        Paragraph::new(language.text("Filter commands")).style(dos(0x70)),
+        Paragraph::new(language.text("Filter commands")).style(dos(theme::TEXT)),
         Rect::new(x, rect.y + 1, width, 1),
     );
     let field = Rect::new(x, rect.y + 2, width, 1);
@@ -54,7 +51,7 @@ pub(crate) fn command_history_spec(app: &App, area: Rect) -> Option<DialogSpec<'
             } else {
                 "No matching commands."
             }))
-            .style(dos(0x70)),
+            .style(dos(theme::TEXT)),
             Rect::new(x, rect.y + 4, width, 1),
         );
     }
@@ -85,7 +82,7 @@ pub(crate) fn command_history_spec(app: &App, area: Rect) -> Option<DialogSpec<'
     }
     spec.caption(
         Paragraph::new(language.text("Enter recalls without running · Tab moves · Esc cancels"))
-            .style(dos(0x70)),
+            .style(dos(theme::TEXT)),
         Rect::new(x, rect.bottom() - 3, width, 1),
     );
     for (label, a, focus, button_x) in [

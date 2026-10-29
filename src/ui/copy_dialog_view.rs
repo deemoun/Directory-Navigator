@@ -1,3 +1,4 @@
+use crate::dialog_theme as theme;
 use crate::turbo::dialog_spec::{centered, scope, Control, ControlKind, DialogSpec};
 use crate::{
     app::App,
@@ -65,7 +66,7 @@ pub(crate) fn copy_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
             .replace("{}", &prompt.sources.len().to_string())
     };
     spec.caption(
-        Paragraph::new(formatting::tail(&label, 55)).style(dos(0x7f)),
+        Paragraph::new(formatting::tail(&label, 55)).style(dos(theme::FRAME)),
         Rect::new(rect.x + 2, rect.y + 1, 55, 1),
     );
     let field = Rect::new(rect.x + 2, rect.y + 2, 53, 1);
@@ -130,7 +131,8 @@ pub(crate) fn copy_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
         spec.control(control);
     }
     spec.caption(
-        Paragraph::new(language.text("Existing destinations are never replaced.")).style(dos(0x78)),
+        Paragraph::new(language.text("Existing destinations are never replaced."))
+            .style(dos(theme::DISABLED)),
         Rect::new(rect.x + 3, rect.y + 9, 53, 1),
     );
     for (x, y, label, action, checked, focus, enabled) in [
@@ -185,20 +187,24 @@ pub(crate) fn copy_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
         control.enabled = enabled;
         spec.control(control);
     }
-    for (index, label, target) in [
+    let buttons = [
         (0, "O~K~", Target::SubmitPrompt),
         (1, "~C~ancel", Target::CancelPrompt),
         (2, "~T~ree", Target::Copy(Action::Tree)),
         (3, "~H~elp", Target::PromptHelp),
-    ] {
-        let area = Rect::new(rect.x + 12 + index * 10, rect.y + 13, 10, 1);
+    ];
+    let labels = buttons.map(|(_, label, _)| language.text(label));
+    let bounds = theme::button_row(Rect::new(rect.x + 2, rect.y + 13, 50, 1), &labels, 10, 0);
+    for ((index, source, target), (label, area)) in
+        buttons.into_iter().zip(labels.into_iter().zip(bounds))
+    {
         let mut control = Control::new(
             6 + index as usize,
             area,
-            ControlKind::Button(language.text(label).into()),
+            ControlKind::Button(label.into()),
             target,
         );
-        control.label_keys(language, label);
+        control.label_keys(language, source);
         spec.control(control);
     }
     spec.tab_order = crate::copy_dialog::FOCUS.to_vec();
@@ -229,7 +235,8 @@ pub(crate) fn history_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
     );
     if h.paths.is_empty() {
         s.caption(
-            Paragraph::new(app.config.language.text("No destination history")).style(p.dos(0x78)),
+            Paragraph::new(app.config.language.text("No destination history"))
+                .style(p.dos(theme::DISABLED)),
             Rect::new(rect.x + 2, rect.y + 2, 66, 1),
         );
     }
@@ -259,7 +266,8 @@ pub(crate) fn history_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
         .collect();
     s.control(c);
     s.caption(
-        Paragraph::new(app.config.language.text("Enter selects · Esc returns")).style(p.dos(0x70)),
+        Paragraph::new(app.config.language.text("Enter selects · Esc returns"))
+            .style(p.dos(theme::TEXT)),
         Rect::new(rect.x + 2, rect.bottom() - 2, 66, 1),
     );
     Some(s)

@@ -147,19 +147,17 @@ pub(crate) fn dispatch(app: &mut App, b: Binding, event: Event<'_>) {
         if tool.uses_controls(key) {
             let proposal = tool.controls(&ctx).key(key);
             if let Some(p) = proposal {
-                if !p.current(app) {
-                    return;
-                }
-                let tool = &mut app.desktop.plugins.entries.get_mut(&b.plugin).unwrap().tool;
-                let mut effects = tool.event(Event::Focus(p.focus), &ctx);
-                if let Some(Target::Plugin(id, a)) = p
-                    .action
-                    .filter(|t| matches!(t,Target::Plugin(id,_) if *id==b.plugin))
-                {
-                    let _ = id;
-                    effects.extend(tool.event(Event::Action(a), &ctx));
-                }
-                apply(app, b, effects);
+                p.deliver(app, |app, focus, target| {
+                    let tool = &mut app.desktop.plugins.entries.get_mut(&b.plugin).unwrap().tool;
+                    let mut effects = tool.event(Event::Focus(focus), &ctx);
+                    if let Some(Target::Plugin(id, a)) =
+                        target.filter(|t| matches!(t,Target::Plugin(id,_) if *id==b.plugin))
+                    {
+                        let _ = id;
+                        effects.extend(tool.event(Event::Action(a), &ctx));
+                    }
+                    apply(app, b, effects);
+                });
                 return;
             }
         }

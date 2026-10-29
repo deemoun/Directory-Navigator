@@ -1,10 +1,7 @@
+use crate::dialog_theme as theme;
 use crate::turbo::dialog_spec::{scope, Control, ControlKind, DialogSpec};
-pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
-    if let Some(spec) = navigation_spec(app, area) {
-        spec.paint(frame, app);
-    }
-}
-use crate::painting::{Frame, Paragraph};
+
+use crate::painting::Paragraph;
 use crate::presentation::{layout::Rect, text::Line};
 use crate::{
     app::App,
@@ -88,7 +85,7 @@ pub(crate) fn navigation_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
                         .language
                         .text("↑↓ / 1–9 choose · Tab moves · Ctrl+1–9 set · Alt+1–9 go"),
                 )
-                .style(dos(0x70)),
+                .style(dos(theme::TEXT)),
                 Rect::new(x, rect.y + 11, w, 2),
             );
             for (i, label, action) in [
@@ -110,7 +107,7 @@ pub(crate) fn navigation_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
             cursor,
             focus,
         } => {
-            spec.caption(Paragraph::new(app.config.language.text("Visible cached filenames · case-sensitive * and ?\nEmpty or * clears · Parent stays visible\nFiltered marks are preserved; operations use visible marks")).style(dos(0x70)),Rect::new(x,rect.y+1,w,3));
+            spec.caption(Paragraph::new(app.config.language.text("Visible cached filenames · case-sensitive * and ?\nEmpty or * clears · Parent stays visible\nFiltered marks are preserved; operations use visible marks")).style(dos(theme::TEXT)),Rect::new(x,rect.y+1,w,3));
             let input = Rect::new(x, rect.y + 5, w, 1);
             let column = Line::from(&field[..*cursor]).width();
             let scroll = column.saturating_sub(w.saturating_sub(1) as usize);

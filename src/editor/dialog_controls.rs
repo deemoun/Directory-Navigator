@@ -26,21 +26,10 @@ pub(super) fn key(app: &mut App, key: KeyEvent) -> bool {
     let Some(proposal) = proposal else {
         return false;
     };
-    if !proposal.current(app) {
-        return true;
-    }
-    if let Some(editor) = app.desktop.active_editor_mut() {
-        match editor.modals.editor_modal_mut() {
-            Some(Modal::Search(d)) => d.focus = proposal.focus,
-            Some(Modal::Replace(s)) => s.focus = proposal.focus,
-            Some(Modal::Prompt { focus, .. } | Modal::ConfirmClose { focus }) => {
-                *focus = proposal.focus
-            }
-            _ => {}
+    crate::dialog_controls::apply(app, proposal, |app, target| {
+        if let Target::Editor(command) = target {
+            action(app, command);
         }
-    }
-    if let Some(Target::Editor(command)) = proposal.action {
-        action(app, command);
-    }
+    });
     true
 }

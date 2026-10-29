@@ -1,3 +1,4 @@
+use crate::dialog_theme as theme;
 use crate::painting::{Frame, Paragraph};
 use crate::presentation::{layout::Rect, text::Span};
 use crate::turbo::dialog_spec::{centered, scope, Control, ControlKind, DialogSpec};
@@ -125,7 +126,7 @@ pub(crate) fn editor_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
                     continue;
                 }
                 spec.caption(
-                    Paragraph::new(app.config.language.text(label)).style(dos(0x70)),
+                    Paragraph::new(app.config.language.text(label)).style(dos(theme::TEXT)),
                     Rect::new(rect.x + 3, rect.y + row, 14, 1),
                 );
                 let field_rect = Rect::new(rect.x + 18, rect.y + row, 50, 1);
@@ -233,7 +234,7 @@ pub(crate) fn editor_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
                 control.enabled = enabled;
                 spec.control(control);
             }
-            spec.caption(Paragraph::new(app.config.language.text("Tab chooses field/option · Space toggles · Enter OK\nAlt+C/W: options · Alt+B/D: direction · Esc Cancel")).style(dos(0x70)), Rect::new(rect.x + 3, rect.y + 14, 66, 2));
+            spec.caption(Paragraph::new(app.config.language.text("Tab chooses field/option · Space toggles · Enter OK\nAlt+C/W: options · Alt+B/D: direction · Esc Cancel")).style(dos(theme::TEXT)), Rect::new(rect.x + 3, rect.y + 14, 66, 2));
             button(
                 &mut spec,
                 app,
@@ -289,7 +290,14 @@ pub(crate) fn editor_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
             }
         }
         Modal::Help => {
-            spec.memo(app.config.language.text(if app.config.shortcuts.is_mac() { crate::shortcuts::EDITOR_HELP } else { "F2 / Ctrl+S Save · Shift+F2 Save As · F3 Open\nF6 Duplicate line · F7 / Ctrl+F Find\nShift+F7 Search again · Alt+F7 Reverse search\nCtrl+F7 Replace · Alt+G / Ctrl+G Go to line\nCtrl+←/→ words · Ctrl+Shift+←/→ select words\nShift+arrows select · Ctrl+A select all\nAlt+Backspace / Ctrl+Z Undo · Ctrl+Y Redo\nCtrl+Ins/C Copy · Shift+Del / Ctrl+X Cut\nShift+Ins / Ctrl+V Paste · terminal paste supported\nAlt+B Block: selection/clipboard · Options: indent/colors/tabs\nF10 Menu · Alt+0 Windows · Ctrl+F4 / Esc Close · Alt+X Quit DN\nOpen/Close/Quit protect unsaved changes.\nUTF-8, 2 MiB / 100k lines. Line endings preserved.\nSave As never overwrites an existing destination." }), Rect::new(rect.x + 2, rect.y + 2, 68, 15));
+            spec.memo(
+                app.config.language.text(if app.config.shortcuts.is_mac() {
+                    crate::shortcuts::EDITOR_HELP
+                } else {
+                    crate::commands::help::CLASSIC_EDITOR
+                }),
+                Rect::new(rect.x + 2, rect.y + 2, 68, 15),
+            );
             button(
                 &mut spec,
                 app,
@@ -330,7 +338,7 @@ pub(crate) fn editor_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
                 PromptKind::TabWidth => "Tab columns (1–16); Ctrl+A clears",
             };
             spec.caption(
-                Paragraph::new(app.config.language.text(label)).style(dos(0x70)),
+                Paragraph::new(app.config.language.text(label)).style(dos(theme::TEXT)),
                 Rect::new(rect.x + 2, rect.y + 1, rect.width - 4, 1),
             );
             input(

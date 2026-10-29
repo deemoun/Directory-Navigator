@@ -9,11 +9,7 @@ use crate::{
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use history::{Histories, HistoryKind};
-use std::{
-    path::PathBuf,
-    sync::mpsc,
-    time::{Duration, Instant},
-};
+use std::{path::PathBuf, sync::mpsc, time::Instant};
 
 pub enum ToolDialog {
     History {
@@ -285,9 +281,11 @@ pub fn action(app: &mut App, action: ToolAction) {
             {
                 if index < paths.len() {
                     let now = Instant::now();
-                    activate = last_click.is_some_and(|(old, time)| {
-                        old == index && now.duration_since(time) <= Duration::from_millis(500)
-                    });
+                    activate = crate::list_state::ClickTracker::FILE_HISTORY.matches(
+                        last_click.as_ref(),
+                        &index,
+                        now,
+                    );
                     *cursor = index;
                     *focus = 0;
                     *last_click = Some((index, now));

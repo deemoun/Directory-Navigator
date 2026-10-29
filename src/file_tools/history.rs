@@ -29,9 +29,7 @@ pub struct Histories {
 impl Histories {
     pub fn record(&mut self, kind: HistoryKind, path: PathBuf) {
         let list = &mut self.lists[kind.index()];
-        list.retain(|p| p != &path);
-        list.insert(0, path);
-        list.truncate(100);
+        crate::history::remember(list, path, 100);
     }
     pub fn get(&self, kind: HistoryKind) -> &[PathBuf] {
         &self.lists[kind.index()]

@@ -11,35 +11,9 @@ pub enum SettingsKind {
     Highlight,
     Plugins,
 }
-#[derive(Clone, Copy)]
-pub enum Setting {
-    SaveOnExit,
-    Clock,
-    HideMenu,
-    Hidden,
-    Highlight,
-    Tags,
-    Space,
-    DeleteKey,
-    Trash,
-    Backspace,
-}
-impl Setting {
-    pub fn label(self) -> &'static str {
-        match self {
-            Self::SaveOnExit => "Save settings on e~x~it",
-            Self::Clock => "Show ~c~lock",
-            Self::HideMenu => "Hide ~m~enu bar",
-            Self::Hidden => "Show ~h~idden files",
-            Self::Highlight => "~H~ighlight file types",
-            Self::Tags => "~T~ag character",
-            Self::Space => "~S~PACE toggles selection",
-            Self::DeleteKey => "~D~EL erases file(s)",
-            Self::Trash => "Move deleted files to T~r~ash",
-            Self::Backspace => "BS - go to ~u~pper directory",
-        }
-    }
-}
+pub(crate) mod choices;
+pub(crate) mod definition;
+pub use definition::Setting;
 
 pub struct Settings {
     pub kind: SettingsKind,
@@ -59,107 +33,45 @@ impl Settings {
         }
     }
     pub fn title(&self) -> &'static str {
-        match self.kind {
-            SettingsKind::Keyboard => " Keyboard shortcuts ",
-            SettingsKind::Regional => " Language / date & time ",
-            SettingsKind::System => " System Setup ",
-            SettingsKind::Interface => " Interface Setup ",
-            SettingsKind::FileManager => " File Manager Setup ",
-            SettingsKind::Highlight => " Highlight Groups ",
-            SettingsKind::Plugins => " Plugins ",
-        }
+        self.kind.definition().title
     }
     pub fn rows(&self) -> &'static [Setting] {
+        self.kind.definition().rows
+    }
+    pub(crate) fn choice_fields(&self) -> &'static [choices::ChoiceId] {
         match self.kind {
-            SettingsKind::Plugins | SettingsKind::Keyboard => &[],
-            SettingsKind::Regional => &[],
-            SettingsKind::System => &[Setting::Hidden, Setting::SaveOnExit],
-            SettingsKind::Interface => &[
-                Setting::Highlight,
-                Setting::Tags,
-                Setting::Clock,
-                Setting::HideMenu,
-            ],
-            SettingsKind::FileManager => &[
-                Setting::Space,
-                Setting::DeleteKey,
-                Setting::Backspace,
-                Setting::Tags,
-                Setting::Highlight,
-                Setting::Trash,
-            ],
-            SettingsKind::Highlight => &[Setting::Highlight],
+            SettingsKind::Keyboard => choices::KEYBOARD,
+            SettingsKind::Regional => choices::REGIONAL,
+            _ => &[],
         }
     }
     pub fn control_count(&self) -> usize {
         if self.kind == SettingsKind::Plugins {
             self.plugins.len()
-        } else if self.kind == SettingsKind::Keyboard {
-            1
-        } else if self.kind == SettingsKind::Regional {
-            5
+        } else if !self.choice_fields().is_empty() {
+            self.choice_fields().len()
         } else {
             self.rows().len()
         }
     }
     pub fn keyboard_choice(&mut self, reverse: bool) {
         if self.kind == SettingsKind::Keyboard {
-            self.cursor = 0;
-            self.draft.shortcuts = self.draft.shortcuts.next(reverse);
+            self.cycle_choice(0, reverse);
         }
     }
     pub fn regional_choice(&mut self, index: usize, reverse: bool) {
-        if self.kind != SettingsKind::Regional || index >= 5 {
-            return;
+        if self.kind == SettingsKind::Regional {
+            self.cycle_choice(index, reverse);
         }
-        self.cursor = index;
-        match index {
-            0 => {
-                self.draft.language =
-                    if self.draft.language == crate::localization::Language::English {
-                        crate::localization::Language::Russian
-                    } else {
-                        crate::localization::Language::English
-                    }
-            }
-            1 => {
-                self.draft.datetime.date_order = self.draft.datetime.date_order.next();
-                if reverse {
-                    self.draft.datetime.date_order = self.draft.datetime.date_order.next();
-                }
-            }
-            2 => {
-                let choices = ['-', '.', '/'];
-                let i = choices
-                    .iter()
-                    .position(|c| *c == self.draft.datetime.date_separator)
-                    .unwrap_or(0);
-                self.draft.datetime.date_separator = choices[(i + if reverse { 2 } else { 1 }) % 3];
-            }
-            3 => self.draft.datetime.twelve_hour = !self.draft.datetime.twelve_hour,
-            4 => {
-                self.draft.datetime.time_separator = if self.draft.datetime.time_separator == ':' {
-                    '.'
-                } else {
-                    ':'
-                }
-            }
-            _ => {}
+    }
+    fn cycle_choice(&mut self, index: usize, reverse: bool) {
+        if let Some(choice) = self.choice_fields().get(index) {
+            self.cursor = index;
+            choice.definition().cycle(&mut self.draft, reverse);
         }
     }
     pub fn value(&self, setting: Setting) -> bool {
-        match setting {
-            Setting::SaveOnExit => self.draft.save_on_exit,
-            Setting::Clock => self.draft.show_clock,
-            Setting::HideMenu => self.draft.hide_menu,
-            Setting::Hidden => self.draft.show_hidden,
-            Setting::Highlight => self.draft.highlight_files,
-            Setting::Tags => self.draft.show_tags,
-            Setting::Space => self.draft.space_select,
-            Setting::DeleteKey => self.draft.delete_key,
-            Setting::Trash => self.draft.use_trash,
-            Setting::Backspace => self.draft.backspace_parent,
-        }
+        (setting.definition().get)(&self.draft)
     }
     pub fn toggle(&mut self, index: usize) {
         if self.kind == SettingsKind::Plugins {
@@ -175,19 +87,9 @@ impl Settings {
             return;
         };
         self.cursor = index;
-        let value = match setting {
-            Setting::SaveOnExit => &mut self.draft.save_on_exit,
-            Setting::Clock => &mut self.draft.show_clock,
-            Setting::HideMenu => &mut self.draft.hide_menu,
-            Setting::Hidden => &mut self.draft.show_hidden,
-            Setting::Highlight => &mut self.draft.highlight_files,
-            Setting::Tags => &mut self.draft.show_tags,
-            Setting::Space => &mut self.draft.space_select,
-            Setting::DeleteKey => &mut self.draft.delete_key,
-            Setting::Trash => &mut self.draft.use_trash,
-            Setting::Backspace => &mut self.draft.backspace_parent,
-        };
-        *value = crate::turbo::widgets::toggle(*value);
+        let field = setting.definition();
+        let value = crate::turbo::widgets::toggle((field.get)(&self.draft));
+        (field.set)(&mut self.draft, value);
     }
 }
 
@@ -256,15 +158,7 @@ pub fn key(app: &mut App, code: KeyCode) {
         })
     };
     if let Some(proposal) = proposal {
-        if !proposal.current(app) {
-            return;
-        }
-        if let Some(settings) = app.modals.settings_mut() {
-            settings.cursor = proposal.focus;
-        }
-        if let Some(target) = proposal.action {
-            action(app, target);
-        }
+        crate::dialog_controls::apply(app, proposal, action);
     }
 }
 
@@ -281,47 +175,14 @@ pub fn choice_items(
     row: usize,
     language: crate::localization::Language,
 ) -> Vec<String> {
-    fn label(settings: &Settings, row: usize, language: crate::localization::Language) -> String {
-        if settings.kind == SettingsKind::Keyboard {
-            return language.text(settings.draft.shortcuts.name()).into();
-        }
-        match row {
-            0 => settings.draft.language.name().into(),
-            1 => language
-                .text(match settings.draft.datetime.date_order {
-                    crate::regional::DateOrder::Ymd => "Year–month–day",
-                    crate::regional::DateOrder::Dmy => "Day–month–year",
-                    crate::regional::DateOrder::Mdy => "Month–day–year",
-                })
-                .into(),
-            2 => settings.draft.datetime.date_separator.to_string(),
-            3 => language
-                .text(if settings.draft.datetime.twelve_hour {
-                    "12 hour"
-                } else {
-                    "24 hour"
-                })
-                .into(),
-            4 => settings.draft.datetime.time_separator.to_string(),
-            _ => String::new(),
-        }
-    }
-    let mut copy = Settings::new(settings.kind, &settings.draft);
-    let mut items = Vec::new();
-    for _ in 0..8 {
-        let value = label(&copy, row, language);
-        if items.contains(&value) {
-            break;
-        }
-        items.push(value);
-        if copy.kind == SettingsKind::Keyboard {
-            copy.keyboard_choice(false);
-        } else {
-            copy.regional_choice(row, false);
-        }
-    }
-    items
+    settings
+        .choice_fields()
+        .get(row)
+        .map_or_else(Vec::new, |choice| {
+            choice.definition().items(&settings.draft, language)
+        })
 }
+
 pub fn open_choice(app: &mut App, row: usize) {
     let Some(settings) = app.modals.settings() else {
         return;

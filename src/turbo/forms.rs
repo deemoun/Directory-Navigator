@@ -142,13 +142,7 @@ pub fn prompt_key(app: &mut App, key: KeyEvent) {
         }
     };
     if let Some(proposal) = proposal {
-        if !proposal.current(app) {
-            return;
-        }
-        if let Some(prompt) = app.modals.prompt_mut() {
-            prompt.focus = proposal.focus;
-        }
-        match proposal.action {
+        crate::dialog_controls::apply(app, proposal, |app, target| match Some(target) {
             Some(Target::SubmitPrompt) => app.submit_prompt(),
             Some(Target::CancelPrompt) => app.modals.set_prompt(None),
             Some(Target::PromptHelp) => crate::dialog::prompt_help(app),
@@ -158,7 +152,7 @@ pub fn prompt_key(app: &mut App, key: KeyEvent) {
                 }
             }
             _ => {}
-        }
+        });
     } else if !key.modifiers.intersects(M::CONTROL | M::ALT) {
         if let Some(prompt) = app.modals.prompt_mut().filter(|p| p.focus == 0) {
             prompt.edit(key.code);

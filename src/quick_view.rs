@@ -2,7 +2,6 @@ use crate::{app::App, task::Task, viewer::Viewer};
 use std::{
     fs,
     path::PathBuf,
-    sync::mpsc::TryRecvError,
     time::{Duration, Instant, SystemTime},
 };
 #[derive(PartialEq, Eq)]
@@ -117,13 +116,9 @@ impl QuickView {
             }
             changed = true;
         }
-        let result = self.probe.as_ref().and_then(|p| match p.try_recv() {
-            Ok(r) => Some(r),
-            Err(TryRecvError::Empty) => None,
-            Err(TryRecvError::Disconnected) => Some(Err("Preview worker stopped".into())),
-        });
+        let result = crate::task::take_reply(&mut self.probe)
+            .map(|reply| reply.unwrap_or_else(|_| Err("Preview worker stopped".into())));
         if let Some(result) = result {
-            self.probe = None;
             changed = true;
             match result {
                 Ok(Probe::Information(lines)) => self.lines = lines,

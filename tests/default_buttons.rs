@@ -1,54 +1,21 @@
-use crossterm::event::{KeyCode as K, KeyEvent, KeyModifiers as M};
+use crossterm::event::KeyCode as K;
 use dn::{
     app::App,
     input,
     mouse::Target,
     settings::{Settings, SettingsKind},
-    testing::{backend::TestBackend, Buffer, Terminal},
+    testing::Buffer,
     tetris::{self, GameAction, Screen},
-    ui,
 };
-use std::{
-    fs, io,
-    path::PathBuf,
-    sync::atomic::{AtomicU64, Ordering},
-};
-struct Temp(PathBuf);
-impl Temp {
-    fn app() -> io::Result<(Self, App)> {
-        static NEXT: AtomicU64 = AtomicU64::new(0);
-        let p = std::env::temp_dir().join(format!(
-            "dn-default-buttons-{}-{}",
-            std::process::id(),
-            NEXT.fetch_add(1, Ordering::Relaxed)
-        ));
-        fs::create_dir(&p)?;
-        let t = Self(p);
-        let mut app = App::new(t.0.clone())?;
-        app.config.save_on_exit = false;
-        app.config_store = dn::config::Store::new(Some(t.0.join("config.conf")));
-        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
-        while app.panels.iter().any(|p| p.loading) {
-            app.poll();
-            assert!(std::time::Instant::now() < deadline);
-            std::thread::sleep(std::time::Duration::from_millis(1));
-        }
-        Ok((t, app))
-    }
+use std::io;
+mod support;
+use support::{draw, key, Fixture as Temp};
+fn fixture() -> io::Result<(Temp, App)> {
+    let t = Temp::new("default-buttons")?.canonicalized()?;
+    let a = t.app()?;
+    Ok((t, a))
 }
-impl Drop for Temp {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.0);
-    }
-}
-fn draw(app: &mut App, w: u16, h: u16) -> io::Result<Buffer> {
-    let mut term = Terminal::new(TestBackend::new(w, h))?;
-    term.draw(|f| ui::draw(f, app))?;
-    Ok(term.backend().buffer().clone())
-}
-fn key(app: &mut App, code: K) {
-    input::handle(app, KeyEvent::new(code, M::NONE));
-}
+
 fn marked(app: &App, b: &Buffer, target: Target) -> bool {
     let r = app
         .mouse
@@ -70,7 +37,7 @@ fn marked(app: &App, b: &Buffer, target: Target) -> bool {
 }
 #[test]
 fn game_over_name_and_help_show_their_default_on_first_paint() -> io::Result<()> {
-    let (_t, mut app) = Temp::app()?;
+    let (_t, mut app) = fixture()?;
     tetris::open(&mut app);
     {
         let g = app.desktop.game_mut().unwrap();
@@ -100,7 +67,7 @@ fn game_over_name_and_help_show_their_default_on_first_paint() -> io::Result<()>
 }
 #[test]
 fn settings_default_remains_visible_until_another_button_takes_focus() -> io::Result<()> {
-    let (_t, mut app) = Temp::app()?;
+    let (_t, mut app) = fixture()?;
     app.modals
         .set_settings(Some(Settings::new(SettingsKind::Interface, &app.config)));
     let b = draw(&mut app, 80, 25)?;
@@ -121,7 +88,7 @@ fn settings_default_remains_visible_until_another_button_takes_focus() -> io::Re
 #[test]
 fn editor_defaults_keep_text_input_active_and_unsaved_cancel_safe() -> io::Result<()> {
     use dn::editor::{self, EditorAction as A, Modal};
-    let (_t, mut app) = Temp::app()?;
+    let (_t, mut app) = fixture()?;
     editor::open(&mut app, true);
     editor::paste(&mut app, "retained edits");
     editor::action(&mut app, A::GoTo);
@@ -144,7 +111,7 @@ fn editor_defaults_keep_text_input_active_and_unsaved_cancel_safe() -> io::Resul
 }
 #[test]
 fn list_default_and_pattern_default_are_unique_without_moving_model_focus() -> io::Result<()> {
-    let (_t, mut app) = Temp::app()?;
+    let (_t, mut app) = fixture()?;
     dn::windowing::open(&mut app);
     let b = draw(&mut app, 80, 25)?;
     assert!(marked(

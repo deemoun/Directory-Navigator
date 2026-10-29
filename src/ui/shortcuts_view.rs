@@ -1,3 +1,4 @@
+use crate::dialog_theme as theme;
 use crate::painting::{Frame, Paragraph};
 use crate::presentation::layout::Rect;
 use crate::turbo::dialog_spec::{centered, scope, Control, ControlKind, DialogSpec};
@@ -37,7 +38,7 @@ pub(super) fn draw_prefix(frame: &mut impl Frame, app: &App) {
     frame.regions().clear();
     super::dialog_style::close_button(frame, app.config.palette, rect, Target::CloseDialog);
     frame.render_widget(
-        Paragraph::new(text).style(app.config.palette.dos(0x70)),
+        Paragraph::new(text).style(app.config.palette.dos(theme::TEXT)),
         Rect::new(rect.x + 2, rect.y + 2, rect.width - 4, rect.height - 4),
     );
 }
@@ -46,7 +47,8 @@ pub(super) fn settings_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
     let settings = app.modals.settings()?;
     let profile = app.config.palette;
     let language = app.config.language;
-    let rect = centered(area, 74, 20);
+    let form = settings.kind.definition();
+    let rect = centered(area, form.width, form.height);
     let mut spec = DialogSpec::new(
         rect,
         scope(app, crate::focus::Focus::Settings)?,
@@ -57,7 +59,8 @@ pub(super) fn settings_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
     );
     let choice = Rect::new(rect.x + 3, rect.y + 2, rect.width - 6, 1);
     spec.caption(
-        Paragraph::new(language.text("Profile")).style(profile.dos(0x70)),
+        Paragraph::new(language.text(settings.choice_fields()[0].definition().caption))
+            .style(profile.dos(theme::TEXT)),
         Rect::new(choice.x, choice.y, 12, 1),
     );
     let field = Rect::new(choice.x + 12, choice.y, choice.width - 12, 1);
@@ -81,12 +84,12 @@ pub(super) fn settings_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
         "Classic DN uses F1–F10 and Alt/Ctrl combinations.\nTab switches panels; Insert or Space marks entries.\nF3 View · F4 Edit · F5 Copy · F6 Move\nF7 MkDir · F8 Trash/delete · F9 Menu · F10 Quit\nEditor: F2 Save · F7 Find · F10 Menu\nMac-friendly adds Ctrl+O sequences without Fn/Option.\nDefault: Classic DN. Automatic: Mac on macOS, Classic elsewhere."
     };
     spec.caption(
-        Paragraph::new(language.text(text)).style(profile.dos(0x70)),
+        Paragraph::new(language.text(text)).style(profile.dos(theme::TEXT)),
         Rect::new(rect.x + 3, rect.y + 4, rect.width - 6, 10),
     );
     spec.caption(
         Paragraph::new(language.text("←/→ or Space changes · Tab/↑↓ chooses"))
-            .style(profile.dos(0x70)),
+            .style(profile.dos(theme::TEXT)),
         Rect::new(rect.x + 3, rect.bottom() - 5, rect.width - 6, 1),
     );
     for (i, (label, target)) in [

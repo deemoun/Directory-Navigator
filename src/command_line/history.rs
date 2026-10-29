@@ -3,10 +3,7 @@ use super::CommandLine;
 use crate::presentation::layout::Rect;
 use crate::{app::App, mouse::Target};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
-use std::{
-    io,
-    time::{Duration, Instant},
-};
+use std::{io, time::Instant};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Action {
@@ -52,14 +49,13 @@ impl HistoryDialog {
     }
     pub fn keep_visible(&mut self) {
         self.rows = self.rows.max(1);
-        self.cursor = self.cursor.min(self.matches.len().saturating_sub(1));
-        self.offset = self.offset.min(self.cursor);
-        if self.cursor >= self.offset + self.rows {
-            self.offset = self.cursor + 1 - self.rows;
-        }
-        self.offset = self
-            .offset
-            .min(self.matches.len().saturating_sub(self.rows));
+        crate::list_state::ListViewport::fit(
+            &mut self.cursor,
+            &mut self.offset,
+            self.rows,
+            Some(self.matches.len().saturating_sub(1)),
+            Some(self.matches.len().saturating_sub(self.rows)),
+        );
     }
     fn step(&mut self, delta: isize) {
         self.cursor = self.cursor.saturating_add_signed(delta);
@@ -203,11 +199,7 @@ pub fn mouse(app: &mut App, event: MouseEvent, target: Option<Target>) {
         MouseEventKind::ScrollUp | MouseEventKind::ScrollDown => {
             if let Some(d) = app.command_line.modals.command_history_mut() {
                 d.last_click = None;
-                d.step(if event.kind == MouseEventKind::ScrollUp {
-                    -3
-                } else {
-                    3
-                });
+                d.step(crate::list_state::wheel_delta(event.kind));
             }
         }
         MouseEventKind::Down(MouseButton::Left) => {
@@ -215,9 +207,11 @@ pub fn mouse(app: &mut App, event: MouseEvent, target: Option<Target>) {
                 let double = if let Action::Row(i) = a {
                     if let Some(d) = app.command_line.modals.command_history_mut() {
                         let now = Instant::now();
-                        let double = d.last_click.is_some_and(|(last, t)| {
-                            last == i && now.duration_since(t) < Duration::from_millis(400)
-                        });
+                        let double = crate::list_state::ClickTracker::STRICT.matches(
+                            d.last_click.as_ref(),
+                            &i,
+                            now,
+                        );
                         d.last_click = Some((i, now));
                         double
                     } else {

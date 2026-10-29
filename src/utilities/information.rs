@@ -1,4 +1,4 @@
-use std::{path::PathBuf, sync::mpsc};
+use std::path::PathBuf;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Kind {
     System,
@@ -40,16 +40,15 @@ impl Information {
         self.pending.is_some()
     }
     pub fn poll(&mut self) -> bool {
-        let reply = self.pending.as_ref().and_then(|r| match r.try_recv() {
-            Ok(fields) => Some(fields),
-            Err(mpsc::TryRecvError::Empty) => None,
-            Err(mpsc::TryRecvError::Disconnected) => Some(vec![(
-                "Snapshot".into(),
-                "Unavailable: information worker stopped".into(),
-            )]),
+        let reply = crate::task::take_reply(&mut self.pending).map(|reply| {
+            reply.unwrap_or_else(|_| {
+                vec![(
+                    "Snapshot".into(),
+                    "Unavailable: information worker stopped".into(),
+                )]
+            })
         });
         if let Some(fields) = reply {
-            self.pending = None;
             self.fields = fields;
             true
         } else {

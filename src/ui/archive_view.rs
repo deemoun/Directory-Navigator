@@ -1,10 +1,7 @@
+use crate::dialog_theme as theme;
 use crate::turbo::dialog_spec::{centered, scope, Control, ControlKind, DialogSpec};
-pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
-    if let Some(spec) = archive_spec(app, area) {
-        spec.paint(frame, app);
-    }
-}
-use crate::painting::{Frame, Paragraph};
+
+use crate::painting::Paragraph;
 use crate::presentation::{layout::Rect, text::Span};
 use crate::{
     app::App,
@@ -33,7 +30,7 @@ pub(crate) fn archive_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
     let x = rect.x + 2;
     let w = rect.width - 5;
     spec.caption(
-        Paragraph::new(tail(&display_name(&b.path.to_string_lossy()), w)).style(dos(0x70)),
+        Paragraph::new(tail(&display_name(&b.path.to_string_lossy()), w)).style(dos(theme::TEXT)),
         Rect::new(x, rect.y + 1, w, 1),
     );
     let directory = b
@@ -43,7 +40,7 @@ pub(crate) fn archive_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
         .map(|n| format!("/{}", display_name(&String::from_utf8_lossy(&n.path))))
         .unwrap_or_else(|| "/".into());
     spec.caption(
-        Paragraph::new(tail(&directory, w)).style(dos(0x71)),
+        Paragraph::new(tail(&directory, w)).style(dos(theme::HEADING)),
         Rect::new(x, rect.y + 2, w, 1),
     );
     spec.caption(
@@ -156,11 +153,11 @@ pub(crate) fn archive_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
         })
         .unwrap_or_else(|| "Enter opens · Backspace parent · Esc closes".into());
     spec.caption(
-        Paragraph::new(details).style(dos(0x71)),
+        Paragraph::new(details).style(dos(theme::HEADING)),
         Rect::new(x, rect.bottom() - 5, w, 1),
     );
     spec.caption(
-        Paragraph::new(display_name(&b.status)).style(dos(0x70)),
+        Paragraph::new(display_name(&b.status)).style(dos(theme::TEXT)),
         Rect::new(x, rect.bottom() - 4, w, 1),
     );
     spec.caption(
@@ -169,30 +166,32 @@ pub(crate) fn archive_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
                 .language
                 .text("Read-only · No extraction · Links are not followed"),
         )
-        .style(dos(0x78)),
+        .style(dos(theme::DISABLED)),
         Rect::new(x, rect.bottom() - 3, w, 1),
     );
     let bw = (rect.width - 4) / 6;
-    for (i, label, a) in [
+    let buttons = [
         (1, "Open", Action::Open),
         (2, "F3 View", Action::View),
         (3, "F9 Info", Action::Info),
         (4, "Refresh", Action::Refresh),
         (5, "Stop", Action::Stop),
         (6, "Close", Action::Close),
-    ] {
-        let r = Rect::new(x + (i as u16 - 1) * bw, rect.bottom() - 2, bw - 1, 1);
+    ];
+    let labels = buttons.map(|(_, label, _)| app.config.language.text(label));
+    let bounds = theme::button_row(
+        Rect::new(x, rect.bottom() - 2, bw * 6 - 1, 1),
+        &labels,
+        bw - 1,
+        1,
+    );
+    for ((i, _, a), (label, r)) in buttons.into_iter().zip(labels.into_iter().zip(bounds)) {
         let enabled = match a {
             Action::Open | Action::View | Action::Info => !b.loading() && b.catalog.is_some(),
             Action::Stop => b.loading(),
             _ => true,
         };
-        let mut control = Control::new(
-            i,
-            r,
-            ControlKind::Button(app.config.language.text(label).into()),
-            Target::Archive(a),
-        );
+        let mut control = Control::new(i, r, ControlKind::Button(label.into()), Target::Archive(a));
         control.enabled = enabled;
         spec.control(control);
     }

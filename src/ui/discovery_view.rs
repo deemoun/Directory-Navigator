@@ -1,10 +1,7 @@
+use crate::dialog_theme as theme;
 use crate::turbo::dialog_spec::{centered, scope, Control, ControlKind, DialogSpec};
-pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
-    if let Some(spec) = discovery_spec(app, area) {
-        spec.paint(frame, app);
-    }
-}
-use crate::painting::{Frame, Paragraph};
+
+use crate::painting::Paragraph;
 use crate::presentation::layout::Rect;
 use crate::{
     app::App,
@@ -52,12 +49,12 @@ pub(crate) fn discovery_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
     let x = rect.x + 2;
     let w = rect.width - 4;
     spec.caption(
-        Paragraph::new(tail(&display_name(&m.root.to_string_lossy()), w)).style(dos(0x70)),
+        Paragraph::new(tail(&display_name(&m.root.to_string_lossy()), w)).style(dos(theme::TEXT)),
         Rect::new(x, rect.y + 1, w, 1),
     );
     if form {
         spec.caption(
-            Paragraph::new(app.config.language.text("Filename pattern")).style(dos(0x70)),
+            Paragraph::new(app.config.language.text("Filename pattern")).style(dos(theme::TEXT)),
             Rect::new(x, rect.y + 3, w, 1),
         );
         let input = Rect::new(x, rect.y + 4, w, 1);
@@ -148,12 +145,12 @@ pub(crate) fn discovery_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
             m.stats.skipped
         );
         spec.caption(
-            Paragraph::new(summary).style(dos(0x70)),
+            Paragraph::new(summary).style(dos(theme::TEXT)),
             Rect::new(x, rect.bottom() - 7, w, 1),
         );
         spec.caption(
             Paragraph::new(tail(&display_name(&m.stats.path.to_string_lossy()), w))
-                .style(dos(0x70)),
+                .style(dos(theme::TEXT)),
             Rect::new(x, rect.bottom() - 6, w, 1),
         );
         if let Some(error) = &m.stats.first_error {

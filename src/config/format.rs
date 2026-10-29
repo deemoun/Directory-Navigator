@@ -14,16 +14,21 @@ fn records(config: &Config) -> Vec<(&'static str, String, Value)> {
         crate::panel::SortMode::Date => "date",
     };
     let mut fields = Vec::new();
+    for setting in crate::settings::definition::ALL {
+        let field = setting.definition();
+        fields.push((
+            field.group,
+            field.key.to_owned(),
+            Value::from((field.get)(config)),
+        ));
+    }
     macro_rules! add {
         ($group:literal,$key:expr,$value:expr) => {
             fields.push(($group, $key.to_owned(), Value::from($value)));
         };
     }
-    add!("application", "save_on_exit", config.save_on_exit);
     add!("application", "shortcuts", config.shortcuts.key());
     add!("interface", "palette", config.palette.key());
-    add!("interface", "show_clock", config.show_clock);
-    add!("interface", "hide_menu", config.hide_menu);
     add!("regional", "language", config.language.key());
     add!("regional", "date_order", config.datetime.date_order.key());
     add!(
@@ -46,13 +51,6 @@ fn records(config: &Config) -> Vec<(&'static str, String, Value)> {
         config.datetime.time_separator.to_string()
     );
     add!("screensaver", "minutes", i64::from(config.saver_minutes));
-    add!("file_manager", "hidden", config.show_hidden);
-    add!("file_manager", "highlight", config.highlight_files);
-    add!("file_manager", "tags", config.show_tags);
-    add!("file_manager", "space_select", config.space_select);
-    add!("file_manager", "delete_key", config.delete_key);
-    add!("file_manager", "use_trash", config.use_trash);
-    add!("file_manager", "backspace_parent", config.backspace_parent);
     add!("panels.left", "sort", sort(config.sorts[0]));
     add!("panels.right", "sort", sort(config.sorts[1]));
     add!("panels.left", "layout", config.layouts[0].key());
@@ -109,13 +107,17 @@ fn checked(group: &str, key: &str, value: &Value, default: &Value) -> io::Result
     Ok(text)
 }
 fn assign(config: &mut Config, group: &str, key: &str, text: &str) -> io::Result<()> {
+    for setting in crate::settings::definition::ALL {
+        let field = setting.definition();
+        if (group, key) == (field.group, field.key) {
+            (field.set)(config, text == "true");
+            return Ok(());
+        }
+    }
     let index = usize::from(group == "panels.right");
     match (group, key) {
-        ("application", "save_on_exit") => config.save_on_exit = text == "true",
         ("application", "shortcuts") => config.shortcuts = crate::shortcuts::Profile::parse(text),
         ("interface", "palette") => config.palette = crate::palette::PaletteProfile::parse(text),
-        ("interface", "show_clock") => config.show_clock = text == "true",
-        ("interface", "hide_menu") => config.hide_menu = text == "true",
         ("regional", "language") => config.language = crate::localization::Language::parse(text),
         ("regional", "date_order") => {
             config.datetime.date_order = crate::regional::DateOrder::parse(text)
@@ -138,13 +140,6 @@ fn assign(config: &mut Config, group: &str, key: &str, text: &str) -> io::Result
                 .parse()
                 .map_err(|_| invalid("Invalid screensaver delay"))?
         }
-        ("file_manager", "hidden") => config.show_hidden = text == "true",
-        ("file_manager", "highlight") => config.highlight_files = text == "true",
-        ("file_manager", "tags") => config.show_tags = text == "true",
-        ("file_manager", "space_select") => config.space_select = text == "true",
-        ("file_manager", "delete_key") => config.delete_key = text == "true",
-        ("file_manager", "use_trash") => config.use_trash = text == "true",
-        ("file_manager", "backspace_parent") => config.backspace_parent = text == "true",
         ("panels.left" | "panels.right", "sort") => {
             config.sorts[index] = match text {
                 "name" => crate::panel::SortMode::Name,

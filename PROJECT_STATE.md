@@ -21,6 +21,39 @@
 
 ## Implemented
 
+- Compact dialog buttons reserve both DN focus arrows using translated Unicode
+  caption widths. Import/common prompts, Copy/Move, archive and game rows share
+  sizing with their mouse bounds; native captions, actions and safe defaults stay
+  unchanged. Regression coverage checks Tab/BackTab, cancellation and both markers
+  across English/Russian, both palettes and two terminal sizes. Private release
+  PTYs verify Import/Copy/Move cancellation, unchanged files and terminal recovery.
+  macOS ARM64: 542 tests pass, one opt-in native Trash test ignored; formatting,
+  all-target Clippy, release and no-default-features checks pass. Windows/Linux
+  validation remains deferred.
+
+- Further shared mechanics: seven list controllers use explicit viewport policies;
+  double-click helpers preserve row/WindowId/path identity and distinct timeout
+  boundaries. MRU histories share insertion with existing 16/100 limits. Profile/
+  regional choices use explicit typed variants instead of probing Config copies.
+  Five one-shot task consumers share slot retirement while retaining generation
+  checks, errors and cancellation. Ten dialog scopes register key/mouse/spec/focus
+  hooks in one adapter table. Six more UI suites share private fixtures/input/
+  render helpers. All 320 macOS pre-refactor frame/cursor/hit captures match.
+  Native suite: 538 pass, one opt-in native Trash ignored. Formatting, all-target
+  Clippy, release/no-default checks and temporary-fixture PTYs pass. Windows/Linux
+  validation remains deferred. See docs/SHARED_UI.md.
+
+- Shared UI logic: command bindings/shortcut presentation/help reside in commands;
+  semantic dialog colors, centering and standard button metrics use dialog_theme.
+  Boolean settings and TOML v2 serialization share typed field descriptions; form
+  metadata supplies titles, dimensions and existing field layout. Proposal::deliver
+  gates focus/action delivery by live ownership, with a shared controller focus
+  adapter for prompts/settings/editor/viewer/tools and plugin Focus events. UI
+  test suites share private fixtures and input/render helpers. All 192 frozen
+  pre-refactor cell/style/cursor/hit captures match across languages/palettes/
+  shortcut profiles and two sizes. Existing appearance, key precedence, draft
+  semantics and filesystem safeguards remain. See docs/SHARED_UI.md.
+
 - Editor menus and editor/viewer command bars share `src/menu/definition.rs` with
   the manager: editor category order/enabled state, captions, actions, separators,
   explicit status keys and widths are declared there. Editor File opens by named
@@ -45,7 +78,7 @@
   desktop/save-on-exit behavior; old configurations enable all tools and unknown
   IDs survive saving. Registry extension, long-list scrolling/stale clicks,
   configuration safeguards, localization and lifecycle tests are included.
-  macOS ARM64: 525 tests pass (one opt-in native Trash test ignored); formatting,
+  macOS ARM64: 538 tests pass (one opt-in native Trash test ignored); formatting,
   all-target Clippy, release and no-default-features checks pass. Release PTY
   verifies cancellation, disable/re-enable, blocked shortcuts, live game closure,
   explicit saving, resize and terminal restoration. Windows/Linux skipped.

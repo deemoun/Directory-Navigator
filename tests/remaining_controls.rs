@@ -1,79 +1,37 @@
 //! Remaining shared controls use only private temporary fixtures.
-use crossterm::event::{
-    KeyCode as K, KeyEvent, KeyModifiers as M, MouseButton, MouseEvent, MouseEventKind,
-};
+use crossterm::event::{KeyCode as K, KeyEvent, KeyModifiers as M};
 use dn::{
     app::App,
     input,
-    mouse::{self, Target},
-    testing::{backend::TestBackend, layout::Rect, Buffer, Terminal},
+    mouse::Target,
+    testing::{layout::Rect, Buffer},
     ui,
 };
 use std::{
     fs, io,
     path::PathBuf,
-    sync::atomic::{AtomicUsize, Ordering},
     time::{Duration, Instant},
 };
-struct Fixture(PathBuf);
-impl Fixture {
-    fn app() -> io::Result<(Self, App)> {
-        static NEXT: AtomicUsize = AtomicUsize::new(0);
-        let t = Self(std::env::temp_dir().join(format!(
-            "dn-remaining-controls-{}-{}",
-            std::process::id(),
-            NEXT.fetch_add(1, Ordering::Relaxed)
-        )));
-        fs::create_dir(&t.0)?;
-        fs::write(t.0.join("fixture.txt"), "never replace this fixture")?;
-        let mut a = App::new(t.0.clone())?;
-        wait(&mut a, |a| a.panels.iter().all(|p| !p.loading));
-        a.config = Default::default();
-        a.config.save_on_exit = false;
-        a.config_store = dn::config::Store::new(Some(t.0.join("settings.conf")));
-        a.panels[0].cursor = a.panels[0]
-            .entries
-            .iter()
-            .position(|e| e.name == "fixture.txt")
-            .unwrap();
-        Ok((t, a))
-    }
-}
-impl Drop for Fixture {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.0);
-    }
+mod support;
+use support::{click_at, draw, key, Fixture};
+fn fixture() -> io::Result<(Fixture, App)> {
+    let t = Fixture::new("remaining-controls")?;
+    fs::write(t.0.join("fixture.txt"), "never replace this fixture")?;
+    let mut a = t.app()?;
+    a.config = Default::default();
+    a.config.save_on_exit = false;
+    a.config_store = dn::config::Store::new(Some(t.0.join("settings.conf")));
+    a.panels[0].cursor = a.panels[0]
+        .entries
+        .iter()
+        .position(|e| e.name == "fixture.txt")
+        .unwrap();
+    Ok((t, a))
 }
 fn wait(a: &mut App, ready: impl Fn(&App) -> bool) {
-    let end = Instant::now() + Duration::from_secs(5);
-    loop {
-        a.poll();
-        if ready(a) {
-            break;
-        }
-        assert!(Instant::now() < end);
-        std::thread::sleep(Duration::from_millis(1));
-    }
+    support::wait_until(a, Duration::from_secs(5), ready);
 }
-fn key(a: &mut App, k: K) {
-    input::handle(a, KeyEvent::new(k, M::NONE));
-}
-fn draw(a: &mut App, w: u16, h: u16) -> io::Result<Buffer> {
-    let mut t = Terminal::new(TestBackend::new(w, h))?;
-    t.draw(|f| ui::draw(f, a))?;
-    Ok(t.backend().buffer().clone())
-}
-fn click_at(a: &mut App, r: Rect) {
-    mouse::handle(
-        a,
-        MouseEvent {
-            kind: MouseEventKind::Down(MouseButton::Left),
-            column: r.x,
-            row: r.y,
-            modifiers: M::NONE,
-        },
-    );
-}
+
 fn hit(a: &App, target: Target) -> Rect {
     a.mouse
         .regions
@@ -85,7 +43,7 @@ fn hit(a: &App, target: Target) -> Rect {
 #[test]
 fn copy_move_disabled_focus_recovers_without_submitting_or_changing_options() -> io::Result<()> {
     for kind in [dn::operations::Kind::Copy, dn::operations::Kind::Move] {
-        let (t, mut a) = Fixture::app()?;
+        let (t, mut a) = fixture()?;
         a.prompt_operation(kind, false);
         if kind == dn::operations::Kind::Copy {
             dn::copy_dialog::action(&mut a, dn::copy_dialog::Action::RemoveSources);
@@ -128,7 +86,7 @@ fn copy_move_disabled_focus_recovers_without_submitting_or_changing_options() ->
 }
 #[test]
 fn completed_discovery_disables_stop_and_retires_its_published_mouse_action() -> io::Result<()> {
-    let (_t, mut a) = Fixture::app()?;
+    let (_t, mut a) = fixture()?;
     dn::discovery::open_find(&mut a);
     dn::discovery::action(&mut a, dn::discovery::Action::Start);
     a.discovery.modals.discovery_mut().unwrap().focus = 4;
@@ -152,7 +110,7 @@ fn completed_discovery_disables_stop_and_retires_its_published_mouse_action() ->
 }
 #[test]
 fn calculator_history_is_a_blocking_shared_list_and_preserves_parent_focus() -> io::Result<()> {
-    let (_t, mut a) = Fixture::app()?;
+    let (_t, mut a) = fixture()?;
     dn::utilities::open(&mut a, dn::utilities::Kind::Calculator);
     a.desktop.plugins.calculator_mut().expression = "41 + 1".into();
     a.desktop.plugins.calculator_mut().cursor = 6;
@@ -282,7 +240,7 @@ fn remaining_dialog_matrix_is_immutable_clipped_and_translated() -> io::Result<(
         for language in [Language::English, Language::Russian] {
             for (w, h) in [(80, 25), (132, 40)] {
                 for case in 0..16 {
-                    let (_t, mut a) = Fixture::app()?;
+                    let (_t, mut a) = fixture()?;
                     a.config.palette = palette;
                     a.config.language = language;
                     let (dw, dh) = setup(&mut a, case);

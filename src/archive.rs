@@ -3,12 +3,7 @@ pub mod reader;
 use crate::{app::App, task::Task, viewer::Contents};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use reader::{Catalog, Kind};
-use std::{
-    io,
-    path::PathBuf,
-    sync::{mpsc::TryRecvError, Arc},
-    time::{Duration, Instant},
-};
+use std::{io, path::PathBuf, sync::Arc, time::Instant};
 enum Reply {
     List(Arc<Catalog>),
     Preview(PathBuf, Contents),
@@ -81,14 +76,14 @@ impl Browser {
     }
     pub fn keep_visible(&mut self) {
         self.rows = self.rows.max(1);
-        self.cursor = self.cursor.min(self.children().len());
-        if self.cursor < self.offset {
-            self.offset = self.cursor;
-        }
-        if self.cursor >= self.offset + self.rows {
-            self.offset = self.cursor + 1 - self.rows;
-        }
-        self.offset = self.offset.min(self.children().len());
+        let last = self.children().len();
+        crate::list_state::ListViewport::fit(
+            &mut self.cursor,
+            &mut self.offset,
+            self.rows,
+            Some(last),
+            Some(last),
+        );
     }
     pub fn step(&mut self, delta: isize) {
         self.cursor = self
@@ -143,22 +138,15 @@ pub fn poll(app: &mut App) -> bool {
     // being handed to the filesystem or recorded in viewer history.
     let reply = app
         .modals
-        .archive()
-        .and_then(|a| a.task.as_ref())
-        .and_then(|t| match t.try_recv() {
-            Ok(r) => Some(r),
-            Err(TryRecvError::Empty) => None,
-            Err(TryRecvError::Disconnected) => {
-                Some(Err(io::Error::other("Archive worker stopped")))
-            }
-        });
+        .archive_mut()
+        .and_then(|a| crate::task::take_reply(&mut a.task))
+        .map(|reply| reply.unwrap_or_else(|_| Err(io::Error::other("Archive worker stopped"))));
     let Some(reply) = reply else {
         return false;
     };
     let Some(browser) = app.modals.archive_mut() else {
         return false;
     };
-    browser.task = None;
     match reply {
         Ok(Reply::List(catalog)) => {
             browser.status = format!(
@@ -231,9 +219,11 @@ pub fn action(app: &mut App, action: Action) {
                 return;
             }
             let now = Instant::now();
-            let double = browser.last_click.is_some_and(|(old, time)| {
-                old == row && now.duration_since(time) < Duration::from_millis(400)
-            });
+            let double = crate::list_state::ClickTracker::STRICT.matches(
+                browser.last_click.as_ref(),
+                &row,
+                now,
+            );
             browser.cursor = row;
             browser.focus = 0;
             browser.keep_visible();
@@ -316,11 +306,7 @@ pub fn mouse(app: &mut App, event: MouseEvent, target: Option<crate::mouse::Targ
         }
         MouseEventKind::ScrollUp | MouseEventKind::ScrollDown => {
             if let Some(b) = app.modals.archive_mut() {
-                b.step(if event.kind == MouseEventKind::ScrollUp {
-                    -3
-                } else {
-                    3
-                });
+                b.step(crate::list_state::wheel_delta(event.kind));
             }
         }
         _ => {}

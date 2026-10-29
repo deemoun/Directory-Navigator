@@ -4,51 +4,18 @@ use dn::{
     input,
     mouse::Target,
     settings::{Settings, SettingsKind},
-    testing::{backend::TestBackend, Buffer, Terminal},
+    testing::Buffer,
     tetris::{self, GameAction, Screen},
-    ui,
 };
-use std::{
-    fs, io,
-    path::PathBuf,
-    sync::atomic::{AtomicU64, Ordering},
-};
-struct Temp(PathBuf);
-impl Temp {
-    fn app() -> io::Result<(Self, App)> {
-        static NEXT: AtomicU64 = AtomicU64::new(0);
-        let p = std::env::temp_dir().join(format!(
-            "dn-dialog-navigation-{}-{}",
-            std::process::id(),
-            NEXT.fetch_add(1, Ordering::Relaxed)
-        ));
-        fs::create_dir(&p)?;
-        let t = Self(p);
-        let mut app = App::new(t.0.clone())?;
-        app.config.save_on_exit = false;
-        app.config_store = dn::config::Store::new(Some(t.0.join("config.conf")));
-        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
-        while app.panels.iter().any(|p| p.loading) {
-            app.poll();
-            assert!(std::time::Instant::now() < deadline);
-            std::thread::sleep(std::time::Duration::from_millis(1));
-        }
-        Ok((t, app))
-    }
+use std::{fs, io};
+mod support;
+use support::{draw, key, Fixture as Temp};
+fn fixture() -> io::Result<(Temp, App)> {
+    let t = Temp::new("dialog-navigation")?.canonicalized()?;
+    let a = t.app()?;
+    Ok((t, a))
 }
-impl Drop for Temp {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.0);
-    }
-}
-fn draw(app: &mut App, w: u16, h: u16) -> io::Result<Buffer> {
-    let mut term = Terminal::new(TestBackend::new(w, h))?;
-    term.draw(|f| ui::draw(f, app))?;
-    Ok(term.backend().buffer().clone())
-}
-fn key(app: &mut App, code: K) {
-    input::handle(app, KeyEvent::new(code, M::NONE));
-}
+
 fn marked(app: &App, b: &Buffer, target: Target) -> bool {
     let r = app
         .mouse
@@ -92,7 +59,7 @@ fn ended(app: &mut App) {
 }
 #[test]
 fn tetris_name_cycles_both_directions_and_cancel_keeps_unsaved_score_and_draft() -> io::Result<()> {
-    let (t, mut app) = Temp::app()?;
+    let (t, mut app) = fixture()?;
     tetris::open(&mut app);
     ended(&mut app);
     draw(&mut app, 80, 25)?;
@@ -140,7 +107,7 @@ fn tetris_name_cycles_both_directions_and_cancel_keeps_unsaved_score_and_draft()
 }
 #[test]
 fn tetris_main_buttons_setup_and_retry_have_real_focus_and_pause_gravity() -> io::Result<()> {
-    let (_t, mut app) = Temp::app()?;
+    let (_t, mut app) = fixture()?;
     tetris::open(&mut app);
     let board = app.desktop.game().unwrap().board;
     shift_tab(&mut app);
@@ -196,7 +163,7 @@ fn tetris_main_buttons_setup_and_retry_have_real_focus_and_pause_gravity() -> io
 #[test]
 fn editor_prompt_and_unsaved_guard_enter_follow_the_focused_button() -> io::Result<()> {
     use dn::editor::{self, EditorAction as A, Modal};
-    let (_t, mut app) = Temp::app()?;
+    let (_t, mut app) = fixture()?;
     editor::open(&mut app, true);
     editor::paste(&mut app, "dirty text");
     editor::action(&mut app, A::GoTo);
@@ -244,7 +211,7 @@ fn editor_prompt_and_unsaved_guard_enter_follow_the_focused_button() -> io::Resu
 #[test]
 fn replacement_confirmation_starts_on_cancel_then_enter_uses_selected_choice() -> io::Result<()> {
     use dn::editor::{self, search::ReplaceSession, Modal};
-    let (_t, mut app) = Temp::app()?;
+    let (_t, mut app) = fixture()?;
     editor::open(&mut app, true);
     editor::paste(&mut app, "a a");
     app.desktop
@@ -303,7 +270,7 @@ fn replacement_confirmation_starts_on_cancel_then_enter_uses_selected_choice() -
 #[test]
 fn pattern_and_history_skip_disabled_actions_and_cancel_without_side_effects() -> io::Result<()> {
     use dn::file_tools::{self, history::HistoryKind, ToolDialog};
-    let (_t, mut app) = Temp::app()?;
+    let (_t, mut app) = fixture()?;
     app.open_pattern(true);
     draw(&mut app, 80, 25)?;
     shift_tab(&mut app);
@@ -347,7 +314,7 @@ fn settings_calculator_characters_and_screensaver_share_reverse_tab_and_enter_de
         screensaver,
         utilities::{self, Kind},
     };
-    let (_t, mut app) = Temp::app()?;
+    let (_t, mut app) = fixture()?;
     app.modals
         .set_settings(Some(Settings::new(SettingsKind::Interface, &app.config)));
     draw(&mut app, 80, 25)?;
@@ -394,7 +361,7 @@ fn settings_calculator_characters_and_screensaver_share_reverse_tab_and_enter_de
 }
 #[test]
 fn archive_and_discovery_skip_unavailable_buttons_in_both_directions() -> io::Result<()> {
-    let (t, mut app) = Temp::app()?;
+    let (t, mut app) = fixture()?;
     let archive = t.0.join("empty.tar");
     fs::write(&archive, vec![0; 1024])?;
     dn::archive::open(&mut app, archive);

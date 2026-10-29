@@ -9,7 +9,7 @@ pub fn key(app: &mut App, key: KeyEvent) {
     let alt = key.modifiers.contains(KeyModifiers::ALT);
     let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
     let shift = key.modifiers.contains(KeyModifiers::SHIFT);
-    if key.code == KeyCode::Char('x') && alt {
+    if alt && crate::commands::editor_alt(key.code) == Some(EditorAction::Quit) {
         request_close(app, CloseIntent::Quit);
         return;
     }
@@ -68,12 +68,7 @@ pub fn key(app: &mut App, key: KeyEvent) {
         return;
     }
     if alt {
-        let command = match key.code {
-            KeyCode::Backspace => Some(EditorAction::Undo),
-            KeyCode::F(7) => Some(EditorAction::FindPrevious),
-            KeyCode::Char('g') => Some(EditorAction::GoTo),
-            _ => None,
-        };
+        let command = crate::commands::editor_alt(key.code);
         if let Some(command) = command {
             action(app, command);
             return;
@@ -97,40 +92,7 @@ pub fn key(app: &mut App, key: KeyEvent) {
             return;
         }
     }
-    use EditorAction as A;
-    let command = if ctrl {
-        match key.code {
-            KeyCode::F(4) => Some(A::Close),
-            KeyCode::F(7) => Some(A::Replace),
-            KeyCode::Insert => Some(A::Copy),
-            KeyCode::Delete => Some(A::Clear),
-            KeyCode::Char('s') => Some(A::Save),
-            KeyCode::Char('f') => Some(A::Find),
-            KeyCode::Char('g') => Some(A::GoTo),
-            KeyCode::Char('z') => Some(A::Undo),
-            KeyCode::Char('y') => Some(A::Redo),
-            KeyCode::Char('c') => Some(A::Copy),
-            KeyCode::Char('x') => Some(A::Cut),
-            KeyCode::Char('v') => Some(A::Paste),
-            KeyCode::Char('a') => Some(A::SelectAll),
-            _ => None,
-        }
-    } else {
-        match key.code {
-            KeyCode::F(1) => Some(A::Help),
-            KeyCode::F(2) if shift => Some(A::SaveAs),
-            KeyCode::F(2) => Some(A::Save),
-            KeyCode::F(3) if !shift => Some(A::Open),
-            KeyCode::F(6) if !shift => Some(A::Duplicate),
-            KeyCode::F(7) if shift => Some(A::FindNext),
-            KeyCode::F(7) => Some(A::Find),
-            KeyCode::F(10) => Some(A::Menu),
-            KeyCode::Insert if shift => Some(A::Paste),
-            KeyCode::Delete if shift => Some(A::Cut),
-            KeyCode::Esc => Some(A::Close),
-            _ => None,
-        }
-    };
+    let command = crate::commands::editor_key(key);
     if let Some(command) = command {
         action(app, command);
         return;

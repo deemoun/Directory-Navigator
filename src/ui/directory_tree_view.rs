@@ -1,4 +1,5 @@
-use crate::painting::{Frame, Paragraph};
+use crate::dialog_theme as theme;
+use crate::painting::Paragraph;
 use crate::presentation::layout::Rect;
 use crate::turbo::dialog_spec::{centered, scope, Control, ControlKind, DialogSpec};
 use crate::{
@@ -8,11 +9,7 @@ use crate::{
     formatting::tail,
     mouse::Target,
 };
-pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
-    if let Some(s) = tree_spec(app, area) {
-        s.paint(frame, app);
-    }
-}
+
 pub(crate) fn tree_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
     let profile = app.config.palette;
     let dos = profile.styles();
@@ -32,7 +29,7 @@ pub(crate) fn tree_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
     let top = rect.y + 3;
     let root = tree.root.as_ref().unwrap_or(&tree.original);
     spec.caption(
-        Paragraph::new(tail(&display_name(&root.to_string_lossy()), w)).style(dos(0x70)),
+        Paragraph::new(tail(&display_name(&root.to_string_lossy()), w)).style(dos(theme::TEXT)),
         Rect::new(x, rect.y + 1, w, 1),
     );
     spec.native(

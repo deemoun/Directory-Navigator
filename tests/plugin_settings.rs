@@ -1,79 +1,28 @@
 //! Plugin preferences use private temporary files and normal settings drafts.
-use crossterm::event::{
-    KeyCode as K, KeyEvent, KeyModifiers as M, MouseButton, MouseEvent, MouseEventKind,
-};
+use crossterm::event::{KeyCode as K, KeyEvent, KeyModifiers as M};
 use dn::{
     app::App,
     config::Config,
     input, menu,
-    mouse::{self, Target},
+    mouse::Target,
     plugins::{CALCULATOR, TETRIS},
     settings::SettingsKind,
-    testing::{backend::TestBackend, Buffer, Terminal},
+    testing::Buffer,
     ui,
 };
-use std::{
-    fs, io,
-    path::PathBuf,
-    sync::atomic::{AtomicUsize, Ordering},
-    time::{Duration, Instant},
-};
-struct Temp(PathBuf);
-impl Temp {
-    fn app() -> io::Result<(Self, App)> {
-        static N: AtomicUsize = AtomicUsize::new(0);
-        let t = Self(std::env::temp_dir().join(format!(
-            "dn-plugin-settings-{}-{}",
-            std::process::id(),
-            N.fetch_add(1, Ordering::Relaxed)
-        )));
-        fs::create_dir(&t.0)?;
-        let mut a = App::new(t.0.clone())?;
-        let end = Instant::now() + Duration::from_secs(5);
-        while a.panels.iter().any(|p| p.loading) {
-            a.poll();
-            assert!(Instant::now() < end);
-            std::thread::sleep(Duration::from_millis(1));
-        }
-        a.config = Config::default();
-        a.config.save_on_exit = false;
-        a.config_store = dn::config::Store::new(Some(t.0.join("config.conf")));
-        Ok((t, a))
-    }
-}
-impl Drop for Temp {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.0);
-    }
-}
-fn key(a: &mut App, k: K) {
-    input::handle(a, KeyEvent::new(k, M::NONE));
-}
-fn draw(a: &mut App, w: u16, h: u16) -> io::Result<Buffer> {
-    let mut t = Terminal::new(TestBackend::new(w, h))?;
-    t.draw(|f| ui::draw(f, a))?;
-    assert!(a
-        .mouse
-        .regions
-        .iter()
-        .all(|(r, _)| r.right() <= w && r.bottom() <= h));
-    Ok(t.backend().buffer().clone())
-}
-fn click(a: &mut App, t: Target) {
-    let r = a.mouse.regions.iter().find(|(_, x)| *x == t).unwrap().0;
-    mouse::handle(
-        a,
-        MouseEvent {
-            kind: MouseEventKind::Down(MouseButton::Left),
-            column: r.x,
-            row: r.y,
-            modifiers: M::NONE,
-        },
-    );
+use std::{fs, io, time::Instant};
+mod support;
+use support::{click, draw, key, Fixture as Temp};
+fn fixture() -> io::Result<(Temp, App)> {
+    let t = Temp::new("plugin-settings")?;
+    let mut a = t.app()?;
+    a.config = Config::default();
+    a.config.save_on_exit = false;
+    Ok((t, a))
 }
 #[test]
 fn plugin_preferences_default_roundtrip_unknown_ids_and_reject_bad_types() -> io::Result<()> {
-    let (t, mut a) = Temp::app()?;
+    let (t, mut a) = fixture()?;
     assert!(a.config.plugin_enabled(CALCULATOR) && a.config.plugin_enabled(TETRIS));
     let path = t.0.join("config.conf");
     fs::write(
@@ -113,7 +62,7 @@ fn plugin_preferences_default_roundtrip_unknown_ids_and_reject_bad_types() -> io
 }
 #[test]
 fn settings_draft_cancel_commit_disable_live_game_and_reenable_keep_scores() -> io::Result<()> {
-    let (t, mut a) = Temp::app()?;
+    let (t, mut a) = fixture()?;
     dn::tetris::open(&mut a);
     let old = a.desktop.active().id;
     a.desktop
@@ -181,7 +130,7 @@ fn plugins_dialog_localized_native_controls_mouse_keyboard_and_immutable_render(
             dn::palette::PaletteProfile::ClassicDn,
             dn::palette::PaletteProfile::Terminal,
         ] {
-            let (_t, mut a) = Temp::app()?;
+            let (_t, mut a) = fixture()?;
             a.config.language = language;
             a.config.palette = palette;
             assert!(menu::submenu_items(menu::MenuId::Configuration)
@@ -261,7 +210,7 @@ fn plugins_dialog_localized_native_controls_mouse_keyboard_and_immutable_render(
 }
 #[test]
 fn config_reload_disables_owned_calculator_help_without_losing_session_state() -> io::Result<()> {
-    let (_t, mut a) = Temp::app()?;
+    let (_t, mut a) = fixture()?;
     input::handle(&mut a, KeyEvent::new(K::Char('k'), M::CONTROL));
     input::paste(&mut a, "6*7");
     key(&mut a, K::Enter);

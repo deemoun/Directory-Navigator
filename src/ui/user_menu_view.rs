@@ -1,14 +1,11 @@
-use crate::painting::{Frame, Paragraph};
+use crate::dialog_theme as theme;
+use crate::painting::Paragraph;
 use crate::presentation::{layout::Rect, text::Span};
 use crate::turbo::dialog_spec::{centered, scope, Control, ControlKind, DialogSpec};
 use crate::{
     app::App, filesystem::display_name, formatting::tail, mouse::Target, user_menu::Action,
 };
-pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
-    if let Some(s) = user_menu_spec(app, area) {
-        s.paint(frame, app);
-    }
-}
+
 pub(crate) fn user_menu_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
     let profile = app.config.palette;
     let dos = profile.styles();
@@ -69,7 +66,7 @@ pub(crate) fn user_menu_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
         })
         .unwrap_or_default();
     spec.caption(
-        Paragraph::new(tail(&source, w)).style(dos(0x70)),
+        Paragraph::new(tail(&source, w)).style(dos(theme::TEXT)),
         Rect::new(x, rect.y + 1, w, 1),
     );
     if review {
@@ -131,7 +128,8 @@ pub(crate) fn user_menu_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
     }
     if !review {
         spec.caption(
-            Paragraph::new(display_name(app.config.language.text(&m.status))).style(dos(0x78)),
+            Paragraph::new(display_name(app.config.language.text(&m.status)))
+                .style(dos(theme::DISABLED)),
             Rect::new(x, rect.bottom() - 3, w, 1),
         );
     }

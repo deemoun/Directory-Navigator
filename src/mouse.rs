@@ -176,12 +176,7 @@ fn handle_mouse(app: &mut App, event: MouseEvent) {
         .native()
         .mouse_target(&app.mouse.regions, event.column, event.row);
 
-    if focus == Focus::WindowList {
-        crate::windowing::mouse(app, event, target);
-        return;
-    }
-    if focus == Focus::ConfigImport {
-        crate::config_import::mouse(app, event, target);
+    if crate::dialog_adapter::mouse(app, event, target, focus) {
         return;
     }
     if focus == Focus::Welcome {
@@ -198,26 +193,6 @@ fn handle_mouse(app: &mut App, event: MouseEvent) {
                 welcome.page.mouse(event, offset);
             }
         }
-        return;
-    }
-    if focus == Focus::CommandHistory {
-        crate::command_line::history::mouse(app, event, target);
-        return;
-    }
-    if focus == Focus::Archive {
-        crate::archive::mouse(app, event, target);
-        return;
-    }
-    if focus == Focus::UserMenu {
-        crate::user_menu::mouse(app, event, target);
-        return;
-    }
-    if focus == Focus::Tree {
-        crate::directory_tree::mouse(app, event, target);
-        return;
-    }
-    if focus == Focus::Discovery {
-        crate::discovery::mouse(app, event, target);
         return;
     }
     if focus == Focus::Manager
@@ -314,25 +289,13 @@ fn handle_mouse(app: &mut App, event: MouseEvent) {
     }
     if focus == Focus::Colors {
         if event.kind == MouseEventKind::Down(MouseButton::Left) {
-            match target {
-                Some(Target::ColorChoice(profile)) => crate::palette::choose(app, profile),
-                Some(Target::AcceptColors) => app.modals.set_color_dialog(None),
-                Some(Target::CancelColors) => crate::palette::cancel(app),
-                _ => {}
+            if let Some(
+                t @ (Target::ColorChoice(_) | Target::AcceptColors | Target::CancelColors),
+            ) = target
+            {
+                crate::dialog_controls::tool_action(app, t);
             }
         }
-        return;
-    }
-    if focus == Focus::Navigation {
-        crate::navigation_tools::mouse(app, event, target);
-        return;
-    }
-    if focus == Focus::Utility {
-        crate::utilities::mouse(app, event, target);
-        return;
-    }
-    if focus == Focus::FileTools {
-        crate::file_tools::mouse(app, event, target);
         return;
     }
     if focus == Focus::Pattern {
@@ -352,13 +315,11 @@ fn handle_mouse(app: &mut App, event: MouseEvent) {
     }
     if focus == Focus::Columns {
         if event.kind == MouseEventKind::Down(MouseButton::Left) {
-            match target {
-                Some(Target::ColumnChoice(panel, preset)) => {
-                    crate::columns::choose(app, panel, preset)
-                }
-                Some(Target::AcceptColumns) => crate::columns::accept(app),
-                Some(Target::CancelColumns) => crate::columns::cancel(app),
-                _ => {}
+            if let Some(
+                t @ (Target::ColumnChoice(_, _) | Target::AcceptColumns | Target::CancelColumns),
+            ) = target
+            {
+                crate::dialog_controls::tool_action(app, t);
             }
         }
         return;
