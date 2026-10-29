@@ -51,6 +51,7 @@ pub enum Target {
     Scrollbar(usize, crate::panel_layout::ScrollAction),
     Entry(usize, usize),
     CloseDialog,
+    AboutRepository,
     SubmitPrompt,
     Copy(crate::copy_dialog::Action),
     CopyHistory(usize),
@@ -231,6 +232,9 @@ fn handle_mouse(app: &mut App, event: MouseEvent) {
             return;
         }
         match event.kind {
+            MouseEventKind::Down(MouseButton::Left) if target == Some(Target::AboutRepository) => {
+                crate::dialog::open_repository(app)
+            }
             MouseEventKind::Down(MouseButton::Left) if target == Some(Target::CloseDialog) => {
                 crate::dialog::message_key(app, crossterm::event::KeyCode::Enter)
             }

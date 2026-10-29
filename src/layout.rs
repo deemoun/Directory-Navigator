@@ -321,13 +321,8 @@ pub fn prepare_window(
         );
     }
     let message = if area.width >= 80 && area.height >= 25 {
-        app.last_dialog().map(|d| {
-            message_layout(
-                area,
-                app.config.language.text(d.title),
-                &app.config.language.message(&d.message),
-            )
-        })
+        app.last_dialog()
+            .map(|d| dialog_layout(area, d, app.config.language))
     } else {
         None
     };
@@ -383,6 +378,34 @@ pub struct MessageLayout {
     pub lines: Vec<String>,
     pub visible: usize,
     pub maximum: usize,
+}
+pub(crate) fn dialog_layout(
+    area: Rect,
+    dialog: &crate::dialog::Dialog,
+    language: crate::localization::Language,
+) -> MessageLayout {
+    let text = language.message(&dialog.message);
+    if !dialog.is_about() {
+        return message_layout(area, language.text(dialog.title), &text);
+    }
+    let width = 64.min(area.width);
+    let height = 20.min(area.height.saturating_sub(3));
+    let rect = crate::dialog_theme::centered(area, width, height);
+    let mut lines = vec![String::new()];
+    for (index, line) in text.lines().enumerate() {
+        lines.extend(wrap(line, width.saturating_sub(4)));
+        if index == 0 || index == 2 {
+            lines.push(String::new());
+        }
+    }
+    let visible = usize::from(height.saturating_sub(5));
+    let maximum = lines.len().saturating_sub(visible);
+    MessageLayout {
+        rect,
+        lines,
+        visible,
+        maximum,
+    }
 }
 pub fn message_layout(area: Rect, title: &str, text: &str) -> MessageLayout {
     use crate::presentation::text::Span;

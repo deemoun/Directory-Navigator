@@ -164,6 +164,32 @@ pub fn is_app_bundle(path: &Path) -> bool {
             .is_some_and(|e| e.eq_ignore_ascii_case("app"))
 }
 
+/// The About link is a fixed HTTPS destination, never interpreted as a file or shell command.
+pub(crate) fn launch_repository(_path: &Path) -> io::Result<Launched> {
+    #[cfg(windows)]
+    {
+        windows_open(Path::new(crate::dialog::REPOSITORY_URL))?;
+        Ok(Launched::Submitted)
+    }
+    #[cfg(not(windows))]
+    {
+        repository_command().spawn().map(Launched::Process)
+    }
+}
+#[cfg(not(windows))]
+fn repository_command() -> Command {
+    #[cfg(target_os = "macos")]
+    let mut command = Command::new("/usr/bin/open");
+    #[cfg(not(target_os = "macos"))]
+    let mut command = Command::new("xdg-open");
+    command
+        .arg(crate::dialog::REPOSITORY_URL)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
+    command
+}
+
 pub fn launch(path: &Path) -> io::Result<Launched> {
     if is_directory(path)? {
         return Ok(Launched::Directory);
@@ -236,6 +262,17 @@ fn windows_open(path: &Path) -> io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(windows))]
+    #[test]
+    fn about_repository_is_one_literal_https_argument_without_a_shell() {
+        let command = repository_command();
+        assert_eq!(
+            command.get_args().collect::<Vec<_>>(),
+            vec![std::ffi::OsStr::new(crate::dialog::REPOSITORY_URL)]
+        );
+        #[cfg(target_os = "macos")]
+        assert_eq!(command.get_program(), "/usr/bin/open");
+    }
     #[test]
     fn navigation_retires_delayed_panel_effect_without_losing_the_worker() -> io::Result<()> {
         let root = std::env::temp_dir().join(format!("dn-launch-owner-{}", std::process::id()));

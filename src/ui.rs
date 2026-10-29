@@ -418,11 +418,7 @@ pub(crate) fn remaining_spec(
         Focus::Plugin => crate::plugins::host::controls(app, area),
         Focus::Message if app.modals.native_help(app.desktop.active().id).is_none() => {
             let d = app.last_dialog()?;
-            let m = crate::layout::message_layout(
-                area,
-                app.config.language.text(d.title),
-                &app.config.language.message(&d.message),
-            );
+            let m = crate::layout::dialog_layout(area, d, app.config.language);
             overlays::message_spec(app, &m)
         }
         Focus::Job => overlays::job_spec(app, area),

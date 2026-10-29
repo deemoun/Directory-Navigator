@@ -231,8 +231,8 @@ pub fn execute(app: &mut App, action: Action) {
         }),
         Action::Plugin(id)=>crate::plugins::host::open(app,id),
         Action::About => app.push_dialog(crate::dialog::Dialog {
-            title: " About Directory Navigator ",
-            message: format!("{}\n{} {}\n{}\n\n{}: Dmitry Yarygin\n\n{}\n{}", crate::APPLICATION_NAME, app.config.language.text("Version"), crate::DISPLAY_VERSION, app.config.language.text("Native Rust terminal file manager"), app.config.language.text("Author"), app.config.language.text("F1: keyboard help"), app.config.language.text("Enter / Esc: close")),
+            title: crate::dialog::ABOUT_TITLE,
+            message: format!("{}\n{} {}\n{}\n\n{}: Dmitry Yarygin\n\n{}\n\n{}\n{}", crate::APPLICATION_NAME, app.config.language.text("Version"), crate::DISPLAY_VERSION, app.config.language.text("Native Rust terminal file manager"), app.config.language.text("Author"), crate::dialog::REPOSITORY_URL, app.config.language.text("F1: keyboard help"), app.config.language.text("Enter / Esc: close")),
         }),
         Action::Welcome => crate::welcome::open(app),
         Action::SelectAll => app.panels[app.active].select_visible(),

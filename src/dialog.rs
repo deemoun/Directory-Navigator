@@ -1,9 +1,28 @@
+pub(crate) const ABOUT_TITLE: &str = " About Directory Navigator ";
+pub(crate) const REPOSITORY_URL: &str = "https://github.com/deemoun/Directory-Navigator";
 pub(crate) mod prompt_controller;
 pub struct Dialog {
     pub title: &'static str,
     pub message: String,
 }
 
+impl Dialog {
+    pub(crate) fn is_about(&self) -> bool {
+        self.title == ABOUT_TITLE
+    }
+}
+pub(crate) fn open_repository(app: &mut crate::app::App) {
+    if !app.last_dialog().is_some_and(Dialog::is_about) {
+        return;
+    }
+    if let Err(error) = app.launcher.request_with(
+        app.active,
+        REPOSITORY_URL.into(),
+        crate::launcher::launch_repository,
+    ) {
+        app.error(error.to_string());
+    }
+}
 use crate::operations::Kind;
 use std::path::PathBuf;
 
@@ -103,6 +122,9 @@ pub fn prompt_help(app: &mut crate::app::App) {
 pub fn message_key(app: &mut crate::app::App, code: crossterm::event::KeyCode) {
     use crossterm::event::KeyCode;
     match code {
+        KeyCode::Char('g' | 'G') if app.last_dialog().is_some_and(Dialog::is_about) => {
+            open_repository(app)
+        }
         KeyCode::Esc | KeyCode::Enter => {
             app.pop_dialog();
         }

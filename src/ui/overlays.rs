@@ -198,22 +198,55 @@ pub(crate) fn message_spec<'a>(
         Target::CloseDialog,
         Target::CloseDialog,
     );
-    s.memo(
-        &message
+    if dialog.is_about() {
+        for (row, line) in message
             .lines
             .iter()
             .skip(app.message_offset())
             .take(message.visible)
-            .cloned()
-            .collect::<Vec<_>>()
-            .join("\n"),
-        Rect::new(
-            rect.x + 2,
-            rect.y + 1,
-            rect.width - 4,
-            rect.height.saturating_sub(4),
-        ),
-    );
+            .enumerate()
+        {
+            let bounds = Rect::new(rect.x + 2, rect.y + 1 + row as u16, rect.width - 4, 1);
+            let link = line == crate::dialog::REPOSITORY_URL;
+            let style = if link {
+                profile
+                    .dos(theme::HEADING)
+                    .add_modifier(crate::presentation::style::Modifier::UNDERLINED)
+            } else {
+                profile.dos(theme::TEXT)
+            };
+            s.caption(
+                Paragraph::new(line.clone())
+                    .alignment(crate::presentation::layout::Alignment::Center)
+                    .style(style),
+                bounds,
+            );
+            if link {
+                let width = Span::raw(line).width() as u16;
+                s.hit(
+                    Rect::new(bounds.x + (bounds.width - width) / 2, bounds.y, width, 1),
+                    Target::AboutRepository,
+                );
+            }
+        }
+    } else {
+        s.memo(
+            &message
+                .lines
+                .iter()
+                .skip(app.message_offset())
+                .take(message.visible)
+                .cloned()
+                .collect::<Vec<_>>()
+                .join("\n"),
+            Rect::new(
+                rect.x + 2,
+                rect.y + 1,
+                rect.width - 4,
+                rect.height.saturating_sub(4),
+            ),
+        );
+    }
     if message.maximum > 0 {
         s.caption(
             Paragraph::new(app.config.language.text("↑↓ / PgUp/PgDn scroll"))
@@ -223,8 +256,22 @@ pub(crate) fn message_spec<'a>(
     }
     s.control(Control::new(
         0,
-        Rect::new(rect.x + (rect.width - 12) / 2, rect.bottom() - 2, 12, 1),
-        ControlKind::Button(app.config.language.text("[ Close ]").into()),
+        Rect::new(
+            rect.x + (rect.width - 12) / 2,
+            rect.bottom() - if dialog.is_about() { 3 } else { 2 },
+            12,
+            1,
+        ),
+        ControlKind::Button(
+            app.config
+                .language
+                .text(if dialog.is_about() {
+                    "O~K~"
+                } else {
+                    "[ Close ]"
+                })
+                .into(),
+        ),
         Target::CloseDialog,
     ));
     Some(s)
