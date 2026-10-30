@@ -55,14 +55,14 @@ fn every_workflow_is_dispatch_only() -> io::Result<()> {
 }
 
 #[test]
-fn draft_release_includes_all_platforms_and_write_permission_is_isolated() -> io::Result<()> {
+fn release_includes_all_platforms_and_write_permission_is_isolated() -> io::Result<()> {
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(".github/workflows/release.yml");
     let text = fs::read_to_string(path)?;
-    assert_draft_release_policy(&text);
+    assert_release_policy(&text);
     Ok(())
 }
 
-fn assert_draft_release_policy(text: &str) {
+fn assert_release_policy(text: &str) {
     // Git may check YAML out as CRLF on Windows; policy is independent of EOLs.
     let text = text.replace("\r\n", "\n");
     let targets = text
@@ -79,16 +79,43 @@ fn assert_draft_release_policy(text: &str) {
     ] {
         assert!(targets.contains(&target));
     }
-    let (build_jobs, draft) = text.split_once("  draft:\n").expect("Dedicated draft job");
+    // Identify the publishing job by its operation, not its display name or ID.
+    let (preamble, jobs) = text.split_once("\njobs:\n").expect("Jobs mapping");
+    let mut boundaries = jobs
+        .match_indices("  ")
+        .filter_map(|(index, _)| {
+            let line = jobs[index..].lines().next()?;
+            let at_line_start = index == 0 || jobs.as_bytes()[index - 1] == b'\n';
+            (at_line_start && !line[2..].starts_with(' ') && line.ends_with(':')).then_some(index)
+        })
+        .collect::<Vec<_>>();
+    boundaries.push(jobs.len());
+    let jobs = boundaries
+        .windows(2)
+        .map(|bounds| &jobs[bounds[0]..bounds[1]])
+        .collect::<Vec<_>>();
+    let publishers = jobs
+        .iter()
+        .filter(|job| job.contains("gh release create"))
+        .collect::<Vec<_>>();
+    assert_eq!(publishers.len(), 1, "Exactly one release publishing job");
+    let publishing_job = *publishers[0];
+    assert!(!preamble.contains("contents: write"));
+    let build_jobs = jobs
+        .iter()
+        .filter(|job| !job.contains("gh release create"))
+        .copied()
+        .collect::<String>();
     assert!(!build_jobs.contains("contents: write"));
+    assert!(!build_jobs.contains("persist-credentials: true"));
     assert!(!build_jobs.contains("git push"));
-    assert!(draft.contains("needs: [validate, build]"));
-    assert!(draft.contains("contents: write"));
-    assert!(draft.contains("--verify-tag --draft"));
-    assert!(draft.contains("--prerelease"));
-    assert!(draft.contains("verify-assets"));
-    assert!(draft.contains("--platform all"));
-    let attach = draft
+    assert!(publishing_job.contains("needs: [validate, build]"));
+    assert!(publishing_job.contains("contents: write"));
+    assert!(publishing_job.contains("--verify-tag --draft"));
+    assert!(publishing_job.contains("--prerelease"));
+    assert!(publishing_job.contains("verify-assets"));
+    assert!(publishing_job.contains("--platform all"));
+    let attach = publishing_job
         .lines()
         .find(|line| line.contains("gh release create"))
         .expect("Release attachment command");
@@ -96,7 +123,7 @@ fn assert_draft_release_policy(text: &str) {
     assert!(!attach.contains("sha256"));
     assert!(!attach.contains("SHA256SUMS"));
     assert!(!attach.contains("dist/* "));
-    assert!(build_jobs.contains("shell: bash"));
+    assert!(preamble.contains("shell: bash"));
     assert!(build_jobs.contains("runs-on: ${{ matrix.os }}"));
     for check in [
         "cargo fmt --check",
@@ -106,7 +133,7 @@ fn assert_draft_release_policy(text: &str) {
     ] {
         assert!(build_jobs.contains(check));
     }
-    assert!(draft.contains("check-unused"));
+    assert!(publishing_job.contains("check-unused"));
     assert!(!text.contains("--clobber"));
     assert!(!text.contains("--draft=false"));
     assert!(!text.contains("git push --force"));
@@ -116,17 +143,44 @@ fn assert_draft_release_policy(text: &str) {
 }
 
 #[test]
-fn draft_release_policy_accepts_windows_and_mixed_line_endings() -> io::Result<()> {
+fn release_policy_accepts_windows_and_mixed_line_endings() -> io::Result<()> {
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(".github/workflows/release.yml");
     let lf = fs::read_to_string(path)?.replace("\r\n", "\n");
-    assert_draft_release_policy(&lf);
-    assert_draft_release_policy(&lf.replace('\n', "\r\n"));
+    assert_release_policy(&lf);
+    assert_release_policy(&lf.replace('\n', "\r\n"));
     let mixed = lf
         .lines()
         .enumerate()
         .map(|(index, line)| format!("{line}{}", if index % 2 == 0 { "\r\n" } else { "\n" }))
         .collect::<String>();
-    assert_draft_release_policy(&mixed);
+    assert_release_policy(&mixed);
+    Ok(())
+}
+
+#[test]
+fn release_policy_is_independent_of_publishing_job_name() -> io::Result<()> {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(".github/workflows/release.yml");
+    let text = fs::read_to_string(path)?;
+    assert_release_policy(&text.replace("  release:\n", "  publish_downloads:\n"));
+    Ok(())
+}
+
+#[test]
+fn release_policy_rejects_unsafe_publishing_changes() -> io::Result<()> {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(".github/workflows/release.yml");
+    let text = fs::read_to_string(path)?;
+    for unsafe_text in [
+        text.replacen("contents: read", "contents: write", 1),
+        text.replace("needs: [validate, build]", "needs: validate"),
+        text.replace("--verify-tag --draft", "--verify-tag"),
+        text.replace(
+            "  build:\n",
+            "  build:\n    permissions:\n      contents: write\n",
+        ),
+    ] {
+        assert_ne!(unsafe_text, text, "Mutation must exercise the policy");
+        assert!(std::panic::catch_unwind(|| assert_release_policy(&unsafe_text)).is_err());
+    }
     Ok(())
 }
 

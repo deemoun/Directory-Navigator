@@ -43,6 +43,12 @@ jobs:
           python-version: '3.12'
       - name: Test release helpers
         run: python -m unittest discover -s scripts -p 'test_*.py'
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Check workflow policy before platform builds
+        run: |
+          set -euo pipefail
+          CARGO_MANIFEST_DIR="$PWD" rustc --edition 2021 --test tests/workflow_policy.rs -o "$RUNNER_TEMP/workflow-policy"
+          "$RUNNER_TEMP/workflow-policy"
       - name: Set release source version
         id: version
         env:
