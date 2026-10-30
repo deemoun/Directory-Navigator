@@ -187,7 +187,7 @@ fn appearance_configuration_defaults_invalid_roundtrip_and_interface_clock() -> 
     };
     config.save(&path)?;
     let loaded = Config::read(&path)?;
-    assert_eq!(loaded.palette, PaletteProfile::Terminal);
+    assert_eq!(loaded.palette, PaletteProfile::ClassicDn);
     assert!(!loaded.show_clock);
     let mut app = t.app()?;
     app.open_settings(SettingsKind::Interface);
@@ -320,22 +320,23 @@ fn palette_preview_mouse_keyboard_cancel_apply_and_separate_highlight() -> io::R
     assert!(app.modals.settings().is_none());
     let entries = app.panels[0].entries.len();
     draw(&mut app, 80, 25)?;
-    click(&mut app, Target::ColorChoice(PaletteProfile::Terminal));
-    assert_eq!(app.config.palette, PaletteProfile::Terminal);
+    click(&mut app, Target::Colors(palette::Action::Foreground(12)));
+    assert!(matches!(app.config.palette, PaletteProfile::Custom(_)));
     assert!(!app.panels[0].loading);
     draw(&mut app, 120, 40)?;
     click(&mut app, Target::CancelColors);
     assert_eq!(app.config.palette, PaletteProfile::ClassicDn);
     assert_eq!(app.panels[0].entries.len(), entries);
     palette::open(&mut app);
-    key(&mut app, KeyCode::Char('t'), KeyModifiers::NONE);
+    key(&mut app, KeyCode::Char('f'), KeyModifiers::NONE);
+    key(&mut app, KeyCode::Right, KeyModifiers::NONE);
     key(&mut app, KeyCode::Enter, KeyModifiers::NONE);
     assert!(app.modals.color_dialog().is_none());
-    assert_eq!(app.config.palette, PaletteProfile::Terminal);
+    assert!(matches!(app.config.palette, PaletteProfile::Custom(_)));
     palette::open(&mut app);
     key(&mut app, KeyCode::Char('c'), KeyModifiers::NONE);
     key(&mut app, KeyCode::Esc, KeyModifiers::NONE);
-    assert_eq!(app.config.palette, PaletteProfile::Terminal);
+    assert!(matches!(app.config.palette, PaletteProfile::Custom(_)));
     app.open_settings(SettingsKind::Highlight);
     assert_eq!(app.modals.settings().unwrap().rows().len(), 1);
     Ok(())
@@ -628,7 +629,7 @@ fn document_close_icons_respect_modal_precedence_and_unsaved_guard() -> io::Resu
 fn color_dialog_shares_dn_button_faces_and_moves_default_markers_to_cancel() -> io::Result<()> {
     let t = Temp::new()?;
     let mut app = t.app()?;
-    for profile in [PaletteProfile::ClassicDn, PaletteProfile::Terminal] {
+    for profile in [PaletteProfile::ClassicDn] {
         app.config.palette = profile;
         palette::open(&mut app);
         for focused_cancel in [false, true] {

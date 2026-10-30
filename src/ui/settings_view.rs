@@ -22,7 +22,7 @@ pub(super) fn draw_settings(frame: &mut impl Frame, app: &App, area: Rect) {
 }
 pub(crate) fn settings_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
     let profile = app.config.palette;
-    let dos = profile.styles();
+    let dos = profile.styles_for(crate::palette::theme::Group::Dialogs);
     let settings = app.modals.settings()?;
     if settings.kind == SettingsKind::Keyboard {
         return super::shortcuts_view::settings_spec(app, area);
@@ -149,7 +149,8 @@ fn plugins_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
         Target::CancelSettings,
     );
     spec.caption(
-        Paragraph::new(language.text("Enabled plugins")).style(palette.dos(theme::HEADING)),
+        Paragraph::new(language.text("Enabled plugins"))
+            .style(palette.for_group(crate::palette::theme::Group::Dialogs, theme::HEADING)),
         Rect::new(rect.x + 3, rect.y + 2, rect.width - 6, 1),
     );
     for (index, (id, title)) in settings.plugins.iter().enumerate() {
@@ -183,7 +184,7 @@ fn plugins_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
     }
     spec.caption(
         Paragraph::new(language.text("Disabling closes open plugin windows."))
-            .style(palette.dos(theme::DISABLED)),
+            .style(palette.for_group(crate::palette::theme::Group::Dialogs, theme::DISABLED)),
         Rect::new(
             rect.x + 3,
             rect.bottom() - theme::HINT_BOTTOM,
@@ -224,7 +225,8 @@ fn regional_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
         let label = choice.definition().caption;
         let row = Rect::new(rect.x + 3, rect.y + 2 + i as u16, rect.width - 6, 1);
         spec.caption(
-            Paragraph::new(language.text(label)).style(profile.dos(theme::TEXT)),
+            Paragraph::new(language.text(label))
+                .style(profile.for_group(crate::palette::theme::Group::Dialogs, theme::TEXT)),
             Rect::new(row.x, row.y, 24, 1),
         );
         let field = Rect::new(row.x + 24, row.y, row.width - 24, 1);
@@ -251,17 +253,17 @@ fn regional_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
             language.text("Preview"),
             format.stamp(now, false, true)
         ))
-        .style(profile.dos(theme::HEADING)),
+        .style(profile.for_group(crate::palette::theme::Group::Dialogs, theme::HEADING)),
         Rect::new(rect.x + 3, rect.y + 9, rect.width - 6, 1),
     );
     spec.caption(
         Paragraph::new(language.text("←/→ or Space changes · Tab/↑↓ chooses"))
-            .style(profile.dos(theme::TEXT)),
+            .style(profile.for_group(crate::palette::theme::Group::Dialogs, theme::TEXT)),
         Rect::new(rect.x + 3, rect.y + 11, rect.width - 6, 1),
     );
     spec.caption(
         Paragraph::new(language.text("Enter applies · Esc cancels"))
-            .style(profile.dos(theme::TEXT)),
+            .style(profile.for_group(crate::palette::theme::Group::Dialogs, theme::TEXT)),
         Rect::new(rect.x + 3, rect.y + 12, rect.width - 6, 1),
     );
     for (i, (label, target)) in [

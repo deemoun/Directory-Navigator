@@ -176,5 +176,6 @@ pub(crate) fn page(
         cursor: None,
     };
     pages::draw(&mut scene, game, ctx.language, pending);
+    scene.apply_theme(crate::palette::theme::Group::Dialogs);
     scene
 }

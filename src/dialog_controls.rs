@@ -9,8 +9,8 @@ pub(crate) fn key(app: &mut App, event: KeyEvent, scope: Focus) -> bool {
         return false;
     }
     let code = match (scope, event.code) {
-        (Focus::Colors | Focus::SaverSetup, KeyCode::Down) => KeyCode::Tab,
-        (Focus::Colors | Focus::SaverSetup, KeyCode::Up) => KeyCode::BackTab,
+        (Focus::SaverSetup, KeyCode::Down) => KeyCode::Tab,
+        (Focus::SaverSetup, KeyCode::Up) => KeyCode::BackTab,
         (Focus::SaverSetup, KeyCode::Right) => KeyCode::Tab,
         (Focus::SaverSetup, KeyCode::Left) => KeyCode::BackTab,
         (Focus::FileTools, KeyCode::Down)
@@ -152,7 +152,7 @@ pub(crate) fn tool_action(app: &mut App, target: Target) {
         Some(Target::Utility(a)) => crate::utilities::action(app, a),
         Some(Target::Window(a)) => crate::windowing::action(app, a),
         Some(Target::CommandHistory(a)) => crate::command_line::history::action(app, a),
-        Some(Target::ColorChoice(profile)) => crate::palette::choose(app, profile),
+        Some(Target::Colors(action)) => crate::palette::action(app, action),
         Some(Target::AcceptColors) => app.modals.set_color_dialog(None),
         Some(Target::CancelColors) => crate::palette::cancel(app),
         Some(Target::Screensaver(i)) => crate::screensaver::command(app, i),

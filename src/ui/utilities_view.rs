@@ -16,7 +16,7 @@ fn text(
     value: &str,
     focused: bool,
 ) {
-    let dos = profile.styles();
+    let dos = profile.styles_for(crate::palette::theme::Group::Dialogs);
     spec.caption(
         Paragraph::new(value.to_owned())
             .style(dos(if focused { 0x30 } else { 0x70 }))
@@ -42,7 +42,7 @@ fn button(spec: &mut DialogSpec<'_>, app: &App, rect: Rect, label: &str, action:
 }
 pub(crate) fn utility_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
     let profile = app.config.palette;
-    let dos = profile.styles();
+    let dos = profile.styles_for(crate::palette::theme::Group::Dialogs);
     let kind = app.utilities.modals.utility_dialog()?;
     if kind == Kind::Calculator {
         return None;

@@ -109,10 +109,13 @@ fn overlapping_documents_native_dialogs_game_pages_resize_and_output_handoff() -
         !s.text().contains("Open file")
     })?;
     s.send(b"\x1b", "close editor", |s| !s.text().contains("F2 Save"))?;
-    s.send(b"\x1b", "close viewer", |s| !s.text().contains("F2 Wrap"))?;
-    s.send(b"\x1b[20;3~", "game opened", |s| {
-        s.text().contains("Navigator's game")
-    })?;
+    // Activate exposed manager background explicitly. An Escape followed by
+    // an Alt sequence can be combined by the terminal key decoder under load.
+    s.send(
+        b"\x1b[<0;79;22M\x1b[<0;79;22m\x1b[20;3~",
+        "game opened",
+        |s| s.text().contains("Navigator's game"),
+    )?;
     s.send(b"\x1b[15~", "game setup", |s| {
         s.text().contains("Setup game")
     })?;
@@ -150,5 +153,66 @@ fn overlapping_documents_native_dialogs_game_pages_resize_and_output_handoff() -
             b"fixture\n"
         );
     }
+    s.finish()
+}
+
+#[test]
+fn colors_window_edits_cancel_saves_moves_and_restores_terminal() -> io::Result<()> {
+    use dn::palette::theme::Slot;
+    let mut s = Session::new("colors")?;
+    s.wait("manager ready", |s| {
+        s.text().contains("item-000.") && s.text().contains("F5 Copy")
+    })?;
+    let config = s.root.join("settings/dn/config.conf");
+    let original = fs::read(&config)?;
+    s.send(b"\x1boo", "colors opened", |s| {
+        s.text().contains("Foreground") && s.text().contains("Background")
+    })?;
+    s.send(b"f\x1b[C\x1b", "color preview cancelled", |s| {
+        !s.text().contains("Foreground")
+    })?;
+    assert_eq!(fs::read(&config)?, original);
+    s.send(b"\x1boo", "colors reopened", |s| {
+        s.text().contains("Foreground")
+    })?;
+    s.send(b"f\x1b[C\r", "color accepted", |s| {
+        !s.text().contains("Foreground")
+    })?;
+    s.send(b"\x1bos", "save colors", |_| {
+        dn::config::Config::read(&config).is_ok_and(|c| c.palette.slot(Slot::TimerColor) == 0x72)
+    })?;
+    s.send(b"\x1boo", "saved colors reopened", |s| {
+        s.text().contains("Foreground")
+    })?;
+    s.send(b"c", "preview default colors", |s| {
+        s.text().contains("Default colors set")
+    })?;
+    s.resize(100, 32)?;
+    // A queued pre-resize frame can still contain the title. Wait for the
+    // function bar on the new bottom row before starting manipulation; resize
+    // deliberately cancels any capture begun against the old viewport.
+    s.wait("resized colors", |s| {
+        let text = s.text();
+        text.contains("Foreground")
+            && text
+                .lines()
+                .last()
+                .is_some_and(|row| row.contains("F10 Quit"))
+    })?;
+    s.send(b"\x1b[15;5~", "move colors", |s| {
+        s.text().contains("Arrows move")
+    })?;
+    s.send(b"\x1b[C\r", "accept color window position", |s| {
+        !s.text().contains("Arrows move")
+    })?;
+    s.send(b"\x1b", "cancel default preview", |s| {
+        !s.text().contains("Foreground")
+    })?;
+    assert_eq!(
+        dn::config::Config::read(&config)?
+            .palette
+            .slot(Slot::TimerColor),
+        0x72
+    );
     s.finish()
 }

@@ -11,7 +11,7 @@ use unicode_segmentation::UnicodeSegmentation;
 pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
     let prefix_armed = crate::shortcuts::armed(app);
     let profile = app.config.palette;
-    let dos = profile.styles();
+    let dos = profile.styles_for(crate::palette::theme::Group::Editor);
     super::editor_menu::draw_bar(frame, app, Rect::new(area.x, area.y, area.width, 1));
     let Some(editor) = app.desktop.active_editor() else {
         return;
@@ -164,9 +164,7 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
         1,
     ));
     for (index, entry) in entries.iter().enumerate() {
-        let key = if app.config.shortcuts.is_mac()
-            || profile == crate::palette::PaletteProfile::ClassicDn
-        {
+        let key = if app.config.shortcuts.is_mac() || profile.is_classic() {
             format!(
                 "{} ",
                 crate::shortcuts::label(

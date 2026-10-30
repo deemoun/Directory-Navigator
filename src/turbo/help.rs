@@ -256,7 +256,8 @@ impl Browser {
                     Glyph {
                         text,
                         attribute: cell.attr.to_u8(),
-                        style: None,
+                        style: profile
+                            .themed(crate::palette::theme::Group::Help, cell.attr.to_u8()),
                     },
                 );
             }

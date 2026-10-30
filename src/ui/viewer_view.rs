@@ -7,7 +7,7 @@ use crate::turbo::dialog_spec::{centered, scope, Control, ControlKind, DialogSpe
 use crate::{app::App, filesystem::display_name, formatting::tail, mouse::Target, viewer::Action};
 pub(super) fn draw_viewer(frame: &mut impl Frame, app: &App, area: Rect) {
     let profile = app.config.palette;
-    let dos = profile.styles();
+    let dos = profile.styles_for(crate::palette::theme::Group::Viewer);
     let header = super::clock::header(app, Rect::new(area.x, area.y, area.width, 1));
     let clock_text = if super::clock::visible(app) {
         Some(app.clock.text.clone())
@@ -43,7 +43,8 @@ pub(super) fn draw_viewer(frame: &mut impl Frame, app: &App, area: Rect) {
     super::dialog_style::document_header(frame, profile, header, &title, Target::CloseViewer);
     if let Some(text) = clock_text {
         frame.render_widget(
-            Paragraph::new(text).style(dos(0x71)),
+            Paragraph::new(text)
+                .style(profile.for_group(crate::palette::theme::Group::Timer, 0x71)),
             Rect::new(
                 area.right() - app.config.datetime.clock_width(),
                 area.y,
@@ -118,7 +119,10 @@ pub(super) fn draw_search(frame: &mut impl Frame, app: &App, area: Rect) {
     }
 }
 pub(crate) fn viewer_search_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
-    let dos = app.config.palette.styles();
+    let dos = app
+        .config
+        .palette
+        .styles_for(crate::palette::theme::Group::Viewer);
     let viewer = app.desktop.active_viewer()?;
     let dialog = viewer.modals.viewer_search()?;
     let width = 58;
@@ -184,7 +188,7 @@ pub(super) fn draw_text(
     profile: crate::palette::PaletteProfile,
     language: crate::localization::Language,
 ) {
-    let dos = profile.styles();
+    let dos = profile.styles_for(crate::palette::theme::Group::Viewer);
     if let Some(contents) = &viewer.contents {
         use unicode_width::UnicodeWidthStr;
         let visual = viewer
@@ -203,7 +207,8 @@ pub(super) fn draw_text(
             viewer.horizontal as usize
         };
         frame.render_widget(
-            crate::turbo::widgets::text_view(&lines, horizontal, 0x1f),
+            crate::turbo::widgets::text_view(&lines, horizontal, 0x1f)
+                .themed(crate::palette::theme::Group::Viewer),
             area,
         );
         for (y, row) in visual.iter().enumerate() {

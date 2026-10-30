@@ -27,6 +27,13 @@ impl Glyph {
     }
 }
 impl Scene {
+    pub(crate) fn apply_theme(&mut self, group: crate::palette::theme::Group) {
+        for glyph in self.cells.values_mut() {
+            if glyph.style.is_none() {
+                glyph.style = self.profile.themed(group, glyph.attribute);
+            }
+        }
+    }
     /// Terminals cannot colour half of a wide grapheme independently. Resolve
     /// partial overlay/shadow intersections before transport and hit publication.
     pub(crate) fn normalize_wide(&mut self) {

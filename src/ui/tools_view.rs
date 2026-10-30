@@ -19,7 +19,7 @@ pub(crate) fn tools_spec(
     layer: crate::focus::Focus,
 ) -> Option<DialogSpec<'_>> {
     let profile = app.config.palette;
-    let dos = profile.styles();
+    let dos = profile.styles_for(crate::palette::theme::Group::Dialogs);
     if let Some(pattern) = app
         .modals
         .pattern()

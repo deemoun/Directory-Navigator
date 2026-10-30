@@ -1,5 +1,28 @@
 # Directory Navigator — beta
 
+## DN-style color editor
+
+- Replaced the Classic/Terminal picker with native group/item lists, 4×4
+  foreground/background selectors, sample text, DN defaults and Color/B/W/Mono
+  presets, following original COLORSEL.PAS and DN.DNR. VGA and blink omitted.
+- A shared component/attribute slot catalog resolves custom colors through native
+  controls, composed dialogs, menus, manager panes, editor/viewer text, Help,
+  clock and function bars. Shared attributes within a component are labeled as
+  shared; raw game colors and physical swatches retain their indices.
+- Live preview, full Cancel/title-close rollback and existing guarded settings
+  saving remain. Accepted colors persist as validated integers in `[colors]`;
+  legacy terminal-palette configuration normalizes to DN defaults.
+- Added native selector, keyboard/mouse, movement/stale-hit, scoped rendering,
+  Unicode transport, preset and temporary-file configuration regression tests.
+  Only the 16 Colors appearance fixtures changed; the remaining 304 captures
+  are unchanged. Colors captures isolate their dialog from variable manager
+  paths/free-space data, with native shadows also tested directly.
+- macOS validation: 608 tests passed across 66 native executables, zero failures,
+  one existing opt-in Trash test ignored. Formatting, all-target Clippy with
+  warnings denied, release build, no-default-features check, doc tests and all
+  three optimized-release PTY walkthroughs pass. Windows/Linux remain skipped.
+
+
 ## Controller extraction and regression stabilization
 
 - Copy/Move draft option changes and child requests, editor Find/Replace input,

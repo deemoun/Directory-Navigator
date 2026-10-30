@@ -95,7 +95,10 @@ fn shared_logic_preserves_native_frames() -> io::Result<()> {
                                 a.config.bookmarks[0] = Some("fixture".into());
                                 dn::navigation_tools::open_bookmarks(&mut a);
                             }
-                            16 => dn::palette::open(&mut a),
+                            16 => {
+                                a.desktop.activate(dn::desktop::WindowId::MANAGER);
+                                dn::palette::open(&mut a);
+                            }
                             17 | 18 => {
                                 a.open_settings(SettingsKind::Keyboard);
                                 if case == 18 {
@@ -120,6 +123,30 @@ fn shared_logic_preserves_native_frames() -> io::Result<()> {
                                 .copied()
                                 .collect::<Vec<_>>();
                             let mut buffer = Buffer::rendered(result);
+                            if case == 16 {
+                                // Colors belongs to the manager. Its exposed background
+                                // contains temporary paths and asynchronous free-space data;
+                                // freeze the dialog itself, not that unrelated environment.
+                                let rect = snapshot
+                                    .surfaces
+                                    .iter()
+                                    .find(|s| {
+                                        matches!(
+                                            s.id.key,
+                                            dn::windowing::geometry::SurfaceKey::Modal(_)
+                                        )
+                                    })
+                                    .unwrap()
+                                    .bounds;
+                                for y in 0..h {
+                                    for x in 0..w {
+                                        if !rect.contains((x, y).into()) {
+                                            buffer.content[usize::from(y * w + x)] =
+                                                Default::default();
+                                        }
+                                    }
+                                }
+                            }
                             if case == 19 {
                                 // The regional preview samples wall-clock time. Freeze only its
                                 // digits; punctuation, geometry, colors and other text stay exact.
@@ -133,6 +160,15 @@ fn shared_logic_preserves_native_frames() -> io::Result<()> {
                             }
                             format!("{cursor:?}{hits:?}{buffer:?}")
                         };
+                        if case == 16 {
+                            assert!(
+                                result
+                                    .hit_regions()
+                                    .iter()
+                                    .any(|(_, t)| matches!(t, dn::mouse::Target::Colors(_))),
+                                "color fixture must render the dialog"
+                            );
+                        }
                         let signature = normalize(result);
                         assert_eq!(signature, normalize(ui::render(&a, &snapshot)));
                         captures.push_str(&format!(

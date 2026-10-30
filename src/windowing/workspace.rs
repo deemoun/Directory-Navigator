@@ -84,6 +84,18 @@ pub(crate) fn chrome(scene: &mut Scene, s: Surface) {
             Target::Surface(s.id, Chrome::Resize),
         ));
     }
+    if matches!(scene.profile, crate::palette::PaletteProfile::Custom(_)) {
+        for ((x, row), glyph) in scene.cells.iter_mut() {
+            if ((*row == y && *x >= r.x && *x < r.right())
+                || (*row == r.bottom() - 1 && *x >= r.right().saturating_sub(2) && *x < r.right()))
+                && glyph.style.is_none()
+            {
+                glyph.style = scene
+                    .profile
+                    .themed(crate::palette::theme::Group::Dialogs, glyph.attribute);
+            }
+        }
+    }
 }
 pub(crate) fn definitions(app: &App, area: Rect) -> Vec<Definition> {
     let mut result = app

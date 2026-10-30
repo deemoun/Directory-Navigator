@@ -142,7 +142,9 @@ fn complete_preferences_roundtrip_and_unknown_keys_survive() -> io::Result<()> {
     config.backspace_parent = false;
     config.show_clock = false;
     config.saver_minutes = 5;
-    config.palette = dn::palette::PaletteProfile::Terminal;
+    config.palette = dn::palette::PaletteProfile::ClassicDn
+        .with_slot(dn::palette::theme::Slot::PanelText, 0x1e)
+        .with_slot(dn::palette::theme::Slot::TimerColor, 0x72);
     config.layouts = [PanelLayout::Brief, PanelLayout::Details];
     config.columns = [ColumnPreset::NameSize, ColumnPreset::NameSizeModified];
     config.sorts = [SortMode::Extension, SortMode::Date];
@@ -317,7 +319,7 @@ fn cancelling_palette_preview_does_not_persist_preview() -> io::Result<()> {
     app.save_config();
     let original = fs::read(t.path())?;
     dn::menu::execute(&mut app, dn::menu::Action::Colors);
-    dn::palette::choose(&mut app, dn::palette::PaletteProfile::Terminal);
+    dn::palette::action(&mut app, dn::palette::Action::Foreground(12));
     dn::palette::cancel(&mut app);
     assert!(app.save_settings_on_exit());
     assert_eq!(fs::read(t.path())?, original);

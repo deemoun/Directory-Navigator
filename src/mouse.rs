@@ -34,7 +34,7 @@ pub enum Target {
     QuickPreview,
     CommandLine,
     Screensaver(usize),
-    ColorChoice(crate::palette::PaletteProfile),
+    Colors(crate::palette::Action),
     AcceptColors,
     CancelColors,
     Navigation(crate::navigation_tools::Action),
@@ -302,14 +302,7 @@ fn handle_mouse(app: &mut App, event: MouseEvent) {
         return;
     }
     if focus == Focus::Colors {
-        if event.kind == MouseEventKind::Down(MouseButton::Left) {
-            if let Some(
-                t @ (Target::ColorChoice(_) | Target::AcceptColors | Target::CancelColors),
-            ) = target
-            {
-                crate::dialog_controls::tool_action(app, t);
-            }
-        }
+        crate::palette::mouse(app, event, target);
         return;
     }
     if focus == Focus::Pattern {

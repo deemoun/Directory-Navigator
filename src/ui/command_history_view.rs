@@ -13,7 +13,7 @@ pub(crate) fn command_history_spec(app: &App, area: Rect) -> Option<DialogSpec<'
     let d = app.command_line.modals.command_history()?;
     let language = app.config.language;
     let profile = app.config.palette;
-    let dos = profile.styles();
+    let dos = profile.styles_for(crate::palette::theme::Group::Dialogs);
     let (rect, _) = history::geometry(area);
     let mut spec = DialogSpec::new(
         rect,

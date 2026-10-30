@@ -337,10 +337,20 @@ Ctrl+F7 searches backward. Search and wrapping are disabled in Hex view.
 Filters preserve excluded marks; file operations/export use visible marks only.
 Bookmarks persist only when explicitly saving the desktop.
 
-Classic DN is the default fixed 256-color palette, with gray panels and red/gray
-function bars. Options → Colors previews Classic DN or the legacy terminal palette;
-Cancel restores the previous choice. Interface → Show clock controls the local
-upper-right clock. Save desktop persists these choices. No drive selector is added.
+DN colors use fixed terminal color indices, with gray panels and red/gray
+function bars by default. **Options → Colors** follows DOS Navigator’s group/item
+layout: choose an implemented component and item, then edit its foreground and
+background in the 4×4 color grids. Changes preview immediately; the sample shows
+the selected attribute. Tab/Shift+Tab changes controls, arrows navigate lists or
+color grids, and Enter activates the focused button (otherwise OK). G/I focuses
+the group/item list; F/B focuses foreground/background. Lists support scrolling.
+**Color** restores DN defaults; **B/W** and **Mono** provide grayscale presets.
+**Default colors set** restores all default UI attributes. OK keeps the changes;
+Cancel, Esc or the close icon restores the complete previous color table.
+Save desktop or normal exit with Save on exit persists accepted colors in the
+existing configuration. The former Classic/Terminal selector is removed; older
+`palette="terminal"` settings load DN defaults. VGA hardware palette controls and
+blinking are omitted. Interface → Show clock controls the upper-right clock.
 
 Screen savers: Options → Configuration → Screen savers offers DN’s Star Sky,
 Preview, and Never / 1 / 2 / 5 / 10 / 30 / 60 minute idle delays (default: 10 minutes).
@@ -452,14 +462,14 @@ Block (Alt+B) offers selection, cut, copy and paste. Unassigned editor function
 keys have no action labels or mouse targets. Paragraph alone remains
 intentionally dimmed, with no dropdown. Editor preferences remain under Options.
 Confirmation policy explains safeguards; it does not offer switches to disable
-them. Save/Load desktop continues to persist the selected palette and settings.
+them. Save/Load desktop continues to persist colors and settings.
 
 Unsupported commands are not menu placeholders. Disk administration/recovery,
 DOS communications/country/printer setup and built-in printing are outside this
 app's scope. Save all remains outside this pass; desktop movement and zoom use
 the shared window controls described below. Future work is separate: safe archive extraction,
 disk/free-space information and permission editing; later,
-archive creation and palette editing.
+archive creation.
 Split/combine and line drawing remain low priority. No settings format changes.
 
 **Ctrl+O** in the Classic profile reveals the terminal's real primary screen and
@@ -809,5 +819,6 @@ Navigator's dark faces, yellow shortcut letters and offset black shadows.
 
 Dialog buttons share DOS Navigator's dark faces and black offset shadows.
 Yellow captions with cyan inward arrows identify the focused/default action;
-disabled buttons have dim captions. In Colors, Apply is the Enter default while
-choosing a palette. Tab to Cancel or press Esc to restore the previous palette.
+disabled buttons have dim captions. In Colors, OK is the Enter default while
+browsing or editing attributes. Tab to Cancel or press Esc to restore the previous
+color table.

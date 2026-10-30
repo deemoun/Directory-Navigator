@@ -9,7 +9,6 @@ use crate::{
     filesystem::display_name,
     formatting,
     layout::Prepared,
-    palette::PaletteProfile,
     panel::Panel,
     panel_layout::{PanelGeometry, PanelLayout},
     quick_search::QuickSearch,
@@ -55,7 +54,7 @@ fn pane(
     g: &PanelGeometry,
 ) {
     let (index, active, header_reserve) = state;
-    let classic = config.palette == PaletteProfile::ClassicDn;
+    let classic = config.palette.is_classic();
     s.fill(area.x, area.y, area.width, area.height, 0x87);
     s.border(
         area.x,
@@ -347,7 +346,7 @@ pub(crate) fn prepare(
     .iter()
     .enumerate()
     {
-        let label = if app.config.palette == PaletteProfile::ClassicDn && *label == "Delete" {
+        let label = if app.config.palette.is_classic() && *label == "Delete" {
             "Del"
         } else {
             label
@@ -355,7 +354,7 @@ pub(crate) fn prepare(
         let label = app.config.language.text(label);
         let key = if app.config.shortcuts.is_mac() {
             format!("^O{} ", (index + 1) % 10)
-        } else if app.config.palette == PaletteProfile::ClassicDn {
+        } else if app.config.palette.is_classic() {
             format!("F{} ", index + 1)
         } else {
             (index + 1).to_string()
@@ -371,6 +370,7 @@ pub(crate) fn prepare(
             buttons[index],
         );
     }
+    s.apply_theme(crate::palette::theme::Group::FilePanel);
     s.cells.extend(header.cells);
     (s, positions)
 }
@@ -428,6 +428,18 @@ pub(crate) fn menu_bar(app: &App, width: u16) -> (Scene, Vec<Rect>) {
             &app.clock.text,
             0x71,
         );
+    }
+    {
+        for ((x, _), glyph) in s.cells.iter_mut() {
+            let group = if clock && *x >= width.saturating_sub(app.config.datetime.clock_width()) {
+                crate::palette::theme::Group::Timer
+            } else {
+                crate::palette::theme::Group::Menus
+            };
+            if glyph.style.is_none() {
+                glyph.style = s.profile.themed(group, glyph.attribute);
+            }
+        }
     }
     (s, positions)
 }

@@ -28,7 +28,6 @@ Cannot read file information.	Не удалось прочитать свойс�
 Case sensitive	С учётом регистра
 Change all	Заменить всё
 Change direc~t~ory...	П~е~рейти в папку...
-Classic DN — fixed 256 colors	Классика DN — 256 цветов
 Clear	Очистить
 Clear all marks	Снять все отметки
 Close	Закрыть
@@ -309,7 +308,6 @@ DOS font glyphs at 01–1F / 7F; not control-code decoding	01–1F / 7F — гр
  Copy disabled 	Копирование выключено
 Archive browser — read-only	Архив — только просмотр
 Viewer search — loaded text	Поиск в загруженном тексте
-C/T or Space chooses · Enter applies · Esc restores	C/T или Пробел — выбор · Enter принять · Esc вернуть
 Copy uses DN's internal clipboard · Ctrl+C copies	Копирование во внутренний буфер DN · Ctrl+C копировать
 Existing destinations are refused.	Существующие файлы не перезаписываются.
 Filename pattern	Маска имени
@@ -330,7 +328,6 @@ Direction	Направление
 Scope	Область
 Origin	Начало
 Global	Весь текст
-Terminal palette — legacy ANSI colors	Палитра терминала — цвета ANSI
  Name      marked	 Имя      отмечено
  folder	 папка
  ordinary file	 обычный файл
@@ -595,3 +592,64 @@ Zoom	Масштаб
 Si~z~e/Move	Сдвиг/~р~азмер
 Zoo~m~/Restore	Масшта~б~/возврат
 Arrows move · Shift+arrows size · Enter accepts · Esc cancels	Стрелки — сдвиг · Shift+стрелки — размер · Enter — OK · Esc — отмена
+Group	Группа
+Item	Элемент
+Foreground	Передний план
+Background	Фон
+Default colors set	Стандартные цвета
+Tab selects · Arrows change · Esc restores	Tab выбор · Стрелки цвет · Esc отмена
+~C~olor	~Ц~вет
+B/~W~	Ч/~Б~
+~M~ono	~М~оно
+Colors: Active path	Активный путь
+Colors: Archives	Архивы
+Colors: Background / text	Фон / текст
+Colors: Button default	Кнопка по умолчанию
+Colors: Button markers	Маркеры кнопки
+Colors: Button normal	Обычная кнопка
+Colors: Button shadow	Тень кнопки
+Colors: Color	Цвет
+Colors: Column title / marked	Заголовок / отмеченные
+Colors: Dialogs	Диалоги
+Colors: Directory / active frame	Каталог / активная рамка
+Colors: Disabled	Недоступный
+Colors: Editor	Редактор
+Colors: Executables	Исполняемые файлы
+Colors: File Manager	Файловый менеджер
+Colors: File Viewer	Просмотр файлов
+Colors: Frame / selected text	Рамка / выбранный текст
+Colors: Frame icons	Значки рамки
+Colors: Function bar	Строка клавиш
+Colors: Help	Пом.
+Colors: History button	Кнопка истории
+Colors: Information / heading	Сведения / заголовок
+Colors: Input normal	Обычный ввод
+Colors: Input selected	Активный ввод
+Colors: Link	Ссылка
+Colors: List focused	Активный список
+Colors: List normal / selection	Список / выделение
+Colors: Marked cursor	Отмеченный курсор
+Colors: Media files	Медиафайлы
+Colors: Menus	Меню
+Colors: Normal	Обычный
+Colors: Normal cursor	Обычный курсор
+Colors: Normal text	Обычный текст
+Colors: Normal text / frame	Обычный текст / рамка
+Colors: Normal text / inactive frame	Текст / неактивная рамка
+Colors: Notice	Сообщение
+Colors: Search match / status	Совпадение / состояние
+Colors: Selected	Выбранный
+Colors: Selected link	Выбранная ссылка
+Colors: Selection	Выделение
+Colors: Shortcut	Горячая клавиша
+Colors: Shortcut selected	Клавиша выбранного
+Colors: Source files	Исходные файлы
+Colors: Status	Состояние
+Colors: Symbolic links	Символические ссылки
+Colors: Timer	Часы
+Colors: └─ Quick View	└─ Быстрый просмотр
+Colors: File dialog input	Ввод файлового диалога
+Colors: File dialog selected	Выделение файлового диалога
+Colors: Input / list focus	Ввод / фокус списка
+Colors: List inactive selection	Неактивное выделение
+Colors: List cursor	Курсор списка

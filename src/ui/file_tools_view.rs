@@ -295,7 +295,7 @@ fn text(
     value: &str,
     focused: bool,
 ) {
-    let dos = profile.styles();
+    let dos = profile.styles_for(crate::palette::theme::Group::Dialogs);
     spec.caption(
         Paragraph::new(value.to_owned()).style(dos(if focused { 0x30 } else { 0x70 })),
         rect,

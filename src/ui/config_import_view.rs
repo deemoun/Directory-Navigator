@@ -38,7 +38,8 @@ pub(crate) fn import_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
         Rect::new(rect.x + 2, rect.y + 1, rect.width - 4, rect.height - 5),
     );
     spec.caption(
-        Paragraph::new(lang.text("↑↓ / PgUp/PgDn scroll")).style(profile.dos(theme::TEXT)),
+        Paragraph::new(lang.text("↑↓ / PgUp/PgDn scroll"))
+            .style(profile.for_group(crate::palette::theme::Group::Dialogs, theme::TEXT)),
         Rect::new(rect.x + 2, rect.bottom() - 4, rect.width - 4, 1),
     );
     let enabled = preview.can_apply();

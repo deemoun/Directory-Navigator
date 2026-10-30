@@ -38,7 +38,11 @@ pub(super) fn draw_prefix(frame: &mut impl Frame, app: &App) {
     frame.regions().clear();
     super::dialog_style::close_button(frame, app.config.palette, rect, Target::CloseDialog);
     frame.render_widget(
-        Paragraph::new(text).style(app.config.palette.dos(theme::TEXT)),
+        Paragraph::new(text).style(
+            app.config
+                .palette
+                .for_group(crate::palette::theme::Group::Dialogs, theme::TEXT),
+        ),
         Rect::new(rect.x + 2, rect.y + 2, rect.width - 4, rect.height - 4),
     );
 }
@@ -60,7 +64,7 @@ pub(super) fn settings_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
     let choice = Rect::new(rect.x + 3, rect.y + 2, rect.width - 6, 1);
     spec.caption(
         Paragraph::new(language.text(settings.choice_fields()[0].definition().caption))
-            .style(profile.dos(theme::TEXT)),
+            .style(profile.for_group(crate::palette::theme::Group::Dialogs, theme::TEXT)),
         Rect::new(choice.x, choice.y, 12, 1),
     );
     let field = Rect::new(choice.x + 12, choice.y, choice.width - 12, 1);
@@ -84,12 +88,13 @@ pub(super) fn settings_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
         "Classic DN uses F1–F10 and Alt/Ctrl combinations.\nTab switches panels; Insert or Space marks entries.\nF3 View · F4 Edit · F5 Copy · F6 Move\nF7 MkDir · F8 Trash/delete · F9 Menu · F10 Quit\nEditor: F2 Save · F7 Find · F10 Menu\nMac-friendly adds Ctrl+O sequences without Fn/Option.\nDefault: Classic DN. Automatic: Mac on macOS, Classic elsewhere."
     };
     spec.caption(
-        Paragraph::new(language.text(text)).style(profile.dos(theme::TEXT)),
+        Paragraph::new(language.text(text))
+            .style(profile.for_group(crate::palette::theme::Group::Dialogs, theme::TEXT)),
         Rect::new(rect.x + 3, rect.y + 4, rect.width - 6, 10),
     );
     spec.caption(
         Paragraph::new(language.text("←/→ or Space changes · Tab/↑↓ chooses"))
-            .style(profile.dos(theme::TEXT)),
+            .style(profile.for_group(crate::palette::theme::Group::Dialogs, theme::TEXT)),
         Rect::new(rect.x + 3, rect.bottom() - 5, rect.width - 6, 1),
     );
     for (i, (label, target)) in [

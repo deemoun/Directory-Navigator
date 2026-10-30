@@ -12,7 +12,7 @@ use crate::{
 use crate::turbo::dialog_spec::{centered, scope, Control, ControlKind, DialogSpec};
 pub(crate) fn prompt_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
     let profile = app.config.palette;
-    let dos = profile.styles();
+    let dos = profile.styles_for(crate::palette::theme::Group::Dialogs);
     let prompt = app.modals.prompt().filter(|p| p.copy.is_none())?;
     let deleting = matches!(
         prompt.kind,
@@ -213,7 +213,7 @@ pub(crate) fn message_spec<'a>(
                     .dos(theme::HEADING)
                     .add_modifier(crate::presentation::style::Modifier::UNDERLINED)
             } else {
-                profile.dos(theme::TEXT)
+                profile.for_group(crate::palette::theme::Group::Dialogs, theme::TEXT)
             };
             s.caption(
                 Paragraph::new(line.clone())
@@ -250,7 +250,7 @@ pub(crate) fn message_spec<'a>(
     if message.maximum > 0 {
         s.caption(
             Paragraph::new(app.config.language.text("↑↓ / PgUp/PgDn scroll"))
-                .style(profile.dos(theme::TEXT)),
+                .style(profile.for_group(crate::palette::theme::Group::Dialogs, theme::TEXT)),
             Rect::new(rect.x + 2, rect.bottom() - 3, rect.width - 4, 1),
         );
     }
@@ -326,7 +326,11 @@ pub(crate) fn job_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
         )
     );
     s.caption(
-        Paragraph::new(text).style(app.config.palette.dos(theme::TEXT)),
+        Paragraph::new(text).style(
+            app.config
+                .palette
+                .for_group(crate::palette::theme::Group::Dialogs, theme::TEXT),
+        ),
         Rect::new(rect.x + 2, rect.y + 1, rect.width - 4, 4),
     );
     s.native(

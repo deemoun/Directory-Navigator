@@ -12,7 +12,7 @@ use crate::{
 
 pub(crate) fn tree_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
     let profile = app.config.palette;
-    let dos = profile.styles();
+    let dos = profile.styles_for(crate::palette::theme::Group::Dialogs);
     let tree = app.modals.directory_tree()?;
     let g = geometry(area);
     let rect = centered(area, g.width, g.height);

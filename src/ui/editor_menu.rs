@@ -9,7 +9,7 @@ use crate::{
 pub(super) fn draw_bar(frame: &mut impl Frame, app: &App, area: Rect) {
     let language = app.config.language;
     let profile = app.config.palette;
-    let dos = profile.styles();
+    let dos = profile.styles_for(crate::palette::theme::Group::Dialogs);
     frame.render_widget(Block::default().style(dos(0x70)), area);
     let header = super::clock::header(app, area);
     let current = app

@@ -108,7 +108,7 @@ pub(crate) fn windows_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
     spec.control(control);
     spec.caption(
         Paragraph::new(language.text("Switching keeps documents open"))
-            .style(profile.dos(theme::TEXT)),
+            .style(profile.for_group(crate::palette::theme::Group::Dialogs, theme::TEXT)),
         Rect::new(rect.x + 2, rect.bottom() - 4, rect.width - 4, 1),
     );
     let selected = list.ids.get(list.cursor).copied();

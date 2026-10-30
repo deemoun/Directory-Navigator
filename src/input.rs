@@ -111,7 +111,7 @@ fn handle_key(app: &mut App, key: KeyEvent) {
         return;
     }
     if focus == Focus::Colors {
-        crate::palette::key(app, key.code);
+        crate::palette::key_event(app, key);
         return;
     }
     if focus == Focus::Settings {

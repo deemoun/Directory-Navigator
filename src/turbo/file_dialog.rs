@@ -449,6 +449,13 @@ impl Picker {
                 }
             }
         }
+        for glyph in scene.cells.values_mut() {
+            if let Some(style) =
+                profile.themed(crate::palette::theme::Group::Dialogs, glyph.attribute)
+            {
+                glyph.style = Some(style.patch(glyph.style.unwrap_or_default()));
+            }
+        }
         self.scene = Some(scene);
     }
     pub(crate) fn place(&mut self, r: Rect) {

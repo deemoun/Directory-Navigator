@@ -9,7 +9,10 @@ use crate::{
 };
 
 pub(super) fn draw_sky(frame: &mut impl Frame, app: &App, area: Rect) {
-    let dos = app.config.palette.styles();
+    let dos = app
+        .config
+        .palette
+        .styles_for(crate::palette::theme::Group::Dialogs);
     frame.render_widget(Block::default().style(dos(0x07)), area);
     for (x, y, glyph, attr) in app.screensaver.cells() {
         frame.render_widget(
@@ -25,7 +28,10 @@ pub(super) fn draw_setup(frame: &mut impl Frame, app: &App, area: Rect) {
 }
 pub(crate) fn saver_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
     let setup = app.screensaver.modals.screensaver()?;
-    let dos = app.config.palette.styles();
+    let dos = app
+        .config
+        .palette
+        .styles_for(crate::palette::theme::Group::Dialogs);
     let rect = Rect::new(
         area.x + (area.width - 58) / 2,
         area.y + (area.height - 20) / 2,

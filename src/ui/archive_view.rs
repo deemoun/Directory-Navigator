@@ -13,7 +13,7 @@ use crate::{
 pub(crate) fn archive_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
     let b = app.modals.archive()?;
     let profile = app.config.palette;
-    let dos = profile.styles();
+    let dos = profile.styles_for(crate::palette::theme::Group::Dialogs);
     let rect = centered(
         area,
         area.width.saturating_sub(4).min(110),

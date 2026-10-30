@@ -98,8 +98,19 @@ pub(super) enum Appearance {
     Disabled,
     Text,
     SelectedInput,
+    DnList(bool),
     History,
     Preview(u8),
+}
+impl Appearance {
+    pub(super) fn group(self) -> crate::palette::theme::Group {
+        use crate::palette::theme::Group;
+        match self {
+            Self::Menu(..) => Group::Menus,
+            Self::Status(..) => Group::Status,
+            _ => Group::Dialogs,
+        }
+    }
 }
 impl Appearance {
     pub(super) fn button_cell(
@@ -117,8 +128,8 @@ impl Appearance {
     pub(super) fn attribute(self, native: u8, profile: PaletteProfile) -> u8 {
         match self {
             Self::Input(selected) => match (profile, selected) {
-                (PaletteProfile::ClassicDn, true) => 0x0f,
-                (PaletteProfile::ClassicDn, false) => 0x07,
+                (PaletteProfile::ClassicDn | PaletteProfile::Custom(_), true) => 0x0f,
+                (PaletteProfile::ClassicDn | PaletteProfile::Custom(_), false) => 0x07,
                 (_, true) => 0x1f,
                 (_, false) => 0x17,
             },
@@ -145,7 +156,7 @@ impl Appearance {
                         0x38
                     }
                 }
-                PaletteProfile::ClassicDn => {
+                PaletteProfile::ClassicDn | PaletteProfile::Custom(_) => {
                     if enabled {
                         native
                     } else {
@@ -156,6 +167,17 @@ impl Appearance {
             Self::Disabled => 0x78,
             Self::Text => 0x70,
             Self::SelectedInput => 0x30,
+            Self::DnList(focused) => {
+                if native >> 4 == 2 {
+                    if focused {
+                        0x0f
+                    } else {
+                        0x3f
+                    }
+                } else {
+                    native
+                }
+            }
             Self::History => 0x9f,
             Self::Preview(attr) => attr,
             _ => native,
@@ -163,6 +185,7 @@ impl Appearance {
     }
 }
 pub(crate) struct Native {
+    pub(super) theme_group: Option<crate::palette::theme::Group>,
     pub(super) view: Box<dyn View>,
     pub(super) text: TextCells,
     pub(super) appearance: Appearance,
@@ -181,6 +204,12 @@ fn bounds(r: Rect) -> TvRect {
 fn focus(view: &mut impl View, selected: bool) {
     view.set_state_flag(State::FOCUSED, selected);
     view.set_state_flag(State::SELECTED, selected);
+}
+impl Native {
+    pub(crate) fn themed(mut self, group: crate::palette::theme::Group) -> Self {
+        self.theme_group = Some(group);
+        self
+    }
 }
 impl Widget for Native {
     fn is_control(&self) -> bool {
@@ -309,7 +338,10 @@ impl Widget for Native {
                     super::scene::Glyph {
                         text,
                         attribute,
-                        style: None,
+                        style: frame.profile().themed(
+                            self.theme_group.unwrap_or_else(|| self.appearance.group()),
+                            attribute,
+                        ),
                     },
                 );
             }
@@ -322,6 +354,7 @@ impl Widget for Native {
 }
 pub(super) fn native(view: impl View + 'static, text: TextCells) -> Native {
     Native {
+        theme_group: None,
         view: Box::new(view),
         text,
         appearance: Appearance::Toolkit,
@@ -691,6 +724,7 @@ pub(crate) fn menu_title(label: &str, selected: bool, enabled: bool) -> Native {
     }
     control.set_state_flag(State::DISABLED, !enabled);
     let mut result = native(control, text);
+    result.theme_group = Some(crate::palette::theme::Group::Menus);
     if !enabled {
         result.appearance = Appearance::Disabled;
     }
@@ -973,6 +1007,27 @@ pub(super) fn outline_focus() -> Native {
         }),
         TextCells::default(),
     )
+}
+
+pub(crate) fn color_grid(value: u8, focused: bool) -> Native {
+    let mut control = super::color_grid::ColorGrid::new(value);
+    focus(&mut control, focused);
+    // Physical color swatches must not inherit editable UI attributes.
+    let mut widget = native(control, TextCells::default());
+    widget.theme_group = Some(crate::palette::theme::Group::Physical);
+    widget
+}
+pub(crate) fn color_key(value: u8, code: crossterm::event::KeyCode) -> Option<u8> {
+    let key = match code {
+        crossterm::event::KeyCode::Left => turbo_vision::core::event::KB_LEFT,
+        crossterm::event::KeyCode::Right => turbo_vision::core::event::KB_RIGHT,
+        crossterm::event::KeyCode::Up => turbo_vision::core::event::KB_UP,
+        crossterm::event::KeyCode::Down => turbo_vision::core::event::KB_DOWN,
+        _ => return None,
+    };
+    let mut control = super::color_grid::ColorGrid::new(value);
+    control.handle_event(&mut Event::keyboard(key));
+    Some(control.selected)
 }
 
 #[cfg(test)]

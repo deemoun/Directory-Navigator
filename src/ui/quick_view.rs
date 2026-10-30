@@ -3,7 +3,7 @@ use crate::presentation::layout::{Margin, Rect};
 use crate::{app::App, filesystem::display_name, formatting::tail, mouse::Target};
 pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
     let profile = app.config.palette;
-    let dos = profile.styles();
+    let dos = profile.styles_for(crate::palette::theme::Group::QuickView);
     let Some(q) = &app.quick_view else {
         return;
     };
@@ -70,6 +70,10 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
             .collect::<Vec<_>>()
             .join("\n");
         let lines = crate::painting::wrap_plain(&content, body.width);
-        frame.render_widget(crate::turbo::widgets::text_view(&lines, 0, 0x87), body);
+        frame.render_widget(
+            crate::turbo::widgets::text_view(&lines, 0, 0x87)
+                .themed(crate::palette::theme::Group::QuickView),
+            body,
+        );
     }
 }

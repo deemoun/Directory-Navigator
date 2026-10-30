@@ -12,7 +12,7 @@ use crate::{
 };
 pub(crate) fn navigation_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
     let profile = app.config.palette;
-    let dos = profile.styles();
+    let dos = profile.styles_for(crate::palette::theme::Group::Dialogs);
     let modal = app.modals.navigation_dialog()?;
     let height = if matches!(modal, Modal::Bookmarks { .. }) {
         18

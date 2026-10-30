@@ -12,7 +12,7 @@ use crate::{
 };
 pub(crate) fn discovery_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
     let profile = app.config.palette;
-    let dos = profile.styles();
+    let dos = profile.styles_for(crate::palette::theme::Group::Dialogs);
     let m = app.discovery.modals.discovery()?;
     let form = m.kind == Kind::FindForm;
     let width = if form {

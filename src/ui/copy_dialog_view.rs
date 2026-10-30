@@ -24,7 +24,7 @@ pub(crate) fn copy_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
     );
     let language = app.config.language;
     let profile = app.config.palette;
-    let dos = profile.styles();
+    let dos = profile.styles_for(crate::palette::theme::Group::Dialogs);
     let rect = centered(area, 59, 16);
     let mut spec = DialogSpec::new(
         rect,

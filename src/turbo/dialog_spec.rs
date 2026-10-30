@@ -42,6 +42,7 @@ pub(crate) enum ControlKind {
         checked: bool,
     },
     History,
+    ColorGrid(u8),
     CharacterGrid {
         page: crate::utilities::characters::Page,
         cells: [u8; 2],
@@ -62,6 +63,7 @@ pub(crate) struct Control {
     pub enter_action: bool,
     pub space_default: bool,
     pub focus_visible: bool,
+    pub dn_list: bool,
     pub action: Target,
     pub hits: Vec<(Rect, Target)>,
     pub mnemonic: Option<char>,
@@ -78,6 +80,7 @@ impl Control {
             enter_action: false,
             space_default: false,
             focus_visible: true,
+            dn_list: false,
             action,
             hits: vec![(bounds, action)],
             mnemonic: None,
@@ -121,6 +124,7 @@ impl Control {
                 }),
                 super::widgets::TextCells::default(),
             ),
+            ControlKind::ColorGrid(value) => super::widgets::color_grid(*value, focused),
             ControlKind::History => super::widgets::history_button(),
             ControlKind::List {
                 items,
@@ -129,6 +133,9 @@ impl Control {
             } => super::widgets::list(items.clone(), *cursor, *offset, focused),
             ControlKind::Choice(items) => super::widgets::combo(items, 0, focused),
         };
+        if self.dn_list {
+            widget.appearance = super::widgets::Appearance::DnList(focused);
+        }
         widget.view.set_state_flag(State::DISABLED, !self.enabled);
         widget
     }

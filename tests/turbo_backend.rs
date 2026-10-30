@@ -1148,3 +1148,54 @@ fn overlapping_document_frames_share_glyph_lifetimes_and_retire_without_stale_ce
     }
     Ok(())
 }
+
+#[test]
+fn custom_ui_colors_survive_native_dialog_composition_and_terminal_transport() -> io::Result<()> {
+    use dn::{
+        app::App,
+        palette::{theme::Slot, PaletteProfile},
+        testing::{backend::TestBackend, Terminal},
+        ui,
+    };
+    let root = std::env::temp_dir().join(format!("dn-custom-transport-{}", std::process::id()));
+    std::fs::create_dir(&root)?;
+    struct Cleanup(std::path::PathBuf);
+    impl Drop for Cleanup {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+    let _cleanup = Cleanup(root.clone());
+    std::fs::write(root.join("界.txt"), "fixture")?;
+    let mut app = App::new(root)?;
+    app.config.save_on_exit = false;
+    app.config.show_clock = false;
+    let end = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    while app.panels.iter().any(|p| p.loading) {
+        app.poll();
+        assert!(std::time::Instant::now() < end);
+        std::thread::sleep(std::time::Duration::from_millis(1));
+    }
+    app.config.palette = PaletteProfile::ClassicDn
+        .with_slot(Slot::MenuNormal, 0x1e)
+        .with_slot(Slot::PanelText, 0x4f)
+        .with_slot(Slot::DialogText, 0x2f)
+        .with_slot(Slot::DialogDefault, 0x5e);
+    let output = Output::default();
+    let size = Size::new(80, 25);
+    let mut native = TurboBackend::with_size(output.clone(), size)?;
+    let mut reference = Terminal::new(TestBackend::new(80, 25))?;
+    for modal in [false, true] {
+        if modal {
+            app.error("界 e\u{301} custom dialog");
+        }
+        reference.draw(|f| ui::draw(f, &mut app))?;
+        native.draw_app(&mut app)?;
+        let bytes = String::from_utf8(output.0.lock().unwrap().clone()).unwrap();
+        assert_eq!(
+            snapshot_pixels(reference.backend().buffer()),
+            colored_screen(&bytes, size)
+        );
+    }
+    Ok(())
+}

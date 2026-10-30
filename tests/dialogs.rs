@@ -323,7 +323,7 @@ fn title_close_restores_previews_and_keeps_unsaved_document() -> io::Result<()> 
     let mut app = temp.app()?;
     let original = app.config.palette;
     dn::palette::open(&mut app);
-    dn::palette::choose(&mut app, dn::palette::PaletteProfile::Terminal);
+    dn::palette::action(&mut app, dn::palette::Action::Foreground(12));
     draw(&mut app, 80, 25)?;
     title_close(&mut app, Target::CancelColors)?;
     assert_eq!(app.config.palette, original);

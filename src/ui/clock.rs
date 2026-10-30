@@ -20,7 +20,11 @@ pub(super) fn header(app: &App, area: Rect) -> Rect {
 pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
     if visible(app) {
         frame.render_widget(
-            Paragraph::new(app.clock.text.as_str()).style(app.config.palette.dos(0x71)),
+            Paragraph::new(app.clock.text.as_str()).style(
+                app.config
+                    .palette
+                    .for_group(crate::palette::theme::Group::Timer, 0x71),
+            ),
             Rect::new(
                 area.right() - app.config.datetime.clock_width(),
                 area.y,

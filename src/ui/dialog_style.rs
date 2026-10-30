@@ -44,9 +44,18 @@ fn close_control(
     if color != theme::MODAL_CLOSE {
         frame.render_widget(
             Paragraph::new(Line::from(vec![
-                Span::styled("[", profile.dos(theme::FRAME)),
-                Span::styled("■", profile.dos(color)),
-                Span::styled("]", profile.dos(theme::FRAME)),
+                Span::styled(
+                    "[",
+                    profile.for_group(crate::palette::theme::Group::Dialogs, theme::FRAME),
+                ),
+                Span::styled(
+                    "■",
+                    profile.for_group(crate::palette::theme::Group::Dialogs, color),
+                ),
+                Span::styled(
+                    "]",
+                    profile.for_group(crate::palette::theme::Group::Dialogs, theme::FRAME),
+                ),
             ])),
             close,
         );
@@ -67,11 +76,11 @@ pub(super) fn document_header(
         Block::default()
             .borders(Borders::TOP)
             .border_type(BorderType::Double)
-            .border_style(profile.dos(theme::FRAME))
+            .border_style(profile.for_group(crate::palette::theme::Group::Dialogs, theme::FRAME))
             .title(title)
             .title_alignment(Alignment::Center)
-            .title_style(profile.dos(theme::FRAME))
-            .style(profile.dos(theme::TEXT)),
+            .title_style(profile.for_group(crate::palette::theme::Group::Dialogs, theme::FRAME))
+            .style(profile.for_group(crate::palette::theme::Group::Dialogs, theme::TEXT)),
         rect,
     );
     close_control(frame, profile, rect, target, theme::DOCUMENT_CLOSE);

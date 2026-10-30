@@ -67,7 +67,10 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
     }
 }
 pub(crate) fn editor_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
-    let dos = app.config.palette.styles();
+    let dos = app
+        .config
+        .palette
+        .styles_for(crate::palette::theme::Group::Dialogs);
     let editor = app.desktop.active_editor()?;
     let modal = editor.modals.editor_modal()?;
     if matches!(modal, Modal::File(_)) {

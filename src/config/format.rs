@@ -69,6 +69,13 @@ fn records(config: &Config) -> Vec<(&'static str, String, Value)> {
                 .map_or_else(String::new, |path| crate::bookmarks::encode(path))
         );
     }
+    for item in crate::palette::theme::ITEMS {
+        add!(
+            "colors",
+            item.key,
+            i64::from(config.palette.slot(item.slot))
+        );
+    }
     fields
 }
 fn checked(group: &str, key: &str, value: &Value, default: &Value) -> io::Result<String> {
@@ -78,6 +85,11 @@ fn checked(group: &str, key: &str, value: &Value, default: &Value) -> io::Result
         _ => value.as_str().map(str::to_owned),
     }
     .ok_or_else(|| invalid(format!("Invalid type for {group}.{key}")))?;
+    if group == "colors" && text.parse::<u8>().is_err() {
+        return Err(invalid(format!(
+            "Invalid color attribute for {key}: expected 0..255"
+        )));
+    }
     let allowed: Option<&[&str]> = match (group, key) {
         ("application", "shortcuts") => Some(&["auto", "classic_dn", "mac"]),
         ("interface", "palette") => Some(&["classic", "terminal"]),
@@ -113,6 +125,16 @@ fn assign(config: &mut Config, group: &str, key: &str, text: &str) -> io::Result
             (field.set)(config, text == "true");
             return Ok(());
         }
+    }
+    if group == "colors" {
+        if let Some(item) = crate::palette::theme::ITEMS.iter().find(|i| i.key == key) {
+            config.palette = config.palette.with_slot(
+                item.slot,
+                text.parse()
+                    .map_err(|_| invalid("Invalid color attribute"))?,
+            );
+        }
+        return Ok(());
     }
     let index = usize::from(group == "panels.right");
     match (group, key) {

@@ -22,6 +22,7 @@ struct Plane {
     rect: Rect,
     text: TextCells,
     appearance: Appearance,
+    theme_group: Option<crate::palette::theme::Group>,
     source: Option<BTreeMap<(u16, u16), Glyph>>,
     button: bool,
     original: Rect,
@@ -102,6 +103,7 @@ impl DialogGroup {
                 rect,
                 text: control.text,
                 appearance: Appearance::Toolkit,
+                theme_group: None,
                 source: None,
                 button: false,
                 original: rect,
@@ -150,6 +152,7 @@ impl DialogGroup {
             rect: area,
             text: control.text,
             appearance: control.appearance,
+            theme_group: control.theme_group,
             source: None,
             button,
             original,
@@ -201,6 +204,7 @@ impl DialogGroup {
             rect: area,
             text,
             appearance: Appearance::Toolkit,
+            theme_group: None,
             source: Some(original),
             button: false,
             original: area,
@@ -255,7 +259,12 @@ impl DialogGroup {
                         Glyph {
                             text,
                             attribute,
-                            style: None,
+                            style: scene.profile.themed(
+                                plane
+                                    .theme_group
+                                    .unwrap_or_else(|| plane.appearance.group()),
+                                attribute,
+                            ),
                         }
                     }
                 } else {

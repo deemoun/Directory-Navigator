@@ -179,3 +179,20 @@ Tetris page movement, manipulation paste isolation, resize, Ctrl+O handoff,
 terminal flags and input back in the parent shell. No Python, terminal emulator
 application or new dependency is required. Windows/Linux validation is deferred.
 Run these cases with `cargo test --test lifecycle_sequences --test terminal_walkthrough`.
+
+## Editable DN colors
+
+Colors follows `original-dn/COLORSEL.PAS` and the implemented subset of the
+`DN.DNR` color catalog. One slot table supplies group/item labels, stable config
+keys, default attributes and component-scoped resolution. Components that happen
+to share a DOS attribute (for example editor and viewer text) retain independent
+slots. Attributes shared within one component are named as shared items.
+
+Native child composition and isolated controls use the same slot resolution;
+raw game colors and the physical swatches retain their palette indices. The
+4×4 selector is a native TV View and supplies keyboard movement for its descriptor.
+The controller alone changes draft/live-preview values. Cancel restores the whole
+original profile; existing config saving persists accepted attributes in `[colors]`
+with integer values 0..255. Unknown keys remain preserved. Old terminal-palette
+configuration is accepted and normalized to DN defaults; the old selector has no
+UI entry. The compatibility renderer remains available for legacy test fixtures.

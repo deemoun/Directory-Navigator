@@ -34,7 +34,7 @@ and modern filesystem handling.
 - Keep multiple editors and viewers open, and switch between them with **Alt+0**.
 - Browse ZIP, TAR and TAR.GZ archives without extracting them.
 - Type shell commands directly into the bottom command prompt.
-- Customize the layout, colors, clock and screensaver; settings save on exit.
+- Customize the layout, clock and screensaver; edit component colors in a DN-style foreground/background selector with Color, B/W and Mono presets. Settings save on exit.
 - Configure file extensions to use DN's viewer/editor or your preferred commands.
 - Classic panel footers show selection totals and available/total volume space.
 - Choose English or Russian, with independent date order and 12/24-hour time.

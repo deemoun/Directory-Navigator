@@ -12,7 +12,7 @@ use crate::{filesystem::display_name, formatting, utilities::calculator::Value};
 pub(super) fn calculator_spec<'a>(plugin: &'a CalculatorPlugin, ctx: &Context) -> DialogSpec<'a> {
     let area = ctx.area;
     let profile = ctx.palette;
-    let dos = profile.styles();
+    let dos = profile.styles_for(crate::palette::theme::Group::Dialogs);
     let language = ctx.language;
     let rect = centered(area, 72, 18);
     let calc = &plugin.state;
@@ -155,7 +155,10 @@ pub(super) fn history_spec<'a>(
     );
     if calc.history.is_empty() {
         s.caption(
-            Paragraph::new(ctx.language.text("No expression history")).style(ctx.palette.dos(0x78)),
+            Paragraph::new(ctx.language.text("No expression history")).style(
+                ctx.palette
+                    .for_group(crate::palette::theme::Group::Dialogs, 0x78),
+            ),
             Rect::new(r.x + 2, r.y + 1, r.width - 4, 1),
         );
     }

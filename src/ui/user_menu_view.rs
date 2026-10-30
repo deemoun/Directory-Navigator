@@ -8,7 +8,7 @@ use crate::{
 
 pub(crate) fn user_menu_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
     let profile = app.config.palette;
-    let dos = profile.styles();
+    let dos = profile.styles_for(crate::palette::theme::Group::Dialogs);
     let m = app.user_menu.modals.user_menu()?;
     let review = m.review.is_some();
     let width = if review {

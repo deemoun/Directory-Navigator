@@ -2,8 +2,7 @@
 //! Rich row colours and native path identity remain model policy, as in FLPANEL.
 use super::scene::Scene;
 use crate::{
-    config::Config, filesystem::display_name, formatting, palette::PaletteProfile, panel::Panel,
-    presentation::layout::Rect,
+    config::Config, filesystem::display_name, formatting, panel::Panel, presentation::layout::Rect,
 };
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
@@ -40,7 +39,7 @@ pub(crate) fn column(
         fields,
         date_time,
     } = layout;
-    let classic = config.palette == PaletteProfile::ClassicDn;
+    let classic = config.palette.is_classic();
     let mut rows = Vec::new();
     let mut colours = Vec::new();
     for (index, entry) in panel

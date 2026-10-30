@@ -28,7 +28,6 @@ Cannot read file information.	Cannot read file information.
 Case sensitive	Case sensitive
 Change all	Change all
 Change direc~t~ory...	Change direc~t~ory...
-Classic DN — fixed 256 colors	Classic DN — fixed 256 colors
 Clear	Clear
 Clear all marks	Clear all marks
 Close	Close
@@ -309,7 +308,6 @@ DOS font glyphs at 01–1F / 7F; not control-code decoding	DOS font glyphs at 01
  Copy disabled 	 Copy disabled 
 Archive browser — read-only	Archive browser — read-only
 Viewer search — loaded text	Viewer search — loaded text
-C/T or Space chooses · Enter applies · Esc restores	C/T or Space chooses · Enter applies · Esc restores
 Copy uses DN's internal clipboard · Ctrl+C copies	Copy uses DN's internal clipboard · Ctrl+C copies
 Existing destinations are refused.	Existing destinations are refused.
 Filename pattern	Filename pattern
@@ -330,7 +328,6 @@ Direction	Direction
 Scope	Scope
 Origin	Origin
 Global	Global
-Terminal palette — legacy ANSI colors	Terminal palette — legacy ANSI colors
  Name      marked	 Name      marked
  folder	 folder
  ordinary file	 ordinary file
@@ -595,3 +592,64 @@ Zoom	Zoom
 Si~z~e/Move	Si~z~e/Move
 Zoo~m~/Restore	Zoo~m~/Restore
 Arrows move · Shift+arrows size · Enter accepts · Esc cancels	Arrows move · Shift+arrows size · Enter accepts · Esc cancels
+Group	Group
+Item	Item
+Foreground	Foreground
+Background	Background
+Default colors set	Default colors set
+Tab selects · Arrows change · Esc restores	Tab selects · Arrows change · Esc restores
+~C~olor	~C~olor
+B/~W~	B/~W~
+~M~ono	~M~ono
+Colors: Active path	Colors: Active path
+Colors: Archives	Colors: Archives
+Colors: Background / text	Colors: Background / text
+Colors: Button default	Colors: Button default
+Colors: Button markers	Colors: Button markers
+Colors: Button normal	Colors: Button normal
+Colors: Button shadow	Colors: Button shadow
+Colors: Color	Colors: Color
+Colors: Column title / marked	Colors: Column title / marked
+Colors: Dialogs	Colors: Dialogs
+Colors: Directory / active frame	Colors: Directory / active frame
+Colors: Disabled	Colors: Disabled
+Colors: Editor	Colors: Editor
+Colors: Executables	Colors: Executables
+Colors: File Manager	Colors: File Manager
+Colors: File Viewer	Colors: File Viewer
+Colors: Frame / selected text	Colors: Frame / selected text
+Colors: Frame icons	Colors: Frame icons
+Colors: Function bar	Colors: Function bar
+Colors: Help	Colors: Help
+Colors: History button	Colors: History button
+Colors: Information / heading	Colors: Information / heading
+Colors: Input normal	Colors: Input normal
+Colors: Input selected	Colors: Input selected
+Colors: Link	Colors: Link
+Colors: List focused	Colors: List focused
+Colors: List normal / selection	Colors: List normal / selection
+Colors: Marked cursor	Colors: Marked cursor
+Colors: Media files	Colors: Media files
+Colors: Menus	Colors: Menus
+Colors: Normal	Colors: Normal
+Colors: Normal cursor	Colors: Normal cursor
+Colors: Normal text	Colors: Normal text
+Colors: Normal text / frame	Colors: Normal text / frame
+Colors: Normal text / inactive frame	Colors: Normal text / inactive frame
+Colors: Notice	Colors: Notice
+Colors: Search match / status	Colors: Search match / status
+Colors: Selected	Colors: Selected
+Colors: Selected link	Colors: Selected link
+Colors: Selection	Colors: Selection
+Colors: Shortcut	Colors: Shortcut
+Colors: Shortcut selected	Colors: Shortcut selected
+Colors: Source files	Colors: Source files
+Colors: Status	Colors: Status
+Colors: Symbolic links	Colors: Symbolic links
+Colors: Timer	Colors: Timer
+Colors: └─ Quick View	Colors: └─ Quick View
+Colors: File dialog input	Colors: File dialog input
+Colors: File dialog selected	Colors: File dialog selected
+Colors: Input / list focus	Colors: Input / list focus
+Colors: List inactive selection	Colors: List inactive selection
+Colors: List cursor	Colors: List cursor
