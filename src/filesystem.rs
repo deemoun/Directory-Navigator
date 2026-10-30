@@ -94,8 +94,18 @@ fn executable(metadata: &fs::Metadata) -> bool {
 
 /// Open regular files without following a final symlink or blocking on a FIFO.
 pub fn open_regular(path: &Path) -> io::Result<fs::File> {
+    open_regular_with_access(path, false)
+}
+
+/// Reopen an existing regular file for flushing or exclusive locking, without
+/// creating/truncating it or following a final symlink.
+pub(crate) fn open_regular_writable(path: &Path) -> io::Result<fs::File> {
+    open_regular_with_access(path, true)
+}
+
+fn open_regular_with_access(path: &Path, writable: bool) -> io::Result<fs::File> {
     let mut options = fs::OpenOptions::new();
-    options.read(true);
+    options.read(true).write(writable);
     #[cfg(unix)]
     {
         use std::os::unix::fs::OpenOptionsExt;

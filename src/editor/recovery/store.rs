@@ -69,7 +69,7 @@ impl Store {
                 private(&dir, true)?;
                 let path = dir.join("lease");
                 private(&path, false)?;
-                let file = crate::filesystem::open_regular(&path)?;
+                let file = crate::filesystem::open_regular_writable(&path)?;
                 file.try_lock()
                     .map_err(|e| io::Error::other(e.to_string()))?;
                 Ok(Arc::new(Lease {
@@ -281,5 +281,57 @@ impl Drop for Lease {
             let _ = fs::remove_file(self.dir.join("lease"));
             let _ = fs::remove_dir(&self.dir);
         }
+        // A concurrent fork can inherit this open-file description until exec.
+        // Release explicitly when the final Arc<Lease> goes away rather than
+        // waiting for every inherited/duplicated descriptor to close.
+        let _ = self._file.unlock();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn final_lease_releases_claim_even_with_a_duplicated_handle() -> io::Result<()> {
+        let root =
+            std::env::temp_dir().join(format!("dn-recovery-duplicate-{}", std::process::id()));
+        fs::create_dir(&root)?;
+        struct Temp(PathBuf);
+        impl Drop for Temp {
+            fn drop(&mut self) {
+                let _ = fs::remove_dir_all(&self.0);
+            }
+        }
+        let _temp = Temp(root.clone());
+        let recovery_root = root.join("recovery");
+        let store = Store::open(&recovery_root)?;
+        write(
+            &store.current.dir.join("1.rec"),
+            &Record {
+                text: "unsaved 界".into(),
+                base: root,
+                path: None,
+                cursor: 0,
+                anchor: None,
+                bom: false,
+                time: 0,
+            },
+        )?;
+        let duplicate = store.current._file.try_clone()?;
+        let worker_lease = Arc::clone(&store.current);
+        drop(store);
+        assert!(Store::open(&recovery_root)?.pending.is_empty());
+        drop(worker_lease);
+        let recovered = Store::open(&recovery_root)?;
+        assert_eq!(recovered.pending.len(), 1);
+        assert!(Store::open(&recovery_root)?.pending.is_empty());
+        // Also exercise release of a recovery claim rather than a current lease.
+        let claim_duplicate = recovered._claims[0]._file.try_clone()?;
+        drop(recovered);
+        assert_eq!(Store::open(&recovery_root)?.pending.len(), 1);
+        drop(claim_duplicate);
+        drop(duplicate);
+        Ok(())
     }
 }

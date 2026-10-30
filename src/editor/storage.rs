@@ -183,7 +183,8 @@ fn save_with(
 /// Retry an already published revision without replacing the file again.
 pub fn confirm_durability(path: &Path, snapshot: &Snapshot) -> Result<SaveOutcome, String> {
     verify(path, snapshot).map_err(|e| e.to_string())?;
-    let warning = filesystem::open_regular(path)
+    // FlushFileBuffers on Windows requires a handle opened for writing.
+    let warning = filesystem::open_regular_writable(path)
         .and_then(|f| f.sync_all())
         .and_then(|_| crate::platform_fs::sync_parent(path))
         .err()
@@ -262,7 +263,11 @@ mod tests {
                 fs::metadata(&p).unwrap().ino()
             };
             let retried = confirm_durability(&p, &out.snapshot).unwrap();
-            assert!(retried.warning.is_none());
+            assert!(
+                retried.warning.is_none(),
+                "Retry warning: {:?}",
+                retried.warning
+            );
             #[cfg(unix)]
             {
                 use std::os::unix::fs::MetadataExt;
