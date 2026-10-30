@@ -78,7 +78,8 @@ fn settings_draft_cancel_commit_disable_live_game_and_reenable_keep_scores() -> 
         .unwrap();
     a.desktop.activate(dn::desktop::WindowId::MANAGER);
     a.open_settings(SettingsKind::Plugins);
-    assert_eq!(a.modals.settings().unwrap().control_count(), 2);
+    assert_eq!(a.modals.settings().unwrap().control_count(), 3);
+    key(&mut a, K::Tab);
     key(&mut a, K::Tab);
     key(&mut a, K::Char(' '));
     assert!(a.config.plugin_enabled(TETRIS));
@@ -87,6 +88,7 @@ fn settings_draft_cancel_commit_disable_live_game_and_reenable_keep_scores() -> 
     assert!(a.config.plugin_enabled(TETRIS));
     assert!(a.desktop.contains(old));
     a.open_settings(SettingsKind::Plugins);
+    key(&mut a, K::Tab);
     key(&mut a, K::Tab);
     key(&mut a, K::Char(' '));
     key(&mut a, K::Enter);
@@ -105,6 +107,7 @@ fn settings_draft_cancel_commit_disable_live_game_and_reenable_keep_scores() -> 
         .any(|i| i.action == menu::Action::Plugin(TETRIS)));
     menu::close(&mut a);
     a.open_settings(SettingsKind::Plugins);
+    key(&mut a, K::Tab);
     key(&mut a, K::Tab);
     key(&mut a, K::Char(' '));
     key(&mut a, K::Enter);
@@ -152,12 +155,15 @@ fn plugins_dialog_localized_native_controls_mouse_keyboard_and_immutable_render(
                 .plugin_enabled(CALCULATOR));
             key(&mut a, K::Tab);
             assert_eq!(a.modals.settings().unwrap().cursor, 1);
+            key(&mut a, K::Tab);
             key(&mut a, K::Char(' '));
             assert!(!a.modals.settings().unwrap().draft.plugin_enabled(TETRIS));
             input::handle(&mut a, KeyEvent::new(K::Tab, M::SHIFT));
+            assert_eq!(a.modals.settings().unwrap().cursor, 1);
+            key(&mut a, K::BackTab);
             assert_eq!(a.modals.settings().unwrap().cursor, 0);
             key(&mut a, K::BackTab);
-            assert_eq!(a.modals.settings().unwrap().cursor, 3);
+            assert_eq!(a.modals.settings().unwrap().cursor, 4);
             let snap = dn::layout::prepare_window(
                 &mut a,
                 dn::testing::layout::Rect::new(7, 3, 80, 25),
@@ -230,5 +236,80 @@ fn config_reload_disables_owned_calculator_help_without_losing_session_state() -
     a.apply_config(config);
     input::handle(&mut a, KeyEvent::new(K::Char('k'), M::CONTROL));
     assert_eq!(a.desktop.plugins.calculator().expression, "6*7");
+    Ok(())
+}
+
+#[test]
+fn compiled_defaults_and_explicit_enable_overrides_survive_config_roundtrips() -> io::Result<()> {
+    use dn::plugins::{PluginId, MP3_PLAYER};
+    let (t, mut a) = fixture()?;
+    assert!(!dn::plugins::enabled_by_default(MP3_PLAYER));
+    assert!(!a.config.plugin_enabled(MP3_PLAYER));
+    assert!(a.config.plugin_enabled(CALCULATOR) && a.config.plugin_enabled(TETRIS));
+    for bytes in [
+        b"config_version=2\n".as_slice(),
+        b"config_version=2\n[plugins]\ndisabled=[]\n",
+    ] {
+        assert!(!Config::parse(bytes)?.plugin_enabled(MP3_PLAYER));
+    }
+    let path = t.0.join("defaults.conf");
+    a.config.set_plugin_enabled(MP3_PLAYER, true);
+    a.config.enabled_plugins.insert("future.opt_in".into());
+    a.config.disabled_plugins.insert("future.opt_out".into());
+    a.config.save(&path)?;
+    let mut saved = Config::read(&path)?;
+    assert!(saved.plugin_enabled(MP3_PLAYER));
+    assert!(saved.plugin_enabled(PluginId("future.opt_in")));
+    assert!(!saved.plugin_enabled(PluginId("future.opt_out")));
+    saved.set_plugin_enabled(MP3_PLAYER, false);
+    assert!(!saved.enabled_plugins.contains(MP3_PLAYER.0));
+    saved.save(&path)?;
+    let saved = Config::read(&path)?;
+    assert!(!saved.plugin_enabled(MP3_PLAYER));
+    assert!(saved.enabled_plugins.contains("future.opt_in"));
+    for bad in [
+        "enabled=true",
+        "enabled=[1]",
+        "enabled=['']",
+        "enabled=['mp3_player']\ndisabled=['mp3_player']",
+    ] {
+        assert!(Config::parse(format!("config_version=2\n[plugins]\n{bad}").as_bytes()).is_err());
+    }
+    let original = fs::read(&path)?;
+    let mut invalid = saved;
+    invalid.enabled_plugins.insert("bad\nID".into());
+    assert!(invalid.save(&path).is_err());
+    assert_eq!(fs::read(&path)?, original);
+    Ok(())
+}
+#[test]
+fn default_off_player_is_hidden_until_explicitly_enabled_in_plugin_settings() -> io::Result<()> {
+    use dn::plugins::MP3_PLAYER;
+    let (_t, mut a) = fixture()?;
+    menu::open(&mut a, menu::root_index(menu::RootId::Utilities).unwrap());
+    assert!(!menu::level_items(&a, 0)
+        .iter()
+        .any(|i| i.action == menu::Action::Plugin(MP3_PLAYER)));
+    menu::execute(&mut a, menu::Action::Plugin(MP3_PLAYER));
+    assert_eq!(a.desktop.active().id, dn::desktop::WindowId::MANAGER);
+    a.open_settings(SettingsKind::Plugins);
+    draw(&mut a, 80, 25)?;
+    click(&mut a, Target::Setting(1));
+    click(&mut a, Target::CancelSettings);
+    assert!(!a.config.plugin_enabled(MP3_PLAYER));
+    a.open_settings(SettingsKind::Plugins);
+    draw(&mut a, 80, 25)?;
+    click(&mut a, Target::Setting(1));
+    click(&mut a, Target::AcceptSettings);
+    assert!(a.config.plugin_enabled(MP3_PLAYER));
+    menu::open(&mut a, menu::root_index(menu::RootId::Utilities).unwrap());
+    assert!(menu::level_items(&a, 0)
+        .iter()
+        .any(|i| i.action == menu::Action::Plugin(MP3_PLAYER)));
+    menu::execute(&mut a, menu::Action::Plugin(MP3_PLAYER));
+    assert_eq!(
+        a.desktop.active().kind,
+        dn::desktop::WindowKind::Plugin(MP3_PLAYER)
+    );
     Ok(())
 }

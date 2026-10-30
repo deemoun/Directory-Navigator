@@ -442,7 +442,10 @@ impl Picker {
                                 y,
                                 b.width_clamped() as u16,
                                 b.height_clamped() as u16,
-                                child.is_focused() || !focused_button && button.is_default(),
+                                (
+                                    child.is_focused() || !focused_button && button.is_default(),
+                                    button.is_down(),
+                                ),
                             );
                         }
                     }
@@ -457,6 +460,38 @@ impl Picker {
             }
         }
         self.scene = Some(scene);
+    }
+    /// The native focused alternative takes precedence over the Enter default.
+    pub(crate) fn activation_rect(&self, key: KeyEvent) -> Option<Rect> {
+        let focused = (0..self.widget.child_count()).find(|&i| {
+            let c = self.widget.child_at(i);
+            c.is_focused() && c.as_any().is::<Button>()
+        });
+        let index = focused.or_else(|| {
+            (key.code == K::Enter)
+                .then(|| {
+                    (0..self.widget.child_count()).find(|&i| {
+                        self.widget
+                            .child_at(i)
+                            .as_any()
+                            .downcast_ref::<Button>()
+                            .is_some_and(|b| b.is_default())
+                    })
+                })
+                .flatten()
+        })?;
+        let c = self.widget.child_at(index);
+        if c.core().state.contains(State::DISABLED) {
+            return None;
+        }
+        let b = c.bounds();
+        let r = self.bounds();
+        Some(Rect::new(
+            r.x + 1 + b.a.x.max(0) as u16,
+            r.y + 1 + b.a.y.max(0) as u16,
+            b.width_clamped() as u16,
+            1,
+        ))
     }
     pub(crate) fn place(&mut self, r: Rect) {
         self.placement = Some(r);

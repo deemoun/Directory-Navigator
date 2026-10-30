@@ -110,6 +110,7 @@ fn viewport_state(app: &App) -> ViewportState {
     }
 }
 pub struct LayoutSnapshot {
+    pub(crate) pressed_button: Option<Rect>,
     pub context: FrameContext,
     pub bounds: Rect,
     pub clip: Rect,
@@ -356,6 +357,7 @@ pub fn prepare_window(
         context.revision = app.layout_revision;
     }
     LayoutSnapshot {
+        pressed_button: crate::button_feedback::pressed(app, context),
         context,
         bounds,
         clip,

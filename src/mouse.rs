@@ -93,6 +93,12 @@ impl MouseState {
     }
 }
 
+/// Terminal entry point: hold shared push buttons until release.
+pub fn handle_ui(app: &mut App, event: MouseEvent) {
+    if !crate::button_feedback::mouse(app, event) {
+        handle(app, event);
+    }
+}
 pub fn handle(app: &mut App, event: MouseEvent) {
     if app.output_visible {
         return;

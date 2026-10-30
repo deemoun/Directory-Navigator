@@ -2,6 +2,18 @@ use crate::app::App;
 use crate::focus::{self, Focus};
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 
+/// Discard held UI input when the terminal changes size.
+pub fn cancel_feedback(app: &mut App) {
+    crate::button_feedback::cancel(app);
+}
+
+/// Terminal entry point, including native-style push-button feedback.
+pub fn handle_ui(app: &mut App, key: KeyEvent) {
+    if !crate::button_feedback::key(app, key) {
+        handle(app, key);
+    }
+}
+
 pub fn handle(app: &mut App, mut key: KeyEvent) {
     if key.code == KeyCode::Tab && key.modifiers.contains(KeyModifiers::SHIFT) {
         key.code = KeyCode::BackTab;
@@ -222,7 +234,7 @@ fn handle_key(app: &mut App, key: KeyEvent) {
 
 /// Paste uses the same topmost recipient as keyboard and mouse input.
 pub fn paste(app: &mut App, text: &str) {
-    if app.desktop.native().manipulating() {
+    if app.desktop.native().manipulating() || crate::button_feedback::busy(app) {
         return;
     }
     if app.output_visible {

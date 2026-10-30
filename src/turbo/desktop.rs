@@ -64,6 +64,7 @@ struct Document {
     scope: Scope,
     mailbox: Mailbox,
     native: Vec<(u16, u16, Cell)>,
+    awaiting_geometry: bool,
 }
 impl Document {
     fn new(bounds: Rect, info: WindowInfo, scope: Scope, mailbox: Mailbox) -> Self {
@@ -77,17 +78,14 @@ impl Document {
         let caps = match info.kind {
             crate::desktop::WindowKind::Editor => Capabilities::document(72, 12),
             crate::desktop::WindowKind::Viewer => Capabilities::document(48, 10),
+            crate::desktop::WindowKind::Plugin(_) => Capabilities::fixed(1, 1),
             _ => Capabilities::fixed(54, 23),
         };
         let default = if maximal {
             geometry::rect(bounds)
         } else {
-            crate::presentation::layout::Rect::new(
-                size.0.saturating_sub(54) / 2,
-                size.1.saturating_sub(23) / 2,
-                54,
-                23,
-            )
+            // Unpainted placeholder; the plugin declares its first placement.
+            crate::presentation::layout::Rect::new(0, 1, 1, 1)
         };
         let mut shell = Shell::new(
             Definition {
@@ -110,6 +108,8 @@ impl Document {
             scope,
             mailbox,
             native: Vec::new(),
+            awaiting_geometry: scope == Scope::Content
+                && matches!(info.kind, crate::desktop::WindowKind::Plugin(_)),
         }
     }
 }
@@ -504,6 +504,22 @@ impl NativeDesktop {
             h.interaction.revision += 1;
         }
         for d in definitions {
+            if let SurfaceKey::Document(owner) = d.key {
+                if let Some(view) = h
+                    .ids
+                    .iter()
+                    .find(|(info, _)| info.id == owner)
+                    .map(|(_, view)| *view)
+                {
+                    let document = h.document_mut(view);
+                    if document.awaiting_geometry {
+                        document.shell.preferred =
+                            geometry::clamp(d.bounds, geometry::workspace(size));
+                        document.shell.surface.maximized = d.maximized;
+                        document.awaiting_geometry = false;
+                    }
+                }
+            }
             if !matches!(d.key, SurfaceKey::Document(_)) && !h.auxiliary.contains_key(&d.key) {
                 let generation = h.next_surface;
                 h.next_surface += 1;

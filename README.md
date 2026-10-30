@@ -40,6 +40,7 @@ and modern filesystem handling.
 - Choose English or Russian, with independent date order and 12/24-hour time.
 - Recall commands through a searchable session history; copy filenames or paths to the internal clipboard.
 - Use the calculator, character table and configurable user menus—or play Tetris or Pentix with separate, persistent high scores.
+- Preview a DN-style **MP3 Player** plugin with compact/expanded controls. Disabled by default; enable it in Options → Configuration → Plugins. UI prototype only; no audio playback. Based on Dos Navigator by RIT Research Labs.
 
 ## In action
 

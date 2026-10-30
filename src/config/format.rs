@@ -224,16 +224,16 @@ fn set(root: &mut Table, group: &str, key: String, value: Value) -> io::Result<(
     table.insert(key, value);
     Ok(())
 }
-fn disabled_plugins(value: &Value) -> io::Result<std::collections::BTreeSet<String>> {
+fn plugin_ids(value: &Value) -> io::Result<std::collections::BTreeSet<String>> {
     value
         .as_array()
-        .ok_or_else(|| invalid("Invalid type for plugins.disabled"))?
+        .ok_or_else(|| invalid("Invalid type for plugin enable/disable list"))?
         .iter()
         .map(|v| {
             v.as_str()
                 .filter(|s| !s.is_empty() && !s.chars().any(char::is_control))
                 .map(str::to_owned)
-                .ok_or_else(|| invalid("Invalid plugin ID in plugins.disabled"))
+                .ok_or_else(|| invalid("Invalid plugin ID in enable/disable list"))
         })
         .collect()
 }
@@ -254,7 +254,13 @@ pub(super) fn parse(bytes: &[u8]) -> io::Result<Config> {
         }
     }
     if let Some(value) = section(&root, "plugins")?.and_then(|t| t.get("disabled")) {
-        config.disabled_plugins = disabled_plugins(value)?;
+        config.disabled_plugins = plugin_ids(value)?;
+    }
+    if let Some(value) = section(&root, "plugins")?.and_then(|t| t.get("enabled")) {
+        config.enabled_plugins = plugin_ids(value)?;
+    }
+    if !config.enabled_plugins.is_disjoint(&config.disabled_plugins) {
+        return Err(invalid("A plugin cannot be both enabled and disabled"));
     }
     Ok(config)
 }
@@ -280,8 +286,21 @@ pub(super) fn encode(config: &Config, previous: Option<&[u8]>) -> io::Result<Vec
             .map(Value::String)
             .collect(),
     );
-    disabled_plugins(&disabled)?;
+    plugin_ids(&disabled)?;
     set(&mut root, "plugins", "disabled".into(), disabled)?;
+    let enabled = Value::Array(
+        config
+            .enabled_plugins
+            .iter()
+            .cloned()
+            .map(Value::String)
+            .collect(),
+    );
+    plugin_ids(&enabled)?;
+    if !config.enabled_plugins.is_disjoint(&config.disabled_plugins) {
+        return Err(invalid("A plugin cannot be both enabled and disabled"));
+    }
+    set(&mut root, "plugins", "enabled".into(), enabled)?;
     for (group, key, value) in records(config) {
         if group == "bookmarks" && value.as_str() == Some("") {
             continue;

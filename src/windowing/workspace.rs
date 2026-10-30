@@ -363,6 +363,18 @@ pub(crate) fn occlude(frame: &mut impl crate::painting::Frame, cover: Rect) {
 pub(crate) fn foreground(app: &App) -> Option<Surface> {
     app.desktop.native().top_surface()
 }
+pub(crate) fn zoom(app: &mut App, surface: Surface) {
+    if !surface.caps.zoom
+        || crate::eligibility::Gate::new(app)
+            .surface(surface.id)
+            .is_none()
+    {
+        return;
+    }
+    if !crate::plugins::host::zoom(app, surface.id) {
+        app.desktop.native().zoom_surface(surface.id);
+    }
+}
 pub(crate) fn key(app: &mut App, key: crossterm::event::KeyEvent) -> bool {
     use crossterm::event::{KeyCode as K, KeyModifiers as M};
     let native = app.desktop.native();
@@ -376,7 +388,7 @@ pub(crate) fn key(app: &mut App, key: crossterm::event::KeyEvent) -> bool {
             if key.code == K::F(5) {
                 native.begin_move(surface.id, None);
             } else {
-                native.zoom_surface(surface.id);
+                zoom(app, surface);
             }
             return true;
         }
@@ -426,7 +438,7 @@ pub(crate) fn mouse(app: &mut App, event: crossterm::event::MouseEvent) -> bool 
                 if surface.caps.zoom
                     && native.title_double(id, (local.column, local.row), Instant::now())
                 {
-                    native.zoom_surface(id);
+                    zoom(app, surface);
                 } else {
                     native.begin_move(id, Some(local));
                 }
@@ -437,7 +449,7 @@ pub(crate) fn mouse(app: &mut App, event: crossterm::event::MouseEvent) -> bool 
                 }
             }
             Chrome::Zoom => {
-                native.zoom_surface(id);
+                zoom(app, surface);
             }
             Chrome::Close => close(app, surface),
             Chrome::Activate => {}

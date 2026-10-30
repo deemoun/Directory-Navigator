@@ -121,7 +121,15 @@ impl Appearance {
         size: (u16, u16),
     ) {
         if let Self::Button(selected) = self {
-            button_cell(text, attribute, cell.0, cell.1, size.0, size.1, selected);
+            button_cell(
+                text,
+                attribute,
+                cell.0,
+                cell.1,
+                size.0,
+                size.1,
+                (selected, false),
+            );
         }
     }
     /// Shared theme mapping for isolated controls and children of a Dialog.
@@ -379,18 +387,19 @@ pub(super) fn button_cell(
     y: u16,
     width: u16,
     height: u16,
-    selected: bool,
+    state: (bool, bool),
 ) {
+    let (selected, down) = state;
     if width < 4 || height < 2 {
         return;
     }
     if y + 1 == height {
         *text = " ".into();
-        *attribute = if x < 2 { 0x70 } else { 0x00 };
-    } else if x == 0 {
+        *attribute = if down || x < 2 { 0x70 } else { 0x00 };
+    } else if x == 0 || down && x == 1 {
         *text = " ".into();
         *attribute = 0x70;
-    } else if x + 1 == width {
+    } else if x + 1 == width && !down {
         *text = " ".into();
         *attribute = 0x00;
     } else {
@@ -405,7 +414,7 @@ pub(super) fn button_cell(
         *attribute = 0x80 | foreground;
         // Keep translated or wide labels intact when a narrow button leaves
         // no spare marker cell. Yellow text still identifies the default.
-        if selected && !disabled && text == " " && (x == 1 || x + 2 == width) {
+        if selected && !down && !disabled && text == " " && (x == 1 || x + 2 == width) {
             *text = if x == 1 { "►".into() } else { "◄".into() };
             *attribute = 0x8b;
         }

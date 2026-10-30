@@ -340,3 +340,94 @@ fn game_and_editor_arrangements_are_visible_and_game_board_keeps_its_size() -> i
     }
     s.finish()
 }
+
+#[test]
+fn mp3_prototype_compact_expanded_help_movement_and_close_restore_terminal() -> io::Result<()> {
+    let mut s = Session::new("mp3-player")?;
+    s.wait("manager ready", |s| {
+        s.command_prompt_active() && s.text().contains("F5 Copy")
+    })?;
+    // The prototype is opt-in; enable it through the actual settings draft.
+    s.send(b"\x1bocp", "plugin settings", |s| {
+        s.text().contains("Plugins") && s.text().contains("mp3_player")
+    })?;
+    s.send(b"\t \r", "enable MP3 player", |s| {
+        !s.text().contains("mp3_player") && s.command_prompt_active()
+    })?;
+    s.send(b"\x1bu3", "compact MP3 player", |s| {
+        s.text()
+            .lines()
+            .nth(8)
+            .is_some_and(|r| r.contains("MP3 Player") && r.chars().nth(22) == Some('╔'))
+    })?;
+    let compact = s.text();
+    assert!(!compact.contains("UI prototype"));
+    s.send(b"\x1bz", "expanded MP3 player", |s| {
+        let t = s.text();
+        t.contains("UI prototype") && t.contains("Pause") && t.contains("Volume")
+    })?;
+    // Buttons only demonstrate navigation; Open must not create a file picker.
+    s.send(b"\t\t\t\t\t\r", "inert Open", |s| {
+        s.text().contains("UI prototype")
+    })?;
+    assert!(!s.text().contains("Open file"));
+    s.send(b"\x1bOP", "player help", |s| {
+        s.text().contains("MP3 Player Help")
+    })?;
+    s.send(b"\x1b", "close player help", |s| {
+        !s.text().contains("MP3 Player Help")
+    })?;
+    s.send(b"\x1b[15;5~", "move player", |s| {
+        s.text().contains("Arrows move")
+    })?;
+    s.send(b"\x1b[C\r", "accept player movement", |s| {
+        !s.text().contains("Arrows move")
+    })?;
+    s.send(b"\x1bz", "compact again", |s| {
+        !s.text().contains("UI prototype") && s.text().contains("MP3 Player")
+    })?;
+    s.send(b"\x1b", "close player", |s| {
+        !s.text().contains("MP3 Player") && s.command_prompt_active()
+    })?;
+    s.finish()
+}
+
+#[test]
+fn held_buttons_shift_and_release_outside_cancels_in_a_real_terminal() -> io::Result<()> {
+    let mut s = Session::new("button-feedback")?;
+    s.wait("manager ready", |s| {
+        s.command_prompt_active() && s.text().contains("F5 Copy")
+    })?;
+    s.send(b"\x1b[18~", "mkdir opened", |s| {
+        s.text().contains("Make directory")
+    })?;
+    fn cancel_position(text: &str) -> Option<(usize, usize)> {
+        text.lines().enumerate().find_map(|(y, line)| {
+            if !line.contains("OK") || !line.contains("Help") {
+                return None;
+            }
+            let at = line.find("Cancel")?;
+            Some((line[..at].chars().count(), y))
+        })
+    }
+    let (x, y) = cancel_position(&s.text()).expect("Cancel button");
+    let down = format!("\x1b[<0;{};{}M", x + 1, y + 1);
+    s.send(down.as_bytes(), "button held", |s| {
+        cancel_position(&s.text()) == Some((x + 1, y))
+    })?;
+    assert!(s.text().contains("Make directory"));
+    s.send(b"\x1b[<32;1;1M", "pointer outside", |s| {
+        cancel_position(&s.text()) == Some((x, y))
+    })?;
+    s.send(b"\x1b[<0;1;1m", "outside release", |s| {
+        s.text().contains("Make directory")
+    })?;
+    s.send(down.as_bytes(), "button pressed again", |s| {
+        cancel_position(&s.text()) == Some((x + 1, y))
+    })?;
+    let up = format!("\x1b[<0;{};{}m", x + 1, y + 1);
+    s.send(up.as_bytes(), "inside release", |s| {
+        !s.text().contains("Make directory") && s.command_prompt_active()
+    })?;
+    s.finish()
+}

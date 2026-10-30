@@ -570,6 +570,22 @@ directory changes and after Refresh. Rendering and clock ticks perform no volume
 queries or directory scans. Failed queries display “Volume space unavailable”.
 No drive selector or DOS drive-letter controls are added.
 
+## MP3 Player prototype
+
+Enable **MP3 Player** in **Options → Configuration → Plugins** first; this
+experimental plugin is disabled by default. **Utilities → MP3 Player** then opens
+a DN-style player window. This is a UI prototype:
+no files are opened and no sound is played. Its Track and Track Time counters stay
+at zero. Transport controls and the expanded view's buttons provide native focus
+and pressed feedback only; Open, Set up, Volume and List are placeholders.
+
+Use Alt+Z, the title zoom button, a title double-click or Alt+0 → Zoom to switch
+between compact and expanded views. Tab/Shift+Tab choose buttons, Enter/Space
+activate them, F1 opens help and Esc closes the player. Ctrl+F5 or title dragging
+moves it. The fixed-size player also participates in Tile/Cascade. Reopening an
+open player activates it; opening it after closing starts compact again.
+**Options → Configuration → Plugins** can hide/enable its menu entry.
+
 ## Tetris / Pentix and high scores
 
 The game uses a classic DN-style board with Info, Next and Best panels and

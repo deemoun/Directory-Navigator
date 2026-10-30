@@ -3,6 +3,7 @@ pub const DISPLAY_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub mod app;
 pub mod associations;
+pub(crate) mod button_feedback;
 pub mod columns;
 pub mod commands;
 pub mod config;

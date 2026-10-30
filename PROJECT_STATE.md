@@ -1,5 +1,73 @@
 # Directory Navigator — beta
 
+## Visible button presses
+
+- Shared push buttons now follow DN DIALOGS.PAS DrawState: the face shifts one
+  column right, arrows disappear and the shadow clears while held. Mouse release
+  inside activates; dragging outside restores the face and releasing cancels.
+  Fast clicks and Enter/Space retain a short non-blocking press indication.
+- Terminal input decorates existing controller dispatch, retaining modal/document
+  ownership, layout revisions, disabled controls and file-operation safeguards.
+  Resize, owner replacement and Esc retire pending presses; paste cannot leak
+  through a held button. Prepared frames capture the feedback for immutable paint.
+- Native FileDialog skinning now respects Button::is_down instead of repainting
+  every face as raised. Its existing native mouse capture remains authoritative.
+- Added shared/native/plugin/Tetris, translated geometry, custom palette, Unicode
+  symbol, cancellation and stale-target tests plus a real-terminal hold/drag/
+  release workflow. Unpressed appearance fixtures remain unchanged.
+- macOS validation: 647 tests passed across 70 executables; one existing opt-in
+  Trash test ignored. Formatting, all-target Clippy, release, no-default-features,
+  doc tests and all ten release PTY checks pass. Windows/Linux skipped.
+
+## Per-plugin defaults and explicit enable overrides
+
+- MP3 Player is now disabled by default and absent from Utilities until enabled
+  in Options → Configuration → Plugins. Calculator and Tetris keep their enabled
+  defaults. Built-in defaults are centralized in `plugins::enabled_by_default`.
+- Config keeps user overrides separate: existing `[plugins].disabled` remains
+  supported, and optional `enabled` records explicit opt-ins so default-off tools
+  remain enabled after saving/reloading. Old configurations without overrides use
+  compiled-in defaults. Unknown IDs are preserved; malformed or contradictory
+  override lists are rejected without replacing the saved file. TOML stays v2.
+- Added default/legacy-config, enable/disable persistence, unknown-ID and invalid
+  publication tests, plus settings Cancel/Apply and hidden-menu/blocked-launch
+  coverage. The real-terminal player workflow explicitly enables the prototype.
+  Only the 16 Plugins checkbox appearance captures changed.
+- macOS validation: 639 tests passed across 69 executables; one existing opt-in
+  Trash test ignored. Formatting, all-target Clippy, release, no-default-features,
+  doc tests and all six release terminal walkthroughs pass. Windows/Linux skipped.
+
+
+## MP3 Player UI prototype
+
+- Added a third built-in plugin, MP3 Player, to Utilities and the existing Plugins
+  configuration list. It is disabled by default, opens as a singleton document and
+  is hidden/retired through the same enablement and owner guards as other tools.
+- Adapted CDPLAYER.PAS's three-row counter and transport arrangement into compact
+  36×9 and expanded 36×16 layouts, preserving space for native shadows/borders.
+  Track/time remain at zero; the MP3 indicator replaces CD-specific mode letters.
+  Existing configured palettes and English/Russian captions are used. Controls
+  are UI-only: no file picker, file reads, audio, metadata, player timers or
+  dependencies. Expanded mode visibly identifies the prototype; F1 explains it.
+- Added an optional internal plugin zoom-action hook and a shared window zoom
+  dispatcher. Title controls/double-click, Alt+Z, menu and window-list Zoom toggle
+  this player's view; other windows retain native maximize/restore. Plugin shells
+  take their initial placement from the first declared window geometry rather
+  than Tetris-sized assumptions, without replacing native view identities.
+- Tested singleton/reopen reset, focus traversal and hidden-focus collapse,
+  inert controls/paste, help, disabling with owned Help open, stale targets,
+  fixed-size arrangement beside editors/Tetris, movement feedback, resize,
+  localized/custom palette frames, clipping and immutable repeated painting.
+  Only the 16 Plugins settings appearance captures changed; 304 others match.
+- macOS validation: 637 tests passed across 69 executables, with one existing
+  opt-in Trash test ignored. Formatting, all-target Clippy with warnings denied,
+  release build, no-default-features and doc checks pass. All six optimized
+  real-terminal walkthroughs (plus three PTY decoder regressions) pass, including
+  the new player workflow. Windows/Linux validation remains skipped.
+- Original CDPLAYER.PAS copyright and license attribution are reproduced in
+  THIRD_PARTY_NOTICES.md; no original CD/hardware implementation was ported.
+
+
 ## Temporary drag highlighting
 
 - Following VIEWS.PAS TFrame's sfDragging palette, the captured window's frame

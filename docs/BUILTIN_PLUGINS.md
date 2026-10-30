@@ -1,6 +1,7 @@
 # Built-in tools
 
-The first plugin iteration contains only Calculator and Tetris. They are compiled
+The built-in plugins are Calculator, Tetris/Pentix and the MP3 Player UI prototype.
+They are compiled
 into DN; there is no dynamic loader, binary ABI, installation format, external SDK,
 new dependency or separate plugin configuration format. This is an internal Rust interface which
 may evolve with the application.
@@ -8,8 +9,10 @@ may evolve with the application.
 ## Enable and disable
 
 Options → Configuration → Plugins lists every registered built-in tool, including
-disabled tools. Checkboxes edit a draft: OK applies it, Cancel discards it. All
-plugins are enabled by default. Disabling closes the current presentation and
+disabled tools. Checkboxes edit a draft: OK applies it, Cancel discards it.
+Calculator and Tetris are enabled by default; the experimental MP3 Player is
+disabled by default. Compiled-in defaults live in `plugins::enabled_by_default`.
+Explicit user choices override those defaults and survive saving/restarting. Disabling closes the current presentation and
 hides its menu entry and blocks shortcut launches. Enabling restores the menu
 entry without opening the tool automatically. Calculator
 session history and pending Tetris score records survive disabling.
@@ -20,9 +23,14 @@ or save on exit). Its optional TOML v2 section is:
 ```toml
 [plugins]
 disabled = ["tetris"]
+enabled = ["mp3_player"]
 ```
 
-Older configurations enable all tools. Unknown plugin IDs are retained on save.
+Older configurations without explicit overrides use the compiled-in defaults.
+The legacy disabled list remains supported; the optional enabled list records
+explicit opt-ins, including default-off plugins. IDs cannot appear in both lists.
+Unknown IDs in either list are retained on save. No configuration version change
+is required.
 
 ## Contract
 
@@ -126,3 +134,22 @@ draft cancellation, registry-driven lists, long-list scrolling/stale targets,
 disable/re-enable, owned Help retirement and configuration safeguards. A release
 PTY verifies toggles, blocked shortcuts, live game retirement, explicit saving,
 resize and terminal restoration. Windows/Linux validation is skipped.
+
+
+## MP3 Player prototype
+
+Utilities → MP3 Player opens a single movable document. Its compact 36×9 and
+expanded 36×16 layouts follow DOS Navigator's CD player, with fixed zero counters,
+a vertical MP3 label and the current configured dialog palette. Transport and
+secondary buttons only demonstrate native focus and activation; there is no
+playback, file picker, metadata reading, timer, audio dependency or saved player
+preference. Open is a placeholder too.
+
+Alt+Z, the title zoom control, title double-click and window-list Zoom toggle
+compact/expanded views. The internal optional `ToolPlugin::zoom_action` hook
+returns a local action ID; the common windowing dispatcher delegates to it before
+native maximize/restore. Other windows keep native zoom. Fixed plugin windows
+participate in Tile/Cascade without stretching. Their first geometry comes from
+the declared `LocalWindow`, not a Tetris-specific fallback; later size changes
+retain preferred placement and clamp effective bounds. Closing/reopening the
+player starts compact with Play focused. F1 opens owned prototype help.

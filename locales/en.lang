@@ -660,3 +660,15 @@ Cascade	Cascade
 Not enough desktop space to arrange windows. Enlarge the terminal or close some document windows.	Not enough desktop space to arrange windows. Enlarge the terminal or close some document windows.
 No document windows are open.	No document windows are open.
 Close the current dialog before arranging windows.	Close the current dialog before arranging windows.
+MP~3~ Player	MP~3~ Player
+MP3 Player	MP3 Player
+Track	Track
+Track Time	Track Time
+Time	Time
+Mode	Mode
+Volume	Volume
+List	List
+UI prototype · no playback	UI prototype · no playback
+MP3 Player Help	MP3 Player Help
+This is a UI-only MP3 player prototype inspired by DOS Navigator.\nNo audio is played and no files are opened or read.\nTransport and secondary buttons only demonstrate native focus and pressed feedback.\nTab / Shift+Tab select controls; Enter / Space press the selected button.\nAlt+Z, the title zoom button or a title double-click switch compact/expanded views.\nCtrl+F5 moves the player; Esc closes it. No preferences are saved.	This is a UI-only MP3 player prototype inspired by DOS Navigator.\nNo audio is played and no files are opened or read.\nTransport and secondary buttons only demonstrate native focus and pressed feedback.\nTab / Shift+Tab select controls; Enter / Space press the selected button.\nAlt+Z, the title zoom button or a title double-click switch compact/expanded views.\nCtrl+F5 moves the player; Esc closes it. No preferences are saved.
+Set up	Set up

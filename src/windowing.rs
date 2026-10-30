@@ -129,7 +129,7 @@ pub fn action(app: &mut App, action: Action) {
                 if action == Action::Move {
                     app.desktop.native().begin_move(surface.id, None);
                 } else {
-                    app.desktop.native().zoom_surface(surface.id);
+                    workspace::zoom(app, surface);
                 }
             }
         }
@@ -232,7 +232,7 @@ pub(crate) fn move_active(app: &mut App, zoom: bool) {
     crate::layout::update(app);
     if let Some(s) = workspace::foreground(app) {
         if zoom {
-            app.desktop.native().zoom_surface(s.id);
+            workspace::zoom(app, s);
         } else {
             app.desktop.native().begin_move(s.id, None);
         }

@@ -207,6 +207,32 @@ fn apply(app: &mut App, b: Binding, effects: Vec<Effect>) {
         }
     }
 }
+/// Route plugin presentation toggles through the same owned action path as controls.
+pub(crate) fn zoom(app: &mut App, surface: crate::windowing::geometry::SurfaceId) -> bool {
+    let crate::windowing::geometry::SurfaceKey::Document(window) = surface.key else {
+        return false;
+    };
+    if crate::eligibility::Gate::new(app)
+        .surface(surface)
+        .is_none()
+    {
+        return false;
+    }
+    let Some(binding) = active(app).filter(|b| b.owner == Owner::Document(window)) else {
+        return false;
+    };
+    let Some(action) = app
+        .desktop
+        .plugins
+        .entries
+        .get(&binding.plugin)
+        .and_then(|e| e.tool.zoom_action())
+    else {
+        return false;
+    };
+    dispatch(app, binding, Event::Action(action));
+    true
+}
 pub(crate) fn controls(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
     let b = active(app)?;
     let ctx = context(app, b, area, app.desktop.plugins.now)?;

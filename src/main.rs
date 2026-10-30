@@ -104,10 +104,11 @@ fn run() -> io::Result<()> {
             }
             match event {
                 Event::Key(key) => {
-                    input::handle(&mut app, key);
+                    input::handle_ui(&mut app, key);
                     dirty = true;
                 }
                 Event::Resize(_, _) => {
+                    input::cancel_feedback(&mut app);
                     app.shortcuts.clear();
                     app.mouse.scrollbar_drag = None;
                     dirty = true;
@@ -126,7 +127,7 @@ fn run() -> io::Result<()> {
                             | MouseEventKind::ScrollDown
                     ) =>
                 {
-                    mouse::handle(&mut app, event);
+                    mouse::handle_ui(&mut app, event);
                     dirty = true;
                 }
                 _ => {}

@@ -1,6 +1,7 @@
 //! Built-in tools. Internal Rust API: no binary ABI, loader or third-party SDK.
 pub(crate) mod calculator;
 pub(crate) mod host;
+pub(crate) mod mp3_player;
 pub(crate) mod tetris;
 
 use crate::{
@@ -24,6 +25,14 @@ use std::{
 pub struct PluginId(pub &'static str);
 pub const CALCULATOR: PluginId = PluginId("calculator");
 pub const TETRIS: PluginId = PluginId("tetris");
+pub const MP3_PLAYER: PluginId = PluginId("mp3_player");
+/// Compiled-in defaults are separate from explicit user overrides. Unknown tools
+/// retain the original enabled default; experimental built-ins opt out here.
+pub fn enabled_by_default(id: PluginId) -> bool {
+    const DEFAULT_DISABLED: &[PluginId] = &[MP3_PLAYER];
+    !DEFAULT_DISABLED.contains(&id)
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Presentation {
     Dialog,
@@ -145,6 +154,10 @@ pub(crate) trait ToolPlugin: Any {
     fn windows(&self, _ctx: &Context) -> Vec<LocalWindow> {
         Vec::new()
     }
+    /// Optional presentation toggle in place of native maximize/restore.
+    fn zoom_action(&self) -> Option<ActionId> {
+        None
+    }
     fn controls(&self, ctx: &Context) -> DialogSpec<'_>;
     fn view(&self, ctx: &Context) -> View<'_> {
         View::Dialog(Box::new(self.controls(ctx)))
@@ -171,6 +184,8 @@ impl Default for Runtime {
         };
         s.register(Box::<calculator::CalculatorPlugin>::default())
             .expect("calculator ID");
+        s.register(Box::<mp3_player::Mp3Player>::default())
+            .expect("MP3 player ID");
         s.register(Box::<tetris::TetrisPlugin>::default())
             .expect("tetris ID");
         s

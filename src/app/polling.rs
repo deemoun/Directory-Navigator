@@ -66,11 +66,16 @@ impl App {
 
         changed |= self.poll_operation();
         self.sync_modals();
-        changed | crate::windowing::poll(self)
+        changed
+            | crate::windowing::poll(self)
+            | crate::button_feedback::poll(self, std::time::Instant::now())
     }
 
     pub fn wait_duration(&self, now: std::time::Instant) -> std::time::Duration {
         use std::time::Duration;
+        if let Some(wait) = crate::button_feedback::next_wake(self, now) {
+            return wait.min(Duration::from_millis(16));
+        }
         if let Some(wait) = crate::plugins::host::next_wake(self, now) {
             return wait.min(Duration::from_millis(50));
         }

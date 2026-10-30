@@ -334,7 +334,7 @@ fn plugins_settings_lists_registered_tools_not_a_builtin_whitelist() -> io::Resu
     a.desktop.activate(WindowId::MANAGER);
     a.open_settings(crate::settings::SettingsKind::Plugins);
     let settings = a.modals.settings().unwrap();
-    assert_eq!(settings.control_count(), 3);
+    assert_eq!(settings.control_count(), 4);
     let index = settings
         .plugins
         .iter()

@@ -13,6 +13,7 @@ mod modals;
 mod polling;
 
 pub struct App {
+    pub(crate) button_feedback: crate::button_feedback::State,
     pub modals: crate::modals::ModalStack,
     pub welcome: crate::welcome::State,
     pub copy_dialog: crate::copy_dialog::State,
@@ -63,6 +64,7 @@ impl App {
     pub fn new(path: PathBuf) -> io::Result<Self> {
         let config = Config::default();
         let mut app = Self {
+            button_feedback: Default::default(),
             modals: Default::default(),
             welcome: Default::default(),
             copy_dialog: Default::default(),

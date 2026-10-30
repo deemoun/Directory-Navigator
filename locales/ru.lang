@@ -660,3 +660,15 @@ Cascade	Каскад
 Not enough desktop space to arrange windows. Enlarge the terminal or close some document windows.	Недостаточно места для окон. Увеличьте терминал или закройте часть окон документов.
 No document windows are open.	Нет открытых окон документов.
 Close the current dialog before arranging windows.	Закройте текущий диалог перед упорядочиванием окон.
+MP~3~ Player	MP~3~-плеер
+MP3 Player	MP3-плеер
+Track	Трек
+Track Time	Время трека
+Time	Время
+Mode	Режим
+Volume	Звук
+List	Список
+UI prototype · no playback	Макет · без воспроизведения
+MP3 Player Help	Справка MP3-плеера
+This is a UI-only MP3 player prototype inspired by DOS Navigator.\nNo audio is played and no files are opened or read.\nTransport and secondary buttons only demonstrate native focus and pressed feedback.\nTab / Shift+Tab select controls; Enter / Space press the selected button.\nAlt+Z, the title zoom button or a title double-click switch compact/expanded views.\nCtrl+F5 moves the player; Esc closes it. No preferences are saved.	Это макет MP3-плеера по образцу DOS Navigator.\nЗвук не воспроизводится, файлы не открываются и не читаются.\nКнопки демонстрируют только фокус и нажатие.\nTab / Shift+Tab выбирают кнопку; Enter / Space нажимают её.\nAlt+Z, кнопка в заголовке или двойной щелчок переключают вид.\nCtrl+F5 перемещает окно; Esc закрывает его. Настройки не сохраняются.
+Set up	Настр.

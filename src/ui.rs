@@ -154,6 +154,9 @@ pub fn render(app: &App, snapshot: &crate::layout::LayoutSnapshot) -> RenderedFr
     }
     scene.normalize_wide();
     snapshot.transform(&mut scene);
+    if let Some(rect) = snapshot.pressed_button {
+        crate::button_feedback::paint(&mut scene, rect);
+    }
     scene.normalize_wide();
     let active_surface = snapshot.surfaces.iter().find(|s| {
         s.id.key == crate::windowing::geometry::SurfaceKey::Document(snapshot.context.owner)
