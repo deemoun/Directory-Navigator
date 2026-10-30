@@ -15,7 +15,7 @@ pub(crate) fn key(app: &mut App, event: KeyEvent, scope: Focus) -> bool {
         (Focus::SaverSetup, KeyCode::Left) => KeyCode::BackTab,
         (Focus::FileTools, KeyCode::Down)
             if matches!(
-                app.file_tools.modals.file_tools(),
+                app.file_tools(),
                 Some(crate::file_tools::ToolDialog::Compare { .. })
             ) =>
         {
@@ -23,7 +23,7 @@ pub(crate) fn key(app: &mut App, event: KeyEvent, scope: Focus) -> bool {
         }
         (Focus::FileTools, KeyCode::Up)
             if matches!(
-                app.file_tools.modals.file_tools(),
+                app.file_tools(),
                 Some(crate::file_tools::ToolDialog::Compare { .. })
             ) =>
         {
@@ -97,6 +97,14 @@ fn set_focus(app: &mut App, scope: Focus, next: usize) {
             if let Some(d) = app
                 .desktop
                 .active_viewer_mut()
+                .and_then(|v| v.modals.viewer_goto_mut())
+            {
+                d.focus = next;
+                return;
+            }
+            if let Some(d) = app
+                .desktop
+                .active_viewer_mut()
                 .and_then(|v| v.modals.viewer_search_mut())
             {
                 d.focus = next;
@@ -128,6 +136,7 @@ fn set_focus(app: &mut App, scope: Focus, next: usize) {
 
 pub(crate) fn tool_action(app: &mut App, target: Target) {
     match Some(target) {
+        Some(Target::Recovery(a)) => crate::editor::recovery::action(app, a),
         Some(Target::CloseDialog) => {
             app.pop_dialog();
         }
@@ -146,7 +155,7 @@ pub(crate) fn tool_action(app: &mut App, target: Target) {
         Some(Target::ColumnChoice(panel, preset)) => crate::columns::choose(app, panel, preset),
         Some(Target::AcceptColumns) => crate::columns::accept(app),
         Some(Target::CancelColumns) => crate::columns::cancel(app),
-        Some(Target::CloseFileInfo) => app.modals.set_file_info(None),
+        Some(Target::CloseFileInfo) => app.set_file_info(None),
         Some(Target::Tree(a)) => crate::directory_tree::action(app, a),
         Some(Target::UserMenu(a)) => crate::user_menu::action(app, a),
         Some(Target::Utility(a)) => crate::utilities::action(app, a),

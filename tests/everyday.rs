@@ -234,11 +234,8 @@ fn information_is_fresh_readonly_and_reports_missing_entries() -> io::Result<()>
         &mut app,
         KeyEvent::new(KeyCode::Char('e'), KeyModifiers::ALT),
     );
-    wait(&mut app, |a| {
-        a.modals.file_info().unwrap().contents.is_some()
-    });
+    wait(&mut app, |a| a.file_info().unwrap().contents.is_some());
     let contents = app
-        .modals
         .file_info()
         .unwrap()
         .contents
@@ -260,7 +257,7 @@ fn information_is_fresh_readonly_and_reports_missing_entries() -> io::Result<()>
         app.mouse
             .regions
             .iter()
-            .filter(|(_, t)| !matches!(t, Target::Surface(..)))
+            .filter(|(_, t)| *t == Target::CloseFileInfo)
             .count(),
         2
     );
@@ -268,9 +265,9 @@ fn information_is_fresh_readonly_and_reports_missing_entries() -> io::Result<()>
         .mouse
         .regions
         .iter()
-        .all(|(_, t)| *t == Target::CloseFileInfo || matches!(t, Target::Surface(..))));
+        .any(|(_, t)| matches!(t, Target::Menu(_))));
     click(&mut app, Target::CloseFileInfo);
-    assert!(app.modals.file_info().is_none());
+    assert!(app.file_info().is_none());
     assert_eq!(fs::metadata(temp.0.join("file"))?.modified()?, original);
     assert_eq!(fs::read(temp.0.join("file"))?, b"new contents");
     let directory = file_info::inspect(&temp.0.join("directory"))?;
@@ -280,17 +277,8 @@ fn information_is_fresh_readonly_and_reports_missing_entries() -> io::Result<()>
         .any(|line| line.contains("contents not counted")));
     fs::remove_file(temp.0.join("file"))?;
     app.open_file_info();
-    wait(&mut app, |a| {
-        a.modals.file_info().unwrap().contents.is_some()
-    });
-    assert!(app
-        .modals
-        .file_info()
-        .unwrap()
-        .contents
-        .as_ref()
-        .unwrap()
-        .is_err());
+    wait(&mut app, |a| a.file_info().unwrap().contents.is_some());
+    assert!(app.file_info().unwrap().contents.as_ref().unwrap().is_err());
     let terminal = render(&mut app, 80, 25)?;
     let text = terminal
         .backend()
@@ -301,7 +289,7 @@ fn information_is_fresh_readonly_and_reports_missing_entries() -> io::Result<()>
         .collect::<String>();
     assert!(text.contains("Cannot read file information"));
     key(&mut app, KeyCode::Enter);
-    assert!(app.modals.file_info().is_none());
+    assert!(app.file_info().is_none());
     Ok(())
 }
 
@@ -349,27 +337,23 @@ fn info_long_paths_scroll_and_can_close_during_loading() -> io::Result<()> {
     let path = directory.join("file.txt");
     fs::write(&path, b"x")?;
     let mut app = temp.app()?;
-    app.modals
-        .set_file_info(Some(file_info::InfoDialog::open(path.clone())?));
-    wait(&mut app, |a| {
-        a.modals.file_info().unwrap().contents.is_some()
-    });
+    app.set_file_info(Some(file_info::InfoDialog::open(path.clone())?));
+    wait(&mut app, |a| a.file_info().unwrap().contents.is_some());
     for _ in 0..20 {
         key(&mut app, KeyCode::Right);
     }
     key(&mut app, KeyCode::PageDown);
-    assert!(app.modals.file_info().unwrap().offset > 0);
-    assert!(app.modals.file_info().unwrap().horizontal > 0);
+    assert!(app.file_info().unwrap().offset > 0);
+    assert!(app.file_info().unwrap().horizontal > 0);
     render(&mut app, 80, 25)?;
     key(&mut app, KeyCode::Home);
-    assert_eq!(app.modals.file_info().unwrap().horizontal, 0);
-    assert_eq!(app.modals.file_info().unwrap().offset, 0);
+    assert_eq!(app.file_info().unwrap().horizontal, 0);
+    assert_eq!(app.file_info().unwrap().offset, 0);
     key(&mut app, KeyCode::Esc);
-    app.modals
-        .set_file_info(Some(file_info::InfoDialog::open(path)?));
+    app.set_file_info(Some(file_info::InfoDialog::open(path)?));
     key(&mut app, KeyCode::Esc);
     app.poll();
-    assert!(app.modals.file_info().is_none());
+    assert!(app.file_info().is_none());
     Ok(())
 }
 
@@ -497,7 +481,7 @@ fn new_menu_entries_open_their_mouse_dialogs() -> io::Result<()> {
     let mut app = temp.app()?;
     focus(&mut app, "file");
     for selecting in [true, false] {
-        menu::open(&mut app, 3);
+        menu::open_submenu(&mut app, menu::RootId::Panel, MenuId::Selection);
         render(&mut app, 80, 25)?;
         menu_action(
             &mut app,
@@ -520,7 +504,7 @@ fn new_menu_entries_open_their_mouse_dialogs() -> io::Result<()> {
     menu::open(&mut app, 1);
     render(&mut app, 80, 25)?;
     menu_action(&mut app, Action::FileInfo);
-    assert!(app.modals.file_info().is_some());
+    assert!(app.file_info().is_some());
     assert!(app.modals.menu().is_none());
     key(&mut app, KeyCode::Esc);
     Ok(())

@@ -1,6 +1,7 @@
 //! Frozen shared-dialog frames. Window chrome/window-list fixtures reflect the
 //! floating desktop; nested choices center over their parent. Surface targets
 //! are checked by floating_windows rather than mixed into legacy control hashes.
+//! Viewer backgrounds include Go to; editor Help includes the block commands.
 mod support;
 use dn::{
     editor::{self, EditorAction as A},

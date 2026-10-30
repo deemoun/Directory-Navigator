@@ -140,6 +140,7 @@ pub fn shell_plan(command: &str, cwd: std::path::PathBuf) -> Plan {
         cwd,
         commands: vec![CommandSpec { program, args }],
         env: Vec::new(),
+        list_files: Vec::new(),
     }
 }
 fn submit(app: &mut App) -> io::Result<()> {

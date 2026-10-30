@@ -61,8 +61,15 @@ pub(crate) fn column(
         } else {
             " "
         };
+        let group_color = config
+            .highlight_files
+            .then(|| config.highlight_groups.color(entry))
+            .flatten();
         let normal = if config.highlight_files {
-            crate::ui::entry_color(entry)
+            config
+                .highlight_groups
+                .color(entry)
+                .unwrap_or_else(|| crate::ui::entry_color(entry))
         } else if entry.directory {
             0x8f
         } else {
@@ -109,7 +116,16 @@ pub(crate) fn column(
             position = f.right();
         }
         rows.push(text);
-        colours.push((colour, marker_colour));
+        let custom_style = if !marked && !(active && index == panel.cursor) {
+            group_color.map(|c| {
+                config.palette.dos(
+                    (config.palette.slot(crate::palette::theme::Slot::PanelText) & 0xf0) | (c & 15),
+                )
+            })
+        } else {
+            None
+        };
+        colours.push((colour, marker_colour, custom_style));
     }
     super::widgets::paint_into(
         scene,
@@ -117,14 +133,14 @@ pub(crate) fn column(
         rect,
     );
     for y in rect.y..rect.bottom() {
-        let (colour, marker) = colours
+        let (colour, marker, custom_style) = colours
             .get((y - rect.y) as usize)
             .copied()
-            .unwrap_or((0x87, 0x87));
+            .unwrap_or((0x87, 0x87, None));
         for x in rect.x..rect.right() {
             if let Some(cell) = scene.cells.get_mut(&(x, y)) {
                 cell.attribute = if x == rect.x { marker } else { colour };
-                cell.style = None;
+                cell.style = custom_style;
             }
         }
     }

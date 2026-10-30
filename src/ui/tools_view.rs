@@ -1,7 +1,7 @@
 use crate::dialog_theme as theme;
 use crate::painting::{Frame, Paragraph};
 use crate::presentation::{layout::Rect, text::Line};
-use crate::turbo::dialog_spec::{centered, scope, Control, ControlKind, DialogSpec};
+use crate::turbo::dialog_spec::{scope, Control, ControlKind, DialogSpec};
 use crate::{app::App, columns::ColumnPreset, filesystem::display_name, mouse::Target};
 pub(super) fn draw_tools(
     frame: &mut impl Frame,
@@ -25,7 +25,7 @@ pub(crate) fn tools_spec(
         .pattern()
         .filter(|_| layer == crate::focus::Focus::Pattern)
     {
-        let rect = centered(area, 58, 8);
+        let rect = crate::tool_windows::bounds(app, area, 58, 8);
         let mut spec = DialogSpec::new(
             rect,
             scope(app, layer)?,
@@ -82,7 +82,7 @@ pub(crate) fn tools_spec(
         .columns_dialog()
         .filter(|_| layer == crate::focus::Focus::Columns)
     {
-        let rect = centered(area, 74, 13);
+        let rect = crate::tool_windows::bounds(app, area, 74, 13);
         let mut spec = DialogSpec::new(
             rect,
             scope(app, layer)?,
@@ -152,11 +152,10 @@ pub(crate) fn tools_spec(
         return Some(spec);
     }
     if let Some(info) = app
-        .modals
         .file_info()
         .filter(|_| layer == crate::focus::Focus::FileInfo)
     {
-        let rect = centered(area, area.width.min(76), area.height.min(21));
+        let rect = crate::tool_windows::bounds(app, area, area.width.min(76), area.height.min(21));
         let mut spec = DialogSpec::new(
             rect,
             scope(app, layer)?,

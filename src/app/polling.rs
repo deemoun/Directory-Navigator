@@ -13,17 +13,19 @@ impl App {
         let associations_changed = crate::associations::poll(self);
         let archive_changed = crate::archive::poll(self);
         let user_menu_changed = crate::user_menu::poll(self);
-        let tree_changed = self.modals.directory_tree_mut().is_some_and(|t| t.poll());
+        let tree_changed = self.directory_tree_mut().is_some_and(|t| t.poll());
         let discovery_changed = crate::discovery::poll(self);
         let launch_changed = self.poll_launches();
         let saver_changed = crate::screensaver::poll(self, std::time::Instant::now());
         let utilities_changed = crate::utilities::poll(self);
         let tools_changed = crate::file_tools::poll(self);
         let editor_changed = self.poll_editors();
+        let recovery_changed = crate::editor::recovery::poll(self, std::time::Instant::now());
         let mut changed = crate::config_import::poll(self);
         changed |= crate::plugins::host::poll(self, std::time::Instant::now());
         changed |= saver_changed
             | associations_changed
+            | recovery_changed
             | editor_changed
             | tools_changed
             | utilities_changed
@@ -40,7 +42,7 @@ impl App {
                     crate::desktop::WindowKind::Plugin(_)
                 );
         }
-        if let Some(info) = self.modals.file_info_mut() {
+        if let Some(info) = self.file_info_mut() {
             changed |= info.poll();
         }
         changed |= self.poll_viewers();
@@ -65,6 +67,7 @@ impl App {
         }
 
         changed |= self.poll_operation();
+        changed |= crate::tool_windows::poll(self);
         self.sync_modals();
         changed
             | crate::windowing::poll(self)
@@ -79,20 +82,21 @@ impl App {
         if let Some(wait) = crate::plugins::host::next_wake(self, now) {
             return wait.min(Duration::from_millis(50));
         }
-        let pending = self
-            .discovery
-            .modals
-            .discovery()
-            .is_some_and(|m| m.job.is_some())
+        let pending = self.editor_recovery.as_ref().is_some_and(|m| m.busy())
+            || self
+                .desktop
+                .windows()
+                .any(|w| matches!(w.kind, crate::desktop::WindowKind::Tool(_)))
+            || self.discovery().is_some_and(|m| m.job.is_some())
             || (matches!(
                 crate::focus::current(self),
                 crate::focus::Focus::Manager | crate::focus::Focus::QuickSearch
             ) && self.quick_view.as_ref().is_some_and(|q| q.pending()))
             || self.modals.config_import().is_some_and(|p| p.loading())
-            || self.modals.directory_tree().is_some_and(|t| t.loading())
+            || self.directory_tree().is_some_and(|t| t.loading())
             || crate::user_menu::pending(&self.user_menu)
             || self.associations.busy()
-            || self.modals.archive().is_some_and(|a| a.loading())
+            || self.archive().is_some_and(|a| a.loading())
             || self.launcher.loading()
             || self.job.is_some()
             || self.file_tools.busy()
@@ -120,12 +124,9 @@ impl App {
                             .viewer(*id)
                             .is_some_and(|v| v.contents.is_none())
                 })
+            || self.file_info().is_some_and(|i| i.contents.is_none())
             || self
-                .modals
-                .file_info()
-                .is_some_and(|i| i.contents.is_none())
-            || self
-                .utilities
+                .utility_state()
                 .information
                 .as_ref()
                 .is_some_and(|i| i.loading());

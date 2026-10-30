@@ -10,6 +10,9 @@ pub(crate) fn user_menu_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
     let profile = app.config.palette;
     let dos = profile.styles_for(crate::palette::theme::Group::Dialogs);
     let m = app.user_menu.modals.user_menu()?;
+    if m.parameters.is_some() {
+        return parameters_spec(app, area);
+    }
     let review = m.review.is_some();
     let width = if review {
         76
@@ -165,6 +168,64 @@ pub(crate) fn user_menu_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
             i + 1,
             r,
             ControlKind::Button(caption),
+            Target::UserMenu(action),
+        ));
+    }
+    Some(spec)
+}
+
+fn parameters_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
+    let m = app.user_menu.modals.user_menu()?;
+    let p = m.parameters.as_ref()?;
+    let lang = app.config.language;
+    let dos = app
+        .config
+        .palette
+        .styles_for(crate::palette::theme::Group::Dialogs);
+    let r = centered(area, 76, p.values.len() as u16 + 8);
+    let mut spec = DialogSpec::new(
+        r,
+        scope(app, crate::focus::Focus::UserMenu)?,
+        m.focus,
+        lang.text(" User command parameters "),
+        Target::UserMenu(Action::ParametersAccept),
+        Target::UserMenu(Action::Cancel),
+    );
+    spec.caption(
+        Paragraph::new(lang.text("Values are single arguments; review follows before execution."))
+            .style(dos(theme::TEXT)),
+        Rect::new(r.x + 2, r.y + 1, r.width - 4, 1),
+    );
+    for (i, (d, value)) in p.definitions.iter().zip(&p.values).enumerate() {
+        let y = r.y + 3 + i as u16;
+        spec.caption(
+            Paragraph::new(tail(&display_name(&d.label), 24)).style(dos(theme::TEXT)),
+            Rect::new(r.x + 2, y, 24, 1),
+        );
+        let input = Rect::new(r.x + 27, y, r.width - 30, 1);
+        let col = crate::presentation::text::Line::from(&value[..p.cursors[i]]).width();
+        let scroll = col.saturating_sub(input.width.saturating_sub(1) as usize);
+        spec.control(Control::new(
+            i,
+            input,
+            ControlKind::ScrolledInput {
+                value: display_name(value),
+                scroll,
+            },
+            Target::UserMenu(Action::Parameter(i)),
+        ));
+        if m.focus == i {
+            spec.cursor = Some((input.x + (col - scroll) as u16, y));
+        }
+    }
+    for (i, label, action, x) in [
+        (0, "Review", Action::ParametersAccept, 18),
+        (1, "Cancel", Action::Cancel, 42),
+    ] {
+        spec.control(Control::new(
+            p.values.len() + i,
+            Rect::new(r.x + x, r.bottom() - 3, 18, 1),
+            ControlKind::Button(lang.text(label).into()),
             Target::UserMenu(action),
         ));
     }

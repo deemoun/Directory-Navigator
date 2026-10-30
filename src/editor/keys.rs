@@ -158,6 +158,12 @@ pub fn key(app: &mut App, key: KeyEvent) {
         KeyCode::Backspace => buffer.delete(true),
         KeyCode::Delete => buffer.delete(false),
         KeyCode::Enter => buffer.enter(editor.preferences.auto_indent),
+        KeyCode::BackTab | KeyCode::Tab if shift || key.code == KeyCode::BackTab => {
+            buffer.indent_block(true, editor.preferences.expand_tabs)
+        }
+        KeyCode::Tab if !buffer.selected().is_empty() => {
+            buffer.indent_block(false, editor.preferences.expand_tabs)
+        }
         KeyCode::Tab if !shift => {
             if editor.preferences.expand_tabs {
                 buffer.insert(

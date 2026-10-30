@@ -19,6 +19,13 @@ pub enum EditorAction {
     TabWidth,
     SaveDesktop,
     Duplicate,
+    Indent,
+    Unindent,
+    Uppercase,
+    Lowercase,
+    Capitalize,
+    MatchBracket,
+    SortLines,
     SelectAll,
     Clear,
     Undo,
@@ -99,7 +106,7 @@ pub(crate) fn open_path_with_focus(
         .find_path(crate::desktop::WindowKind::Editor, &path)
     {
         if foreground {
-            app.desktop.activate(id);
+            crate::windowing::activate(app, id);
         }
         return Some(id);
     }
@@ -110,9 +117,9 @@ pub(crate) fn open_path_with_focus(
             editor.replacement = app.editor_search.replacement.clone();
             editor.search_options = app.editor_search.options;
             let result = if foreground {
-                app.desktop.open_editor(editor)
+                app.install_document(|desktop| desktop.open_editor(editor))
             } else {
-                app.desktop.open_editor_background(editor)
+                app.install_document(|desktop| desktop.open_editor_background(editor))
             };
             match result {
                 Ok(id) => return Some(id),
@@ -233,8 +240,11 @@ pub fn poll(app: &mut App) -> bool {
                 editor.modals.set_editor_modal(None);
                 editor.notice = "UTF-8 · F2 Save · F7 Search · F10 Menu · Esc Close".into();
                 editor.recolor();
+                if let Some(line) = editor.reveal_line.take() {
+                    editor.go_to_line(line);
+                }
             }
-            Reply::Saved(Ok((path, snapshot))) => {
+            Reply::Saved(Ok((path, outcome))) => {
                 editor.base = path
                     .parent()
                     .map(PathBuf::from)
@@ -245,11 +255,21 @@ pub fn poll(app: &mut App) -> bool {
                         .record(crate::file_tools::history::HistoryKind::Edit, path.clone());
                 }
                 editor.path = Some(path);
-                editor.original = Some(snapshot);
+                editor.original = Some(outcome.snapshot);
                 if let Some(buffer) = &mut editor.buffer {
-                    buffer.mark_saved();
+                    if outcome.warning.is_none() {
+                        buffer.mark_saved();
+                        editor.durability_pending = None;
+                    } else {
+                        editor.durability_pending = Some(buffer.revision());
+                    }
                 }
                 editor.notice = "Saved".into();
+                if let Some(warning) = outcome.warning {
+                    editor.closing = None;
+                    editor.notice = "Written — durability unconfirmed; retry Save".into();
+                    error = Some(format!("{} {warning}\n\n{}", app.config.language.text("File was written, but durability could not be confirmed:"),app.config.language.text("Your buffer is retained and recovery checkpointing continues. Retry Save to confirm it without rewriting unchanged text.")));
+                }
                 editor.recolor();
                 saved = true;
             }
@@ -553,12 +573,23 @@ pub fn action(app: &mut App, command: EditorAction) {
         finish_file(app, outcome);
         return;
     }
-    if command == A::Cancel && app.modals.native_help(app.desktop.active().id).is_some() {
+    if command == A::Cancel && app.native_help().is_some() {
         app.pop_dialog();
         return;
     }
     if command == A::Help {
-        app.push_dialog(crate::dialog::Dialog{title:" Editor Help ",message:app.config.language.text(if app.config.shortcuts.is_mac(){crate::shortcuts::EDITOR_HELP}else{"F2 / Ctrl+S Save · Shift+F2 Save As · F3 Open\nF6 Duplicate line · F7 / Ctrl+F Find\nShift+F7 Search again · Alt+F7 Reverse search\nCtrl+F7 Replace · Alt+G / Ctrl+G Go to line\nCtrl+←/→ words · Ctrl+Shift+←/→ select words\nShift+arrows select · Ctrl+A select all\nAlt+Backspace / Ctrl+Z Undo · Ctrl+Y Redo\nCtrl+Ins/C Copy · Shift+Del / Ctrl+X Cut\nShift+Ins / Ctrl+V Paste · terminal paste supported\nAlt+B Block: selection/clipboard · Options: indent/colors/tabs\nF10 Menu · Alt+0 Windows · Ctrl+F4 / Esc Close · Alt+X Quit DN\nOpen/Close/Quit protect unsaved changes.\nUTF-8, 2 MiB / 100k lines. Line endings preserved.\nSave As never overwrites an existing destination."}).into()});
+        app.push_dialog(crate::dialog::Dialog {
+            title: " Editor Help ",
+            message: app
+                .config
+                .language
+                .text(if app.config.shortcuts.is_mac() {
+                    crate::shortcuts::EDITOR_HELP
+                } else {
+                    crate::commands::help::CLASSIC_EDITOR
+                })
+                .into(),
+        });
         return;
     }
     if command == A::Windows {
@@ -733,6 +764,23 @@ fn apply(app: &mut App, command: EditorAction) -> Result<(), String> {
                     A::Undo => buffer.undo(false),
                     A::Redo => buffer.undo(true),
                     A::Duplicate => buffer.duplicate_line()?,
+                    A::Indent | A::Unindent => buffer
+                        .indent_block(command == A::Unindent, editor.preferences.expand_tabs)?,
+                    A::Uppercase | A::Lowercase | A::Capitalize => {
+                        buffer.change_case(match command {
+                            A::Uppercase => Case::Upper,
+                            A::Lowercase => Case::Lower,
+                            _ => Case::Capitalize,
+                        })?
+                    }
+                    A::SortLines => buffer.sort_lines()?,
+                    A::MatchBracket => {
+                        editor.highlight.refresh(buffer);
+                        let pos = buffer
+                            .matching_bracket(&editor.highlight)
+                            .ok_or("No matching bracket at the cursor.")?;
+                        buffer.move_to(pos, false);
+                    }
                     A::SelectAll => {
                         buffer.move_to(0, false);
                         buffer.move_to(buffer.text.len(), true);
@@ -758,4 +806,78 @@ fn apply(app: &mut App, command: EditorAction) -> Result<(), String> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod save_outcome_tests {
+    use super::*;
+    #[test]
+    fn published_but_uncertain_save_keeps_dirty_state_aborts_quit_and_confirms_without_replacement(
+    ) -> std::io::Result<()> {
+        let root = std::env::temp_dir().join(format!("dn-editor-uncertain-{}", std::process::id()));
+        std::fs::create_dir(&root)?;
+        struct Temp(PathBuf);
+        impl Drop for Temp {
+            fn drop(&mut self) {
+                let _ = std::fs::remove_dir_all(&self.0);
+            }
+        }
+        let _temp = Temp(root.clone());
+        let path = root.join("source");
+        std::fs::write(&path, "old")?;
+        let mut app = App::new(root)?;
+        app.config.save_on_exit = false;
+        open_path(&mut app, path.clone());
+        let until = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while app.desktop.active_editor().is_none_or(|e| e.busy())
+            || app.desktop.identity_pending(app.desktop.target())
+        {
+            app.poll();
+            assert!(std::time::Instant::now() < until);
+            std::thread::sleep(std::time::Duration::from_millis(1));
+        }
+        paste(&mut app, "new");
+        let e = app.desktop.active_editor_mut().unwrap();
+        let text = e.buffer.as_ref().unwrap().text.clone();
+        let mut outcome = storage::save(&path, &text, false, e.original.as_ref()).unwrap();
+        outcome.warning = Some("injected sync failure".into());
+        #[cfg(unix)]
+        let ino = {
+            use std::os::unix::fs::MetadataExt;
+            std::fs::metadata(&path)?.ino()
+        };
+        e.closing = Some(PendingAction::Quit);
+        e.saving = true;
+        let dest = path.clone();
+        e.worker = Some(
+            e.requests
+                .spawn("dn-editor-save", move |_| Reply::Saved(Ok((dest, outcome))))?,
+        );
+        while app.desktop.active_editor().unwrap().busy() {
+            app.poll();
+            assert!(std::time::Instant::now() < until);
+            std::thread::sleep(std::time::Duration::from_millis(1));
+        }
+        assert!(!app.quit);
+        let e = app.desktop.active_editor().unwrap();
+        assert!(e.dirty());
+        assert!(e.durability_pending.is_some());
+        assert!(e.closing.is_none());
+        assert_eq!(e.buffer.as_ref().unwrap().text, text);
+        app.clear_dialogs();
+        action(&mut app, EditorAction::Save);
+        while app.desktop.active_editor().unwrap().busy() {
+            app.poll();
+            assert!(std::time::Instant::now() < until);
+            std::thread::sleep(std::time::Duration::from_millis(1));
+        }
+        assert!(!app.desktop.active_editor().unwrap().dirty());
+        assert!(app.dialogs().is_empty());
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::MetadataExt;
+            assert_eq!(std::fs::metadata(&path)?.ino(), ino);
+        }
+        Ok(())
+    }
 }

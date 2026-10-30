@@ -285,23 +285,23 @@ fn pattern_and_history_skip_disabled_actions_and_cancel_without_side_effects() -
     draw(&mut app, 80, 25)?;
     key(&mut app, K::Tab);
     assert!(matches!(
-        app.file_tools.modals.file_tools(),
+        app.file_tools(),
         Some(ToolDialog::History { focus: 2, .. })
     ));
     key(&mut app, K::Enter);
-    assert!(app.file_tools.modals.file_tools().is_none());
+    assert!(app.file_tools().is_none());
     app.file_tools
         .histories
         .record(HistoryKind::Directory, app.panels[0].path.clone());
     file_tools::open_history(&mut app, HistoryKind::Directory);
     key(&mut app, K::Tab);
     assert!(matches!(
-        app.file_tools.modals.file_tools(),
+        app.file_tools(),
         Some(ToolDialog::History { focus: 1, .. })
     ));
     shift_tab(&mut app);
     assert!(matches!(
-        app.file_tools.modals.file_tools(),
+        app.file_tools(),
         Some(ToolDialog::History { focus: 0, .. })
     ));
     key(&mut app, K::Esc);
@@ -335,15 +335,15 @@ fn settings_calculator_characters_and_screensaver_share_reverse_tab_and_enter_de
     assert_eq!(app.desktop.plugins.calculator_mut().focus, 0);
     key(&mut app, K::Esc);
     utilities::open(&mut app, Kind::Characters);
-    app.utilities.chart.select(0);
+    app.utility_state_mut().chart.select(0);
     for expected in [1, 2, 4, 0] {
         key(&mut app, K::Tab);
-        assert_eq!(app.utilities.chart.focus, expected);
+        assert_eq!(app.utility_state().chart.focus, expected);
     }
     shift_tab(&mut app);
-    assert_eq!(app.utilities.chart.focus, 4);
+    assert_eq!(app.utility_state().chart.focus, 4);
     key(&mut app, K::Enter);
-    assert!(app.utilities.modals.utility_dialog().is_none());
+    assert!(app.utility_dialog().is_none());
     app.config.saver_minutes = 0;
     screensaver::open(&mut app);
     draw(&mut app, 80, 25)?;
@@ -366,39 +366,29 @@ fn archive_and_discovery_skip_unavailable_buttons_in_both_directions() -> io::Re
     fs::write(&archive, vec![0; 1024])?;
     dn::archive::open(&mut app, archive);
     key(&mut app, K::Tab);
-    assert_eq!(app.modals.archive().unwrap().focus, 4);
+    assert_eq!(app.archive().unwrap().focus, 4);
     shift_tab(&mut app);
-    assert_eq!(app.modals.archive().unwrap().focus, 0);
-    wait(&mut app, |a| {
-        a.modals.archive().is_some_and(|b| !b.loading())
-    });
-    app.modals.archive_mut().unwrap().focus = 4;
+    assert_eq!(app.archive().unwrap().focus, 0);
+    wait(&mut app, |a| a.archive().is_some_and(|b| !b.loading()));
+    app.archive_mut().unwrap().focus = 4;
     key(&mut app, K::Tab);
-    assert_eq!(app.modals.archive().unwrap().focus, 6);
+    assert_eq!(app.archive().unwrap().focus, 6);
     shift_tab(&mut app);
-    assert_eq!(app.modals.archive().unwrap().focus, 4);
+    assert_eq!(app.archive().unwrap().focus, 4);
     key(&mut app, K::Esc);
     dn::discovery::open_find(&mut app);
-    let original = app.discovery.modals.discovery().unwrap().prefs.recursive;
+    let original = app.discovery().unwrap().prefs.recursive;
     key(&mut app, K::Tab);
-    assert_eq!(app.discovery.modals.discovery().unwrap().focus, 1);
+    assert_eq!(app.discovery().unwrap().focus, 5);
     key(&mut app, K::Enter);
-    assert_eq!(
-        app.discovery.modals.discovery().unwrap().prefs.recursive,
-        original
-    );
-    wait(&mut app, |a| {
-        a.discovery
-            .modals
-            .discovery()
-            .is_some_and(|m| m.job.is_none())
-    });
-    app.discovery.modals.discovery_mut().unwrap().hits.clear();
-    app.discovery.modals.discovery_mut().unwrap().focus = 0;
+    assert_eq!(app.discovery().unwrap().prefs.recursive, original);
+    wait(&mut app, |a| a.discovery().is_some_and(|m| m.job.is_none()));
+    app.discovery_mut().unwrap().hits.clear();
+    app.discovery_mut().unwrap().focus = 0;
     key(&mut app, K::Tab);
-    assert_eq!(app.discovery.modals.discovery().unwrap().focus, 5);
+    assert_eq!(app.discovery().unwrap().focus, 5);
     shift_tab(&mut app);
-    assert_eq!(app.discovery.modals.discovery().unwrap().focus, 0);
+    assert_eq!(app.discovery().unwrap().focus, 0);
     key(&mut app, K::Esc);
     Ok(())
 }

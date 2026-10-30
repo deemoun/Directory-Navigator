@@ -146,10 +146,7 @@ fn native_outline_leaf_name_double_click_opens_the_directory() -> io::Result<()>
         loop {
             app.poll();
             if !app.panels.iter().any(|p| p.loading)
-                && !app
-                    .modals
-                    .directory_tree()
-                    .is_some_and(|tree| tree.loading())
+                && !app.directory_tree().is_some_and(|tree| tree.loading())
             {
                 break;
             }
@@ -161,7 +158,6 @@ fn native_outline_leaf_name_double_click_opens_the_directory() -> io::Result<()>
     dn::directory_tree::open(&mut app);
     settle(&mut app);
     let index = app
-        .modals
         .directory_tree()
         .unwrap()
         .rows
@@ -171,7 +167,7 @@ fn native_outline_leaf_name_double_click_opens_the_directory() -> io::Result<()>
     dn::directory_tree::action(&mut app, dn::directory_tree::Action::Row(index));
     key(&mut app, K::Right);
     settle(&mut app);
-    let tree = app.modals.directory_tree().unwrap();
+    let tree = app.directory_tree().unwrap();
     let index = tree.rows.iter().position(|row| row.path == leaf).unwrap();
     let depth = tree.rows[index].depth;
     assert_eq!(tree.marker(&tree.rows[index]), " ");
@@ -197,7 +193,7 @@ fn native_outline_leaf_name_double_click_opens_the_directory() -> io::Result<()>
         render(&mut app);
     }
     settle(&mut app);
-    assert!(app.modals.directory_tree().is_none());
+    assert!(app.directory_tree().is_none());
     assert_eq!(app.panels[app.active].path, leaf);
     Ok(())
 }

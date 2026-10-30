@@ -29,7 +29,7 @@ fn button(spec: &mut DialogSpec<'_>, app: &App, rect: Rect, label: &str, action:
         Action::Page(Page::Ascii) => 1,
         Action::Page(Page::Cp437) => 2,
         Action::Copy => 3,
-        Action::Close if app.utilities.modals.utility_dialog() == Some(Kind::Characters) => 4,
+        Action::Close if app.utility_dialog() == Some(Kind::Characters) => 4,
         Action::Close => 1,
         _ => 0,
     };
@@ -43,7 +43,7 @@ fn button(spec: &mut DialogSpec<'_>, app: &App, rect: Rect, label: &str, action:
 pub(crate) fn utility_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
     let profile = app.config.palette;
     let dos = profile.styles_for(crate::palette::theme::Group::Dialogs);
-    let kind = app.utilities.modals.utility_dialog()?;
+    let kind = app.utility_dialog()?;
     if kind == Kind::Calculator {
         return None;
     }
@@ -53,12 +53,7 @@ pub(crate) fn utility_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
         _ => area.height.saturating_sub(4).min(24),
     };
     let width = area.width.saturating_sub(4).min(100);
-    let rect = Rect::new(
-        area.x + (area.width - width) / 2,
-        area.y + (area.height - height) / 2,
-        width,
-        height,
-    );
+    let rect = crate::tool_windows::bounds(app, area, width, height);
     let title = match kind {
         Kind::Calculator => " Calculator ",
         Kind::Characters => " ASCII / DOS CP437 Table ",
@@ -66,9 +61,9 @@ pub(crate) fn utility_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
         Kind::Memory => " Memory Information ",
     };
     let focus = if kind == Kind::Characters {
-        app.utilities.chart.focus
+        app.utility_state().chart.focus
     } else {
-        app.utilities.focus
+        app.utility_state().focus
     };
     let default = if kind == Kind::Characters {
         Action::Copy
@@ -91,7 +86,7 @@ pub(crate) fn utility_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
     match kind {
         Kind::Calculator => {}
         Kind::Characters => {
-            let page = app.utilities.chart.page;
+            let page = app.utility_state().chart.page;
             button(
                 &mut spec,
                 app,
@@ -115,7 +110,7 @@ pub(crate) fn utility_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
                     false,
                 );
             }
-            let chart = &app.utilities.chart;
+            let chart = &app.utility_state().chart;
             for row in 0..if page == Page::Ascii { 8 } else { 16 } {
                 text(
                     &mut spec,
@@ -158,8 +153,8 @@ pub(crate) fn utility_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
                 &detail,
                 false,
             );
-            let note = if !app.utilities.notice.is_empty() {
-                app.utilities.notice.as_str()
+            let note = if !app.utility_state().notice.is_empty() {
+                app.utility_state().notice.as_str()
             } else if page == Page::Cp437 {
                 "DOS font glyphs at 01–1F / 7F; not control-code decoding"
             } else {
@@ -207,7 +202,7 @@ pub(crate) fn utility_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
             );
         }
         Kind::System | Kind::Memory => {
-            if let Some(info) = &app.utilities.information {
+            if let Some(info) = &app.utility_state().information {
                 if info.loading() {
                     text(
                         &mut spec,

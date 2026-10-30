@@ -6,6 +6,13 @@ pub struct Item {
     pub label: String,
     pub commands: Vec<Vec<String>>,
     pub children: Vec<Item>,
+    pub prompts: Vec<Parameter>,
+}
+#[derive(Clone, Debug)]
+pub struct Parameter {
+    pub name: String,
+    pub label: String,
+    pub default: String,
 }
 impl Item {
     pub fn separator(&self) -> bool {
@@ -102,9 +109,9 @@ pub fn parse(text: &str) -> io::Result<Vec<Item>> {
                 return Err(error("Invalid heading, nesting (1–8), or item limit (256)"));
             }
             if level > previous
-                && flat
-                    .last()
-                    .is_some_and(|(_, i)| !i.commands.is_empty() || i.separator())
+                && flat.last().is_some_and(|(_, i)| {
+                    !i.commands.is_empty() || !i.prompts.is_empty() || i.separator()
+                })
             {
                 return Err(error(
                     "A submenu heading cannot contain commands or be a separator",
@@ -116,6 +123,7 @@ pub fn parse(text: &str) -> io::Result<Vec<Item>> {
                     label: label.into(),
                     commands: Vec::new(),
                     children: Vec::new(),
+                    prompts: Vec::new(),
                 },
             ));
         } else {
@@ -126,6 +134,32 @@ pub fn parse(text: &str) -> io::Result<Vec<Item>> {
                 return Err(error("Separator command or more than 32 commands"));
             }
             let args = words(line).map_err(|e| error(&e.to_string()))?;
+            if args.first().is_some_and(|s| s == "?") {
+                if !(3..=4).contains(&args.len())
+                    || item.prompts.len() >= 8
+                    || args[1].is_empty()
+                    || args[1].len() > 32
+                    || !args[1]
+                        .chars()
+                        .all(|c| c.is_ascii_alphanumeric() || c == '_')
+                    || args[2].len() > 120
+                    || args[2].is_empty()
+                    || args[2].chars().any(char::is_control)
+                    || args.get(3).is_some_and(|s| s.chars().any(char::is_control))
+                    || args.get(3).is_some_and(|s| s.len() > 4096)
+                    || item.prompts.iter().any(|p| p.name == args[1])
+                {
+                    return Err(error(
+                        "Expected ? name 'Label' 'default' (up to eight unique parameters)",
+                    ));
+                }
+                item.prompts.push(Parameter {
+                    name: args[1].clone(),
+                    label: args[2].clone(),
+                    default: args.get(3).cloned().unwrap_or_default(),
+                });
+                continue;
+            }
             if args.is_empty() || args[0].is_empty() {
                 return Err(error("Missing executable"));
             }
@@ -155,6 +189,6 @@ pub fn parse(text: &str) -> io::Result<Vec<Item>> {
     Ok(result)
 }
 #[cfg(not(windows))]
-pub const DEFAULT:&str="; DN user menu: >level ~hotkey~ label; commands are argv, not shell scripts.\n; Placeholders must occupy a whole argument: {file} {name} {dir}\n; {other_file} {other_dir} {selected}. Quotes group arguments.\n; Use an explicit shell for pipelines; native DN_* environment values are available.\n>1 ~P~rint directory\nprintf '%s\\n' '{dir}'\n>1 ~F~ile tools\n>2 ~L~ist marked paths\nprintf '%s\\n' '{selected}'\n>2 File ~i~nformation\nls -ld -- '{file}'\n>1 -\n>1 ~S~hell\n'{shell}'\n";
+pub const DEFAULT:&str="; DN user menu: >level ~hotkey~ label; commands are argv, not shell scripts.\n; Placeholders must occupy a whole argument: {file} {name} {dir}\n; {other_file} {other_dir} {selected} {other_selected}. Quotes group arguments.\n; {selected_list}/{other_selected_list}: private lists created only on Run.\n; ? value 'Label' 'default' declares a {param:value} input.\n; Use an explicit shell for pipelines; native DN_* environment values are available.\n>1 ~P~rint directory\nprintf '%s\\n' '{dir}'\n>1 ~F~ile tools\n>2 ~L~ist marked paths\nprintf '%s\\n' '{selected}'\n>2 File ~i~nformation\nls -ld -- '{file}'\n>1 -\n>1 ~S~hell\n'{shell}'\n";
 #[cfg(windows)]
 pub const DEFAULT:&str="; DN user menu: commands are argv, not implicit shell scripts.\n; Whole arguments: {file} {name} {dir} {other_file} {other_dir} {selected}.\n>1 ~P~anel paths\ncmd /D /C 'set DN_'\n>1 ~S~hell\n'{shell}'\n";

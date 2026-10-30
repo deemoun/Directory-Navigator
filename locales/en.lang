@@ -345,7 +345,7 @@ Tab moves · Space toggles · Enter compares · Esc cancels	Tab moves · Space t
 Destination:	Destination:
 Names	Names
 Full paths	Full paths
-F2 / Ctrl+S Save · Shift+F2 Save As · F3 Open\nF6 Duplicate line · F7 / Ctrl+F Find\nShift+F7 Search again · Alt+F7 Reverse search\nCtrl+F7 Replace · Alt+G / Ctrl+G Go to line\nCtrl+←/→ words · Ctrl+Shift+←/→ select words\nShift+arrows select · Ctrl+A select all\nAlt+Backspace / Ctrl+Z Undo · Ctrl+Y Redo\nCtrl+Ins/C Copy · Shift+Del / Ctrl+X Cut\nShift+Ins / Ctrl+V Paste · terminal paste supported\nAlt+B Block: selection/clipboard · Options: indent/colors/tabs\nF10 Menu · Alt+0 Windows · Ctrl+F4 / Esc Close · Alt+X Quit DN\nOpen/Close/Quit protect unsaved changes.\nUTF-8, 2 MiB / 100k lines. Line endings preserved.\nSave As never overwrites an existing destination.	F2 / Ctrl+S Save · Shift+F2 Save As · F3 Open\nF6 Duplicate line · F7 / Ctrl+F Find\nShift+F7 Search again · Alt+F7 Reverse search\nCtrl+F7 Replace · Alt+G / Ctrl+G Go to line\nCtrl+←/→ words · Ctrl+Shift+←/→ select words\nShift+arrows select · Ctrl+A select all\nAlt+Backspace / Ctrl+Z Undo · Ctrl+Y Redo\nCtrl+Ins/C Copy · Shift+Del / Ctrl+X Cut\nShift+Ins / Ctrl+V Paste · terminal paste supported\nAlt+B Block: selection/clipboard · Options: indent/colors/tabs\nF10 Menu · Alt+0 Windows · Ctrl+F4 / Esc Close · Alt+X Quit DN\nOpen/Close/Quit protect unsaved changes.\nUTF-8, 2 MiB / 100k lines. Line endings preserved.\nSave As never overwrites an existing destination.
+F2 / Ctrl+S Save · Shift+F2 Save As · F3 Open\nF6 Duplicate line · F7 / Ctrl+F Find\nShift+F7 Search again · Alt+F7 Reverse search\nCtrl+F7 Replace · Alt+G / Ctrl+G Go to line\nCtrl+←/→ words · Ctrl+Shift+←/→ select words\nShift+arrows select · Ctrl+A select all\nAlt+Backspace / Ctrl+Z Undo · Ctrl+Y Redo\nCtrl+Ins/C Copy · Shift+Del / Ctrl+X Cut\nShift+Ins / Ctrl+V Paste · terminal paste supported\nAlt+B Block: indent/case/sort/clipboard · Ctrl+] bracket\nF10 Menu · Alt+0 Windows · Ctrl+F4 / Esc Close · Alt+X Quit DN\nOpen/Close/Quit protect unsaved changes.\nUTF-8, 2 MiB / 100k lines. Line endings preserved.\nSave As never overwrites an existing destination.	F2 / Ctrl+S Save · Shift+F2 Save As · F3 Open\nF6 Duplicate line · F7 / Ctrl+F Find\nShift+F7 Search again · Alt+F7 Reverse search\nCtrl+F7 Replace · Alt+G / Ctrl+G Go to line\nCtrl+←/→ words · Ctrl+Shift+←/→ select words\nShift+arrows select · Ctrl+A select all\nAlt+Backspace / Ctrl+Z Undo · Ctrl+Y Redo\nCtrl+Ins/C Copy · Shift+Del / Ctrl+X Cut\nShift+Ins / Ctrl+V Paste · terminal paste supported\nAlt+B Block: indent/case/sort/clipboard · Ctrl+] bracket\nF10 Menu · Alt+0 Windows · Ctrl+F4 / Esc Close · Alt+X Quit DN\nOpen/Close/Quit protect unsaved changes.\nUTF-8, 2 MiB / 100k lines. Line endings preserved.\nSave As never overwrites an existing destination.
 Modified (local)	Modified (local)
 Read-only attribute	Read-only attribute
 Permissions describe the link, not its target.	Permissions describe the link, not its target.
@@ -424,8 +424,8 @@ Automatic (Classic DN)	Automatic (Classic DN)
 Classic DN	Classic DN
 Mac-friendly	Mac-friendly
 Mac-friendly: press Ctrl+O, release, then choose\n1 Help · 2 User · 3 View · 4 Edit · 5 Copy\n6 Move · 7 MkDir · 8 Trash/delete · 9 Menu · 0 Quit\ns Quick search · f Recursive Find · i Info · z Sort\nb Bookmarks · l Filter · e Columns · r Refresh\nh Commands · j Directories · a Edits · v Views\no OS default app · p List file · y Tetris\nk Keyboard settings · u Windows · m Menu\nUp/Down Page · Left/Right First/last entry\nCtrl+A all · Ctrl+U clear · Ctrl+O then Space marks\nEsc or click cancels the prefix; nothing is typed.\nClassic DN keys remain available.\nCommand shortcuts belong to your terminal.\nTrash/delete still requires confirmation.	Mac-friendly: press Ctrl+O, release, then choose\n1 Help · 2 User · 3 View · 4 Edit · 5 Copy\n6 Move · 7 MkDir · 8 Trash/delete · 9 Menu · 0 Quit\ns Quick search · f Recursive Find · i Info · z Sort\nb Bookmarks · l Filter · e Columns · r Refresh\nh Commands · j Directories · a Edits · v Views\no OS default app · p List file · y Tetris\nk Keyboard settings · u Windows · m Menu\nUp/Down Page · Left/Right First/last entry\nCtrl+A all · Ctrl+U clear · Ctrl+O then Space marks\nEsc or click cancels the prefix; nothing is typed.\nClassic DN keys remain available.\nCommand shortcuts belong to your terminal.\nTrash/delete still requires confirmation.
-Mac-friendly: Ctrl+O, release, then digit or letter\n1 Help · 2 Save · 3 Open · 6 Duplicate · 7 Find · 0 Menu\na Save As · w Close · x Quit DN · m Menu · u Windows\nn Next match · p Reverse · r Replace · g Go to line\nCtrl+S Save · Ctrl+F Find · Ctrl+G Go to line\nCtrl+Z/Y Undo/Redo · Ctrl+C/X/V internal clipboard\nCtrl+O then Left/Right: word movement\nAdd Shift to the arrow to extend selection\nUp/Down Page · , / . Line start/end\nh / e Document start/end · c Clear selection\nEsc or click cancels the prefix. Classic keys still work.\nOpen/Close/Quit protect unsaved changes.\nUTF-8, 2 MiB / 100k lines. Line endings preserved.\nSave As never overwrites an existing destination.	Mac-friendly: Ctrl+O, release, then digit or letter\n1 Help · 2 Save · 3 Open · 6 Duplicate · 7 Find · 0 Menu\na Save As · w Close · x Quit DN · m Menu · u Windows\nn Next match · p Reverse · r Replace · g Go to line\nCtrl+S Save · Ctrl+F Find · Ctrl+G Go to line\nCtrl+Z/Y Undo/Redo · Ctrl+C/X/V internal clipboard\nCtrl+O then Left/Right: word movement\nAdd Shift to the arrow to extend selection\nUp/Down Page · , / . Line start/end\nh / e Document start/end · c Clear selection\nEsc or click cancels the prefix. Classic keys still work.\nOpen/Close/Quit protect unsaved changes.\nUTF-8, 2 MiB / 100k lines. Line endings preserved.\nSave As never overwrites an existing destination.
-Mac-friendly: press Ctrl+O, release, then choose\n2 Wrap · 3 Close · 7 Find · 0 Quit DN\nf Find · n Next match · p Reverse · w Close · u Windows\nUp/Down Page · Left/Right First/last row\nEsc or click cancels the prefix.\nClassic DN keys remain available.	Mac-friendly: press Ctrl+O, release, then choose\n2 Wrap · 3 Close · 7 Find · 0 Quit DN\nf Find · n Next match · p Reverse · w Close · u Windows\nUp/Down Page · Left/Right First/last row\nEsc or click cancels the prefix.\nClassic DN keys remain available.
+Mac-friendly: Ctrl+O, release, then digit or letter\n1 Help · 2 Save · 3 Open · 6 Duplicate · 7 Find · 0 Menu\na Save As · w Close · x Quit DN · m Menu · u Windows\nn Next match · p Reverse · r Replace · g Go to line\nCtrl+S Save · Ctrl+F Find · Ctrl+G Go to line\nCtrl+Z/Y Undo/Redo · Ctrl+C/X/V internal clipboard\nTab/Shift+Tab block indent · Ctrl+] matching bracket\nCtrl+O then Left/Right: word movement\nAdd Shift to the arrow to extend selection\nUp/Down Page · , / . Line start/end\nh / e Document start/end · c Clear selection\nEsc or click cancels the prefix. Classic keys still work.\nOpen/Close/Quit protect unsaved changes.\nUTF-8, 2 MiB / 100k lines. Line endings preserved.\nSave As never overwrites an existing destination.	Mac-friendly: Ctrl+O, release, then digit or letter\n1 Help · 2 Save · 3 Open · 6 Duplicate · 7 Find · 0 Menu\na Save As · w Close · x Quit DN · m Menu · u Windows\nn Next match · p Reverse · r Replace · g Go to line\nCtrl+S Save · Ctrl+F Find · Ctrl+G Go to line\nCtrl+Z/Y Undo/Redo · Ctrl+C/X/V internal clipboard\nTab/Shift+Tab block indent · Ctrl+] matching bracket\nCtrl+O then Left/Right: word movement\nAdd Shift to the arrow to extend selection\nUp/Down Page · , / . Line start/end\nh / e Document start/end · c Clear selection\nEsc or click cancels the prefix. Classic keys still work.\nOpen/Close/Quit protect unsaved changes.\nUTF-8, 2 MiB / 100k lines. Line endings preserved.\nSave As never overwrites an existing destination.
+Mac-friendly: press Ctrl+O, release, then choose\n2 Wrap · 3 Close · 7 Find · 0 Quit DN\nf Find · g Go to · n Next match · p Reverse · w Close · u Windows\nUp/Down Page · Left/Right First/last row\nEsc or click cancels the prefix.\nClassic DN keys remain available.	Mac-friendly: press Ctrl+O, release, then choose\n2 Wrap · 3 Close · 7 Find · 0 Quit DN\nf Find · g Go to · n Next match · p Reverse · w Close · u Windows\nUp/Down Page · Left/Right First/last row\nEsc or click cancels the prefix.\nClassic DN keys remain available.
 ^O means Ctrl+O, release, then the next key.\n1 Help · 2 User · 3 View · 4 Edit · 5 Copy\n6 Move · 7 MkDir · 8 Trash · 9 Menu · 0 Quit\ns Quick search · f Find · i Info · z Sort\nb Bookmarks · l Filter · h Commands · k Keyboard\nEditor: a Save As · w Close · r Replace · x Quit\nViewer: 2 Wrap · n Next · p Reverse · w Close\nThe prefix displays a guide for the current screen.\nClassic DN shortcuts remain available.	^O means Ctrl+O, release, then the next key.\n1 Help · 2 User · 3 View · 4 Edit · 5 Copy\n6 Move · 7 MkDir · 8 Trash · 9 Menu · 0 Quit\ns Quick search · f Find · i Info · z Sort\nb Bookmarks · l Filter · h Commands · k Keyboard\nEditor: a Save As · w Close · r Replace · x Quit\nViewer: 2 Wrap · n Next · p Reverse · w Close\nThe prefix displays a guide for the current screen.\nClassic DN shortcuts remain available.
 Classic DN uses F1–F10 and Alt/Ctrl combinations.\nTab switches panels; Insert or Space marks entries.\nF3 View · F4 Edit · F5 Copy · F6 Move\nF7 MkDir · F8 Trash/delete · F9 Menu · F10 Quit\nEditor: F2 Save · F7 Find · F10 Menu\nMac-friendly adds Ctrl+O sequences without Fn/Option.\nDefault: Classic DN. Automatic: Mac on macOS, Classic elsewhere.	Classic DN uses F1–F10 and Alt/Ctrl combinations.\nTab switches panels; Insert or Space marks entries.\nF3 View · F4 Edit · F5 Copy · F6 Move\nF7 MkDir · F8 Trash/delete · F9 Menu · F10 Quit\nEditor: F2 Save · F7 Find · F10 Menu\nMac-friendly adds Ctrl+O sequences without Fn/Option.\nDefault: Classic DN. Automatic: Mac on macOS, Classic elsewhere.
 Ctrl+O: choose a user-menu command\n1 Help · 2 Global/Local · 4 Edit · other digits: F-keys\nr Reload · w Back/Cancel · Up/Down Page\nLeft/Right First/last item\nEsc or click cancels the prefix.\nCommands still require explicit Run confirmation.	Ctrl+O: choose a user-menu command\n1 Help · 2 Global/Local · 4 Edit · other digits: F-keys\nr Reload · w Back/Cancel · Up/Down Page\nLeft/Right First/last item\nEsc or click cancels the prefix.\nCommands still require explicit Run confirmation.
@@ -670,5 +670,98 @@ Volume	Volume
 List	List
 UI prototype · no playback	UI prototype · no playback
 MP3 Player Help	MP3 Player Help
-This is a UI-only MP3 player prototype inspired by DOS Navigator.\nNo audio is played and no files are opened or read.\nTransport and secondary buttons only demonstrate native focus and pressed feedback.\nTab / Shift+Tab select controls; Enter / Space press the selected button.\nAlt+Z, the title zoom button or a title double-click switch compact/expanded views.\nCtrl+F5 moves the player; Esc closes it. No preferences are saved.	This is a UI-only MP3 player prototype inspired by DOS Navigator.\nNo audio is played and no files are opened or read.\nTransport and secondary buttons only demonstrate native focus and pressed feedback.\nTab / Shift+Tab select controls; Enter / Space press the selected button.\nAlt+Z, the title zoom button or a title double-click switch compact/expanded views.\nCtrl+F5 moves the player; Esc closes it. No preferences are saved.
+This is a UI-only MP3 player prototype inspired by DOS Navigator.\nNo audio is played and no files are opened or read.\nTransport controls remain inert. In expanded view, List opens a demo play-order dialog inspired by CDUTIL.PAS.\nAdd opens a track chooser; Delete removes a demo row; OK keeps the order for this opening, Cancel discards the draft.\nDurations are unknown (--:--), Save is disabled, and no files are loaded or saved.\nTab / Shift+Tab select controls; Enter / Space press the selected button.\nAlt+Z, the title zoom button or a title double-click switch compact/expanded views.\nCtrl+F5 moves the player; Esc closes it. No preferences are saved.	This is a UI-only MP3 player prototype inspired by DOS Navigator.\nNo audio is played and no files are opened or read.\nTransport controls remain inert. In expanded view, List opens a demo play-order dialog inspired by CDUTIL.PAS.\nAdd opens a track chooser; Delete removes a demo row; OK keeps the order for this opening, Cancel discards the draft.\nDurations are unknown (--:--), Save is disabled, and no files are loaded or saved.\nTab / Shift+Tab select controls; Enter / Space press the selected button.\nAlt+Z, the title zoom button or a title double-click switch compact/expanded views.\nCtrl+F5 moves the player; Esc closes it. No preferences are saved.
 Set up	Set up
+
+Next window	Next window
+Previous window	Previous window
+Directory sizes	Directory sizes
+Archive browser	Archive browser
+File information	File information
+ASCII table	ASCII table
+System information	System information
+Memory information	Memory information
+Bookmarks	Bookmarks
+Directory history	Directory history
+Command history	Command history
+Windows...	Windows...
+Containing text	Containing text
+Min bytes	Min bytes
+Max bytes	Max bytes
+From date	From date
+To date	To date
+Any entry	Any entry
+Files only	Files only
+Directories only	Directories only
+Links only	Links only
+Match text case	Match text case
+Sizes: bytes/K/M/G · Dates: YYYY-MM-DD UTC · Empty = unrestricted	Sizes: bytes/K/M/G · Dates: YYYY-MM-DD UTC · Empty = unrestricted
+New search	New search
+Filename masks (; separated)	Filename masks (; separated)
+Color (0–15)	Color (0–15)
+First matching enabled group wins; folders and links keep their colors.	First matching enabled group wins; folders and links keep their colors.
+User command parameters	User command parameters
+Values are single arguments; review follows before execution.	Values are single arguments; review follows before execution.
+Review	Review
+
+# DN block and related-selection commands
+Select same highlight type	Select same highlight type
+Unselect same highlight type	Unselect same highlight type
+Select same extension	Select same extension
+Unselect same extension	Unselect same extension
+~I~ndent lines	~I~ndent lines
+~U~nindent lines	~U~nindent lines
+Uppe~r~case	Uppe~r~case
+Lo~w~ercase	Lo~w~ercase
+Capitali~z~e words	Capitali~z~e words
+~S~ort selected lines	~S~ort selected lines
+Matching ~b~racket	Matching ~b~racket
+Viewer Go to	Viewer Go to
+Byte offset (decimal or 0x hexadecimal, from 0)	Byte offset (decimal or 0x hexadecimal, from 0)
+Line number (from 1)	Line number (from 1)
+[ Go ]	[ Go ]
+Go to	Go to
+Wait for the file to load.	Wait for the file to load.
+Enter a decimal byte offset or 0x hexadecimal offset.	Enter a decimal byte offset or 0x hexadecimal offset.
+Enter a line number starting at 1.	Enter a line number starting at 1.
+Offset is outside the loaded preview.	Offset is outside the loaded preview.
+Line is outside the loaded preview.	Line is outside the loaded preview.
+Select text first.	Select text first.
+Select at least two lines first.	Select at least two lines first.
+No matching bracket at the cursor.	No matching bracket at the cursor.
+Select~i~on	Select~i~on
+Sorting would merge mixed CR/LF line endings.	Sorting would merge mixed CR/LF line endings.
+
+# Editor crash recovery and save durability
+Editor recovery	Editor recovery
+Recover	Recover
+Inspect	Inspect
+Later	Later
+Unsaved work from a previous session	Unsaved work from a previous session
+Checkpoint (UTC):	Checkpoint (UTC):
+Recover opens an unsaved copy. The source file stays unchanged.	Recover opens an unsaved copy. The source file stays unchanged.
+Cannot read this checkpoint. You may discard it or leave it for later.	Cannot read this checkpoint. You may discard it or leave it for later.
+Untitled document	Untitled document
+Recover unsaved documents...	Recover unsaved documents...
+Recovery Help	Recovery Help
+Recovered unsaved copy	Recovered unsaved copy
+No recovery checkpoints are waiting.	No recovery checkpoints are waiting.
+Written — durability unconfirmed; retry Save	Written — durability unconfirmed; retry Save
+File was written, but durability could not be confirmed:	File was written, but durability could not be confirmed:
+Your buffer is retained and recovery checkpointing continues. Retry Save to confirm it without rewriting unchanged text.	Your buffer is retained and recovery checkpointing continues. Retry Save to confirm it without rewriting unchanged text.
+Your open buffers are retained. Previously completed checkpoints remain available; DN will retry.	Your open buffers are retained. Previously completed checkpoints remain available; DN will retry.
+Recovery checkpoint failed:	Recovery checkpoint failed:
+Editor recovery unavailable:	Editor recovery unavailable:
+Recovery cleanup failed:	Recovery cleanup failed:
+Checkpoints were retained. Press Enter or Esc to finish exiting.	Checkpoints were retained. Press Enter or Esc to finish exiting.
+
+# MP3 demo playlist and track chooser
+Play order	Play order
+Select track	Select track
+No.	No.
+Example tracks · no files loaded	Example tracks · no files loaded
+Demo track	Demo track
+Empty demo playlist	Empty demo playlist
+* Already in the draft playlist	* Already in the draft playlist
+Edit the demo order · OK keeps it until this player closes	Edit the demo order · OK keeps it until this player closes
+UI prototype · no playback or file saving	UI prototype · no playback or file saving

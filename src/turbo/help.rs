@@ -145,6 +145,12 @@ impl Browser {
             72,
             20,
         ));
+        // Preparation can run once before the desktop publishes resized bounds.
+        // Clip the effective placement now, retaining its preferred geometry.
+        let rect = crate::windowing::geometry::clamp(
+            rect,
+            crate::windowing::geometry::workspace((size.width, size.height)),
+        );
         if self.window.is_none() || self.language != Some(language) {
             self.text = TextCells::default();
             let body = crate::painting::wrap_plain(language.text(&self.body), 66).join("\n");
@@ -191,6 +197,10 @@ impl Browser {
             let title = self.text.text(language.text(&self.title));
             let mut window = HelpWindow::new(TvRect::new(0, 0, 72, 20), &title, file);
             window.window_mut().set_resizable(self.landing.is_none());
+            // Desktop chrome owns zoom geometry and hit regions. A second native
+            // icon becomes an inert duplicate when the host moves its maximized
+            // control away from the clock; fixed-size Welcome cannot zoom at all.
+            window.window_mut().set_zoomable(false);
             window.set_state_flag(State::MODAL, true);
             window.show_topic("context");
             self.window = Some(window);

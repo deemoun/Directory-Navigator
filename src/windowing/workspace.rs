@@ -1,5 +1,5 @@
 //! Coordinate ownership and compositing for the native floating desktop.
-use super::geometry::{self, Capabilities, Definition, Surface, SurfaceKey};
+use super::geometry::{self, Definition, Surface, SurfaceKey};
 use crate::presentation::placement::Placement;
 use crate::{
     app::App,
@@ -39,7 +39,14 @@ pub(crate) fn chrome(scene: &mut Scene, s: Surface) {
     let y = r.y + s.title_row;
     scene.regions.push((
         Rect::new(r.x, y, r.width, 1),
-        Target::Surface(s.id, Chrome::Move),
+        Target::Surface(
+            s.id,
+            if s.caps.movable {
+                Chrome::Move
+            } else {
+                Chrome::Activate
+            },
+        ),
     ));
     scene.regions.push((
         Rect::new(r.x + 2, y, 3, 1),
@@ -119,34 +126,12 @@ pub(crate) fn definitions(app: &App, area: Rect) -> Vec<Definition> {
     let mut result = app
         .desktop
         .windows()
-        .filter_map(|w| match w.kind {
-            WindowKind::Editor => {
-                use unicode_width::UnicodeWidthStr;
-                let menu = crate::editor::menus::LABELS
-                    .iter()
-                    .map(|label| {
-                        crate::menu::plain(app.config.language.text(label)).width() as u16 + 3
-                    })
-                    .sum::<u16>();
-                let clock = if app.config.show_clock {
-                    app.clock.text.width() as u16 + 2
-                } else {
-                    0
-                };
-                Some((w, Capabilities::document(72.max(menu + clock + 2), 12)))
-            }
-            WindowKind::Viewer => Some((w, Capabilities::document(48, 10))),
-            _ => None,
-        })
-        .map(|(w, caps)| Definition {
-            key: SurfaceKey::Document(w.id),
-            bounds: area,
-            caps,
-            maximized: true,
-            title_row: u16::from(w.kind == WindowKind::Editor),
-            parent: None,
+        .filter_map(|w| {
+            super::presentation::Policy::document(app, w.kind)
+                .map(|p| p.definition(SurfaceKey::Document(w.id), area, None))
         })
         .collect::<Vec<_>>();
+    result.extend(crate::tool_windows::definitions(app, area));
     result.extend(crate::plugins::host::window_definitions(app, area));
     for modal in app.visible_modals() {
         use crate::focus::Focus;
@@ -174,14 +159,9 @@ pub(crate) fn definitions(app: &App, area: Rect) -> Vec<Definition> {
             Focus::ViewerSearch => {
                 crate::ui::viewer_search_spec(app, area).map(|s| spec_bounds(s, area))
             }
-            Focus::Message => app
-                .modals
-                .native_help(app.desktop.active().id)
-                .map(|h| h.bounds())
-                .or_else(|| {
-                    crate::ui::remaining_spec(app, area, Focus::Message)
-                        .map(|s| spec_bounds(s, area))
-                }),
+            Focus::Message => app.native_help().map(|h| h.bounds()).or_else(|| {
+                crate::ui::remaining_spec(app, area, Focus::Message).map(|s| spec_bounds(s, area))
+            }),
             Focus::EditorModal => {
                 app.desktop
                     .active_editor()
@@ -195,23 +175,18 @@ pub(crate) fn definitions(app: &App, area: Rect) -> Vec<Definition> {
             _ => crate::ui::remaining_spec(app, area, modal.focus).map(|s| spec_bounds(s, area)),
         };
         if let Some(bounds) = bounds {
-            let help = modal.focus == Focus::Message
-                && app.modals.native_help(app.desktop.active().id).is_some();
-            result.push(Definition {
-                key: SurfaceKey::Modal(modal.id),
-                bounds,
-                caps: if help {
-                    Capabilities::document(48, 10)
-                } else {
-                    Capabilities::fixed(bounds.width, bounds.height)
-                },
-                maximized: false,
-                title_row: 0,
-                parent: modal.parent.map(SurfaceKey::Modal).or(match modal.owner {
-                    crate::modals::ModalOwner::Document(id) => Some(SurfaceKey::Document(id)),
-                    _ => None,
-                }),
+            let help = modal.focus == Focus::Message && app.native_help().is_some();
+            let parent = modal.parent.map(SurfaceKey::Modal).or(match modal.owner {
+                crate::modals::ModalOwner::Document(id) => Some(SurfaceKey::Document(id)),
+                _ => None,
             });
+            result.push(
+                super::presentation::Policy::dialog(bounds, help).definition(
+                    SurfaceKey::Modal(modal.id),
+                    bounds,
+                    parent,
+                ),
+            );
         }
     }
     result
@@ -237,7 +212,7 @@ pub(crate) fn prepare(app: &mut App, area: Rect) -> Vec<Surface> {
                 .map(|m| m.focus);
             match focus {
                 Some(crate::focus::Focus::Message) => {
-                    if let Some(help) = app.modals.native_help_mut(app.desktop.active().id) {
+                    if let Some(help) = app.native_help_mut() {
                         help.place(surface.bounds);
                         help.prepare(size, profile, language, shortcuts);
                     }
@@ -427,7 +402,7 @@ pub(crate) fn mouse(app: &mut App, event: crossterm::event::MouseEvent) -> bool 
                 if app.modal_top().is_some() {
                     return true;
                 }
-                app.desktop.activate(owner);
+                super::activate(app, owner);
                 if command == Chrome::Activate {
                     return true;
                 }
@@ -467,12 +442,16 @@ pub(crate) fn mouse(app: &mut App, event: crossterm::event::MouseEvent) -> bool 
         && !foreground(app).is_some_and(|s| matches!(s.id.key, SurfaceKey::Page(..)))
         && app.desktop.active().id != WindowId::MANAGER
     {
-        let in_window = app.mouse.surfaces.iter().any(|s| {
-            matches!(s.id.key, SurfaceKey::Document(_))
-                && s.bounds.contains((local.column, local.row).into())
-        });
+        let in_window = app
+            .desktop
+            .native()
+            .z_order()
+            .into_iter()
+            .filter(|id| *id != WindowId::MANAGER)
+            .filter_map(|id| app.desktop.native().surface(SurfaceKey::Document(id)))
+            .any(|s| s.bounds.contains((local.column, local.row).into()));
         if !in_window {
-            app.desktop.activate(WindowId::MANAGER);
+            super::activate(app, WindowId::MANAGER);
             return true;
         }
     }
@@ -489,7 +468,7 @@ fn close(app: &mut App, surface: Surface) {
                 Some(WindowKind::Viewer) => {
                     crate::viewer::action(app, crate::viewer::Action::Close)
                 }
-                Some(WindowKind::Plugin(_)) => {
+                Some(WindowKind::Plugin(_) | WindowKind::Tool(_)) => {
                     app.retire_document(id);
                 }
                 _ => {}

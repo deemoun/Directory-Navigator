@@ -70,10 +70,7 @@ fn viewport_state(app: &App) -> ViewportState {
                 Some(crate::editor::Modal::File(picker)) => Some(picker.revision),
                 _ => None,
             }),
-        help: app
-            .modals
-            .native_help(app.desktop.active().id)
-            .map(|h| h.revision),
+        help: app.native_help().map(|h| h.revision),
         welcome: app.welcome.modals.welcome().map(|w| w.page.revision),
         viewer: app.desktop.active_viewer().map(|v| {
             (
@@ -85,12 +82,10 @@ fn viewport_state(app: &App) -> ViewportState {
             )
         }),
         windows: app.modals.window_list().map(|l| (l.ids.clone(), l.offset)),
-        characters: (app.utilities.modals.utility_dialog()
-            == Some(crate::utilities::Kind::Characters))
-        .then(|| {
+        characters: (app.utility_dialog() == Some(crate::utilities::Kind::Characters)).then(|| {
             (
-                app.utilities.chart.page,
-                app.utilities.chart.copy_text().is_some(),
+                app.utility_state().chart.page,
+                app.utility_state().chart.copy_text().is_some(),
             )
         }),
         menu: app.modals.menu(),
@@ -98,14 +93,11 @@ fn viewport_state(app: &App) -> ViewportState {
         copy_history: app.modals.copy_history().map(|h| (h.cursor, h.offset)),
         submenus: app.modals.submenus().to_vec(),
         modal_offsets: vec![
-            app.modals.archive().map_or(0, |m| m.offset),
-            app.modals.directory_tree().map_or(0, |m| m.offset),
+            app.archive().map_or(0, |m| m.offset),
+            app.directory_tree().map_or(0, |m| m.offset),
             app.user_menu.modals.user_menu().map_or(0, |m| m.offset),
-            app.discovery.modals.discovery().map_or(0, |m| m.offset),
-            app.command_line
-                .modals
-                .command_history()
-                .map_or(0, |m| m.offset),
+            app.discovery().map_or(0, |m| m.offset),
+            app.command_history().map_or(0, |m| m.offset),
         ],
     }
 }
@@ -237,7 +229,7 @@ pub fn prepare_window(
                     .saturating_sub(rows),
             );
         }
-        if let Some(b) = app.modals.archive_mut() {
+        if let Some(b) = app.archive_mut() {
             b.rows = usize::from(area.height.saturating_sub(4).min(30).saturating_sub(9)).max(1);
             b.keep_visible();
         }
@@ -252,7 +244,7 @@ pub fn prepare_window(
             m.rows = usize::from(height.saturating_sub(7)).max(1);
             m.keep_visible();
         }
-        if let Some(t) = app.modals.directory_tree_mut() {
+        if let Some(t) = app.directory_tree_mut() {
             t.page_rows = usize::from(
                 crate::directory_tree::geometry(area)
                     .height
@@ -261,7 +253,7 @@ pub fn prepare_window(
             .max(1);
             t.keep_visible();
         }
-        if let Some(m) = app.discovery.modals.discovery_mut() {
+        if let Some(m) = app.discovery_mut() {
             m.rows = usize::from(area.height.saturating_sub(4).min(26).saturating_sub(11)).max(1);
             m.keep_visible();
         }
@@ -271,7 +263,7 @@ pub fn prepare_window(
             offset,
             rows,
             ..
-        }) = app.file_tools.modals.file_tools_mut()
+        }) = app.file_tools_mut()
         {
             *rows = usize::from(area.height.saturating_sub(4).min(22) - 6);
             *cursor = (*cursor).min(paths.len().saturating_sub(1));
@@ -282,11 +274,11 @@ pub fn prepare_window(
                 *offset = *cursor + 1 - *rows;
             }
         }
-        if let Some(d) = app.command_line.modals.command_history_mut() {
+        if let Some(d) = app.command_history_mut() {
             d.rows = crate::command_line::history::geometry(area).1;
             d.keep_visible();
         }
-        if let Some(info) = &mut app.utilities.information {
+        if let Some(info) = &mut app.utility_state_mut().information {
             info.rows = usize::from(area.height.saturating_sub(4).min(24).saturating_sub(6));
             info.step(0);
         }
@@ -314,7 +306,7 @@ pub fn prepare_window(
     }
     let language = app.config.language;
     let shortcuts = app.config.shortcuts;
-    if let Some(help) = app.modals.native_help_mut(owner) {
+    if let Some(help) = app.native_help_mut() {
         help.prepare(
             crate::presentation::layout::Size::new(area.width, area.height),
             profile,
@@ -329,7 +321,7 @@ pub fn prepare_window(
         None
     };
     if let Some(m) = &message {
-        if app.modals.native_help(owner).is_none() {
+        if app.native_help().is_none() {
             app.set_message_offset(app.message_offset().min(m.maximum));
         }
     }
@@ -346,6 +338,7 @@ pub fn prepare_window(
             ));
         Vec::new()
     };
+    crate::tool_windows::prepare(app, area);
     crate::plugins::host::update_activity(app, now);
     let state = viewport_state(app);
     if app.layout_state.as_ref() != Some(&state) {
@@ -372,6 +365,7 @@ pub fn prepare_window(
 }
 /// Prepare after commands, even when no terminal draw is requested.
 pub fn update(app: &mut App) {
+    app.sync_modals();
     if let Some((_, bounds, screen)) = app.layout_key {
         let _ = prepare_window(app, bounds, screen, std::time::Instant::now());
     }

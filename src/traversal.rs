@@ -1,4 +1,5 @@
 //! Bounded, cancellable directory traversal shared by Find and size snapshots.
+pub mod find;
 use crate::{pattern::Wildcard, task::Cancellation};
 use std::{
     fs, io,
@@ -12,6 +13,7 @@ pub const RESULT_LIMIT: usize = 10_000;
 pub struct Hit {
     pub path: PathBuf,
     pub regular: bool,
+    pub line: Option<usize>,
 }
 #[derive(Clone, Debug, Default)]
 pub struct Stats {
@@ -45,6 +47,13 @@ pub enum Request {
         recursive: bool,
         hidden: bool,
     },
+    AdvancedFind {
+        root: PathBuf,
+        pattern: String,
+        recursive: bool,
+        hidden: bool,
+        options: find::Options,
+    },
     Sizes(Vec<PathBuf>),
 }
 pub enum Event {
@@ -72,6 +81,9 @@ impl Job {
     }
 
     pub fn start(request: Request) -> io::Result<Self> {
+        if let Request::AdvancedFind { options, .. } = &request {
+            options.validate()?;
+        }
         let requests = crate::requests::RequestScope::default();
         let token = requests.start("traversal");
         let (send, events) = mpsc::sync_channel(8);
@@ -197,12 +209,23 @@ fn run(request: Request, cancel: &Cancellation, sender: &SyncSender<Event>) {
     let mut stats = Stats::default();
     let mut limited = false;
     let mut last = Instant::now();
+    let options = match &request {
+        Request::AdvancedFind { options, .. } => options.clone(),
+        _ => Default::default(),
+    };
     match request {
         Request::Find {
             root,
             pattern,
             recursive,
             hidden,
+        }
+        | Request::AdvancedFind {
+            root,
+            pattern,
+            recursive,
+            hidden,
+            ..
         } => {
             let matcher = Wildcard::new(&pattern);
             let mut batch = Vec::with_capacity(64);
@@ -214,10 +237,30 @@ fn run(request: Request, cancel: &Cancellation, sender: &SyncSender<Event>) {
                 cancel,
                 &mut stats,
                 |path, metadata, stats| {
-                    if path.file_name().is_some_and(|name| matcher.matches(name)) {
+                    let mut line = None;
+                    let mut matches = options.accepts(metadata)
+                        && path.file_name().is_some_and(|name| matcher.matches(name));
+                    if matches && !options.text.is_empty() {
+                        matches = metadata.is_file();
+                        if matches {
+                            match options.content(path, metadata, cancel) {
+                                Ok(found) => {
+                                    line = found;
+                                    matches = line.is_some();
+                                }
+                                Err(_) if cancel.cancelled() => return false,
+                                Err(e) => {
+                                    stats.error(path, e);
+                                    matches = false;
+                                }
+                            }
+                        }
+                    }
+                    if matches {
                         batch.push(Hit {
                             path: path.into(),
                             regular: metadata.is_file(),
+                            line,
                         });
                         count += 1;
                         if batch.len() == 64

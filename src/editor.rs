@@ -1,10 +1,13 @@
+mod block;
 pub mod buffer;
 pub(crate) mod controls;
 mod dialog_controls;
 mod editing;
+pub use block::Case;
 pub mod highlight;
 mod keys;
 pub mod menus;
+pub mod recovery;
 pub mod search;
 mod search_controller;
 mod search_controls;
@@ -69,7 +72,7 @@ pub enum Modal {
 }
 enum Reply {
     Loaded(PathBuf, Result<(Buffer, Snapshot, bool), String>),
-    Saved(Result<(PathBuf, Snapshot), String>),
+    Saved(Result<(PathBuf, storage::SaveOutcome), String>),
 }
 struct SaveDestination {
     path: PathBuf,
@@ -96,6 +99,9 @@ pub struct Editor {
     pub notice: String,
     pub search: String,
     original: Option<Snapshot>,
+    pub(crate) recovery_source: Option<PathBuf>,
+    pub(crate) durability_pending: Option<u64>,
+    reveal_line: Option<usize>,
     bom: bool,
     worker: Option<crate::task::Task<Reply>>,
     saving: bool,
@@ -104,6 +110,20 @@ pub struct Editor {
     save_prepare: Option<crate::task::Task<Result<SaveDestination, String>>>,
 }
 impl Editor {
+    pub fn go_to_line(&mut self, line: usize) {
+        if let Some(buffer) = &mut self.buffer {
+            let row = line
+                .saturating_sub(1)
+                .min(buffer.lines.len().saturating_sub(1));
+            let position = buffer.position_at(row, 0);
+            buffer.move_to(position, false);
+            self.scroll_row = row;
+            self.keep_visible();
+        } else {
+            self.reveal_line = Some(line);
+        }
+    }
+
     fn new(base: PathBuf) -> Result<Self, String> {
         Ok(Self {
             requests: Default::default(),
@@ -125,6 +145,9 @@ impl Editor {
             notice: "New UTF-8 document".into(),
             search: String::new(),
             original: None,
+            recovery_source: None,
+            durability_pending: None,
+            reveal_line: None,
             bom: false,
             worker: None,
             saving: false,
@@ -171,7 +194,7 @@ impl Editor {
         }
     }
     pub fn dirty(&self) -> bool {
-        self.buffer.as_ref().is_some_and(Buffer::dirty)
+        self.durability_pending.is_some() || self.buffer.as_ref().is_some_and(Buffer::dirty)
     }
     fn save(&mut self, path: PathBuf, save_as: bool) -> Result<(), String> {
         if self.busy() {
@@ -183,12 +206,20 @@ impl Editor {
         let text = buffer.text.clone();
         let original = if save_as { None } else { self.original.clone() };
         let bom = self.bom;
+        let confirm = !save_as && self.durability_pending == Some(buffer.revision());
         let receive = self
             .requests
             .spawn("dn-editor-save", move |_| {
                 Reply::Saved(
-                    storage::save(&path, &text, bom, original.as_ref())
-                        .map(|snapshot| (path, snapshot)),
+                    (if confirm {
+                        storage::confirm_durability(
+                            &path,
+                            original.as_ref().expect("published snapshot"),
+                        )
+                    } else {
+                        storage::save(&path, &text, bom, original.as_ref())
+                    })
+                    .map(|snapshot| (path, snapshot)),
                 )
             })
             .map_err(|e| e.to_string())?;

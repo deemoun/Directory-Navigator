@@ -35,6 +35,7 @@ pub fn enabled_by_default(id: PluginId) -> bool {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Presentation {
+    #[allow(dead_code)] // Supported for internal plugins which need a blocking presentation.
     Dialog,
     Document,
 }

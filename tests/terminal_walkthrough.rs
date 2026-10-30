@@ -139,14 +139,18 @@ fn overlapping_documents_native_dialogs_game_pages_resize_and_output_handoff() -
     s.send(b"\x1b", "close game", |s| {
         !s.text().contains("Navigator's game") && s.command_prompt_active()
     })?;
-    s.send(b"\x1bOP", "native help", |s| s.text().contains("Contents"))?;
+    s.send(b"\x1bOP", "native help", |s| {
+        s.text().contains("Directory Navigator — Help")
+    })?;
     s.send(b"\x1b[15;5~", "resize help", |s| {
         s.text().contains("Arrows move")
     })?;
     s.send(b"\x1b[1;2C\r", "accept help size", |s| {
         !s.text().contains("Arrows move")
     })?;
-    s.send(b"\x1b", "close help", |s| !s.text().contains("Contents"))?;
+    s.send(b"\x1b", "close help", |s| {
+        !s.text().contains("Directory Navigator — Help")
+    })?;
     let exits = s.occurrences(b"\x1b[?1049l");
     s.send_output(b"\x0f", "output handoff", |s| {
         s.occurrences(b"\x1b[?1049l") > exits
@@ -396,7 +400,10 @@ fn mp3_prototype_compact_expanded_help_movement_and_close_restore_terminal() -> 
 fn held_buttons_shift_and_release_outside_cancels_in_a_real_terminal() -> io::Result<()> {
     let mut s = Session::new("button-feedback")?;
     s.wait("manager ready", |s| {
-        s.command_prompt_active() && s.text().contains("F5 Copy")
+        s.command_prompt_active()
+            && s.text().contains("item-000.")
+            && s.text().contains("F5 Copy")
+            && !s.text().contains("Reading directory")
     })?;
     s.send(b"\x1b[18~", "mkdir opened", |s| {
         s.text().contains("Make directory")
@@ -429,5 +436,288 @@ fn held_buttons_shift_and_release_outside_cancels_in_a_real_terminal() -> io::Re
     s.send(up.as_bytes(), "inside release", |s| {
         !s.text().contains("Make directory") && s.command_prompt_active()
     })?;
+    s.finish()
+}
+
+#[test]
+fn tree_and_calculator_share_menus_switching_and_terminal_restoration() -> io::Result<()> {
+    let mut s = Session::new("tool-windows")?;
+    s.wait("manager ready", |s| {
+        s.command_prompt_active()
+            && s.text().contains("item-000.")
+            && s.text().contains("F5 Copy")
+            && !s.text().contains("Reading directory")
+    })?;
+    s.send(b"\x14", "tree document", |s| {
+        s.text().contains("Directory tree")
+    })?;
+    s.send(b"\x1b[20~", "File menu above tree", |s| {
+        s.text().contains("Copy") && s.text().contains("Rename")
+    })?;
+    s.send(b"\x1b", "tree menu closed", |s| {
+        s.text().contains("Directory tree")
+    })?;
+    s.send(b"\x1buc", "Calculator document", |s| {
+        s.text().contains("Calculator")
+    })?;
+    s.send(b"\x1b[17;3~", "cycle to manager", |s| {
+        s.command_prompt_active()
+    })?;
+    assert!(s.text().contains("Directory tree") && s.text().contains("Calculator"));
+    s.send(b"\x1b[17;3~", "cycle to tree", |s| {
+        !s.command_prompt_active() && s.text().contains("Directory tree")
+    })?;
+    s.send(b"\x1b[20~", "tree menu after switching", |s| {
+        s.text().contains("Rename")
+    })?;
+    s.send(b"\x1b", "close menu", |s| {
+        s.text().contains("Directory tree")
+    })?;
+    s.send(b"\x1b0", "window list with tools", |s| {
+        s.text().contains("Open windows")
+            && s.text().contains("Calculator")
+            && s.text().contains("Directory tree")
+    })?;
+    s.send(b"\x1b", "close window list", |s| {
+        !s.text().contains("Switching keeps")
+    })?;
+    s.resize(100, 32)?;
+    s.wait("tool resize", |s| s.text().contains("Directory tree"))?;
+    s.finish()
+}
+
+#[test]
+fn advanced_find_highlight_drafts_and_parameter_review_work_in_terminal() -> io::Result<()> {
+    let mut s = Session::new("dn-workflows")?;
+    fs::write(
+        s.root.join("dn.mnu"),
+        ">1 ~P~arameter test\n? value 'Value' 'start'\nprintf '%s' '{param:value}'\n",
+    )?;
+    s.wait("manager ready", |s| {
+        s.command_prompt_active()
+            && s.text().contains("item-000.")
+            && !s.text().contains("Reading directory")
+    })?;
+    let config = fs::read(s.root.join("settings/dn/config.conf"))?;
+    s.send(b"\x1b[18;5~", "advanced Find", |s| {
+        s.text().contains("Containing text") && s.text().contains("Entry type")
+    })?;
+    s.send(b"item-000.txt\tfixture", "find criteria", |s| {
+        s.text().contains("item-000.txt") && s.text().contains("fixture")
+    })?;
+    s.send(b"\r", "content result", |s| {
+        s.text().contains("Find results") && s.text().contains("item-000.txt:1")
+    })?;
+    s.send(b"\x1b", "close results", |s| s.command_prompt_active())?;
+    s.send(b"\x1bofh", "highlight groups", |s| {
+        s.text().contains("Highlight Groups") && s.text().contains("Filename masks")
+    })?;
+    s.send(b"\t \t;*.custom", "group draft", |s| {
+        s.text().contains("*.custom")
+    })?;
+    // Confirm the final color action, rather than an intermediate mask frame,
+    // before queuing a terminal resize and Esc.
+    s.send(b"\t\x1b[C", "group color", |s| {
+        s.text()
+            .lines()
+            .any(|line| line.contains("*.custom") && line.contains("09"))
+    })?;
+    s.resize(100, 32)?;
+    s.wait("highlight resize", |s| s.text().contains("*.custom"))?;
+    s.send(b"\x1b", "cancel group changes", |s| {
+        s.command_prompt_active()
+    })?;
+    assert_eq!(fs::read(s.root.join("settings/dn/config.conf"))?, config);
+    s.send(b"\x1bOQ", "user menu", |s| {
+        s.text().contains("Parameter test")
+    })?;
+    s.send(b"\r", "parameter dialog", |s| {
+        s.text().contains("User command parameters")
+    })?;
+    s.send(
+        "\x1b[200~界 value\x1b[201~".as_bytes(),
+        "parameter Unicode",
+        |s| s.text().contains("界 value"),
+    )?;
+    s.send(b"\r", "review before Run", |s| {
+        s.text().contains("Run user command") && s.text().contains("Program:")
+    })?;
+    let exits = s.occurrences(b"\x1b[?1049l");
+    s.send(b"\x1b", "cancel command review", |s| {
+        s.text().contains("User menu") && !s.text().contains("Run user command")
+    })?;
+    assert_eq!(s.occurrences(b"\x1b[?1049l"), exits);
+    s.send(b"\x1b", "close menu", |s| s.command_prompt_active())?;
+    s.finish()
+}
+
+#[test]
+fn block_commands_and_viewer_addresses_preserve_files_and_restore_terminal() -> io::Result<()> {
+    let mut s = Session::new("block-addresses")?;
+    s.wait("manager ready", |s| {
+        s.text().contains("item-000.")
+            && !s.text().contains("Reading directory")
+            && s.command_prompt_active()
+    })?;
+    let original = "zebra\nalpha\n([界])\n";
+    fs::write(s.root.join("item-000.txt"), original)?;
+    s.select_file("item-000.txt")?;
+    s.send(b"\x1b[14~", "editor loaded", |s| {
+        s.text().contains("zebra") && s.text().contains("F2 Save")
+    })?;
+    s.send(b"\x01\x1bbs", "sort selected block", |s| {
+        let t = s.text();
+        t.find("alpha")
+            .zip(t.find("zebra"))
+            .is_some_and(|(a, z)| a < z)
+    })?;
+    s.send(b"\x1bbr", "uppercase block", |s| {
+        s.text().contains("ZEBRA") && s.text().contains("ALPHA")
+    })?;
+    s.send(b"\x1a", "undo case conversion", |s| {
+        s.text().contains("zebra") && !s.text().contains("ZEBRA")
+    })?;
+    s.send(b"\t\x1b[Z", "indent and unindent", |s| {
+        s.text().contains("zebra")
+    })?;
+    s.send(b"\x1b", "dirty close guard", |s| {
+        s.text().contains("Discard")
+    })?;
+    s.send(b"d", "discard unsaved block edits", |s| {
+        s.command_prompt_active() && !s.text().contains("F2 Save")
+    })?;
+    assert_eq!(fs::read_to_string(s.root.join("item-000.txt"))?, original);
+    s.send(b"\x1b[13~", "viewer opened", |s| {
+        s.text().contains("F3 Viewer") && s.text().contains("zebra")
+    })?;
+    s.send(b"\x07", "viewer go to", |s| {
+        s.text().contains("Viewer Go to")
+    })?;
+    s.send(b"3\r", "line navigation", |s| {
+        !s.text().contains("Viewer Go to") && s.text().contains("3/3 lines")
+    })?;
+    s.send(b"\x1b", "close viewer", |s| {
+        s.command_prompt_active() && !s.text().contains("F3 Viewer")
+    })?;
+    assert_eq!(fs::read_to_string(s.root.join("item-000.txt"))?, original);
+    s.finish()
+}
+
+#[test]
+fn recovery_inspect_later_restore_and_discard_leave_source_and_terminal_intact() -> io::Result<()> {
+    let mut s = Session::new_recovery("recovery")?;
+    s.wait("recovery offered", |s| {
+        s.text().contains("Unsaved work from a previous session")
+    })?;
+    s.send(b"\t\r", "inspect checkpoint", |s| {
+        s.text().contains("recovery 界")
+    })?;
+    s.send(b"\x1b", "return to recovery", |s| {
+        s.text().contains("Unsaved work from a previous session")
+    })?;
+    s.send(b"\x1b", "defer recovery", |s| s.command_prompt_active())?;
+    s.send(b"\x1bf\x1b[F\x1b[A\r", "reopen recovery", |s| {
+        s.text().contains("Unsaved work from a previous session")
+    })?;
+    s.send(b"\r", "recover unsaved copy", |s| {
+        s.text().contains("F2 Save") && s.text().contains("recovery 界")
+    })?;
+    assert_eq!(fs::read(s.root.join("source.txt"))?, b"original source\n");
+    s.send(b"\x1b", "guard recovered document close", |s| {
+        s.text().contains("Discard")
+    })?;
+    s.send(b"d", "discard recovered document", |s| {
+        s.command_prompt_active()
+    })?;
+    s.finish()?;
+    assert_eq!(fs::read(s.root.join("source.txt"))?, b"original source\n");
+    for dir in fs::read_dir(s.root.join("settings/dn/editor-recovery"))? {
+        for file in fs::read_dir(dir?.path())? {
+            assert!(file?.path().extension().is_none_or(|s| s != "rec"));
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn help_has_one_working_expand_restore_control_in_a_real_terminal() -> io::Result<()> {
+    fn zoom(s: &Session, icon: &str) -> (usize, usize) {
+        let wanted = icon.chars().collect::<Vec<_>>();
+        let hits = s
+            .text()
+            .lines()
+            .enumerate()
+            .flat_map(|(y, line)| {
+                line.chars()
+                    .collect::<Vec<_>>()
+                    .windows(3)
+                    .enumerate()
+                    .filter_map(|(x, g)| (g == wanted.as_slice()).then_some((x + 2, y + 1)))
+                    .collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(hits.len(), 1, "one visible {icon}");
+        hits[0]
+    }
+    let mut s = Session::new("help-zoom")?;
+    s.wait("manager ready", |s| {
+        s.command_prompt_active()
+            && s.text().contains("item-000.")
+            && !s.text().contains("Reading directory")
+    })?;
+    s.send(b"\x1bOP", "Help opened", |s| s.text().contains("[↑]"))?;
+    for _ in 0..2 {
+        let (x, y) = zoom(&s, "[↑]");
+        let click = format!("\x1b[<0;{x};{y}M\x1b[<0;{x};{y}m");
+        s.send(click.as_bytes(), "Help expanded", |s| {
+            s.text().contains("[↕]") && !s.text().contains("[▲]")
+        })?;
+        let (x, y) = zoom(&s, "[↕]");
+        let click = format!("\x1b[<0;{x};{y}M\x1b[<0;{x};{y}m");
+        s.send(click.as_bytes(), "Help restored", |s| {
+            s.text().contains("[↑]") && !s.text().contains("[↕]")
+        })?;
+    }
+    s.send(b"\x1b", "close Help", |s| s.command_prompt_active())?;
+    s.finish()
+}
+
+#[test]
+fn mp3_demo_playlist_track_picker_help_and_cancel_are_ui_only() -> io::Result<()> {
+    let mut s = Session::new("mp3-playlist")?;
+    s.wait("manager ready", |s| {
+        s.command_prompt_active()
+            && s.text().contains("item-000.")
+            && !s.text().contains("Reading directory")
+    })?;
+    s.send(b"\x1bocp", "plugins", |s| s.text().contains("mp3_player"))?;
+    s.send(b"\t \r", "enable prototype", |s| {
+        s.command_prompt_active() && !s.text().contains("mp3_player")
+    })?;
+    s.send(b"\x1bu3", "player", |s| s.text().contains("MP3 Player"))?;
+    s.send(b"\x1bz", "expanded player", |s| {
+        s.text().contains("UI prototype")
+    })?;
+    // Play is initially focused; ten tabs reach List in expanded row order.
+    s.send(b"\t\t\t\t\t\t\t\t\t\t\r", "demo play order", |s| {
+        s.text().contains("Play order") && s.text().contains("Demo track 01")
+    })?;
+    s.send(b"\t\t\r", "Add track chooser", |s| {
+        s.text().contains("Select track")
+    })?;
+    s.send(b"\x1b[B\r", "append demo track", |s| {
+        s.text().contains("Play order") && !s.text().contains("Select track")
+    })?;
+    s.send(b"\x1bOP", "owned player Help", |s| {
+        s.text().contains("MP3 Player Help")
+    })?;
+    s.send(b"\x1b", "return to draft", |s| {
+        s.text().contains("Play order") && !s.text().contains("MP3 Player Help")
+    })?;
+    s.send(b"\x1b", "cancel playlist", |s| {
+        s.text().contains("MP3 Player") && !s.text().contains("Play order")
+    })?;
+    s.send(b"\x1b", "close prototype", |s| s.command_prompt_active())?;
+    assert_eq!(fs::read(s.root.join("item-000.txt"))?, b"fixture\n");
     s.finish()
 }

@@ -26,13 +26,38 @@ pub struct SurfaceId {
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Capabilities {
+    pub movable: bool,
+    pub tile: bool,
+    pub cascade: bool,
+    pub workspace_only: bool,
     pub resize: bool,
     pub zoom: bool,
     pub minimum: (u16, u16),
 }
 impl Capabilities {
+    pub(crate) fn arranges(self, mode: super::Arrangement) -> bool {
+        match mode {
+            super::Arrangement::Tile => self.tile,
+            super::Arrangement::Cascade => self.cascade,
+        }
+    }
+    pub const fn fixed_zoom(w: u16, h: u16) -> Self {
+        let mut c = Self::fixed(w, h);
+        c.zoom = true;
+        c.workspace_only = true;
+        c
+    }
+    pub const fn tool(w: u16, h: u16) -> Self {
+        let mut c = Self::document(w, h);
+        c.workspace_only = true;
+        c
+    }
     pub const fn fixed(w: u16, h: u16) -> Self {
         Self {
+            movable: true,
+            tile: true,
+            cascade: true,
+            workspace_only: false,
             resize: false,
             zoom: false,
             minimum: (w, h),
@@ -40,6 +65,10 @@ impl Capabilities {
     }
     pub const fn document(w: u16, h: u16) -> Self {
         Self {
+            movable: true,
+            tile: true,
+            cascade: true,
+            workspace_only: false,
             resize: true,
             zoom: true,
             minimum: (w, h),
@@ -135,7 +164,11 @@ impl Shell {
             clamp(d.bounds, limits)
         };
         let bounds = if d.maximized {
-            maximized_bounds(d.key, size)
+            if d.caps.workspace_only {
+                workspace(size)
+            } else {
+                maximized_bounds(d.key, size)
+            }
         } else {
             preferred
         };
@@ -180,7 +213,11 @@ impl Shell {
         self.window
             .set_min_size(Point::new(d.caps.minimum.0 as i16, d.caps.minimum.1 as i16));
         let bounds = if self.surface.maximized {
-            maximized_bounds(self.surface.id.key, size)
+            if self.surface.caps.workspace_only {
+                workspace(size)
+            } else {
+                maximized_bounds(self.surface.id.key, size)
+            }
         } else {
             let mut preferred = self.preferred;
             preferred.width = preferred.width.max(d.caps.minimum.0);
@@ -209,7 +246,11 @@ impl Shell {
         self.preferred = s.preferred;
         self.surface.maximized = s.maximized;
         self.set(if s.maximized {
-            maximized_bounds(self.surface.id.key, size)
+            if self.surface.caps.workspace_only {
+                workspace(size)
+            } else {
+                maximized_bounds(self.surface.id.key, size)
+            }
         } else {
             clamp(s.bounds, workspace(size))
         });
@@ -228,7 +269,11 @@ impl Shell {
         } else {
             self.preferred = self.surface.bounds;
             self.surface.maximized = true;
-            self.set(maximized_bounds(self.surface.id.key, size));
+            self.set(if self.surface.caps.workspace_only {
+                workspace(size)
+            } else {
+                maximized_bounds(self.surface.id.key, size)
+            });
         }
     }
     pub(crate) fn arrange(&mut self, bounds: Rect) {

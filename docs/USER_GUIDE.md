@@ -174,14 +174,44 @@ an immediate refresh.
 | Ctrl+H / Ctrl+L / Ctrl+R | Toggle hidden / go to directory / refresh |
 | Esc | Close viewer/dialog or cancel operation |
 
-File → Find searches filename patterns beneath the active directory, with
-subdirectory and hidden-entry options. Alt+F7 remains cached quick search.
+Independent tools are desktop windows: Directory Tree, Find/results, Directory
+Sizes, archive browsing, file information, Calculator, character table,
+system/memory information, bookmarks, histories and standalone Help. They remain
+open when you switch away. Reopening activates the existing tool; archives and
+file-information windows distinguish file paths. Navigation and View/Edit retain
+the originating tool's selection and results.
+
+Click an exposed window to raise it; the first client click activates without
+operating a control. Clicking exposed file-manager background focuses the panes
+without covering floating windows. Alt+F6 / Alt+Shift+F6 cycle in creation order;
+Ctrl+Tab / Ctrl+Shift+Tab also work when the terminal reports their modifiers.
+Ordinary Tab still navigates controls. Alt+0 opens the window list. The manager
+remains first; closing a window returns to the most recently used live window.
+
+Tools, Tetris and MP3 Player expose the main DN menu. Editors/viewers keep their
+own menus. Main-menu file/panel actions target the manager's current pane. F6 and
+Shift+F6 keep their Move/Rename meanings in that pane. Settings, confirmations,
+Copy/Move forms, destination pickers and Tetris pages still block switching.
+Help from a blocking form stays with that form; ordinary Help is a switchable
+window and closes with its originating document if that document is retired.
+
+File → Find searches filename patterns beneath the originating directory, with
+subdirectory and hidden-entry options. Advanced criteria include literal UTF-8
+content, optional case matching, entry type, minimum/maximum byte size and
+inclusive modification dates. Sizes accept bytes or K/M/G (1024-based); dates
+use YYYY-MM-DD in UTC. Blank fields are unrestricted. Content matching uses
+Unicode lowercase when Match text case is off; it is literal, not regex.
+Alt+F7 remains cached quick search.
 Results arrive in the background; Stop retains partial results and Close cancels.
 Enter/double-click jumps to the containing folder and highlights the result;
-F3/F4 view/edit regular files. Jumping clears that panel's filename filter and
+F3/F4 view/edit regular files, starting at the first matching line when content
+was searched. Existing editor/viewer file limits still apply. New search returns
+to the retained criteria. Jumping clears that panel's filename filter and
 reveals hidden results when necessary. Patterns are case-sensitive Unicode `*`/`?`.
 Results stop at 10,000; skipped paths and the first error are reported. Traversal
 does not follow directory links and reports nesting deeper than 512 as skipped.
+Content reads use bounded buffers, reject special files/final symlinks, check
+cancellation between chunks and report files changed during reading as skipped.
 
 Panel → Calculate directory sizes snapshots visible marked directories, or the
 highlighted directory. It reports apparent bytes, file/directory/link counts and
@@ -337,6 +367,17 @@ Ctrl+F7 searches backward. Search and wrapping are disabled in Hex view.
 Filters preserve excluded marks; file operations/export use visible marks only.
 Bookmarks persist only when explicitly saving the desktop.
 
+**Options → File Manager → Highlight groups** defines five ordered filename
+rules. Enable a group, edit semicolon-separated Unicode `*`/`?` masks and choose
+a foreground color (0–15) with arrows, Space or a click. Matching ignores case;
+the first enabled matching group wins. Unmatched files retain their existing
+type colors. Folders/links, marks and the active selection retain priority.
+Group foregrounds use the current terminal palette and preserve the configured
+panel background. The global Highlight file types switch controls both built-in
+and custom rules. Defaults resets the five sample groups to disabled; OK applies,
+Cancel/Esc discards the draft. Accepted rules save with the existing settings
+flow in TOML v2; old configurations retain their existing file colors.
+
 DN colors use fixed terminal color indices, with gray panels and red/gray
 function bars by default. **Options → Colors** follows DOS Navigator’s group/item
 layout: choose an implemented component and item, then edit its foreground and
@@ -410,10 +451,30 @@ printf '%s\n' '{dir}'
 Each command line is an executable and separate arguments. Single/double quotes
 group arguments; backslash escapes quotes, backslash or unquoted whitespace.
 Placeholders occupy whole arguments: `{file}`, `{name}`, `{dir}`, `{other_file}`,
-`{other_dir}`, `{selected}`, `{shell}`. `{selected}` expands to visible marked
+`{other_dir}`, `{selected}`, `{other_selected}`, `{shell}`. `{selected}` expands to visible marked
 entries in listing order, falling back to the highlighted entry; `..` is excluded.
 Filtered-out marks alone produce an error. Native filename bytes remain intact.
 Expansion is bounded to 2,048 arguments/64 KiB per command and 256 KiB per action.
+`{other_selected}` uses the same rules for the opposite pane.
+`{selected_list}` and `{other_selected_list}` provide a path to a temporary,
+newline-delimited file list. Lists use native filename bytes, reject names with
+CR/LF, and contain at most 2,048 paths/256 KiB. They are created in private
+directories only after Run and removed after completion or failure.
+
+An action can declare up to eight parameter prompts before its command lines:
+
+```text
+>1 ~S~earch selected files
+? query "Text to find" "TODO"
+grep -n -- '{param:query}' '{selected}'
+```
+
+Each `? name "Label" "default"` declares a field; the default is optional.
+`{param:name}` occupies one whole argument, including spaces or Unicode.
+Parameters and pane context are captured for the action; editing a parameter
+never evaluates shell syntax. Enter/Review opens the existing command review;
+Run remains a separate step. Esc from parameters cancels without execution or
+temporary-file creation. Nested Help preserves the draft and focus.
 
 Every action shows its working directory, panel context, executable and arguments
 before Run. Commands run sequentially in the active directory, stopping on failure.
@@ -425,14 +486,15 @@ There is no implicit shell or DOS batch expansion. For pipelines/built-ins/scrip
 invoke a shell explicitly, e.g. `/bin/sh -c 'printf "%s\n" "$DN_FILE"'`.
 `DN_FILE`, `DN_DIR`, `DN_OTHER_FILE` and `DN_OTHER_DIR` are native environment
 values; quote their expansions. Windows has a small `cmd` starter menu. Original
-DOS `!`, `$`, `%1`…`%9`, parameter prompts and batch flags are not translated.
+DOS `!`, `$`, `%1`…`%9` and batch flags are not translated; use the native
+parameter and selection placeholders above instead.
 
 
 Archive browsing is read-only. Enter/double-click a ZIP, TAR, TAR.GZ or TGZ,
 or choose File → Browse archive. Enter opens folders or previews regular members;
 Backspace/Left returns to the parent and Esc closes the archive. F3 opens the
 bounded text/hex viewer, with its existing wrap/search controls; closing that
-viewer returns to the archive. F9 shows member metadata, Ctrl+R refreshes,
+viewer returns to the archive. Alt+I shows member metadata, Ctrl+R refreshes,
 Stop cancels background indexing/preview work, and the mouse supports rows,
 double-click, wheel, scrollbar arrows/track, buttons and the title close control.
 The underlying panel paths, cursor, marks, filters and layouts remain intact.
@@ -577,7 +639,19 @@ experimental plugin is disabled by default. **Utilities → MP3 Player** then op
 a DN-style player window. This is a UI prototype:
 no files are opened and no sound is played. Its Track and Track Time counters stay
 at zero. Transport controls and the expanded view's buttons provide native focus
-and pressed feedback only; Open, Set up, Volume and List are placeholders.
+and pressed feedback; Open, Set up and Volume remain placeholders.
+
+In expanded view, **List** opens a DN-style **Play order** dialog with a native
+scrolling list of numbered demo tracks, unknown durations (`--:--`) and
+descriptions. **Add** opens a nested track chooser; `*` marks tracks already in
+the draft. **Delete** removes the selected row. **OK** keeps the demo order until
+this player window closes; **Cancel/Esc** restores the previously accepted order.
+The chooser's Cancel/Esc returns to the parent draft without changing it.
+Save is deliberately disabled. The list is clearly labelled as example content:
+it does not read MP3 files, scan directories, save playlists or start playback.
+Arrow/page/Home/End keys and the scrollbar navigate; Tab/Shift+Tab select controls.
+Nested F1 Help preserves the draft and focus. Closing/reopening the player resets
+the demo order.
 
 Use Alt+Z, the title zoom button, a title double-click or Alt+0 → Zoom to switch
 between compact and expanded views. Tab/Shift+Tab choose buttons, Enter/Space
@@ -855,3 +929,98 @@ Yellow captions with cyan inward arrows identify the focused/default action;
 disabled buttons have dim captions. In Colors, OK is the Enter default while
 browsing or editing attributes. Tab to Cancel or press Esc to restore the previous
 color table.
+
+## Related selection and block commands
+
+Panel → Selection → **Select/Unselect same highlight type** matches the first enabled filename
+group, falling back to the built-in file categories. Distinct groups stay distinct
+when they use the same color. **Select/Unselect same extension** ignores extension
+case, excludes directories/links and groups extensionless files together. Both
+operate on visible entries and preserve marks outside the current filter.
+Ctrl+Plus/Minus selects/unselects the same type; Ctrl+Shift+Plus/Minus uses the
+extension, when the terminal reports these modifiers distinctly. Menu actions
+are available in every terminal. Ordinary Plus/Minus still open wildcard prompts.
+
+Editor → **Block** provides Indent/Unindent, Uppercase/Lowercase/Capitalize words
+and Sort selected lines. Tab indents selected lines; Shift+Tab unindents selected
+lines or the current line. With no selection, Tab retains ordinary tab insertion.
+Indentation follows the current tab width and Expand tabs setting. Case conversion
+supports Unicode, including characters whose converted form changes length.
+Sorting uses stable, case-sensitive Unicode order on whole selected lines,
+retaining each position's original line ending and the final newline state.
+Ambiguous blank-line moves that would fuse separate CR/LF endings are refused
+without changing the buffer.
+A selection ending at the next line's start excludes that next line. Every change
+is a single undoable edit; none saves the file automatically.
+
+Editor → **Misc → Matching bracket** (Ctrl+]) jumps between nested `()`, `[]` and
+`{}` pairs at or immediately before the cursor. Supported language lexers exclude
+quoted strings/comments, independently of syntax-color visibility. Plain text
+matches structurally. Mismatched nesting leaves the cursor unchanged.
+
+Viewer **Ctrl+G / Alt+G** (Mac prefix: Ctrl+O, then G), or its **Go to** function-bar
+button, opens an owned navigation dialog. Text mode accepts 1-based line numbers;
+Hex mode accepts 0-based decimal byte offsets or `0x` hexadecimal addresses and
+highlights the destination byte. Addresses must lie within the loaded preview;
+the command does not read beyond its bounds. Invalid input retains the draft and
+position. Enter applies, Esc cancels, and Tab/Shift+Tab traverse field/buttons.
+
+## Editor crash recovery and save outcomes
+
+DN checkpoints dirty editors, including untitled and inactive documents, in a
+private `editor-recovery` directory beside `config.conf`. It attempts checkpoints
+at roughly five-second intervals while the event loop runs; slow I/O and queued
+work may delay completion. A checkpoint is also requested before shell handoff.
+Recovery restores the **last completed checkpoint**, so edits since that point
+may be lost after a crash. It does not automatically save over your source files.
+
+On startup, abandoned sessions offer **Recover / Inspect / Discard / Later**:
+
+- Recover opens a separate, dirty untitled document, retaining the text, UTF-8 BOM
+  preference and checkpoint cursor/selection. Save As uses the existing
+  no-overwrite safeguards. Undo history is not restored.
+- Inspect opens a bounded, read-only preview using owned Help, then returns to
+  the same recovery dialog and focused button.
+- Discard removes that checkpoint. Later/Esc leaves it on disk; use
+  **File → Recover unsaved documents…** to return to deferred entries.
+- Corrupt or unsupported checkpoints cannot be recovered or inspected. They stay
+  on disk until explicitly discarded. Partial staging files are not offered.
+
+Session leases exclude live DN instances and prevent two instances from claiming
+one abandoned session concurrently. Checkpoint files are versioned, checksummed,
+bounded, synchronized and published by sibling-file replacement. On macOS/Unix,
+recovery directories require owner-only access and records use mode 0600;
+symlinks, hard-linked records and unsafe directories are refused. Native source
+paths are encoded losslessly and are descriptive metadata, never restore targets.
+
+Recovered data remains in its original checkpoint until a replacement checkpoint
+is completed, or the document is successfully saved or explicitly discarded.
+Dirty buffers and their checkpoints survive cancelled quit reviews and settings
+save failures. Final cleanup happens after the existing quit and settings checks;
+if cleanup fails, DN retains the remaining data and asks you to acknowledge the
+notice before finishing exit. No recovery files are removed merely because the
+process terminates or a checkpoint update fails.
+
+Saving now distinguishes three outcomes:
+
+- **Not published:** the attempt did not replace the destination; the buffer stays
+  dirty and current file/conflict safeguards still apply.
+- **Saved:** file synchronization, publication and directory synchronization
+  completed; the editor may mark the revision saved and retire its checkpoint.
+- **Written, durability unconfirmed:** publication succeeded but directory
+  synchronization failed. DN updates the file identity, retains dirty/recovery
+  state and cancels pending close/quit. Save retries confirmation without replacing
+  an unchanged published revision. If you edit again, the normal checked save
+  path applies. External changes are still checked before retrying.
+
+Atomic replacement and conflict checks do not constitute an atomic compare-and-
+replace against an uncooperative external writer. Keep the file size/encoding
+limits and external-change safeguards in mind when editing concurrently elsewhere.
+
+## Help window controls
+
+Help windows use the shared desktop **Expand/Restore** title button. The button,
+Alt+Z and title double-click use the same window geometry, preserving the current
+Help topic, scroll position and back history. Expanded Help stays within the
+workspace when the terminal shrinks and restores its remembered floating bounds.
+The fixed-size Welcome page has no expand control.

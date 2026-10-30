@@ -11,7 +11,7 @@ use crate::{
 
 pub(crate) fn file_tools_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
     let profile = app.config.palette;
-    let modal = app.file_tools.modals.file_tools()?;
+    let modal = app.file_tools()?;
     let (title, height) = match modal {
         ToolDialog::History { kind, .. } => (kind.title(), area.height.saturating_sub(4).min(22)),
         ToolDialog::Compare { .. } => (" Compare directories ", 15),
@@ -19,12 +19,7 @@ pub(crate) fn file_tools_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
         ToolDialog::Busy => (" Make list file ", 7),
     };
     let width = area.width.saturating_sub(6).min(94);
-    let rect = Rect::new(
-        area.x + (area.width - width) / 2,
-        area.y + (area.height - height) / 2,
-        width,
-        height,
-    );
+    let rect = crate::tool_windows::bounds(app, area, width, height);
     let focus = match modal {
         ToolDialog::History { focus, .. }
         | ToolDialog::Compare { focus }

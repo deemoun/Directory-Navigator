@@ -54,15 +54,7 @@ fn history_order_dedup_limit_filter_and_safe_recall() -> io::Result<()> {
     key(&mut a, KeyCode::F(8), KeyModifiers::ALT);
     assert_eq!(focus::current(&a), Focus::CommandHistory);
     input::paste(&mut a, "привет");
-    assert_eq!(
-        a.command_line
-            .modals
-            .command_history()
-            .unwrap()
-            .matches
-            .len(),
-        1
-    );
+    assert_eq!(a.command_history().unwrap().matches.len(), 1);
     assert_eq!(a.command_line.history(), snapshot);
     plain(&mut a, KeyCode::Esc);
     assert_eq!(a.command_line.text, "draft");
@@ -92,31 +84,25 @@ fn history_empty_editing_navigation_resize_mouse_and_modal_precedence() -> io::R
         .iter()
         .any(|(_, t)| *t == Target::CommandHistory(Action::Use)));
     plain(&mut a, KeyCode::Enter);
-    assert!(a.command_line.modals.command_history().is_some());
+    assert!(a.command_history().is_some());
     plain(&mut a, KeyCode::Esc);
     for i in 0..30 {
         remember(&mut a, &format!("echo {i}"));
     }
     history::open(&mut a);
     draw(&mut a, 80, 25)?;
-    let rows = a.command_line.modals.command_history().unwrap().rows;
+    let rows = a.command_history().unwrap().rows;
     plain(&mut a, KeyCode::PageDown);
-    assert_eq!(
-        a.command_line.modals.command_history().unwrap().cursor,
-        rows
-    );
+    assert_eq!(a.command_history().unwrap().cursor, rows);
     plain(&mut a, KeyCode::End);
-    assert_eq!(a.command_line.modals.command_history().unwrap().cursor, 29);
+    assert_eq!(a.command_history().unwrap().cursor, 29);
     draw(&mut a, 120, 40)?;
     plain(&mut a, KeyCode::Home);
-    assert_eq!(a.command_line.modals.command_history().unwrap().cursor, 0);
+    assert_eq!(a.command_history().unwrap().cursor, 0);
     input::paste(&mut a, "absent👩‍💻");
     assert!(draw(&mut a, 80, 25)?.contains("No matching"));
     plain(&mut a, KeyCode::Backspace);
-    assert_eq!(
-        a.command_line.modals.command_history().unwrap().query,
-        "absent"
-    );
+    assert_eq!(a.command_history().unwrap().query, "absent");
     input::paste(&mut a, "\n");
     assert_eq!(focus::current(&a), Focus::Message);
     plain(&mut a, KeyCode::Esc);
@@ -125,9 +111,10 @@ fn history_empty_editing_navigation_resize_mouse_and_modal_precedence() -> io::R
     history::open(&mut a);
     draw(&mut a, 80, 25)?;
     click(&mut a, Target::CommandHistory(Action::Row(3)));
-    assert!(a.command_line.modals.command_history().is_some());
+    assert!(a.command_history().is_some());
+    draw(&mut a, 80, 25)?;
     click(&mut a, Target::CommandHistory(Action::Row(3)));
-    assert!(a.command_line.modals.command_history().is_none());
+    assert!(a.command_history().is_none());
     assert_eq!(a.command_line.text, "echo 26");
     assert!(a.command_line.pending.is_none());
     history::open(&mut a);
@@ -139,11 +126,11 @@ fn history_empty_editing_navigation_resize_mouse_and_modal_precedence() -> io::R
         dn::viewer::from_bytes(b"text".to_vec(), dn::viewer::ViewMode::Text),
     ));
     key(&mut a, KeyCode::F(8), KeyModifiers::ALT);
-    assert!(a.command_line.modals.command_history().is_none());
+    assert!(a.command_history().is_none());
     a.desktop.close_viewer();
     dn::editor::open(&mut a, true);
     key(&mut a, KeyCode::F(8), KeyModifiers::ALT);
-    assert!(a.command_line.modals.command_history().is_none());
+    assert!(a.command_history().is_none());
     Ok(())
 }
 #[test]

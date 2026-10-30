@@ -24,6 +24,9 @@ pub(crate) fn settings_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
     let profile = app.config.palette;
     let dos = profile.styles_for(crate::palette::theme::Group::Dialogs);
     let settings = app.modals.settings()?;
+    if settings.kind == SettingsKind::Highlight {
+        return highlight_spec(app, area);
+    }
     if settings.kind == SettingsKind::Keyboard {
         return super::shortcuts_view::settings_spec(app, area);
     }
@@ -76,24 +79,7 @@ pub(crate) fn settings_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
         control.fallback_mnemonic = crate::menu::mnemonic(setting.label());
         spec.control(control);
     }
-    if settings.kind == SettingsKind::Highlight {
-        for (index, (color, label)) in [
-            (0x0f, "Directories / documents"),
-            (0x0a, "Executables / scripts"),
-            (0x0b, "Source / configuration"),
-            (0x0d, "Archives"),
-            (0x0c, "Images / audio / video"),
-            (0x09, "Symbolic links"),
-        ]
-        .iter()
-        .enumerate()
-        {
-            spec.caption(
-                Paragraph::new(app.config.language.text(label)).style(dos(*color)),
-                Rect::new(rect.x + 5, rect.y + 6 + index as u16, width - 10, 1),
-            );
-        }
-    } else if settings.kind == SettingsKind::System {
+    if settings.kind == SettingsKind::System {
         spec.caption(Paragraph::new(app.config.language.text("Existing destinations are always refused.\nTrash and permanent deletion require confirmation.")).style(dos(theme::TEXT)), Rect::new(rect.x + 3, rect.y + 7, width - 6, 2));
     }
     spec.caption(
@@ -334,4 +320,100 @@ pub(crate) fn settings_choice_bounds(app: &App, area: Rect) -> Option<Rect> {
         .clamp(24, 60) as u16
         + 4;
     Some(centered(area, width, choice.items.len() as u16 + 4))
+}
+
+fn highlight_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
+    let s = app.modals.settings()?;
+    let lang = app.config.language;
+    let form = s.kind.definition();
+    let r = centered(area, form.width, form.height);
+    let dos = app
+        .config
+        .palette
+        .styles_for(crate::palette::theme::Group::Dialogs);
+    let mut spec = DialogSpec::new(
+        r,
+        scope(app, crate::focus::Focus::Settings)?,
+        s.cursor,
+        lang.text(s.title()),
+        Target::AcceptSettings,
+        Target::CancelSettings,
+    );
+    spec.control(Control::new(
+        0,
+        Rect::new(r.x + 3, r.y + 2, 68, 1),
+        ControlKind::Checkbox {
+            caption: lang.text("Highlight file types").into(),
+            checked: s.draft.highlight_files,
+        },
+        Target::Setting(0),
+    ));
+    for (x, label) in [
+        (3, "Group"),
+        (12, "Filename masks (; separated)"),
+        (55, "Color (0–15)"),
+    ] {
+        spec.caption(
+            Paragraph::new(lang.text(label)).style(dos(theme::HEADING)),
+            Rect::new(r.x + x, r.y + 4, if x == 12 { 42 } else { 17 }, 1),
+        );
+    }
+    for (i, g) in s.draft.highlight_groups.0.iter().enumerate() {
+        let y = r.y + 6 + i as u16;
+        spec.control(Control::new(
+            1 + 3 * i,
+            Rect::new(r.x + 3, y, 8, 1),
+            ControlKind::Checkbox {
+                caption: (i + 1).to_string(),
+                checked: g.enabled,
+            },
+            Target::Setting(1 + 3 * i),
+        ));
+        let input = Rect::new(r.x + 12, y, 40, 1);
+        let col = crate::presentation::text::Line::from(&g.masks[..s.mask_cursors[i]]).width();
+        let scroll = col.saturating_sub(39);
+        spec.control(Control::new(
+            2 + 3 * i,
+            input,
+            ControlKind::ScrolledInput {
+                value: g.masks.clone(),
+                scroll,
+            },
+            Target::Setting(2 + 3 * i),
+        ));
+        if s.cursor == 2 + 3 * i {
+            spec.cursor = Some((input.x + (col - scroll) as u16, y));
+        }
+        spec.control(Control::new(
+            3 + 3 * i,
+            Rect::new(r.x + 55, y, 15, 1),
+            ControlKind::Choice(vec![format!("{:02}", g.color)]),
+            Target::Setting(3 + 3 * i),
+        ));
+        spec.caption(
+            Paragraph::new("██").style(app.config.palette.dos(0x70 | g.color)),
+            Rect::new(r.x + 70, y, 2, 1),
+        );
+    }
+    spec.caption(
+        Paragraph::new(
+            lang.text("First matching enabled group wins; folders and links keep their colors."),
+        )
+        .wrap(crate::painting::Wrap { trim: false })
+        .style(dos(theme::TEXT)),
+        Rect::new(r.x + 3, r.y + 12, 70, 2),
+    );
+    for (id, label, target, x) in [
+        (16, "Defaults", Target::Setting(16), 7),
+        (17, "OK", Target::AcceptSettings, 29),
+        (18, "Cancel", Target::CancelSettings, 51),
+    ] {
+        spec.control(Control::new(
+            id,
+            Rect::new(r.x + x, r.bottom() - 3, 18, 1),
+            ControlKind::Button(lang.text(label).into()),
+            target,
+        ));
+    }
+    Some(spec)
 }

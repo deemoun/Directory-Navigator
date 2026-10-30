@@ -56,7 +56,7 @@ fn wait(a: &mut App, done: impl Fn(&App) -> bool) {
     }
 }
 fn finish(a: &mut App) {
-    wait(a, |a| a.modals.archive().is_some_and(|b| !b.loading()));
+    wait(a, |a| a.archive().is_some_and(|b| !b.loading()));
 }
 fn key(a: &mut App, k: KeyCode) {
     input::handle(a, KeyEvent::new(k, KeyModifiers::NONE));
@@ -119,7 +119,7 @@ fn id(c: &reader::Catalog, path: &[u8]) -> usize {
     c.nodes.iter().position(|n| n.path == path).unwrap()
 }
 fn select(a: &mut App, name: &str) {
-    let b = a.modals.archive_mut().unwrap();
+    let b = a.archive_mut().unwrap();
     let c = b.catalog.as_ref().unwrap();
     b.cursor = b
         .children()
@@ -328,9 +328,9 @@ fn browser_enter_f3_return_parent_and_panel_state_preservation() -> io::Result<(
     key(&mut a, KeyCode::Esc);
     assert_eq!(focus::current(&a), Focus::Archive);
     key(&mut a, KeyCode::Backspace);
-    assert_eq!(a.modals.archive().unwrap().directory, 0);
+    assert_eq!(a.archive().unwrap().directory, 0);
     key(&mut a, KeyCode::Esc);
-    assert!(a.modals.archive().is_none());
+    assert!(a.archive().is_none());
     assert_eq!(a.panels[0].selected, marks);
     assert_eq!(a.panels[0].cursor, cursor);
     assert_eq!(a.panels[1].path, t.0);
@@ -348,11 +348,11 @@ fn mouse_double_click_modals_buttons_and_resizing() -> io::Result<()> {
         draw(&mut a, w, h)?;
     }
     select(&mut a, "folder");
-    let row = a.modals.archive().unwrap().cursor;
+    let row = a.archive().unwrap().cursor;
     draw(&mut a, 80, 25)?;
     click(&mut a, Target::Archive(Action::Row(row)));
     click(&mut a, Target::Archive(Action::Row(row)));
-    assert_ne!(a.modals.archive().unwrap().directory, 0);
+    assert_ne!(a.archive().unwrap().directory, 0);
     select(&mut a, "文.txt");
     draw(&mut a, 80, 25)?;
     click(&mut a, Target::Archive(Action::Info));
@@ -364,7 +364,7 @@ fn mouse_double_click_modals_buttons_and_resizing() -> io::Result<()> {
     key(&mut a, KeyCode::Esc);
     draw(&mut a, 80, 25)?;
     click(&mut a, Target::Archive(Action::Close));
-    assert!(a.modals.archive().is_none());
+    assert!(a.archive().is_none());
     Ok(())
 }
 #[test]
@@ -378,13 +378,13 @@ fn close_stop_refresh_and_failed_open_do_not_publish_stale_replies() -> io::Resu
     for _ in 0..10 {
         a.poll();
     }
-    assert!(a.modals.archive().is_none());
+    assert!(a.archive().is_none());
     archive::open(&mut a, p.clone());
     archive::action(&mut a, Action::Stop);
-    assert!(!a.modals.archive().unwrap().loading());
+    assert!(!a.archive().unwrap().loading());
     archive::action(&mut a, Action::Refresh);
     finish(&mut a);
-    assert!(a.modals.archive().unwrap().catalog.is_some());
+    assert!(a.archive().unwrap().catalog.is_some());
     select(&mut a, "root.bin");
     archive::action(&mut a, Action::View);
     archive::action(&mut a, Action::Close);
@@ -425,7 +425,7 @@ fn source_symlinks_special_files_and_permission_errors_are_not_followed() -> io:
     app.launcher
         .request_with(0, p.clone(), |_| Err(io::Error::other("test opener")))?;
     app.open_current();
-    assert!(app.modals.archive().is_none());
+    assert!(app.archive().is_none());
     assert!(!app.dialogs().is_empty());
     app.clear_dialogs();
     app.panels[0].cursor = app.panels[0]
@@ -437,7 +437,7 @@ fn source_symlinks_special_files_and_permission_errors_are_not_followed() -> io:
         &mut app,
         KeyEvent::new(KeyCode::Enter, KeyModifiers::CONTROL),
     );
-    assert!(app.modals.archive().is_none());
+    assert!(app.archive().is_none());
     assert!(!app.dialogs().is_empty());
     Ok(())
 }

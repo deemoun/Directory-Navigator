@@ -45,7 +45,7 @@ pub fn label(profile: Profile, screen: Screen, classic: &str) -> Cow<'_, str> {
                 _ => classic,
             },
         ),
-        Screen::Plugin(_) => classic,
+        Screen::Plugin(_) | Screen::Tool(_) => classic,
     };
     Cow::Borrowed(value)
 }
@@ -137,17 +137,17 @@ pub(crate) fn mac_key(app: &mut App, c: char, key: KeyEvent) -> Option<KeyEvent>
                 },
             }
         }
-        Screen::Plugin(_) => None,
+        Screen::Plugin(_) | Screen::Tool(_) => None,
     }
 }
 pub mod help {
     pub const MANAGER_HELP: &str="Mac-friendly: press Ctrl+O, release, then choose\n1 Help · 2 User · 3 View · 4 Edit · 5 Copy\n6 Move · 7 MkDir · 8 Trash/delete · 9 Menu · 0 Quit\ns Quick search · f Recursive Find · i Info · z Sort\nb Bookmarks · l Filter · e Columns · r Refresh\nh Commands · j Directories · a Edits · v Views\no OS default app · p List file · y Tetris\nk Keyboard settings · u Windows · m Menu\nUp/Down Page · Left/Right First/last entry\nCtrl+A all · Ctrl+U clear · Ctrl+O then Space marks\nCtrl+O twice: terminal output; Esc returns\nEsc or click cancels the prefix; nothing is typed.\nClassic DN keys remain available.\nCommand shortcuts belong to your terminal.\nTrash/delete still requires confirmation.";
-    pub const EDITOR_HELP: &str="Mac-friendly: Ctrl+O, release, then digit or letter\n1 Help · 2 Save · 3 Open · 6 Duplicate · 7 Find · 0 Menu\na Save As · w Close · x Quit DN · m Menu · u Windows\nn Next match · p Reverse · r Replace · g Go to line\nCtrl+S Save · Ctrl+F Find · Ctrl+G Go to line\nCtrl+Z/Y Undo/Redo · Ctrl+C/X/V internal clipboard\nCtrl+O then Left/Right: word movement\nAdd Shift to the arrow to extend selection\nUp/Down Page · , / . Line start/end\nh / e Document start/end · c Clear selection\nEsc or click cancels the prefix. Classic keys still work.\nOpen/Close/Quit protect unsaved changes.\nUTF-8, 2 MiB / 100k lines. Line endings preserved.\nSave As never overwrites an existing destination.";
-    pub const VIEWER_HELP: &str="Mac-friendly: press Ctrl+O, release, then choose\n2 Wrap · 3 Close · 7 Find · 0 Quit DN\nf Find · n Next match · p Reverse · w Close · u Windows\nUp/Down Page · Left/Right First/last row\nEsc or click cancels the prefix.\nClassic DN keys remain available.";
+    pub const EDITOR_HELP: &str="Mac-friendly: Ctrl+O, release, then digit or letter\n1 Help · 2 Save · 3 Open · 6 Duplicate · 7 Find · 0 Menu\na Save As · w Close · x Quit DN · m Menu · u Windows\nn Next match · p Reverse · r Replace · g Go to line\nCtrl+S Save · Ctrl+F Find · Ctrl+G Go to line\nCtrl+Z/Y Undo/Redo · Ctrl+C/X/V internal clipboard\nTab/Shift+Tab block indent · Ctrl+] matching bracket\nCtrl+O then Left/Right: word movement\nAdd Shift to the arrow to extend selection\nUp/Down Page · , / . Line start/end\nh / e Document start/end · c Clear selection\nEsc or click cancels the prefix. Classic keys still work.\nOpen/Close/Quit protect unsaved changes.\nUTF-8, 2 MiB / 100k lines. Line endings preserved.\nSave As never overwrites an existing destination.";
+    pub const VIEWER_HELP: &str="Mac-friendly: press Ctrl+O, release, then choose\n2 Wrap · 3 Close · 7 Find · 0 Quit DN\nf Find · g Go to · n Next match · p Reverse · w Close · u Windows\nUp/Down Page · Left/Right First/last row\nEsc or click cancels the prefix.\nClassic DN keys remain available.";
     pub const USER_MENU_HELP: &str="Ctrl+O: choose a user-menu command\n1 Help · 2 Global/Local · 4 Edit · other digits: F-keys\nr Reload · w Back/Cancel · Up/Down Page\nLeft/Right First/last item\nEsc or click cancels the prefix.\nCommands still require explicit Run confirmation.";
 
     pub const CLASSIC_MANAGER: &str = "Tab panels · Arrows/PgUp/PgDn/Home/End navigate\nAlt+F/U/P/M/O menus · Alt+0 windows · Alt+X exits\nEnter app/dir/archive · Ctrl+Enter OS app · F3 view · F4 edit · BS parent\nIns / Space marks · Ctrl+A all · Ctrl+U clear\n+ / - group · Alt+E info · Alt+K columns\nAlt+F7 quick search · Ctrl+F7 recursive Find\nCtrl+Q quick view · Ctrl+T tree · Alt+F9 Tetris\nCtrl+1–9 bookmarks set · Alt+1–9 go · Alt+Del filter\nCtrl+K calculator · Ctrl+B ASCII · Alt+Y memory\nCtrl+C compare · Alt+L list file\nAlt+BS directories · Alt+PgUp edits / PgDn views\nF2 user menu · Shift+F2 sort · Ctrl+F3 name / F4 ext / F5 date / F6 size\nF5 copy · F6 move · Shift+F6 rename here\nF7 mkdir · F8 Trash/delete · F9 menu · F10 exit\nCtrl+H hidden · Ctrl+L go to · Ctrl+R refresh\nClick row · Ctrl+click mark · Double-click open\nWheel scrolls · Esc cancels dialogs/operations\nType commands · Enter runs · Esc clears · Ctrl+E/X history · Alt+F8 list\nFile menu: Copy names / paths uses internal clipboard\nOptions: File associations configures Enter actions\nOptions: Import DOS settings previews DN.CFG preferences\nColors: white dirs · green exec · cyan source\nMagenta archives · blue links · yellow marks\nTrash by default; File Manager Setup changes mode.\nExisting destinations are refused; no overwrites.";
-    pub const CLASSIC_EDITOR: &str = "F2 / Ctrl+S Save · Shift+F2 Save As · F3 Open\nF6 Duplicate line · F7 / Ctrl+F Find\nShift+F7 Search again · Alt+F7 Reverse search\nCtrl+F7 Replace · Alt+G / Ctrl+G Go to line\nCtrl+←/→ words · Ctrl+Shift+←/→ select words\nShift+arrows select · Ctrl+A select all\nAlt+Backspace / Ctrl+Z Undo · Ctrl+Y Redo\nCtrl+Ins/C Copy · Shift+Del / Ctrl+X Cut\nShift+Ins / Ctrl+V Paste · terminal paste supported\nAlt+B Block: selection/clipboard · Options: indent/colors/tabs\nF10 Menu · Alt+0 Windows · Ctrl+F4 / Esc Close · Alt+X Quit DN\nOpen/Close/Quit protect unsaved changes.\nUTF-8, 2 MiB / 100k lines. Line endings preserved.\nSave As never overwrites an existing destination.";
+    pub const CLASSIC_EDITOR: &str = "F2 / Ctrl+S Save · Shift+F2 Save As · F3 Open\nF6 Duplicate line · F7 / Ctrl+F Find\nShift+F7 Search again · Alt+F7 Reverse search\nCtrl+F7 Replace · Alt+G / Ctrl+G Go to line\nCtrl+←/→ words · Ctrl+Shift+←/→ select words\nShift+arrows select · Ctrl+A select all\nAlt+Backspace / Ctrl+Z Undo · Ctrl+Y Redo\nCtrl+Ins/C Copy · Shift+Del / Ctrl+X Cut\nShift+Ins / Ctrl+V Paste · terminal paste supported\nAlt+B Block: indent/case/sort/clipboard · Ctrl+] bracket\nF10 Menu · Alt+0 Windows · Ctrl+F4 / Esc Close · Alt+X Quit DN\nOpen/Close/Quit protect unsaved changes.\nUTF-8, 2 MiB / 100k lines. Line endings preserved.\nSave As never overwrites an existing destination.";
 }
 
 #[derive(Clone, Copy)]
@@ -189,6 +189,14 @@ impl<A: Copy> Binding<A> {
     }
 }
 const EDITOR_KEYS: &[Binding<E>] = &[
+    bind(
+        K::Char(']'),
+        M::CONTROL,
+        M::empty(),
+        "Ctrl+]",
+        None,
+        E::MatchBracket,
+    ),
     bind(
         K::F(4),
         M::CONTROL,
@@ -381,6 +389,15 @@ pub(crate) fn editor_alt(key: K) -> Option<E> {
     Binding::resolve(EDITOR_ALT_KEYS, KeyEvent::new(key, M::ALT))
 }
 const VIEWER_KEYS: &[Binding<V>] = &[
+    bind(
+        K::Char('g'),
+        M::CONTROL,
+        M::ALT,
+        "Ctrl+G",
+        Some("^Og"),
+        V::GoTo,
+    ),
+    bind(K::Char('g'), M::ALT, M::CONTROL, "Alt+G", None, V::GoTo),
     bind(K::Esc, M::empty(), M::empty(), "Esc", None, V::Close),
     bind(K::F(3), M::empty(), M::empty(), "F3", None, V::Close),
     bind(K::F(2), M::empty(), M::empty(), "F2", None, V::Wrap),
@@ -410,7 +427,9 @@ pub(crate) fn manager_available(app: &App, action: Action) -> bool {
     match action {
         Action::Plugin(id) => app.config.plugin_enabled(id),
         Action::WindowTile | Action::WindowCascade => crate::windowing::can_arrange(app),
-        Action::WindowMove => crate::windowing::workspace::foreground(app).is_some(),
+        Action::WindowMove => {
+            crate::windowing::workspace::foreground(app).is_some_and(|s| s.caps.movable)
+        }
         Action::WindowZoom => {
             crate::windowing::workspace::foreground(app).is_some_and(|s| s.caps.zoom)
         }
@@ -419,7 +438,11 @@ pub(crate) fn manager_available(app: &App, action: Action) -> bool {
     }
 }
 pub(crate) fn viewer_available(viewer: &crate::viewer::Viewer, action: V) -> bool {
-    !matches!(action, V::Wrap | V::Find | V::Next | V::Reverse) || viewer.text_ready()
+    if action == V::GoTo {
+        viewer.contents.is_some()
+    } else {
+        !matches!(action, V::Wrap | V::Find | V::Next | V::Reverse) || viewer.text_ready()
+    }
 }
 
 fn binding_label<'a, A: Copy + 'a>(
@@ -542,6 +565,134 @@ const MANAGER_ALT_KEYS: &[Binding<fn(&mut App)>] = &[
 ];
 
 const MANAGER_CONTROL_KEYS: &[Binding<fn(&mut App)>] = &[
+    bind(
+        K::Char('+'),
+        M::CONTROL.union(M::SHIFT),
+        M::ALT,
+        "Ctrl+Shift++",
+        None,
+        |app| {
+            crate::menu::execute(
+                app,
+                Action::SelectRelated {
+                    extension: true,
+                    selecting: true,
+                },
+            );
+        },
+    ),
+    bind(
+        K::Char('+'),
+        M::CONTROL,
+        M::SHIFT.union(M::ALT),
+        "Ctrl++",
+        None,
+        |app| {
+            crate::menu::execute(
+                app,
+                Action::SelectRelated {
+                    extension: false,
+                    selecting: true,
+                },
+            );
+        },
+    ),
+    bind(
+        K::Char('='),
+        M::CONTROL.union(M::SHIFT),
+        M::ALT,
+        "Ctrl+Shift+=",
+        None,
+        |app| {
+            crate::menu::execute(
+                app,
+                Action::SelectRelated {
+                    extension: true,
+                    selecting: true,
+                },
+            );
+        },
+    ),
+    bind(
+        K::Char('='),
+        M::CONTROL,
+        M::SHIFT.union(M::ALT),
+        "Ctrl+=",
+        None,
+        |app| {
+            crate::menu::execute(
+                app,
+                Action::SelectRelated {
+                    extension: false,
+                    selecting: true,
+                },
+            );
+        },
+    ),
+    bind(
+        K::Char('-'),
+        M::CONTROL.union(M::SHIFT),
+        M::ALT,
+        "Ctrl+Shift+-",
+        None,
+        |app| {
+            crate::menu::execute(
+                app,
+                Action::SelectRelated {
+                    extension: true,
+                    selecting: false,
+                },
+            );
+        },
+    ),
+    bind(
+        K::Char('-'),
+        M::CONTROL,
+        M::SHIFT.union(M::ALT),
+        "Ctrl+-",
+        None,
+        |app| {
+            crate::menu::execute(
+                app,
+                Action::SelectRelated {
+                    extension: false,
+                    selecting: false,
+                },
+            );
+        },
+    ),
+    bind(
+        K::Char('_'),
+        M::CONTROL.union(M::SHIFT),
+        M::ALT,
+        "Ctrl+Shift+_",
+        None,
+        |app| {
+            crate::menu::execute(
+                app,
+                Action::SelectRelated {
+                    extension: true,
+                    selecting: false,
+                },
+            );
+        },
+    ),
+    bind(
+        K::Char('_'),
+        M::CONTROL,
+        M::SHIFT.union(M::ALT),
+        "Ctrl+_",
+        None,
+        |app| {
+            crate::menu::execute(
+                app,
+                Action::SelectRelated {
+                    extension: false,
+                    selecting: false,
+                },
+            );
+        },
+    ),
     bind(
         K::Enter,
         M::CONTROL,

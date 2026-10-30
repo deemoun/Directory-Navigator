@@ -191,6 +191,7 @@ fn command_runner_executes_in_disposable_directory_and_reports_spawn_error() -> 
             args: Vec::new(),
         }],
         env: Vec::new(),
+        list_files: Vec::new(),
     };
     assert!(runner::run(&failed).is_err());
     Ok(())

@@ -150,6 +150,7 @@ fn bookmark_shortcuts_dialog_mouse_and_missing_directory() -> io::Result<()> {
     navigation_tools::open_bookmarks(&mut app);
     draw(&mut app, 80, 25)?;
     click(&mut app, Target::Navigation(Nav::Slot(8)));
+    draw(&mut app, 80, 25)?;
     click(&mut app, Target::Navigation(Nav::Set));
     assert_eq!(app.config.bookmarks[8], Some(t.0.clone()));
     draw(&mut app, 120, 40)?;
@@ -166,7 +167,7 @@ fn bookmark_shortcuts_dialog_mouse_and_missing_directory() -> io::Result<()> {
     key(&mut app, KeyCode::End, KeyModifiers::NONE);
     key(&mut app, KeyCode::Tab, KeyModifiers::NONE);
     assert!(matches!(
-        app.modals.navigation_dialog(),
+        app.navigation_dialog(),
         Some(Modal::Bookmarks { slot: 8, .. })
     ));
     draw(&mut app, 80, 25)?;
@@ -230,7 +231,7 @@ fn filtering_moves_cached_paths_preserves_marks_and_visible_targets() -> io::Res
     assert!(app.last_dialog().unwrap().message.contains("filtered out"));
     app.clear_dialogs();
     dn::file_tools::open_export(&mut app);
-    assert!(app.file_tools.modals.file_tools().is_none());
+    assert!(app.file_tools().is_none());
     assert!(app.last_dialog().unwrap().message.contains("filtered out"));
     app.panels[0].set_filter(String::new());
     assert!(app.panels[0]
@@ -507,6 +508,7 @@ fn viewport_search_highlights_only_rendered_rows_and_menu_fit() -> io::Result<()
     fs::write(&path, "a")?;
     let mut v = loaded_viewer(path)?;
     v.contents = Some(Contents {
+        loaded_bytes: 0,
         lines: (0..1000).map(|n| format!("line {n}")).collect(),
         binary: false,
         truncated: false,
@@ -559,9 +561,7 @@ fn filtered_copy_and_list_export_never_touch_excluded_entries() -> io::Result<()
     assert_eq!(app.panels[0].filtered_marks(), 1);
     app.panels[0].selected.insert("a.rs".into());
     dn::file_tools::open_export(&mut app);
-    if let Some(dn::file_tools::ToolDialog::Export { paths, .. }) =
-        app.file_tools.modals.file_tools()
-    {
+    if let Some(dn::file_tools::ToolDialog::Export { paths, .. }) = app.file_tools() {
         assert_eq!(paths, &[t.0.join("a.rs")]);
     } else {
         panic!("export dialog")

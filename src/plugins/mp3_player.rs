@@ -10,14 +10,16 @@ use crate::{
 };
 use crossterm::event::{KeyCode as K, MouseButton, MouseEventKind};
 
+mod playlist;
 const PLAY: usize = 2;
 const ZOOM: usize = 100;
 const CLOSE: usize = 101;
 const HELP: usize = 102;
-const HELP_TEXT: &str = "This is a UI-only MP3 player prototype inspired by DOS Navigator.\nNo audio is played and no files are opened or read.\nTransport and secondary buttons only demonstrate native focus and pressed feedback.\nTab / Shift+Tab select controls; Enter / Space press the selected button.\nAlt+Z, the title zoom button or a title double-click switch compact/expanded views.\nCtrl+F5 moves the player; Esc closes it. No preferences are saved.";
+const HELP_TEXT: &str = "This is a UI-only MP3 player prototype inspired by DOS Navigator.\nNo audio is played and no files are opened or read.\nTransport controls remain inert. In expanded view, List opens a demo play-order dialog inspired by CDUTIL.PAS.\nAdd opens a track chooser; Delete removes a demo row; OK keeps the order for this opening, Cancel discards the draft.\nDurations are unknown (--:--), Save is disabled, and no files are loaded or saved.\nTab / Shift+Tab select controls; Enter / Space press the selected button.\nAlt+Z, the title zoom button or a title double-click switch compact/expanded views.\nCtrl+F5 moves the player; Esc closes it. No preferences are saved.";
 
 #[derive(Default)]
 pub(crate) struct Mp3Player {
+    playlist: playlist::Playlist,
     expanded: bool,
     focus: usize,
 }
@@ -33,7 +35,18 @@ impl Mp3Player {
         }
     }
     fn action(&mut self, id: usize) -> Vec<Effect> {
+        if self.playlist.open && id != HELP {
+            self.playlist.action(id);
+            if !self.playlist.open {
+                self.focus = playlist::LIST;
+            }
+            return Vec::new();
+        }
         match id {
+            playlist::LIST if self.expanded => {
+                self.focus = playlist::LIST;
+                self.playlist.show();
+            }
             CLOSE => return vec![Effect::Close],
             HELP => {
                 return vec![Effect::Help {
@@ -64,6 +77,7 @@ impl ToolPlugin for Mp3Player {
         self
     }
     fn open(&mut self, _: &Context) {
+        self.playlist = playlist::Playlist::default();
         self.expanded = false;
         self.focus = PLAY;
     }
@@ -73,6 +87,24 @@ impl ToolPlugin for Mp3Player {
     fn event(&mut self, event: Event<'_>, _: &Context) -> Vec<Effect> {
         match event {
             Event::Action(ActionId(id)) => self.action(id),
+            Event::Focus(id) if self.playlist.open => {
+                self.playlist.focus(id);
+                Vec::new()
+            }
+            Event::Key(k) if self.playlist.open && k.code != K::F(1) => {
+                self.playlist.key(k);
+                Vec::new()
+            }
+            Event::Mouse(e, _)
+                if self.playlist.open
+                    && matches!(
+                        e.kind,
+                        MouseEventKind::ScrollUp | MouseEventKind::ScrollDown
+                    ) =>
+            {
+                self.playlist.wheel(e.kind == MouseEventKind::ScrollDown);
+                Vec::new()
+            }
             Event::Focus(id) if id < self.count() => {
                 self.focus = id;
                 Vec::new()
@@ -89,18 +121,48 @@ impl ToolPlugin for Mp3Player {
     }
     fn windows(&self, ctx: &Context) -> Vec<LocalWindow> {
         let bounds = self.bounds(ctx);
-        vec![LocalWindow {
+        let mut result = vec![LocalWindow {
             id: 0,
             parent: None,
             bounds,
-            caps: Capabilities {
-                resize: false,
-                zoom: true,
-                minimum: (bounds.width, bounds.height),
-            },
-        }]
+            caps: Capabilities::fixed_zoom(bounds.width, bounds.height),
+        }];
+        if self.playlist.open {
+            result.extend(self.playlist.windows(ctx));
+        }
+        result
     }
     fn controls(&self, ctx: &Context) -> DialogSpec<'_> {
+        if self.playlist.open {
+            self.playlist
+                .controls(ctx, self.playlist.page() == playlist::PICKER_PAGE)
+        } else {
+            self.main_controls(ctx)
+        }
+    }
+    fn view(&self, ctx: &Context) -> View<'_> {
+        let mut frame = NativeFrame::new(ctx.area, ctx.palette);
+        frame.render_widget(
+            crate::turbo::widgets::dialog(ctx.language.text("MP3 Player")),
+            self.bounds(ctx),
+        );
+        let mut layers = vec![Layer {
+            id: 0,
+            interactive: !self.playlist.open,
+            scene: frame.finish(),
+            controls: Some(self.main_controls(ctx)),
+        }];
+        if self.playlist.open {
+            layers.push(self.playlist.layer(ctx, playlist::ORDER_PAGE));
+            if self.playlist.page() == playlist::PICKER_PAGE {
+                layers.push(self.playlist.layer(ctx, playlist::PICKER_PAGE));
+            }
+        }
+        View::Layers(layers)
+    }
+}
+impl Mp3Player {
+    fn main_controls(&self, ctx: &Context) -> DialogSpec<'_> {
         let r = self.bounds(ctx);
         let language = ctx.language;
         let style = ctx
@@ -177,19 +239,6 @@ impl ToolPlugin for Mp3Player {
             Rect::new(r.x + 2, r.y, 3, 1),
         );
         spec
-    }
-    fn view(&self, ctx: &Context) -> View<'_> {
-        let mut frame = NativeFrame::new(ctx.area, ctx.palette);
-        frame.render_widget(
-            crate::turbo::widgets::dialog(ctx.language.text("MP3 Player")),
-            self.bounds(ctx),
-        );
-        View::Layers(vec![Layer {
-            id: 0,
-            interactive: true,
-            scene: frame.finish(),
-            controls: Some(self.controls(ctx)),
-        }])
     }
 }
 

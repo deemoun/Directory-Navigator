@@ -49,6 +49,17 @@ pub(crate) fn paint(frame: &mut impl Frame, app: &App, area: Rect, focus: Focus)
 
 const ADAPTERS: &[Adapter] = &[
     Adapter {
+        focus: Focus::Recovery,
+        key: crate::editor::recovery::key,
+        mouse: crate::editor::recovery::mouse,
+        spec: crate::editor::recovery::spec,
+        set_focus: |app, next| {
+            if let Some(d) = app.modals.recovery_mut() {
+                d.focus = next;
+            }
+        },
+    },
+    Adapter {
         focus: Focus::WindowList,
         key: crate::windowing::key,
         mouse: crate::windowing::mouse,
@@ -65,7 +76,7 @@ const ADAPTERS: &[Adapter] = &[
         mouse: crate::command_line::history::mouse,
         spec: crate::ui::command_history_spec,
         set_focus: |app, next| {
-            if let Some(m) = app.command_line.modals.command_history_mut() {
+            if let Some(m) = app.command_history_mut() {
                 m.focus = next;
             }
         },
@@ -87,7 +98,7 @@ const ADAPTERS: &[Adapter] = &[
         mouse: crate::archive::mouse,
         spec: crate::ui::archive_spec,
         set_focus: |app, next| {
-            if let Some(m) = app.modals.archive_mut() {
+            if let Some(m) = app.archive_mut() {
                 m.focus = next;
             }
         },
@@ -109,7 +120,7 @@ const ADAPTERS: &[Adapter] = &[
         mouse: crate::directory_tree::mouse,
         spec: crate::ui::tree_spec,
         set_focus: |app, next| {
-            if let Some(m) = app.modals.directory_tree_mut() {
+            if let Some(m) = app.directory_tree_mut() {
                 m.focus = next;
             }
         },
@@ -120,7 +131,7 @@ const ADAPTERS: &[Adapter] = &[
         mouse: crate::discovery::mouse,
         spec: crate::ui::discovery_spec,
         set_focus: |app, next| {
-            if let Some(m) = app.discovery.modals.discovery_mut() {
+            if let Some(m) = app.discovery_mut() {
                 m.focus = next;
             }
         },
@@ -134,7 +145,7 @@ const ADAPTERS: &[Adapter] = &[
             if let Some(
                 crate::navigation_tools::Modal::Bookmarks { focus, .. }
                 | crate::navigation_tools::Modal::Filter { focus, .. },
-            ) = app.modals.navigation_dialog_mut()
+            ) = app.navigation_dialog_mut()
             {
                 *focus = next;
             }
@@ -145,9 +156,9 @@ const ADAPTERS: &[Adapter] = &[
         key: crate::utilities::key,
         mouse: crate::utilities::mouse,
         spec: crate::ui::utility_spec,
-        set_focus: |app, next| match app.utilities.modals.utility_dialog() {
-            Some(crate::utilities::Kind::Characters) => app.utilities.chart.focus = next,
-            _ => app.utilities.focus = next,
+        set_focus: |app, next| match app.utility_dialog() {
+            Some(crate::utilities::Kind::Characters) => app.utility_state_mut().chart.focus = next,
+            _ => app.utility_state_mut().focus = next,
         },
     },
     Adapter {
@@ -160,7 +171,7 @@ const ADAPTERS: &[Adapter] = &[
                 crate::file_tools::ToolDialog::History { focus, .. }
                 | crate::file_tools::ToolDialog::Compare { focus }
                 | crate::file_tools::ToolDialog::Export { focus, .. },
-            ) = app.file_tools.modals.file_tools_mut()
+            ) = app.file_tools_mut()
             {
                 *focus = next;
             }

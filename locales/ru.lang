@@ -345,7 +345,7 @@ Tab moves · Space toggles · Enter compares · Esc cancels	Tab переход �
 Destination:	Назначение:
 Names	Имена
 Full paths	Полные пути
-F2 / Ctrl+S Save · Shift+F2 Save As · F3 Open\nF6 Duplicate line · F7 / Ctrl+F Find\nShift+F7 Search again · Alt+F7 Reverse search\nCtrl+F7 Replace · Alt+G / Ctrl+G Go to line\nCtrl+←/→ words · Ctrl+Shift+←/→ select words\nShift+arrows select · Ctrl+A select all\nAlt+Backspace / Ctrl+Z Undo · Ctrl+Y Redo\nCtrl+Ins/C Copy · Shift+Del / Ctrl+X Cut\nShift+Ins / Ctrl+V Paste · terminal paste supported\nAlt+B Block: selection/clipboard · Options: indent/colors/tabs\nF10 Menu · Alt+0 Windows · Ctrl+F4 / Esc Close · Alt+X Quit DN\nOpen/Close/Quit protect unsaved changes.\nUTF-8, 2 MiB / 100k lines. Line endings preserved.\nSave As never overwrites an existing destination.	F2 / Ctrl+S сохранить · Shift+F2 сохранить как · F3 открыть\nF6 повторить строку · F7 / Ctrl+F найти\nShift+F7 искать далее · Alt+F7 обратный поиск\nCtrl+F7 заменить · Alt+G / Ctrl+G перейти к строке\nCtrl+←/→ по словам · Ctrl+Shift+←/→ выделить слова\nShift+стрелки выделение · Ctrl+A выделить всё\nAlt+Backspace / Ctrl+Z отменить · Ctrl+Y повторить\nCtrl+Ins/C копировать · Shift+Del / Ctrl+X вырезать\nShift+Ins / Ctrl+V вставить · Вставка терминала поддерживается\nAlt+B блок: выделение/буфер · Настройки: отступ/цвет/табуляция\nF10 меню · Alt+0 окна · Ctrl+F4 / Esc закрыть · Alt+X выход\nОткрытие/закрытие/выход защищают несохранённые изменения.\nUTF-8, 2 МиБ / 100 тыс. строк. Концы строк сохраняются.\nСохранить как не перезаписывает существующие файлы.
+F2 / Ctrl+S Save · Shift+F2 Save As · F3 Open\nF6 Duplicate line · F7 / Ctrl+F Find\nShift+F7 Search again · Alt+F7 Reverse search\nCtrl+F7 Replace · Alt+G / Ctrl+G Go to line\nCtrl+←/→ words · Ctrl+Shift+←/→ select words\nShift+arrows select · Ctrl+A select all\nAlt+Backspace / Ctrl+Z Undo · Ctrl+Y Redo\nCtrl+Ins/C Copy · Shift+Del / Ctrl+X Cut\nShift+Ins / Ctrl+V Paste · terminal paste supported\nAlt+B Block: indent/case/sort/clipboard · Ctrl+] bracket\nF10 Menu · Alt+0 Windows · Ctrl+F4 / Esc Close · Alt+X Quit DN\nOpen/Close/Quit protect unsaved changes.\nUTF-8, 2 MiB / 100k lines. Line endings preserved.\nSave As never overwrites an existing destination.	F2 / Ctrl+S сохранить · Shift+F2 сохранить как · F3 открыть\nF6 повторить строку · F7 / Ctrl+F найти\nShift+F7 искать далее · Alt+F7 обратный поиск\nCtrl+F7 заменить · Alt+G / Ctrl+G перейти к строке\nCtrl+←/→ по словам · Ctrl+Shift+←/→ выделить слова\nShift+стрелки выделение · Ctrl+A выделить всё\nAlt+Backspace / Ctrl+Z отменить · Ctrl+Y повторить\nCtrl+Ins/C копировать · Shift+Del / Ctrl+X вырезать\nShift+Ins / Ctrl+V вставить · Вставка терминала поддерживается\nAlt+B блок: отступ/регистр/сортировка · Ctrl+] скобка\nF10 меню · Alt+0 окна · Ctrl+F4 / Esc закрыть · Alt+X выход\nОткрытие/закрытие/выход защищают несохранённые изменения.\nUTF-8, 2 МиБ / 100 тыс. строк. Концы строк сохраняются.\nСохранить как не перезаписывает существующие файлы.
 Modified (local)	Изменён (местное)
 Read-only attribute	Только чтение
 Permissions describe the link, not its target.	Права самой ссылки, а не её цели.
@@ -424,8 +424,8 @@ Automatic (Classic DN)	Авто (классические DN)
 Classic DN	Классические DN
 Mac-friendly	Для Mac
 Mac-friendly: press Ctrl+O, release, then choose\n1 Help · 2 User · 3 View · 4 Edit · 5 Copy\n6 Move · 7 MkDir · 8 Trash/delete · 9 Menu · 0 Quit\ns Quick search · f Recursive Find · i Info · z Sort\nb Bookmarks · l Filter · e Columns · r Refresh\nh Commands · j Directories · a Edits · v Views\no OS default app · p List file · y Tetris\nk Keyboard settings · u Windows · m Menu\nUp/Down Page · Left/Right First/last entry\nCtrl+A all · Ctrl+U clear · Ctrl+O then Space marks\nEsc or click cancels the prefix; nothing is typed.\nClassic DN keys remain available.\nCommand shortcuts belong to your terminal.\nTrash/delete still requires confirmation.	Для Mac: нажмите Ctrl+O, отпустите, затем выберите\n1 Помощь · 2 Пользователь · 3 Просмотр · 4 Редактор · 5 Копия\n6 Перенос · 7 Папка · 8 Корзина · 9 Меню · 0 Выход\ns Быстрый поиск · f Поиск файлов · i Свойства · z Сортировка\nb Закладки · l Фильтр · e Колонки · r Обновить\nh Команды · j Каталоги · a Редактирование · v Просмотр\no Приложение ОС · p Список файлов · y Тетрис\nk Клавиши · u Окна · m Меню\n↑/↓ Страница · ←/→ Начало/конец списка\nCtrl+A всё · Ctrl+U снять отметки · Ctrl+O, Пробел отметить\nEsc или щелчок отменяет префикс; текст не вводится.\nКлассические клавиши DN также работают.\nСочетания Command обрабатывает терминал.\nУдаление и корзина требуют подтверждения.
-Mac-friendly: Ctrl+O, release, then digit or letter\n1 Help · 2 Save · 3 Open · 6 Duplicate · 7 Find · 0 Menu\na Save As · w Close · x Quit DN · m Menu · u Windows\nn Next match · p Reverse · r Replace · g Go to line\nCtrl+S Save · Ctrl+F Find · Ctrl+G Go to line\nCtrl+Z/Y Undo/Redo · Ctrl+C/X/V internal clipboard\nCtrl+O then Left/Right: word movement\nAdd Shift to the arrow to extend selection\nUp/Down Page · , / . Line start/end\nh / e Document start/end · c Clear selection\nEsc or click cancels the prefix. Classic keys still work.\nOpen/Close/Quit protect unsaved changes.\nUTF-8, 2 MiB / 100k lines. Line endings preserved.\nSave As never overwrites an existing destination.	Для Mac: Ctrl+O, отпустите, затем цифра или буква\n1 Помощь · 2 Сохранить · 3 Открыть · 6 Дубль · 7 Поиск · 0 Меню\na Сохранить как · w Закрыть · x Выход · m Меню · u Окна\nn Далее · p Назад · r Замена · g Перейти к строке\nCtrl+S Сохранить · Ctrl+F Найти · Ctrl+G К строке\nCtrl+Z/Y Отмена/Повтор · Ctrl+C/X/V внутренний буфер\nCtrl+O, затем влево/вправо: движение по словам\nДобавьте Shift к стрелке для выделения\n↑/↓ Страница · , / . Начало/конец строки\nh / e Начало/конец текста · c Удалить выделение\nEsc или щелчок отменяет префикс. Клавиши DN работают.\nОткрытие, закрытие и выход защищают несохранённый текст.\nUTF-8, 2 МиБ / 100 тыс. строк. Переводы строк сохраняются.\nСохранить как не заменяет существующий файл.
-Mac-friendly: press Ctrl+O, release, then choose\n2 Wrap · 3 Close · 7 Find · 0 Quit DN\nf Find · n Next match · p Reverse · w Close · u Windows\nUp/Down Page · Left/Right First/last row\nEsc or click cancels the prefix.\nClassic DN keys remain available.	Для Mac: нажмите Ctrl+O, отпустите, затем выберите\n2 Перенос строк · 3 Закрыть · 7 Поиск · 0 Выход из DN\nf Поиск · n Далее · p Назад · w Закрыть · u Окна\n↑/↓ Страница · ←/→ Начало/конец\nEsc или щелчок отменяет префикс.\nКлассические клавиши DN также работают.
+Mac-friendly: Ctrl+O, release, then digit or letter\n1 Help · 2 Save · 3 Open · 6 Duplicate · 7 Find · 0 Menu\na Save As · w Close · x Quit DN · m Menu · u Windows\nn Next match · p Reverse · r Replace · g Go to line\nCtrl+S Save · Ctrl+F Find · Ctrl+G Go to line\nCtrl+Z/Y Undo/Redo · Ctrl+C/X/V internal clipboard\nTab/Shift+Tab block indent · Ctrl+] matching bracket\nCtrl+O then Left/Right: word movement\nAdd Shift to the arrow to extend selection\nUp/Down Page · , / . Line start/end\nh / e Document start/end · c Clear selection\nEsc or click cancels the prefix. Classic keys still work.\nOpen/Close/Quit protect unsaved changes.\nUTF-8, 2 MiB / 100k lines. Line endings preserved.\nSave As never overwrites an existing destination.	Для Mac: Ctrl+O, отпустите, затем цифра или буква\n1 Помощь · 2 Сохранить · 3 Открыть · 6 Дубль · 7 Поиск · 0 Меню\na Сохранить как · w Закрыть · x Выход · m Меню · u Окна\nn Далее · p Назад · r Замена · g Перейти к строке\nCtrl+S Сохранить · Ctrl+F Найти · Ctrl+G К строке\nCtrl+Z/Y Отмена/Повтор · Ctrl+C/X/V внутренний буфер\nTab/Shift+Tab отступ блока · Ctrl+] парная скобка\nCtrl+O, затем влево/вправо: движение по словам\nДобавьте Shift к стрелке для выделения\n↑/↓ Страница · , / . Начало/конец строки\nh / e Начало/конец текста · c Удалить выделение\nEsc или щелчок отменяет префикс. Клавиши DN работают.\nОткрытие, закрытие и выход защищают несохранённый текст.\nUTF-8, 2 МиБ / 100 тыс. строк. Переводы строк сохраняются.\nСохранить как не заменяет существующий файл.
+Mac-friendly: press Ctrl+O, release, then choose\n2 Wrap · 3 Close · 7 Find · 0 Quit DN\nf Find · g Go to · n Next match · p Reverse · w Close · u Windows\nUp/Down Page · Left/Right First/last row\nEsc or click cancels the prefix.\nClassic DN keys remain available.	Для Mac: нажмите Ctrl+O, отпустите, затем выберите\n2 Перенос строк · 3 Закрыть · 7 Поиск · 0 Выход из DN\nf Поиск · g Перейти · n Далее · p Назад · w Закрыть · u Окна\n↑/↓ Страница · ←/→ Начало/конец\nEsc или щелчок отменяет префикс.\nКлассические клавиши DN также работают.
 ^O means Ctrl+O, release, then the next key.\n1 Help · 2 User · 3 View · 4 Edit · 5 Copy\n6 Move · 7 MkDir · 8 Trash · 9 Menu · 0 Quit\ns Quick search · f Find · i Info · z Sort\nb Bookmarks · l Filter · h Commands · k Keyboard\nEditor: a Save As · w Close · r Replace · x Quit\nViewer: 2 Wrap · n Next · p Reverse · w Close\nThe prefix displays a guide for the current screen.\nClassic DN shortcuts remain available.	^O: нажмите Ctrl+O, отпустите, затем другую клавишу.\n1 Помощь · 2 Пользователь · 3 Просмотр · 4 Редактор · 5 Копия\n6 Перенос · 7 Папка · 8 Корзина · 9 Меню · 0 Выход\ns Быстрый поиск · f Поиск файлов · i Свойства · z Сортировка\nb Закладки · l Фильтр · h Команды · k Клавиши\nРедактор: a Сохранить как · w Закрыть · r Замена · x Выход\nПросмотр: 2 Перенос строк · n Далее · p Назад · w Закрыть\nПосле Ctrl+O видна подсказка для текущего экрана.\nКлассические клавиши DN также работают.
 Classic DN uses F1–F10 and Alt/Ctrl combinations.\nTab switches panels; Insert or Space marks entries.\nF3 View · F4 Edit · F5 Copy · F6 Move\nF7 MkDir · F8 Trash/delete · F9 Menu · F10 Quit\nEditor: F2 Save · F7 Find · F10 Menu\nMac-friendly adds Ctrl+O sequences without Fn/Option.\nDefault: Classic DN. Automatic: Mac on macOS, Classic elsewhere.	Классические DN: F1–F10 и сочетания с Alt/Ctrl.\nTab переключает панели; Insert или Пробел отмечает.\nF3 Просмотр · F4 Редактор · F5 Копия · F6 Перенос\nF7 Папка · F8 Корзина/удаление · F9 Меню · F10 Выход\nРедактор: F2 Сохранить · F7 Поиск · F10 Меню\nПрофиль Mac добавляет Ctrl+O без Fn/Option.\nПо умолчанию — DN. Авто: Mac на macOS, иначе DN.
 Ctrl+O: choose a user-menu command\n1 Help · 2 Global/Local · 4 Edit · other digits: F-keys\nr Reload · w Back/Cancel · Up/Down Page\nLeft/Right First/last item\nEsc or click cancels the prefix.\nCommands still require explicit Run confirmation.	Ctrl+O: команды меню пользователя\n1 Справка · 2 Общее/Локальное · 4 Правка\nОстальные цифры: соответствующие F-клавиши\nr Перечитать · w Назад/Отмена · ↑↓ Страница\n←/→ Первый/последний пункт\nEsc или щелчок отменяет префикс.\nЗапуск команды требует явного подтверждения.
@@ -670,5 +670,98 @@ Volume	Звук
 List	Список
 UI prototype · no playback	Макет · без воспроизведения
 MP3 Player Help	Справка MP3-плеера
-This is a UI-only MP3 player prototype inspired by DOS Navigator.\nNo audio is played and no files are opened or read.\nTransport and secondary buttons only demonstrate native focus and pressed feedback.\nTab / Shift+Tab select controls; Enter / Space press the selected button.\nAlt+Z, the title zoom button or a title double-click switch compact/expanded views.\nCtrl+F5 moves the player; Esc closes it. No preferences are saved.	Это макет MP3-плеера по образцу DOS Navigator.\nЗвук не воспроизводится, файлы не открываются и не читаются.\nКнопки демонстрируют только фокус и нажатие.\nTab / Shift+Tab выбирают кнопку; Enter / Space нажимают её.\nAlt+Z, кнопка в заголовке или двойной щелчок переключают вид.\nCtrl+F5 перемещает окно; Esc закрывает его. Настройки не сохраняются.
+This is a UI-only MP3 player prototype inspired by DOS Navigator.\nNo audio is played and no files are opened or read.\nTransport controls remain inert. In expanded view, List opens a demo play-order dialog inspired by CDUTIL.PAS.\nAdd opens a track chooser; Delete removes a demo row; OK keeps the order for this opening, Cancel discards the draft.\nDurations are unknown (--:--), Save is disabled, and no files are loaded or saved.\nTab / Shift+Tab select controls; Enter / Space press the selected button.\nAlt+Z, the title zoom button or a title double-click switch compact/expanded views.\nCtrl+F5 moves the player; Esc closes it. No preferences are saved.	Это макет MP3-плеера по образцу DOS Navigator.\nЗвук не воспроизводится, файлы не открываются и не читаются.\nВ развёрнутом виде кнопка «Список» открывает пример порядка дорожек.\nДобавить открывает выбор дорожки; Удалить убирает строку примера.\nOK оставляет список до закрытия плеера, Отмена убирает изменения.\nВремя неизвестно (--:--), запись списка недоступна.\nTab / Shift+Tab выбирают контрол; Enter / Space нажимают кнопку.\nСтрелки и клавиши страниц перемещаются по списку.\nAlt+Z меняет размер плеера; Ctrl+F5 перемещает окно.\nEsc возвращает из списка, затем закрывает плеер. Настройки не сохраняются.
 Set up	Настр.
+
+Next window	Следующее окно
+Previous window	Предыдущее окно
+Directory sizes	Размеры каталогов
+Archive browser	Просмотр архива
+File information	Сведения о файле
+ASCII table	Таблица ASCII
+System information	Сведения о системе
+Memory information	Сведения о памяти
+Bookmarks	Закладки
+Directory history	История каталогов
+Command history	История команд
+Windows...	Окна...
+Containing text	Содержит текст
+Min bytes	Мин. байт
+Max bytes	Макс. байт
+From date	С даты
+To date	По дату
+Any entry	Любой объект
+Files only	Только файлы
+Directories only	Только каталоги
+Links only	Только ссылки
+Match text case	Учитывать регистр текста
+Sizes: bytes/K/M/G · Dates: YYYY-MM-DD UTC · Empty = unrestricted	Байты/K/M/G · Даты ГГГГ-ММ-ДД UTC · Пусто — любой
+New search	Новый поиск
+Filename masks (; separated)	Маски имён (через ;)
+Color (0–15)	Цвет (0–15)
+First matching enabled group wins; folders and links keep their colors.	Используется первая подходящая группа; цвета каталогов и ссылок сохраняются.
+User command parameters	Параметры команды
+Values are single arguments; review follows before execution.	Значения — отдельные аргументы; перед запуском будет просмотр.
+Review	Просмотр
+
+# DN block and related-selection commands
+Select same highlight type	Выделить такой же тип
+Unselect same highlight type	Снять выделение типа
+Select same extension	Выделить расширение
+Unselect same extension	Снять выделение расширения
+~I~ndent lines	С~д~винуть строки вправо
+~U~nindent lines	Сдвинуть строки в~л~ево
+Uppe~r~case	Верхний р~е~гистр
+Lo~w~ercase	~Н~ижний регистр
+Capitali~z~e words	~П~ервые буквы слов
+~S~ort selected lines	~С~ортировать строки
+Matching ~b~racket	Парная с~к~обка
+Viewer Go to	Переход в просмотре
+Byte offset (decimal or 0x hexadecimal, from 0)	Смещение: число или 0x HEX (от 0)
+Line number (from 1)	Номер строки (от 1)
+[ Go ]	[ Перейти ]
+Go to	Перейти
+Wait for the file to load.	Дождитесь загрузки файла.
+Enter a decimal byte offset or 0x hexadecimal offset.	Введите смещение: число или 0x HEX.
+Enter a line number starting at 1.	Введите номер строки, начиная с 1.
+Offset is outside the loaded preview.	Смещение за пределами загруженной части.
+Line is outside the loaded preview.	Строка за пределами загруженной части.
+Select text first.	Сначала выделите текст.
+Select at least two lines first.	Сначала выделите не менее двух строк.
+No matching bracket at the cursor.	Парная скобка у курсора не найдена.
+Select~i~on	~В~ыделение
+Sorting would merge mixed CR/LF line endings.	Сортировка объединила бы разные переводы строк CR/LF.
+
+# Editor crash recovery and save durability
+Editor recovery	Восстановление редактора
+Recover	Вернуть
+Inspect	Просмотр
+Later	Позже
+Unsaved work from a previous session	Несохранённый текст предыдущего сеанса
+Checkpoint (UTC):	Снимок (UTC):
+Recover opens an unsaved copy. The source file stays unchanged.	Откроется несохранённая копия. Исходный файл не меняется.
+Cannot read this checkpoint. You may discard it or leave it for later.	Снимок не читается. Можно удалить его или оставить на потом.
+Untitled document	Документ без имени
+Recover unsaved documents...	Восстановить несохранённые документы...
+Recovery Help	Просмотр снимка восстановления
+Recovered unsaved copy	Восстановленная несохранённая копия
+No recovery checkpoints are waiting.	Нет снимков для восстановления.
+Written — durability unconfirmed; retry Save	Файл записан — надёжность не подтверждена; повторите сохранение
+File was written, but durability could not be confirmed:	Файл записан, но надёжность записи не подтверждена:
+Your buffer is retained and recovery checkpointing continues. Retry Save to confirm it without rewriting unchanged text.	Текст остаётся в редакторе, снимки восстановления продолжаются. Повторите сохранение: неизменённый текст не будет перезаписан.
+Your open buffers are retained. Previously completed checkpoints remain available; DN will retry.	Открытые документы сохранены в памяти. Готовые снимки доступны; DN повторит попытку.
+Recovery checkpoint failed:	Не удалось создать снимок восстановления:
+Editor recovery unavailable:	Восстановление редактора недоступно:
+Recovery cleanup failed:	Не удалось удалить снимки восстановления:
+Checkpoints were retained. Press Enter or Esc to finish exiting.	Снимки оставлены на диске. Нажмите Enter или Esc для выхода.
+
+# MP3 demo playlist and track chooser
+Play order	Порядок дорожек
+Select track	Выбор дорожки
+No.	№
+Example tracks · no files loaded	Пример дорожек · файлы не загружены
+Demo track	Демо-дорожка
+Empty demo playlist	Список примера пуст
+* Already in the draft playlist	* Уже есть в черновике списка
+Edit the demo order · OK keeps it until this player closes	OK оставит пример списка до закрытия плеера
+UI prototype · no playback or file saving	Макет интерфейса · без звука и записи файлов

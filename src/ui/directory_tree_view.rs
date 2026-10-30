@@ -1,7 +1,7 @@
 use crate::dialog_theme as theme;
 use crate::painting::Paragraph;
 use crate::presentation::layout::Rect;
-use crate::turbo::dialog_spec::{centered, scope, Control, ControlKind, DialogSpec};
+use crate::turbo::dialog_spec::{scope, Control, ControlKind, DialogSpec};
 use crate::{
     app::App,
     directory_tree::{geometry, Action},
@@ -13,9 +13,9 @@ use crate::{
 pub(crate) fn tree_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
     let profile = app.config.palette;
     let dos = profile.styles_for(crate::palette::theme::Group::Dialogs);
-    let tree = app.modals.directory_tree()?;
+    let tree = app.directory_tree()?;
     let g = geometry(area);
-    let rect = centered(area, g.width, g.height);
+    let rect = crate::tool_windows::bounds(app, area, g.width, g.height);
     let mut spec = DialogSpec::new(
         rect,
         scope(app, crate::focus::Focus::Tree)?,
@@ -119,6 +119,9 @@ pub(crate) fn tree_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
             0x78,
         ),
     ] {
+        if y < top + tree.page_rows as u16 {
+            continue;
+        }
         spec.caption(
             Paragraph::new(text).style(dos(color)),
             Rect::new(x, y, w, 1),

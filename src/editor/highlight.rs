@@ -62,6 +62,7 @@ pub struct Token {
     pub start: usize,
     pub end: usize,
     pub color: u8,
+    code: bool,
 }
 struct Highlighted {
     hash: u64,
@@ -112,6 +113,15 @@ impl Cache {
             state = end;
         }
         self.lines.truncate(buffer.lines.len());
+    }
+    pub fn is_code(&self, row: usize, column: usize) -> bool {
+        self.lines
+            .get(row)
+            .and_then(|line| {
+                line.tokens
+                    .get(line.tokens.partition_point(|t| t.end <= column))
+            })
+            .is_none_or(|t| t.code)
     }
     pub fn color(&self, row: usize, column: usize) -> u8 {
         self.lines
@@ -277,6 +287,7 @@ fn lex(text: &str, language: Language, mut state: State) -> (Vec<Token>, State) 
                 start,
                 end: i,
                 color,
+                code: !matches!(color, 0x1a | 0x1e),
             });
         }
     }

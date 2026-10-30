@@ -222,7 +222,13 @@ fn mouse_menus_function_bar_and_modal_clicks() -> io::Result<()> {
     }
     for width in [80, 120] {
         render(&mut app, width, 25)?;
-        mouse_at(&mut app, Target::Function(1), click);
+        app.push_owned_dialog(
+            dn::modals::ModalOwner::Workspace,
+            dn::dialog::Dialog {
+                title: "Help",
+                message: "Modal help".into(),
+            },
+        );
         assert_eq!(app.dialogs().len(), 1);
         render(&mut app, width, 25)?;
         assert!(app

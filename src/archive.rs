@@ -115,9 +115,12 @@ impl Browser {
 pub fn open(app: &mut App, path: PathBuf) {
     crate::menu::close(app);
     app.modals.set_quick_search(None);
+    if !crate::tool_windows::open(app, crate::tool_windows::Kind::Archive, Some(path.clone())) {
+        return;
+    }
     match Browser::new(path) {
-        Ok(b) => app.modals.set_archive(Some(b)),
-        Err(e) => app.error(e.to_string()),
+        Ok(b) => app.set_archive(Some(b)),
+        Err(e) => crate::tool_windows::failed(app, e.to_string()),
     }
 }
 pub fn open_current(app: &mut App) {
@@ -137,14 +140,13 @@ pub fn poll(app: &mut App) -> bool {
     // Take the reply here so previews can open the ordinary viewer without paths
     // being handed to the filesystem or recorded in viewer history.
     let reply = app
-        .modals
         .archive_mut()
         .and_then(|a| crate::task::take_reply(&mut a.task))
         .map(|reply| reply.unwrap_or_else(|_| Err(io::Error::other("Archive worker stopped"))));
     let Some(reply) = reply else {
         return false;
     };
-    let Some(browser) = app.modals.archive_mut() else {
+    let Some(browser) = app.archive_mut() else {
         return false;
     };
     match reply {
@@ -165,16 +167,15 @@ pub fn poll(app: &mut App) -> bool {
             browser.offset = 0;
         }
         Ok(Reply::Preview(path, contents)) => {
-            browser.status = "Read-only · Enter browse/view · F3 view · F9 info".into();
+            browser.status = "Read-only · Enter browse/view · F3 view · Alt+I info".into();
             let foreground = browser.preview_epoch == app.desktop.activation_revision()
-                && app
-                    .modal_top()
-                    .is_some_and(|m| m.focus == crate::focus::Focus::Archive);
+                && app.desktop.active().kind
+                    == crate::desktop::WindowKind::Tool(crate::tool_windows::Kind::Archive);
             let viewer = crate::viewer::Viewer::from_contents(path, contents);
             let result = if foreground {
-                app.desktop.open_viewer(viewer)
+                app.install_document(|desktop| desktop.open_viewer(viewer))
             } else {
-                app.desktop.open_viewer_background(viewer)
+                app.install_document(|desktop| desktop.open_viewer_background(viewer))
             };
             if let Err(error) = result {
                 app.error(error.to_string());
@@ -188,12 +189,13 @@ pub fn poll(app: &mut App) -> bool {
     true
 }
 pub fn action(app: &mut App, action: Action) {
+    let datetime = app.config.datetime;
     if action == Action::Close {
-        app.modals.set_archive(None);
+        app.set_archive(None);
         return;
     }
     let epoch = app.desktop.activation_revision();
-    let Some(browser) = app.modals.archive_mut() else {
+    let Some(browser) = app.archive_mut() else {
         return;
     };
     match action {
@@ -203,7 +205,10 @@ pub fn action(app: &mut App, action: Action) {
         }
         Action::Refresh => {
             let path = browser.path.clone();
-            open(app, path);
+            match Browser::new(path) {
+                Ok(next) => app.set_archive(Some(next)),
+                Err(e) => app.error(e.to_string()),
+            }
         }
         Action::Up => browser.step(-1),
         Action::Down => browser.step(1),
@@ -211,7 +216,7 @@ pub fn action(app: &mut App, action: Action) {
         Action::PageDown => browser.step(browser.rows as isize),
         Action::Parent => {
             if browser.parent() {
-                app.modals.set_archive(None);
+                app.set_archive(None);
             }
         }
         Action::Row(row) => {
@@ -238,7 +243,7 @@ pub fn action(app: &mut App, action: Action) {
             }
             let Some(id) = browser.selected() else {
                 if action == Action::Open && browser.parent() {
-                    app.modals.set_archive(None);
+                    app.set_archive(None);
                 }
                 return;
             };
@@ -253,7 +258,7 @@ pub fn action(app: &mut App, action: Action) {
                 return;
             }
             if action == Action::Info || node.kind != Kind::File || node.locked {
-                let dialog=crate::dialog::Dialog{title:" Archive member information ",message:format!("{}\nType: {:?}{}\nSize: {} bytes\nModified: {}\nRead-only. Links and special entries are never followed.\nEncrypted members cannot be previewed.",crate::filesystem::display_name(&String::from_utf8_lossy(&node.path)),node.kind,if node.locked{" (encrypted)"}else{""},node.size,app.config.datetime.archive(node.modified.as_deref().unwrap_or("Unavailable")))};
+                let dialog=crate::dialog::Dialog{title:" Archive member information ",message:format!("{}\nType: {:?}{}\nSize: {} bytes\nModified: {}\nRead-only. Links and special entries are never followed.\nEncrypted members cannot be previewed.",crate::filesystem::display_name(&String::from_utf8_lossy(&node.path)),node.kind,if node.locked{" (encrypted)"}else{""},node.size,datetime.archive(node.modified.as_deref().unwrap_or("Unavailable")))};
                 app.push_dialog(dialog);
                 return;
             }
@@ -277,13 +282,13 @@ pub fn action(app: &mut App, action: Action) {
     }
 }
 pub fn key(app: &mut App, key: KeyEvent) {
-    if let Some(m) = app.modals.archive_mut() {
+    if let Some(m) = app.archive_mut() {
         m.last_click = None;
     }
     if crate::dialog_controls::key(app, key, crate::focus::Focus::Archive) {
         return;
     }
-    let Some(browser) = app.modals.archive_mut() else {
+    let Some(browser) = app.archive_mut() else {
         return;
     };
     browser.last_click = None;
@@ -294,7 +299,7 @@ pub fn key(app: &mut App, key: KeyEvent) {
     match key.code{
   KeyCode::Backspace|KeyCode::Left=>action(app,Action::Parent),
   KeyCode::Up=>browser.step(-1),KeyCode::Down=>browser.step(1),KeyCode::PageUp=>browser.step(-(browser.rows as isize)),KeyCode::PageDown=>browser.step(browser.rows as isize),KeyCode::Home=>browser.step(isize::MIN),KeyCode::End=>browser.step(isize::MAX),KeyCode::Right=>{if browser.selected().is_some_and(|id|browser.catalog.as_ref().is_some_and(|c|c.nodes[id].kind==Kind::Directory)){action(app,Action::Open);}},
-  KeyCode::F(3)=>action(app,Action::View),KeyCode::F(9)=>action(app,Action::Info),KeyCode::F(1)=>app.push_dialog(crate::dialog::Dialog{title:" Archive browser help ",message:"Read-only ZIP / TAR / TAR.GZ / TGZ browser.\nEnter/double-click opens a folder or previews a file.\nBackspace/Left goes up; Esc closes the archive.\nF3 previews; F9 shows metadata; Ctrl+R refreshes.\nStop cancels indexing or preview reads.\nLinks/special entries are never followed.\nNo extraction, editing or nested archive execution.\nIn the file manager, Ctrl+Enter uses the OS default app.".into()}),_=>{}
+  KeyCode::F(3)=>action(app,Action::View),KeyCode::Char('i') if key.modifiers==KeyModifiers::ALT=>action(app,Action::Info),KeyCode::F(1)=>app.push_dialog(crate::dialog::Dialog{title:" Archive browser help ",message:"Read-only ZIP / TAR / TAR.GZ / TGZ browser.\nEnter/double-click opens a folder or previews a file.\nBackspace/Left goes up; Esc closes the archive.\nF3 previews; Alt+I shows metadata; Ctrl+R refreshes.\nStop cancels indexing or preview reads.\nLinks/special entries are never followed.\nNo extraction, editing or nested archive execution.\nIn the file manager, Ctrl+Enter uses the OS default app.".into()}),_=>{}
  }
 }
 pub fn mouse(app: &mut App, event: MouseEvent, target: Option<crate::mouse::Target>) {
@@ -305,7 +310,7 @@ pub fn mouse(app: &mut App, event: MouseEvent, target: Option<crate::mouse::Targ
             }
         }
         MouseEventKind::ScrollUp | MouseEventKind::ScrollDown => {
-            if let Some(b) = app.modals.archive_mut() {
+            if let Some(b) = app.archive_mut() {
                 b.step(crate::list_state::wheel_delta(event.kind));
             }
         }

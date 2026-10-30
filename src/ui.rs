@@ -105,9 +105,7 @@ pub fn render(app: &App, snapshot: &crate::layout::LayoutSnapshot) -> RenderedFr
                 .iter()
                 .find(|m| m.id == id)
                 .is_some_and(|m| match m.focus {
-                    crate::focus::Focus::Message => {
-                        app.modals.native_help(app.desktop.active().id).is_some()
-                    }
+                    crate::focus::Focus::Message => app.native_help().is_some(),
                     crate::focus::Focus::Welcome => true,
                     crate::focus::Focus::EditorModal => matches!(
                         app.desktop
@@ -145,6 +143,19 @@ pub fn render(app: &App, snapshot: &crate::layout::LayoutSnapshot) -> RenderedFr
     }
     shortcuts_view::draw_prefix(&mut frame, app);
     let (mut scene, dialogs) = frame.finish_dialogs();
+    if app.modal_top().is_none() {
+        if let Some(page) = app
+            .desktop
+            .native()
+            .top_surface()
+            .filter(|s| matches!(s.id.key, crate::windowing::geometry::SurfaceKey::Page(..)))
+        {
+            scene.regions.retain(|(r, t)| match t {
+                Target::Surface(id, _) => *id == page.id,
+                _ => page.bounds.contains((r.x, r.y).into()),
+            });
+        }
+    }
     if let Some(surface) = snapshot
         .surfaces
         .iter()
@@ -426,7 +437,7 @@ pub(crate) fn remaining_spec(
     }
     match focus {
         Focus::Plugin => crate::plugins::host::controls(app, area),
-        Focus::Message if app.modals.native_help(app.desktop.active().id).is_none() => {
+        Focus::Message if app.native_help().is_none() => {
             let d = app.last_dialog()?;
             let m = crate::layout::dialog_layout(area, d, app.config.language);
             overlays::message_spec(app, &m)
@@ -460,6 +471,7 @@ fn draw_workspace(
         || frame.area().width < 80
         || frame.area().height < 25
         || active_surface.is_some_and(|s| s.maximized)
+            && matches!(active.kind, WindowKind::Editor | WindowKind::Viewer)
     {
         draw_content(frame, app, prepared, true);
         if app.modal_top().is_none()
@@ -499,6 +511,56 @@ fn draw_workspace(
         let Some(info) = app.desktop.windows().find(|w| w.id == id) else {
             continue;
         };
+        if let WindowKind::Tool(_) = info.kind {
+            let mut layer = crate::painting::NativeFrame::new(frame.area(), app.config.palette);
+            app.desktop.render_as(id, || {
+                if let Some(t) = app.desktop.tool(id) {
+                    if t.kind == crate::tool_windows::Kind::Help {
+                        if let Some(scene) = t.state.help.as_ref().and_then(|h| h.browser.scene()) {
+                            layer.compose(scene.clone());
+                        }
+                    } else if let Some(spec) = crate::tool_windows::spec(app, frame.area()) {
+                        spec.paint(&mut layer, app);
+                    }
+                }
+            });
+            let mut scene = layer.finish();
+            let visible = Rect::new(
+                surface.bounds.x,
+                surface.bounds.y,
+                surface.bounds.width.saturating_add(2),
+                surface.bounds.height.saturating_add(1),
+            )
+            .intersection(crate::windowing::geometry::workspace((
+                frame.area().width,
+                frame.area().height,
+            )));
+            scene.cells.retain(|p, _| visible.contains((*p).into()));
+            scene.regions = scene
+                .regions
+                .into_iter()
+                .map(|(r, t)| (r.intersection(surface.bounds), t))
+                .filter(|(r, _)| !r.is_empty())
+                .collect();
+            scene.cursor = scene
+                .cursor
+                .filter(|p| surface.bounds.contains((*p).into()));
+            if id != active.id {
+                scene.regions.clear();
+                scene.cursor = None;
+            }
+            scene.regions.insert(
+                0,
+                (
+                    surface.bounds,
+                    Target::Surface(surface.id, crate::windowing::geometry::Chrome::Activate),
+                ),
+            );
+            crate::windowing::workspace::chrome(&mut scene, surface);
+            crate::windowing::workspace::occlude(frame, surface.bounds);
+            frame.compose(scene);
+            continue;
+        }
         if let WindowKind::Plugin(plugin) = info.kind {
             if let Some(binding) = app.desktop.plugins.binding(plugin) {
                 let mut layer = crate::painting::NativeFrame::new(frame.area(), app.config.palette);
@@ -612,6 +674,61 @@ fn draw_workspace(
             frame.set_cursor_position(cursor);
         }
     }
-    let (_, menu_positions) = crate::turbo::manager::menu_bar(app, frame.area().width);
+    let content_cursor = frame.cursor();
+    let (bar, menu_positions) = crate::turbo::manager::menu_bar(app, frame.area().width);
+    if !matches!(active.kind, WindowKind::Editor | WindowKind::Viewer) {
+        frame.compose(bar);
+        if crate::menu::bar_visible(app) {
+            for (i, r) in menu_positions.iter().enumerate() {
+                frame.regions().push((*r, Target::Menu(i)));
+            }
+        }
+    }
+    if matches!(active.kind, WindowKind::Tool(_)) && app.modal_top().is_none() {
+        let y = frame.area().height - 1;
+        frame.regions().retain(|(r, _)| r.y != y);
+        let width = frame.area().width;
+        let entries = [
+            ("F1 ", "Help", Target::Function(1), 13),
+            ("F9 ", "Menu", Target::Function(9), 13),
+            (
+                "Alt+F6 ",
+                "Next window",
+                Target::Window(crate::windowing::Action::Next),
+                25,
+            ),
+            (
+                "Alt+0 ",
+                "Windows...",
+                Target::Window(crate::windowing::Action::List),
+                20,
+            ),
+        ];
+        let mut x = 0;
+        for (key, label, target, w) in entries {
+            let w = w.min(width.saturating_sub(x));
+            let r = Rect::new(x, y, w, 1);
+            frame.render_widget(
+                crate::turbo::widgets::function_status(key, app.config.language.text(label), true),
+                r,
+            );
+            frame.regions().push((r, target));
+            x += w;
+        }
+        let r = Rect::new(x, y, width.saturating_sub(x), 1);
+        frame.render_widget(
+            crate::turbo::widgets::function_status("Esc ", app.config.language.text("Close"), true),
+            r,
+        );
+        if let Some(surface) = active_surface {
+            frame.regions().push((
+                r,
+                Target::Surface(surface.id, crate::windowing::geometry::Chrome::Close),
+            ));
+        }
+    }
+    if let Some(cursor) = content_cursor {
+        frame.set_cursor_position(cursor);
+    }
     draw_layers(frame, app, prepared, &menu_positions);
 }

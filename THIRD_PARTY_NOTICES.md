@@ -114,7 +114,9 @@ cannot simply be copied and put under another distribution licence
 
 The MP3 Player UI prototype in `src/plugins/mp3_player.rs` adapts the
 three-row counter glyph and compact/expanded arrangement from DOS Navigator
-1.51 `CDPLAYER.PAS`. No CD or audio implementation is included.
+1.51 `CDPLAYER.PAS`. The demo play-order dialog and nested track chooser in
+`src/plugins/mp3_player/playlist.rs` follow `CDUTIL.PAS` (`TOrder`, track/time/
+description rows and Add/Delete controls). No CD or audio implementation is included.
 
 Based on Dos Navigator by RIT Research Labs.
 
@@ -162,3 +164,14 @@ cannot simply be copied and put under another distribution licence
 (including the GNU Public Licence).
 
 ```
+
+## DOS Navigator workflow references
+
+Based on Dos Navigator by RIT Research Labs. Advanced Find criteria, parameterized
+user actions and ordered highlight groups follow behavior documented in the
+original `FILEFIND.PAS`, `USERMENU.PAS`, `SETUPS.PAS` and English `DNHELP.HTX`.
+Related selection, editor block commands/bracket navigation and viewer addressing
+also reference `EDITOR.PAS`, `FVIEWER.PAS` and the original keyboard help; UTF-8
+transformations and undo transactions use the current Rust editor.
+The implementation uses DN's current Rust workers, controls and file safeguards.
+The original DOS Navigator notice and license reproduced above are retained.

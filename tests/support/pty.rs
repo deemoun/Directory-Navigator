@@ -24,6 +24,12 @@ pub struct Session {
 }
 impl Session {
     pub fn new(label: &str) -> io::Result<Self> {
+        Self::with_checkpoint(label, false)
+    }
+    pub fn new_recovery(label: &str) -> io::Result<Self> {
+        Self::with_checkpoint(label, true)
+    }
+    fn with_checkpoint(label: &str, checkpoint: bool) -> io::Result<Self> {
         static NEXT: AtomicU64 = AtomicU64::new(0);
         let root = std::env::temp_dir().join(format!(
             "dn-walk-{label}-{}-{}",
@@ -39,6 +45,23 @@ impl Session {
         fs::write(root.join("inside/child.txt"), "child\n")?;
         for n in 0..65 {
             fs::write(root.join(format!("item-{n:03}.txt")), "fixture\n")?;
+        }
+        if checkpoint {
+            let root_recovery = root.join("settings/dn/editor-recovery");
+            let store = dn::editor::recovery::store::Store::open(&root_recovery)?;
+            fs::write(root.join("source.txt"), "original source\n")?;
+            dn::editor::recovery::store::write(
+                &store.current.dir.join("1.rec"),
+                &dn::editor::recovery::Record {
+                    text: "recovery 界\n".into(),
+                    path: Some(root.join("source.txt")),
+                    base: root.clone(),
+                    cursor: 0,
+                    anchor: None,
+                    bom: true,
+                    time: 1700000000,
+                },
+            )?;
         }
         let (mut master, mut slave) = (0, 0);
         let mut size = libc::winsize {

@@ -235,7 +235,9 @@ impl Widget for Native {
                 return;
             }
         }
-        if self.view.as_any().is::<Dialog>() && frame.dialog_scope().is_some() {
+        if self.view.as_any().is::<Dialog>()
+            && (frame.dialog_scope().is_some() || frame.document_owner().is_some())
+        {
             frame.start_dialog(self, area);
             return;
         }

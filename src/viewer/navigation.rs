@@ -17,6 +17,11 @@ impl Default for SearchMemory {
         }
     }
 }
+pub struct GoToDialog {
+    pub field: String,
+    pub cursor: usize,
+    pub focus: usize,
+}
 pub struct SearchDialog {
     pub memory: SearchMemory,
     pub cursor: usize,
@@ -34,6 +39,7 @@ pub struct VisualRow {
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Action {
+    GoTo,
     Wrap,
     Find,
     Next,
@@ -45,6 +51,52 @@ pub enum Action {
     Field,
 }
 impl Viewer {
+    pub fn go_to(&mut self, field: &str) -> Result<(), String> {
+        let contents = self.contents.as_ref().ok_or("Wait for the file to load.")?;
+        let field = field.trim();
+        let value = if contents.binary {
+            if let Some(hex) = field
+                .strip_prefix("0x")
+                .or_else(|| field.strip_prefix("0X"))
+            {
+                usize::from_str_radix(hex, 16)
+                    .map_err(|_| "Enter a decimal byte offset or 0x hexadecimal offset.")?
+            } else {
+                field
+                    .parse::<usize>()
+                    .map_err(|_| "Enter a decimal byte offset or 0x hexadecimal offset.")?
+            }
+        } else {
+            field
+                .parse::<usize>()
+                .map_err(|_| "Enter a line number starting at 1.")?
+        };
+        if contents.binary {
+            if value >= contents.loaded_bytes.max(1) {
+                return Err("Offset is outside the loaded preview.".into());
+            }
+            self.offset = value / 16;
+            self.horizontal = 0;
+            self.current = (contents.loaded_bytes > 0).then_some(Match {
+                line: value / 16,
+                range: (10 + 3 * (value % 16))..(12 + 3 * (value % 16)),
+            });
+        } else {
+            if value == 0 || value > contents.lines.len() {
+                return Err("Line is outside the loaded preview.".into());
+            }
+            self.current = None;
+            self.go_to_line(value);
+            self.layout(self.layout_width.max(1) as u16);
+        }
+        self.notice.clear();
+        Ok(())
+    }
+    pub fn go_to_line(&mut self, line: usize) {
+        self.reveal_line = Some(line.saturating_sub(1));
+        self.layout_width = 0;
+    }
+
     pub fn text_ready(&self) -> bool {
         self.contents.as_ref().is_some_and(|c| !c.binary)
     }
@@ -88,6 +140,12 @@ impl Viewer {
         }
         self.offset = self.row_for(anchor.0, anchor.1);
         self.mapped_wrap = self.wrap;
+        if self.contents.is_some() {
+            if let Some(line) = self.reveal_line.take() {
+                self.offset = self.row_for(line, 0);
+                self.horizontal = 0;
+            }
+        }
         if was_wrapped && !self.wrap {
             if let Some(line) = self.contents.as_ref().and_then(|c| c.lines.get(anchor.0)) {
                 self.horizontal = Span::raw(&line[..anchor.1.min(line.len())])
@@ -258,7 +316,31 @@ pub fn action(app: &mut App, action: Action) {
     let Some(viewer) = app.desktop.active_viewer_mut() else {
         return;
     };
+    if viewer.modals.viewer_goto().is_some() {
+        match action {
+            Action::Cancel => viewer.modals.set_viewer_goto(None),
+            Action::Field => viewer.modals.viewer_goto_mut().unwrap().focus = 0,
+            Action::Submit => {
+                let dialog = viewer.modals.take_viewer_goto().unwrap();
+                if let Err(error) = viewer.go_to(&dialog.field) {
+                    viewer.notice = error;
+                    viewer.modals.set_viewer_goto(Some(dialog));
+                }
+            }
+            _ => {}
+        }
+        return;
+    }
     match action {
+        Action::GoTo => {
+            if viewer.contents.is_some() {
+                viewer.modals.set_viewer_goto(Some(GoToDialog {
+                    field: String::new(),
+                    cursor: 0,
+                    focus: 0,
+                }));
+            }
+        }
         Action::Wrap => viewer.toggle_wrap(),
         Action::Find => {
             if viewer.text_ready() {
@@ -303,6 +385,16 @@ pub fn paste(app: &mut App, text: &str) {
     if let Some(dialog) = app
         .desktop
         .active_viewer_mut()
+        .and_then(|v| v.modals.viewer_goto_mut())
+    {
+        if dialog.focus == 0 {
+            crate::dialog::paste_input(&mut dialog.field, &mut dialog.cursor, text);
+        }
+        return;
+    }
+    if let Some(dialog) = app
+        .desktop
+        .active_viewer_mut()
         .and_then(|v| v.modals.viewer_search_mut())
     {
         super::search_controller::paste(dialog, text);
@@ -315,7 +407,7 @@ pub fn key(app: &mut App, key: KeyEvent) {
             if matches!(
                 key.code,
                 KeyCode::Tab | KeyCode::BackTab | KeyCode::Enter | KeyCode::Esc
-            ) || (key.code == KeyCode::Char(' ') && spec.focus == 1)
+            ) || (key.code == KeyCode::Char(' ') && spec.focus != 0)
             {
                 spec.key(key)
             } else {
@@ -334,6 +426,23 @@ pub fn key(app: &mut App, key: KeyEvent) {
     let Some(viewer) = app.desktop.active_viewer_mut() else {
         return;
     };
+    if let Some(dialog) = viewer.modals.viewer_goto_mut() {
+        if dialog.focus == 0 {
+            if key.code == KeyCode::Char('a')
+                && key
+                    .modifiers
+                    .contains(crossterm::event::KeyModifiers::CONTROL)
+            {
+                dialog.field.clear();
+                dialog.cursor = 0;
+            } else if !key.modifiers.intersects(
+                crossterm::event::KeyModifiers::CONTROL | crossterm::event::KeyModifiers::ALT,
+            ) {
+                crate::dialog::edit_input(&mut dialog.field, &mut dialog.cursor, key.code);
+            }
+        }
+        return;
+    }
     if let Some(dialog) = viewer.modals.viewer_search_mut() {
         super::search_controller::edit(dialog, key);
         return;

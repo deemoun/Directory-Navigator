@@ -2,7 +2,7 @@
 //! selected window, z-order and the modal input scope. Commands return to the
 //! existing controllers before any close/save/filesystem action is performed.
 use crate::windowing::geometry::{
-    self, Capabilities, Capture, Definition, Interaction, Shell, Surface, SurfaceId, SurfaceKey,
+    self, Capture, Definition, Interaction, Shell, Surface, SurfaceId, SurfaceKey,
 };
 use crate::{
     desktop::{WindowId, WindowInfo},
@@ -69,18 +69,9 @@ struct Document {
 impl Document {
     fn new(bounds: Rect, info: WindowInfo, scope: Scope, mailbox: Mailbox) -> Self {
         let size = (bounds.width() as u16, bounds.height() as u16);
-        let maximal = matches!(
-            info.kind,
-            crate::desktop::WindowKind::Manager
-                | crate::desktop::WindowKind::Editor
-                | crate::desktop::WindowKind::Viewer
-        ) || scope != Scope::Content;
-        let caps = match info.kind {
-            crate::desktop::WindowKind::Editor => Capabilities::document(72, 12),
-            crate::desktop::WindowKind::Viewer => Capabilities::document(48, 10),
-            crate::desktop::WindowKind::Plugin(_) => Capabilities::fixed(1, 1),
-            _ => Capabilities::fixed(54, 23),
-        };
+        let maximal = crate::windowing::presentation::Policy::initial(info.kind).maximized
+            || scope != Scope::Content;
+        let policy = crate::windowing::presentation::Policy::initial(info.kind);
         let default = if maximal {
             geometry::rect(bounds)
         } else {
@@ -91,9 +82,9 @@ impl Document {
             Definition {
                 key: SurfaceKey::Document(info.id),
                 bounds: default,
-                caps,
+                caps: policy.caps,
                 maximized: maximal,
-                title_row: u16::from(info.kind == crate::desktop::WindowKind::Editor),
+                title_row: policy.title_row,
                 parent: None,
             },
             0,
@@ -109,7 +100,10 @@ impl Document {
             mailbox,
             native: Vec::new(),
             awaiting_geometry: scope == Scope::Content
-                && matches!(info.kind, crate::desktop::WindowKind::Plugin(_)),
+                && matches!(
+                    info.kind,
+                    crate::desktop::WindowKind::Plugin(_) | crate::desktop::WindowKind::Tool(_)
+                ),
         }
     }
 }
@@ -608,7 +602,10 @@ impl NativeDesktop {
                     .child_at(i)
                     .as_any()
                     .downcast_ref::<Document>()
-                    .is_some_and(|d| d.scope == Scope::Content && d.info.id != WindowId::MANAGER)
+                    .is_some_and(|d| {
+                        d.scope == Scope::Content
+                            && (d.shell.surface.caps.tile || d.shell.surface.caps.cascade)
+                    })
             })
             .count()
     }
@@ -632,7 +629,7 @@ impl NativeDesktop {
         }
         let mut surfaces = (0..h.desktop.child_count())
             .filter_map(|i| h.desktop.child_at(i).as_any().downcast_ref::<Document>())
-            .filter(|d| d.scope == Scope::Content && d.info.id != WindowId::MANAGER)
+            .filter(|d| d.scope == Scope::Content && d.shell.surface.caps.arranges(mode))
             .map(|d| d.shell.surface)
             .collect::<Vec<_>>();
         if mode == Arrangement::Tile {
@@ -682,7 +679,10 @@ impl NativeDesktop {
     ) -> bool {
         let mut h = self.0.borrow_mut();
         let size = h.interaction.size;
-        let Some(shell) = h.shell_mut(id.key).filter(|s| s.surface.id == id) else {
+        let Some(shell) = h
+            .shell_mut(id.key)
+            .filter(|s| s.surface.id == id && s.surface.caps.movable)
+        else {
             return false;
         };
         let saved = shell.save();

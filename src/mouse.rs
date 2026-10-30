@@ -13,6 +13,7 @@ use std::{
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Target {
+    Recovery(crate::editor::recovery::Action),
     Surface(
         crate::windowing::geometry::SurfaceId,
         crate::windowing::geometry::Chrome,
@@ -123,6 +124,79 @@ pub fn handle(app: &mut App, event: MouseEvent) {
         app.mouse.reset_click();
         return;
     }
+    if matches!(
+        event.kind,
+        MouseEventKind::ScrollUp | MouseEventKind::ScrollDown
+    ) && app.modal_top().is_none()
+    {
+        let target = app
+            .desktop
+            .native()
+            .mouse_target(&app.mouse.regions, event.column, event.row);
+        let active = app.desktop.active().id;
+        if target.is_none() {
+            return;
+        }
+        if matches!(target,Some(Target::Surface(id,_)) if matches!(id.key,crate::windowing::geometry::SurfaceKey::Document(owner) if owner!=active))
+        {
+            return;
+        }
+        let offset = app.layout_key.map_or((0, 0), |(_, r, _)| (r.x, r.y));
+        let point = (
+            event.column.saturating_sub(offset.0),
+            event.row.saturating_sub(offset.1),
+        );
+        if active != crate::desktop::WindowId::MANAGER
+            && app
+                .desktop
+                .native()
+                .top_surface()
+                .is_some_and(|s| !s.bounds.contains(point.into()))
+        {
+            return;
+        }
+    }
+    if event.kind == MouseEventKind::Down(MouseButton::Left) && !crate::windowing::blocked(app) {
+        let target = app
+            .desktop
+            .native()
+            .mouse_target(&app.mouse.regions, event.column, event.row);
+        if let Some(Target::Window(
+            a @ (crate::windowing::Action::List
+            | crate::windowing::Action::Next
+            | crate::windowing::Action::Previous),
+        )) = target
+        {
+            crate::windowing::action(app, a);
+            crate::layout::update(app);
+            return;
+        }
+        if let Some(Target::Function(n @ (1 | 9 | 10))) = target {
+            if matches!(
+                app.desktop.active().kind,
+                crate::desktop::WindowKind::Tool(_)
+            ) {
+                crate::input::handle(
+                    app,
+                    crossterm::event::KeyEvent::new(
+                        crossterm::event::KeyCode::F(n),
+                        crossterm::event::KeyModifiers::NONE,
+                    ),
+                );
+                return;
+            }
+        }
+        if let Some(Target::Menu(root)) = target {
+            crate::menu::open(app, root);
+            crate::layout::update(app);
+            return;
+        }
+        if app.modals.menu().is_some()
+            && !matches!(target, Some(Target::MenuItem(..) | Target::MenuSurface))
+        {
+            crate::menu::close(app);
+        }
+    }
     if crate::windowing::workspace::mouse(app, event) {
         crate::layout::update(app);
         return;
@@ -142,7 +216,10 @@ pub fn handle(app: &mut App, event: MouseEvent) {
             .dialogs
             .iter()
             .rev()
-            .find(|d| Some(d.borrow().scope.id) == top)
+            .find(|d| {
+                d.borrow().scope.map(|s| s.id) == top
+                    && (top.is_some() || d.borrow().document == Some(app.desktop.active().id))
+            })
             .and_then(|d| d.borrow_mut().button(local.column, local.row));
         if let Some((rect, _target)) = proposal {
             event.column = rect.x + offset.0;
@@ -230,7 +307,7 @@ fn handle_mouse(app: &mut App, event: MouseEvent) {
     }
     if focus == Focus::Message {
         let offset = app.layout_key.map_or((0, 0), |(_, r, _)| (r.x, r.y));
-        if let Some(help) = app.modals.native_help_mut(app.desktop.active().id) {
+        if let Some(help) = app.native_help_mut() {
             let close = help.mouse(event, offset);
             if close {
                 app.pop_dialog();
@@ -337,16 +414,12 @@ fn handle_mouse(app: &mut App, event: MouseEvent) {
         }
         return;
     }
-    if let Some(info) = app
-        .modals
-        .file_info_mut()
-        .filter(|_| focus == Focus::FileInfo)
-    {
+    if let Some(info) = app.file_info_mut().filter(|_| focus == Focus::FileInfo) {
         match event.kind {
             MouseEventKind::ScrollUp => info.step(-3),
             MouseEventKind::ScrollDown => info.step(3),
             MouseEventKind::Down(MouseButton::Left) if target == Some(Target::CloseFileInfo) => {
-                app.modals.set_file_info(None)
+                app.set_file_info(None)
             }
             _ => {}
         }

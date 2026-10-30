@@ -15,6 +15,7 @@ pub fn handle_ui(app: &mut App, key: KeyEvent) {
 }
 
 pub fn handle(app: &mut App, mut key: KeyEvent) {
+    app.sync_modals();
     if key.code == KeyCode::Tab && key.modifiers.contains(KeyModifiers::SHIFT) {
         key.code = KeyCode::BackTab;
     }
@@ -46,6 +47,36 @@ fn handle_key(app: &mut App, key: KeyEvent) {
     let Some(key) = crate::shortcuts::key(app, key) else {
         return;
     };
+    if !crate::windowing::blocked(app) {
+        let back = key.modifiers.contains(KeyModifiers::SHIFT) || key.code == KeyCode::BackTab;
+        if matches!(key.code, KeyCode::Tab | KeyCode::BackTab)
+            && key.modifiers.contains(KeyModifiers::CONTROL)
+            || key.code == KeyCode::F(6) && key.modifiers.contains(KeyModifiers::ALT)
+        {
+            crate::windowing::cycle(app, back);
+            return;
+        }
+        if !matches!(
+            focus::screen(app),
+            focus::Screen::Editor | focus::Screen::Viewer
+        ) && (key.code == KeyCode::F(9) && key.modifiers == KeyModifiers::NONE
+            || matches!(key.code, KeyCode::Char(_)) && key.modifiers == KeyModifiers::ALT)
+        {
+            if key.code == KeyCode::F(9) {
+                if app.modals.menu().is_some() {
+                    crate::menu::close(app);
+                } else {
+                    crate::menu::open_root(app, crate::menu::RootId::File);
+                }
+                return;
+            }
+            if let KeyCode::Char(c) = key.code {
+                if crate::menu::open_mnemonic(app, c) {
+                    return;
+                }
+            }
+        }
+    }
     let focus = focus::current(app);
     if (key.code == KeyCode::Char('o') && key.modifiers == KeyModifiers::CONTROL
         || key.code == KeyCode::F(5) && key.modifiers == KeyModifiers::ALT)
@@ -74,7 +105,7 @@ fn handle_key(app: &mut App, key: KeyEvent) {
         return;
     }
     if focus == Focus::Message {
-        if let Some(help) = app.modals.native_help_mut(app.desktop.active().id) {
+        if let Some(help) = app.native_help_mut() {
             let close = help.key(key);
             if close {
                 app.pop_dialog();
@@ -141,13 +172,9 @@ fn handle_key(app: &mut App, key: KeyEvent) {
     if focus == Focus::FileInfo && crate::dialog_controls::key(app, key, focus) {
         return;
     }
-    if let Some(info) = app
-        .modals
-        .file_info_mut()
-        .filter(|_| focus == Focus::FileInfo)
-    {
+    if let Some(info) = app.file_info_mut().filter(|_| focus == Focus::FileInfo) {
         match key.code {
-            KeyCode::Esc | KeyCode::Enter => app.modals.set_file_info(None),
+            KeyCode::Esc | KeyCode::Enter => app.set_file_info(None),
             KeyCode::Up => info.step(-1),
             KeyCode::Down => info.step(1),
             KeyCode::PageUp => info.step(-10),
@@ -259,6 +286,8 @@ fn paste_text(app: &mut App, text: &str) {
         Focus::FileTools => app.file_tools.paste(text),
         Focus::CommandHistory => crate::command_line::history::paste(app, text),
         Focus::Discovery => crate::discovery::paste(app, text),
+        Focus::Settings => crate::settings::paste(app, text),
+        Focus::UserMenu => crate::user_menu::paste(app, text),
         Focus::QuickSearch => {
             if let Some(s) = app.modals.quick_search_mut() {
                 s.paste(&mut app.panels[s.panel], text);

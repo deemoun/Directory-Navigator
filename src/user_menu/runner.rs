@@ -14,14 +14,19 @@ pub struct Plan {
     pub cwd: PathBuf,
     pub commands: Vec<CommandSpec>,
     pub env: Vec<(String, OsString)>,
+    pub list_files: Vec<SelectedList>,
 }
 pub fn run(plan: &Plan) -> io::Result<ExitStatus> {
+    if plan.commands.is_empty() {
+        return Err(io::Error::other("No commands to run"));
+    }
     static RUN: std::sync::Mutex<()> = std::sync::Mutex::new(());
     let _run = RUN
         .lock()
         .map_err(|_| io::Error::other("Command runner lock unavailable"))?;
     #[cfg(unix)]
     let _signals = Signals::ignore()?;
+    let _lists = ListGuard::prepare(&plan.list_files)?;
     let mut last = None;
     for spec in &plan.commands {
         let mut command = Command::new(&spec.program);
@@ -87,4 +92,94 @@ pub fn display(value: &OsStr) -> String {
         "{:?}",
         crate::filesystem::display_name(&value.to_string_lossy())
     )
+}
+
+/// Planned paths are inert until Run; lists use private directories and are
+/// removed on success, launch failure and nonzero exit alike.
+#[derive(Clone, Debug)]
+pub struct SelectedList {
+    path: PathBuf,
+    entries: Vec<PathBuf>,
+}
+impl SelectedList {
+    pub fn new(entries: Vec<PathBuf>) -> io::Result<Self> {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static NEXT: AtomicU64 = AtomicU64::new(0);
+        if entries.is_empty()
+            || entries.len() > 2048
+            || entries.iter().any(|p| {
+                p.as_os_str()
+                    .as_encoded_bytes()
+                    .iter()
+                    .any(|b| matches!(b, b'\n' | b'\r'))
+            })
+            || entries
+                .iter()
+                .map(|p| p.as_os_str().as_encoded_bytes().len() + 1)
+                .sum::<usize>()
+                > 256 * 1024
+        {
+            return Err(io::Error::other(
+                "File lists require 1–2048 paths, at most 256 KiB and no newline characters",
+            ));
+        }
+        let stamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_err(io::Error::other)?
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!(
+            "dn-menu-list-{}-{stamp}-{}",
+            std::process::id(),
+            NEXT.fetch_add(1, Ordering::Relaxed)
+        ));
+        Ok(Self {
+            path: root.join("files.txt"),
+            entries,
+        })
+    }
+    pub fn path(&self) -> &std::path::Path {
+        &self.path
+    }
+    pub fn entries(&self) -> &[PathBuf] {
+        &self.entries
+    }
+}
+struct ListGuard(Vec<PathBuf>);
+impl ListGuard {
+    fn prepare(lists: &[SelectedList]) -> io::Result<Self> {
+        use std::io::Write;
+        let mut guard = Self(Vec::new());
+        for list in lists {
+            let root = list.path.parent().expect("planned list directory");
+            let mut dir = std::fs::DirBuilder::new();
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::DirBuilderExt;
+                dir.mode(0o700);
+            }
+            dir.create(root)?;
+            guard.0.push(root.to_owned());
+            let mut options = std::fs::OpenOptions::new();
+            options.write(true).create_new(true);
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::OpenOptionsExt;
+                options.mode(0o600);
+            }
+            let mut file = options.open(&list.path)?;
+            for path in &list.entries {
+                file.write_all(path.as_os_str().as_encoded_bytes())?;
+                file.write_all(b"\n")?;
+            }
+            file.sync_all()?;
+        }
+        Ok(guard)
+    }
+}
+impl Drop for ListGuard {
+    fn drop(&mut self) {
+        for path in &self.0 {
+            let _ = std::fs::remove_dir_all(path);
+        }
+    }
 }

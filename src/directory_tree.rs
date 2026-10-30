@@ -513,26 +513,32 @@ impl Tree {
     }
 }
 pub fn open(app: &mut App) {
+    if crate::tool_windows::reopen(app, crate::tool_windows::Kind::Tree) {
+        return;
+    }
     if app.panels[app.active].loading {
         return;
     }
     crate::menu::close(app);
     app.modals.set_quick_search(None);
+    if !crate::tool_windows::open(app, crate::tool_windows::Kind::Tree, None) {
+        return;
+    }
     match Tree::new(
         app.active,
         app.panels[app.active].path.clone(),
         app.config.show_hidden,
     ) {
-        Ok(tree) => app.modals.set_directory_tree(Some(tree)),
-        Err(e) => app.error(e.to_string()),
+        Ok(tree) => app.set_directory_tree(Some(tree)),
+        Err(e) => crate::tool_windows::failed(app, e.to_string()),
     }
 }
 pub fn action(app: &mut App, command: Action) {
     if command == Action::Close {
-        app.modals.set_directory_tree(None);
+        app.set_directory_tree(None);
         return;
     }
-    let Some(tree) = app.modals.directory_tree_mut() else {
+    let Some(tree) = app.directory_tree_mut() else {
         return;
     };
     match command {
@@ -543,13 +549,14 @@ pub fn action(app: &mut App, command: Action) {
             let path = row.path.clone();
             let panel = tree.panel;
             let destination = tree.destination_prompt;
-            app.modals.set_directory_tree(None);
             if let Some(parent) = destination {
+                app.set_directory_tree(None);
                 crate::copy_dialog::pick(app, parent, path);
                 return;
             }
             app.active = panel;
             app.panels[panel].go_to(path, app.config.show_hidden);
+            crate::windowing::activate(app, crate::desktop::WindowId::MANAGER);
         }
         Action::Refresh => tree.refresh(),
         Action::Hidden => tree.toggle_hidden(),
@@ -585,13 +592,13 @@ pub fn action(app: &mut App, command: Action) {
     }
 }
 pub fn key(app: &mut App, key: KeyEvent) {
-    if let Some(tree) = app.modals.directory_tree_mut() {
+    if let Some(tree) = app.directory_tree_mut() {
         tree.last_click = None;
     }
     if crate::dialog_controls::key(app, key, crate::focus::Focus::Tree) {
         return;
     }
-    let Some(tree) = app.modals.directory_tree_mut() else {
+    let Some(tree) = app.directory_tree_mut() else {
         return;
     };
     tree.last_click = None;
@@ -599,7 +606,7 @@ pub fn key(app: &mut App, key: KeyEvent) {
         match key.code {
             KeyCode::Char('r') => tree.refresh(),
             KeyCode::Char('h') => tree.toggle_hidden(),
-            KeyCode::F(4) => app.modals.set_directory_tree(None),
+            KeyCode::F(4) => app.set_directory_tree(None),
             _ => {}
         }
         return;
@@ -626,7 +633,7 @@ pub fn mouse(app: &mut App, event: MouseEvent, target: Option<crate::mouse::Targ
             }
         }
         MouseEventKind::ScrollUp | MouseEventKind::ScrollDown => {
-            if let Some(tree) = app.modals.directory_tree_mut() {
+            if let Some(tree) = app.directory_tree_mut() {
                 tree.step(crate::list_state::wheel_delta(event.kind));
             }
         }

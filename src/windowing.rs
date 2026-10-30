@@ -3,6 +3,7 @@ pub(crate) mod arrangement;
 pub use arrangement::Arrangement;
 pub(crate) use arrangement::Error as ArrangementError;
 pub mod geometry;
+pub(crate) mod presentation;
 pub(crate) mod workspace;
 use crate::{
     app::App,
@@ -13,6 +14,75 @@ use crate::{
 use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
 use std::time::Instant;
 
+/// Transient menus are dismissible; decisions and plugin pages remain blocking.
+pub(crate) fn blocked(app: &App) -> bool {
+    app.exit_pending
+        || app.desktop.native().manipulating()
+        || app.modal_top().is_some_and(|m| {
+            !matches!(
+                m.focus,
+                Focus::Menu | Focus::EditorMenu | Focus::QuickSearch
+            )
+        })
+        || app
+            .desktop
+            .native()
+            .top_surface()
+            .is_some_and(|s| matches!(s.id.key, geometry::SurfaceKey::Page(..)))
+}
+#[derive(Default)]
+pub(crate) struct ActivationState {
+    revision: u64,
+}
+/// Reconcile every native selection transition, including opening, reuse,
+/// retirement fallback and identity coalescing. Never select from rendering.
+pub(crate) fn reconcile_activation(app: &mut App) {
+    let revision = app.desktop.selection_revision();
+    if app.activation.revision == revision {
+        return;
+    }
+    app.activation.revision = revision;
+    crate::menu::close(app);
+    app.modals.set_quick_search(None);
+    for id in app.desktop.document_ids(crate::desktop::WindowKind::Editor) {
+        if let Some(e) = app.desktop.editor_mut(id) {
+            e.modals.set_editor_menu(None);
+        }
+    }
+    crate::button_feedback::cancel(app);
+    app.shortcuts.clear();
+    app.mouse.reset_click();
+    app.layout_revision = app
+        .layout_revision
+        .checked_add(1)
+        .expect("layout revision exhausted");
+    crate::plugins::host::update_activity(app, Instant::now());
+}
+pub(crate) fn activate(app: &mut App, id: WindowId) -> bool {
+    if blocked(app) {
+        return false;
+    }
+    restore_focus(app, id)
+}
+/// Only lifecycle guards and modal-parent restoration bypass blocking policy.
+pub(crate) fn restore_focus(app: &mut App, id: WindowId) -> bool {
+    let changed = app.desktop.activate(id);
+    reconcile_activation(app);
+    changed
+}
+pub(crate) fn cycle(app: &mut App, back: bool) {
+    if blocked(app) {
+        return;
+    }
+    let ids = ids(app);
+    let current = ids
+        .iter()
+        .position(|id| *id == app.desktop.active().id)
+        .unwrap_or(0);
+    if let Some(id) = ids.get(crate::control_focus::cycle(current, ids.len(), back)) {
+        activate(app, *id);
+    }
+}
 pub struct WindowList {
     pub ids: Vec<WindowId>,
     pub cursor: usize,
@@ -34,6 +104,9 @@ impl WindowList {
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Action {
+    List,
+    Next,
+    Previous,
     Row(WindowId),
     Switch,
     Move,
@@ -48,6 +121,9 @@ fn ids(app: &App) -> Vec<WindowId> {
     windows
 }
 pub fn open(app: &mut App) {
+    if blocked(app) {
+        return;
+    }
     if app.exit_pending
         || !matches!(
             focus::current(app),
@@ -58,6 +134,15 @@ pub fn open(app: &mut App) {
                 | Focus::EditorMenu
                 | Focus::Viewer
                 | Focus::Plugin
+                | Focus::Tree
+                | Focus::Discovery
+                | Focus::Archive
+                | Focus::FileInfo
+                | Focus::Utility
+                | Focus::Navigation
+                | Focus::FileTools
+                | Focus::CommandHistory
+                | Focus::Message
         )
     {
         return;
@@ -106,6 +191,9 @@ pub fn poll(app: &mut App) -> bool {
 }
 pub fn action(app: &mut App, action: Action) {
     match action {
+        Action::List => open(app),
+        Action::Next => cycle(app, false),
+        Action::Previous => cycle(app, true),
         Action::Tile => arrange(app, Arrangement::Tile),
         Action::Cascade => arrange(app, Arrangement::Cascade),
         Action::Move | Action::Zoom => {
@@ -119,7 +207,7 @@ pub fn action(app: &mut App, action: Action) {
                 return;
             }
             app.modals.set_window_list(None);
-            app.desktop.activate(id);
+            activate(app, id);
             crate::layout::update(app);
             if let Some(surface) = app
                 .desktop
@@ -143,8 +231,8 @@ pub fn action(app: &mut App, action: Action) {
                 .and_then(|l| l.ids.get(l.cursor))
                 .copied();
             if let Some(id) = selected.filter(|id| app.desktop.contains(*id)) {
-                app.desktop.activate(id);
                 app.modals.set_window_list(None);
+                activate(app, id);
             } else {
                 poll(app);
             }
@@ -254,6 +342,15 @@ pub fn arrange(app: &mut App, mode: Arrangement) {
                 | Focus::EditorMenu
                 | Focus::Viewer
                 | Focus::Plugin
+                | Focus::Tree
+                | Focus::Discovery
+                | Focus::Archive
+                | Focus::FileInfo
+                | Focus::Utility
+                | Focus::Navigation
+                | Focus::FileTools
+                | Focus::CommandHistory
+                | Focus::Message
                 | Focus::WindowList
         )
     {

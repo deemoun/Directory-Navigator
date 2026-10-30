@@ -45,9 +45,12 @@ impl Default for ModalStack {
 }
 impl ModalStack {
     pub fn bind(&mut self, id: WindowId) {
+        let previous = self.owner;
         self.owner = ModalOwner::Document(id);
         for entry in &mut self.entries {
-            entry.info.owner = self.owner;
+            if entry.info.owner == previous {
+                entry.info.owner = self.owner;
+            }
         }
     }
     pub fn infos(&self) -> impl Iterator<Item = ModalInfo> + '_ {
@@ -165,7 +168,12 @@ impl ModalStack {
                 }
                 let owner = if matches!(
                     focus,
-                    Focus::Settings | Focus::WindowList | Focus::Job | Focus::Plugin
+                    Focus::Settings
+                        | Focus::WindowList
+                        | Focus::Job
+                        | Focus::Plugin
+                        | Focus::Menu
+                        | Focus::FileTools
                 ) {
                     ModalOwner::Workspace
                 } else {
@@ -597,4 +605,22 @@ copy_slot!(
     set_plugin_dialog,
     crate::plugins::PluginId,
     Plugin
+);
+
+slot!(
+    viewer_goto,
+    viewer_goto_mut,
+    take_viewer_goto,
+    set_viewer_goto,
+    crate::viewer::GoToDialog,
+    ViewerSearch
+);
+
+slot!(
+    recovery,
+    recovery_mut,
+    take_recovery,
+    set_recovery,
+    crate::editor::recovery::Dialog,
+    Recovery
 );

@@ -262,6 +262,33 @@ pub(super) fn parse(bytes: &[u8]) -> io::Result<Config> {
     if !config.enabled_plugins.is_disjoint(&config.disabled_plugins) {
         return Err(invalid("A plugin cannot be both enabled and disabled"));
     }
+    if let Some(value) = root.get("highlight_groups") {
+        let groups = value
+            .as_array()
+            .filter(|v| v.len() == 5)
+            .ok_or_else(|| invalid("Expected five highlight groups"))?;
+        for (g, value) in config.highlight_groups.0.iter_mut().zip(groups) {
+            let table = value
+                .as_table()
+                .ok_or_else(|| invalid("Invalid highlight group"))?;
+            g.enabled = table
+                .get("enabled")
+                .and_then(Value::as_bool)
+                .ok_or_else(|| invalid("Missing highlight enabled flag"))?;
+            g.masks = table
+                .get("masks")
+                .and_then(Value::as_str)
+                .ok_or_else(|| invalid("Missing highlight masks"))?
+                .into();
+            g.color = table
+                .get("color")
+                .and_then(Value::as_integer)
+                .and_then(|v| u8::try_from(v).ok())
+                .filter(|v| *v < 16)
+                .ok_or_else(|| invalid("Invalid highlight color"))?;
+        }
+        config.highlight_groups.validate()?;
+    }
     Ok(config)
 }
 pub(super) fn encode(config: &Config, previous: Option<&[u8]>) -> io::Result<Vec<u8>> {
@@ -301,6 +328,26 @@ pub(super) fn encode(config: &Config, previous: Option<&[u8]>) -> io::Result<Vec
         return Err(invalid("A plugin cannot be both enabled and disabled"));
     }
     set(&mut root, "plugins", "enabled".into(), enabled)?;
+    config.highlight_groups.validate()?;
+    let old = root.get("highlight_groups").and_then(Value::as_array);
+    let groups = config
+        .highlight_groups
+        .0
+        .iter()
+        .enumerate()
+        .map(|(i, g)| {
+            let mut table = old
+                .and_then(|v| v.get(i))
+                .and_then(Value::as_table)
+                .cloned()
+                .unwrap_or_default();
+            table.insert("enabled".into(), Value::Boolean(g.enabled));
+            table.insert("masks".into(), Value::String(g.masks.clone()));
+            table.insert("color".into(), Value::Integer(i64::from(g.color)));
+            Value::Table(table)
+        })
+        .collect();
+    root.insert("highlight_groups".into(), Value::Array(groups));
     for (group, key, value) in records(config) {
         if group == "bookmarks" && value.as_str() == Some("") {
             continue;

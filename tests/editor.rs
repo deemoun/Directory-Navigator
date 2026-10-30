@@ -233,7 +233,9 @@ fn safe_save_preserves_bytes_bom_endings_final_newline_and_permissions() -> io::
         let (b, snapshot, bom) = storage::load(&path).unwrap();
         assert!(bom);
         assert_eq!(&b.text, text);
-        let snapshot = storage::save(&path, &b.text, bom, Some(&snapshot)).unwrap();
+        let snapshot = storage::save(&path, &b.text, bom, Some(&snapshot))
+            .unwrap()
+            .snapshot;
         assert_eq!(fs::read(&path)?, bytes);
         storage::save(&path, &b.text, bom, Some(&snapshot)).unwrap();
         #[cfg(unix)]
@@ -262,7 +264,9 @@ fn storage_rejects_conflicts_existing_destinations_missing_files_and_binary() ->
     assert!(storage::save(&path, "unrelated", false, None).is_err());
     assert_eq!(fs::read(&path)?, b"external");
     let destination = temp.0.join("new");
-    let saved = storage::save(&destination, "new text", false, None).unwrap();
+    let saved = storage::save(&destination, "new text", false, None)
+        .unwrap()
+        .snapshot;
     storage::save(&destination, "next", false, Some(&saved)).unwrap();
     assert_eq!(fs::read(&destination)?, b"next");
     fs::remove_file(&path)?;
@@ -467,13 +471,16 @@ fn selection_clipboard_search_goto_and_mouse_colored_rendering() -> io::Result<(
     render(&mut app, 80, 25)?;
     click(&mut app, A::Help);
     render(&mut app, 80, 25)?;
+    assert_eq!(
+        app.desktop.active().kind,
+        dn::desktop::WindowKind::Tool(dn::tool_windows::Kind::Help)
+    );
     assert!(app
         .mouse
         .regions
         .iter()
-        .all(|(_, target)| *target == Target::Editor(A::Cancel)
-            || matches!(target, Target::Surface(..))));
-    click(&mut app, A::Cancel);
+        .any(|(_, t)| matches!(t, Target::Menu(_))));
+    key(&mut app, KeyCode::Esc);
     key(&mut app, KeyCode::Esc);
     assert!(app.desktop.active_editor().is_none());
     Ok(())

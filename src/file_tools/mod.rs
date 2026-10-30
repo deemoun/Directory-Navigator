@@ -72,18 +72,24 @@ fn prepare(app: &mut App) {
 }
 pub fn open_history(app: &mut App, kind: HistoryKind) {
     prepare(app);
+    let tool = match kind {
+        HistoryKind::Edit => crate::tool_windows::Kind::EditHistory,
+        HistoryKind::View => crate::tool_windows::Kind::ViewHistory,
+        HistoryKind::Directory => crate::tool_windows::Kind::DirectoryHistory,
+    };
+    if !crate::tool_windows::open(app, tool, None) {
+        return;
+    }
     let paths = app.file_tools.histories.get(kind).to_vec();
-    app.file_tools
-        .modals
-        .set_file_tools(Some(ToolDialog::History {
-            kind,
-            paths,
-            cursor: 0,
-            offset: 0,
-            rows: 10,
-            last_click: None,
-            focus: 0,
-        }));
+    app.set_file_tools(Some(ToolDialog::History {
+        kind,
+        paths,
+        cursor: 0,
+        offset: 0,
+        rows: 10,
+        last_click: None,
+        focus: 0,
+    }));
 }
 pub fn open_compare(app: &mut App) {
     prepare(app);
@@ -111,13 +117,14 @@ pub fn open_export(app: &mut App) {
         return;
     }
     let field = "files.lst".to_string();
+    let base = panel.path.clone();
     app.file_tools
         .modals
         .set_file_tools(Some(ToolDialog::Export {
             cursor: field.len(),
             field,
             focus: 0,
-            base: panel.path.clone(),
+            base,
             paths,
         }));
 }
@@ -159,7 +166,37 @@ pub fn poll(app: &mut App) -> bool {
     true
 }
 pub fn accept(app: &mut App) {
-    match app.file_tools.modals.take_file_tools() {
+    if let Some(ToolDialog::History {
+        kind,
+        paths,
+        cursor,
+        ..
+    }) = app.file_tools()
+    {
+        let kind = *kind;
+        let path = paths.get(*cursor).cloned();
+        if let Some(path) = path {
+            match kind {
+                HistoryKind::Directory => {
+                    let panel = app
+                        .desktop
+                        .tool(app.desktop.target())
+                        .map_or(app.active, |t| t.panel);
+                    app.panels[panel].go_to(path, app.config.show_hidden);
+                    app.active = panel;
+                    crate::windowing::activate(app, crate::desktop::WindowId::MANAGER);
+                }
+                HistoryKind::Edit => crate::editor::open_path(app, path),
+                HistoryKind::View => match Viewer::open_mode(path, ViewMode::Auto) {
+                    Ok(v) => app.show_viewer(v),
+                    Err(e) => app.error(e.to_string()),
+                },
+            }
+        }
+        return;
+    }
+
+    match app.take_file_tools() {
         Some(ToolDialog::History {
             kind,
             paths,
@@ -244,10 +281,10 @@ pub fn action(app: &mut App, action: ToolAction) {
         ToolAction::Accept => accept(app),
         ToolAction::Cancel => {
             if !app.file_tools.busy() {
-                app.file_tools.modals.set_file_tools(None);
+                app.set_file_tools(None);
             }
         }
-        ToolAction::Choice(index) => match app.file_tools.modals.file_tools_mut() {
+        ToolAction::Choice(index) => match app.file_tools_mut() {
             Some(ToolDialog::Compare { focus }) => {
                 *focus = index;
                 match index {
@@ -265,7 +302,7 @@ pub fn action(app: &mut App, action: ToolAction) {
             _ => {}
         },
         ToolAction::Field => {
-            if let Some(ToolDialog::Export { focus, .. }) = app.file_tools.modals.file_tools_mut() {
+            if let Some(ToolDialog::Export { focus, .. }) = app.file_tools_mut() {
                 *focus = 0;
             }
         }
@@ -277,7 +314,7 @@ pub fn action(app: &mut App, action: ToolAction) {
                 last_click,
                 focus,
                 ..
-            }) = app.file_tools.modals.file_tools_mut()
+            }) = app.file_tools_mut()
             {
                 if index < paths.len() {
                     let now = Instant::now();
@@ -298,14 +335,14 @@ pub fn action(app: &mut App, action: ToolAction) {
     }
 }
 pub fn key(app: &mut App, key: KeyEvent) {
-    if let Some(ToolDialog::History { last_click, .. }) = app.file_tools.modals.file_tools_mut() {
+    if let Some(ToolDialog::History { last_click, .. }) = app.file_tools_mut() {
         *last_click = None;
     }
     if crate::dialog_controls::key(app, key, crate::focus::Focus::FileTools) {
         return;
     }
     let mut choice = None;
-    match app.file_tools.modals.file_tools_mut() {
+    match app.file_tools_mut() {
         Some(ToolDialog::History {
             cursor,
             paths,

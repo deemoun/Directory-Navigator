@@ -4,6 +4,23 @@ use crate::dialog::Dialog;
 
 impl App {
     pub fn push_dialog(&mut self, dialog: Dialog) {
+        if dialog.title.to_ascii_lowercase().contains("help") && !crate::windowing::blocked(self) {
+            let source = self.desktop.target();
+            crate::tool_windows::open(self, crate::tool_windows::Kind::Help, None);
+            if self
+                .desktop
+                .tool(self.desktop.target())
+                .is_some_and(|t| t.kind == crate::tool_windows::Kind::Help)
+            {
+                let id = self.desktop.target();
+                self.desktop.tool_mut(id).unwrap().help_owner =
+                    (source != crate::desktop::WindowId::MANAGER && source != id).then_some(source);
+                self.desktop.tool_mut(id).unwrap().set_help(dialog);
+                self.sync_modals();
+                return;
+            }
+        }
+
         self.sync_modals();
         let target = self.desktop.target();
         let owner = if target == crate::desktop::WindowId::MANAGER {
@@ -19,27 +36,58 @@ impl App {
         self.sync_modals();
     }
     pub fn dialogs(&self) -> Vec<&Dialog> {
-        self.modals.messages(self.desktop.active().id)
+        if let Some(h) = self.help_document() {
+            vec![&h.dialog]
+        } else {
+            self.modals.messages(self.desktop.target())
+        }
     }
     pub fn last_dialog(&self) -> Option<&Dialog> {
-        self.modals.last_message(self.desktop.active().id)
+        self.help_document()
+            .map(|h| &h.dialog)
+            .or_else(|| self.modals.last_message(self.desktop.target()))
     }
     pub fn last_dialog_mut(&mut self) -> Option<&mut Dialog> {
-        let id = self.desktop.active().id;
-        self.modals.last_message_mut(id)
+        let id = self.desktop.target();
+        if self.help_document().is_some() {
+            Some(&mut self.help_document_mut()?.dialog)
+        } else {
+            self.modals.last_message_mut(id)
+        }
     }
     pub fn message_offset(&self) -> usize {
-        self.modals.message_offset(self.desktop.active().id)
+        self.help_document().map_or_else(
+            || self.modals.message_offset(self.desktop.target()),
+            |h| h.offset,
+        )
     }
     pub fn set_message_offset(&mut self, offset: usize) {
-        self.modals
-            .set_message_offset(self.desktop.active().id, offset);
+        let id = self.desktop.target();
+        if let Some(h) = self.help_document_mut() {
+            h.offset = offset;
+        } else {
+            self.modals.set_message_offset(id, offset);
+        }
     }
     pub fn pop_dialog(&mut self) -> Option<Dialog> {
-        self.modals.pop_message(self.desktop.active().id)
+        let id = self.desktop.target();
+        if self.help_document().is_some() {
+            self.desktop
+                .tool_mut(id)?
+                .state
+                .help
+                .take()
+                .map(|h| h.dialog)
+        } else {
+            self.modals.pop_message(id)
+        }
     }
     pub fn clear_dialogs(&mut self) {
-        self.modals.clear_messages(self.desktop.active().id);
+        if self.help_document().is_some() {
+            self.pop_dialog();
+        } else {
+            self.modals.clear_messages(self.desktop.target());
+        }
     }
     pub fn modal_infos(&self) -> Vec<crate::modals::ModalInfo> {
         let mut infos = Vec::new();
@@ -113,6 +161,8 @@ impl App {
         }
     }
     pub fn sync_modals(&mut self) {
+        crate::windowing::reconcile_activation(self);
+        crate::tool_windows::reconcile(self);
         for stack in [
             &mut self.screensaver.modals,
             &mut self.utilities.modals,
@@ -172,7 +222,7 @@ impl App {
                             .return_document
                             .filter(|id| self.desktop.contains(*id))
                         {
-                            self.desktop.activate(id);
+                            crate::windowing::restore_focus(self, id);
                         }
                     }
                 }
@@ -180,6 +230,7 @@ impl App {
         }
         self.last_modal = self.modal_top();
         self.visit_modals_mut(|s| s.finish_transaction());
+        crate::windowing::reconcile_activation(self);
         crate::retirement::reconcile(self);
     }
 }

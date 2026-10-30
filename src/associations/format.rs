@@ -153,5 +153,6 @@ pub fn command(args: &[String], path: &Path, cwd: PathBuf) -> io::Result<Plan> {
             args: expanded,
         }],
         env: Vec::new(),
+        list_files: Vec::new(),
     })
 }

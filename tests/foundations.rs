@@ -540,7 +540,7 @@ fn stale_published_mouse_frame_cannot_target_a_new_modal_or_document() -> io::Re
     let mut terminal = Terminal::new(TestBackend::new(80, 25))?;
     terminal.draw(|f| ui::draw(f, &mut app))?;
     let old_frame = app.mouse.frame;
-    editor::action(&mut app, A::Help);
+    editor::action(&mut app, A::Find);
     let help = app.modal_top().unwrap().id;
     dn::mouse::handle(
         &mut app,

@@ -3,6 +3,7 @@ use crate::app::App;
 pub use crate::desktop::WindowKind as Screen;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Focus {
+    Recovery,
     TerminalOutput,
     ConfigImport,
     Welcome,
@@ -53,5 +54,6 @@ pub fn current(app: &App) -> Focus {
         Screen::Editor => Focus::Editor,
         Screen::Viewer => Focus::Viewer,
         Screen::Plugin(_) => Focus::Plugin,
+        Screen::Tool(kind) => kind.focus(),
     }
 }

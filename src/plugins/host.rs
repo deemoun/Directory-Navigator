@@ -81,12 +81,7 @@ pub(crate) fn open(app: &mut App, id: PluginId) {
     let definition = e.tool.definition();
     let opening = OpenContext {
         job: app.job.is_some(),
-        blocking: app.modal_top().is_some_and(|m| {
-            !matches!(
-                m.focus,
-                Focus::Menu | Focus::QuickSearch | Focus::EditorMenu
-            )
-        }),
+        blocking: crate::windowing::blocked(app),
         viewer: app.desktop.active().kind == WindowKind::Viewer,
     };
     // A tool cannot bypass the workspace's blocking-modal rule.
@@ -97,7 +92,7 @@ pub(crate) fn open(app: &mut App, id: PluginId) {
     app.modals.set_quick_search(None);
     if let Some(b) = app.desktop.plugins.binding(id).filter(|b| alive(app, *b)) {
         if let Owner::Document(w) = b.owner {
-            app.desktop.activate(w);
+            crate::windowing::activate(app, w);
         }
         return;
     }
@@ -112,7 +107,7 @@ pub(crate) fn open(app: &mut App, id: PluginId) {
                 .unwrap();
             Owner::Modal(m.id)
         }
-        Presentation::Document => match app.desktop.open_plugin(id) {
+        Presentation::Document => match app.install_document(|desktop| desktop.open_plugin(id)) {
             Ok(w) => Owner::Document(w),
             Err(e) => {
                 app.error(e.to_string());
@@ -285,7 +280,12 @@ pub(crate) fn draw(frame: &mut impl Frame, app: &App, area: Rect, b: Binding) {
                 frame.compose(scene);
             }
         }
-        View::Dialog(s) => (*s).paint(frame, app),
+        View::Dialog(mut s) => {
+            if let Owner::Document(id) = b.owner {
+                s.place_document_windows(id, &app.desktop.native());
+            }
+            (*s).paint(frame, app);
+        }
     }
 }
 pub(crate) fn poll(app: &mut App, now: Instant) -> bool {
@@ -315,7 +315,12 @@ pub(crate) fn update_activity(app: &mut App, now: Instant) -> bool {
         let entry = app.desktop.plugins.entries.get_mut(&b.plugin).unwrap();
         if entry.active != Some(ctx.active) {
             entry.active = Some(ctx.active);
-            let effects = entry.tool.event(Event::Activity(ctx.active), &ctx);
+            let mut effects = entry.tool.event(Event::Activity(ctx.active), &ctx);
+            // Losing activity includes blocking pages, output handoff and an
+            // unprepared/small viewport, not just selection of another owner.
+            if !ctx.active {
+                effects.retain(|e| matches!(e, Effect::Close));
+            }
             apply(app, b, effects);
             changed = true;
         }

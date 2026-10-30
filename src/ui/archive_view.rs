@@ -1,5 +1,5 @@
 use crate::dialog_theme as theme;
-use crate::turbo::dialog_spec::{centered, scope, Control, ControlKind, DialogSpec};
+use crate::turbo::dialog_spec::{scope, Control, ControlKind, DialogSpec};
 
 use crate::painting::Paragraph;
 use crate::presentation::{layout::Rect, text::Span};
@@ -11,10 +11,11 @@ use crate::{
     mouse::Target,
 };
 pub(crate) fn archive_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
-    let b = app.modals.archive()?;
+    let b = app.archive()?;
     let profile = app.config.palette;
     let dos = profile.styles_for(crate::palette::theme::Group::Dialogs);
-    let rect = centered(
+    let rect = crate::tool_windows::bounds(
+        app,
         area,
         area.width.saturating_sub(4).min(110),
         area.height.saturating_sub(4).min(30),

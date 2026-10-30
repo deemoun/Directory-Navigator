@@ -115,7 +115,7 @@ fn inert_controls_unicode_paste_and_help_preserve_files_clipboard_and_owner() ->
     let id = open(&mut a);
     support::draw(&mut a, 100, 32)?;
     support::modified(&mut a, K::Char('z'), M::ALT);
-    for n in 0..14 {
+    for n in (0..14).filter(|n| *n != 12) {
         support::draw(&mut a, 100, 32)?;
         support::click(&mut a, Target::Plugin(MP3_PLAYER, ActionId(n)));
         support::key(&mut a, K::Enter);
@@ -132,7 +132,11 @@ fn inert_controls_unicode_paste_and_help_preserve_files_clipboard_and_owner() ->
     assert_eq!(fs::read_dir(&f.0)?.count(), 1);
     support::key(&mut a, K::F(1));
     support::draw(&mut a, 100, 32)?;
-    assert!(a.modal_top().is_some());
+    assert!(a.modal_top().is_none());
+    assert_eq!(
+        a.desktop.active().kind,
+        WindowKind::Tool(dn::tool_windows::Kind::Help)
+    );
     support::key(&mut a, K::Esc);
     assert_eq!(a.desktop.active().id, id);
     assert_eq!(surface(&mut a, id, 100, 32).bounds.height, 16);
@@ -234,7 +238,11 @@ fn plugin_settings_disable_retires_player_and_help_and_reenable_restores_menu() 
     support::draw(&mut a, 100, 32)?;
     support::key(&mut a, K::F(1));
     support::draw(&mut a, 100, 32)?;
-    assert!(a.modal_top().is_some());
+    assert!(a.modal_top().is_none());
+    assert_eq!(
+        a.desktop.active().kind,
+        WindowKind::Tool(dn::tool_windows::Kind::Help)
+    );
     let mut config = a.config.clone();
     config.set_plugin_enabled(MP3_PLAYER, false);
     a.apply_config(config);
@@ -260,5 +268,180 @@ fn plugin_settings_disable_retires_player_and_help_and_reenable_restores_menu() 
         .any(|i| i.action == menu::Action::Plugin(MP3_PLAYER)));
     menu::close(&mut a);
     assert_ne!(open(&mut a), old);
+    Ok(())
+}
+
+fn show_playlist(a: &mut App) -> io::Result<WindowId> {
+    let id = open(a);
+    support::draw(a, 100, 32)?;
+    support::modified(a, K::Char('z'), M::ALT);
+    support::draw(a, 100, 32)?;
+    support::click(a, Target::Plugin(MP3_PLAYER, ActionId(12)));
+    support::draw(a, 100, 32)?;
+    Ok(id)
+}
+fn action(a: &mut App, id: usize) -> io::Result<()> {
+    support::draw(a, 100, 32)?;
+    support::click(a, Target::Plugin(MP3_PLAYER, ActionId(id)));
+    Ok(())
+}
+fn page(a: &mut App, owner: WindowId, n: u64) -> bool {
+    layout::prepare(a, Rect::new(0, 0, 100, 32))
+        .surfaces
+        .iter()
+        .any(|s| s.id.key == SurfaceKey::Page(owner, n))
+}
+#[test]
+fn demo_playlist_add_picker_commit_cancel_and_reopening_are_ui_only() -> io::Result<()> {
+    let f = support::Fixture::new("mp3-playlist")?;
+    fs::write(f.0.join("untouched.mp3"), b"do not read")?;
+    let mut a = f.app()?;
+    let id = show_playlist(&mut a)?;
+    assert!(page(&mut a, id, 1));
+    assert!(support::text(&mut a, 100, 32)?.contains("Example tracks"));
+    assert!(!a
+        .mouse
+        .regions
+        .iter()
+        .any(|(_, t)| *t == Target::Plugin(MP3_PLAYER, ActionId(221))));
+    action(&mut a, 201)?;
+    assert!(page(&mut a, id, 2));
+    support::key(&mut a, K::Down);
+    support::key(&mut a, K::Enter);
+    assert!(!page(&mut a, id, 2));
+    support::draw(&mut a, 100, 32)?;
+    assert!(a
+        .mouse
+        .regions
+        .iter()
+        .any(|(_, t)| *t == Target::Plugin(MP3_PLAYER, ActionId(1012))));
+    action(&mut a, 200)?;
+    assert!(!page(&mut a, id, 1));
+    action(&mut a, 12)?;
+    support::key(&mut a, K::End);
+    support::draw(&mut a, 100, 32)?;
+    assert!(a
+        .mouse
+        .regions
+        .iter()
+        .any(|(_, t)| *t == Target::Plugin(MP3_PLAYER, ActionId(1012))));
+    action(&mut a, 202)?;
+    support::key(&mut a, K::Esc);
+    action(&mut a, 12)?;
+    support::key(&mut a, K::End);
+    support::draw(&mut a, 100, 32)?;
+    assert!(
+        a.mouse
+            .regions
+            .iter()
+            .any(|(_, t)| *t == Target::Plugin(MP3_PLAYER, ActionId(1012))),
+        "Cancel restores the accepted demo order"
+    );
+    support::key(&mut a, K::Esc);
+    support::key(&mut a, K::Esc);
+    assert!(!a.desktop.contains(id));
+    let fresh = show_playlist(&mut a)?;
+    assert_ne!(fresh, id);
+    support::key(&mut a, K::End);
+    support::draw(&mut a, 100, 32)?;
+    assert!(
+        !a.mouse
+            .regions
+            .iter()
+            .any(|(_, t)| *t == Target::Plugin(MP3_PLAYER, ActionId(1012))),
+        "New openings reset demo state"
+    );
+    assert!(a.job.is_none());
+    assert_eq!(fs::read(f.0.join("untouched.mp3"))?, b"do not read");
+    assert_eq!(fs::read_dir(&f.0)?.count(), 1);
+    Ok(())
+}
+#[test]
+fn playlist_empty_state_focus_scrollbar_and_nested_help_remain_owned() -> io::Result<()> {
+    let f = support::Fixture::new("mp3-playlist-focus")?;
+    let mut a = f.app()?;
+    let id = show_playlist(&mut a)?;
+    for _ in 0..3 {
+        support::key(&mut a, K::Tab);
+    } // Delete
+    support::key(&mut a, K::F(1));
+    assert!(a.modal_top().is_some());
+    assert_eq!(a.desktop.active().id, id);
+    support::key(&mut a, K::Esc);
+    assert!(page(&mut a, id, 1));
+    support::key(&mut a, K::Tab); // Cancel, skipping disabled Save.
+    support::key(&mut a, K::Enter);
+    assert!(!page(&mut a, id, 1));
+    action(&mut a, 12)?;
+    action(&mut a, 223)?;
+    support::draw(&mut a, 100, 32)?;
+    for _ in 0..12 {
+        action(&mut a, 202)?;
+    }
+    assert!(support::text(&mut a, 100, 32)?.contains("Empty demo playlist"));
+    assert!(!a
+        .mouse
+        .regions
+        .iter()
+        .any(|(_, t)| *t == Target::Plugin(MP3_PLAYER, ActionId(202))));
+    support::key(&mut a, K::Enter);
+    assert!(page(&mut a, id, 2), "focused Add remains usable when empty");
+    support::key(&mut a, K::BackTab);
+    support::key(&mut a, K::Enter);
+    assert!(!page(&mut a, id, 2));
+    assert!(page(&mut a, id, 1));
+    support::key(&mut a, K::Esc);
+    assert!(a.desktop.contains(id));
+    Ok(())
+}
+#[test]
+fn playlist_pages_localized_palettes_bounds_and_paint_are_consistent() -> io::Result<()> {
+    let f = support::Fixture::new("mp3-playlist-frames")?;
+    for language in [
+        dn::localization::Language::English,
+        dn::localization::Language::Russian,
+    ] {
+        for palette in [
+            PaletteProfile::ClassicDn,
+            PaletteProfile::ClassicDn.with_slot(Slot::DialogText, 0x1e),
+        ] {
+            let mut a = f.app()?;
+            a.config.language = language;
+            a.config.palette = palette;
+            let id = show_playlist(&mut a)?;
+            for picker in [false, true] {
+                if picker {
+                    action(&mut a, 201)?;
+                }
+                for (w, h) in [(80, 25), (132, 40)] {
+                    let snapshot = layout::prepare(&mut a, Rect::new(0, 0, w, h));
+                    let first = dn::ui::render(&a, &snapshot);
+                    let second = dn::ui::render(&a, &snapshot);
+                    assert!(first
+                        .hit_regions()
+                        .iter()
+                        .all(|(r, _)| r.right() <= w && r.bottom() <= h));
+                    assert_eq!(
+                        dn::testing::Buffer::rendered(first),
+                        dn::testing::Buffer::rendered(second)
+                    );
+                    support::draw(&mut a, w, h)?;
+                    assert!(
+                        !a.mouse
+                            .regions
+                            .iter()
+                            .any(|(_, t)| *t == Target::Plugin(MP3_PLAYER, ActionId(2))),
+                        "Covered transport buttons cannot receive clicks"
+                    );
+                    let child = snapshot
+                        .surfaces
+                        .iter()
+                        .find(|s| s.id.key == SurfaceKey::Page(id, if picker { 2 } else { 1 }))
+                        .unwrap();
+                    assert_eq!((child.bounds.width, child.bounds.height), (68, 20));
+                }
+            }
+        }
+    }
     Ok(())
 }

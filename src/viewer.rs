@@ -1,7 +1,9 @@
 mod navigation;
 mod search_controller;
 use crate::filesystem::open_regular;
-pub use navigation::{action, key, paste, Action, Match, SearchDialog, SearchMemory, VisualRow};
+pub use navigation::{
+    action, key, paste, Action, GoToDialog, Match, SearchDialog, SearchMemory, VisualRow,
+};
 use std::{
     io::{self, Read},
     path::{Path, PathBuf},
@@ -19,6 +21,7 @@ pub enum ViewMode {
 }
 
 pub struct Contents {
+    pub loaded_bytes: usize,
     pub lines: Vec<String>,
     pub binary: bool,
     pub truncated: bool,
@@ -123,6 +126,11 @@ pub fn from_bytes(mut bytes: Vec<u8>, mode: ViewMode) -> Contents {
         lines.push(String::new());
     }
     Contents {
+        loaded_bytes: if binary {
+            bytes.len().min(MAX_LINES * 16)
+        } else {
+            bytes.len()
+        },
         lines,
         binary,
         truncated,
@@ -145,6 +153,7 @@ pub struct Viewer {
     last_search: SearchMemory,
     pub notice: String,
     pending: Option<crate::task::Task<Result<Contents, String>>>,
+    reveal_line: Option<usize>,
 }
 
 impl Viewer {
@@ -197,6 +206,7 @@ impl Viewer {
             last_search: SearchMemory::default(),
             notice: String::new(),
             pending,
+            reveal_line: None,
         }
     }
 

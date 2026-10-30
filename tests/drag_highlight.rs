@@ -127,10 +127,13 @@ fn game_and_native_and_composed_dialogs_share_the_transient_frame_highlight() ->
     for action in [editor::EditorAction::Help, editor::EditorAction::Open] {
         editor::action(&mut a, action);
         support::draw(&mut a, 100, 32)?;
-        let modal = a.modal_top().unwrap().id;
+        let owner = a
+            .modal_top()
+            .map(|m| SurfaceKey::Modal(m.id))
+            .unwrap_or(SurfaceKey::Document(a.desktop.active().id));
         support::modified(&mut a, K::F(5), M::CONTROL);
         let (s, _) = captured(&mut a);
-        assert_eq!(s.id.key, SurfaceKey::Modal(modal));
+        assert_eq!(s.id.key, owner);
         support::key(&mut a, K::Enter);
         let b = support::draw(&mut a, 100, 32)?;
         assert_ne!(b[(s.bounds.x, s.bounds.y)].bg, a.config.palette.color(2));

@@ -118,6 +118,10 @@ impl Buffer {
     pub fn dirty(&self) -> bool {
         self.revision != self.saved
     }
+    pub(crate) fn mark_recovered(&mut self) {
+        self.sequence += 1;
+        self.revision = self.sequence;
+    }
     pub fn mark_saved(&mut self) {
         self.saved = self.revision;
     }

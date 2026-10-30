@@ -30,6 +30,7 @@ pub struct App {
     pub utilities: crate::utilities::Utilities,
     pub file_tools: crate::file_tools::Tools,
     pub editor_clipboard: String,
+    pub editor_recovery: Option<crate::editor::recovery::Manager>,
     pub editor_search: crate::editor::search::SearchMemory,
     pub desktop: crate::desktop::Desktop,
     pub panels: [Panel; 2],
@@ -47,6 +48,7 @@ pub struct App {
     pub exit_pending: bool,
     last_modal: Option<crate::modals::ModalInfo>,
     pub(crate) retirement: crate::retirement::State,
+    pub(crate) activation: crate::windowing::ActivationState,
     pub layout_revision: u64,
     pub(crate) layout_state: Option<crate::layout::ViewportState>,
     pub layout_key: Option<(
@@ -81,6 +83,7 @@ impl App {
             utilities: crate::utilities::Utilities::default(),
             file_tools: crate::file_tools::Tools::default(),
             editor_clipboard: String::new(),
+            editor_recovery: None,
             editor_search: crate::editor::search::SearchMemory::default(),
             desktop: Default::default(),
             panels: [
@@ -100,13 +103,13 @@ impl App {
             exit_pending: false,
             last_modal: None,
             retirement: Default::default(),
+            activation: Default::default(),
             layout_revision: 0,
             layout_state: None,
             layout_key: None,
             quit_review: None,
         };
         for stack in [
-            &mut app.modals,
             &mut app.screensaver.modals,
             &mut app.utilities.modals,
             &mut app.command_line.modals,
@@ -207,10 +210,20 @@ impl App {
         if self.job.is_some() || panel.loading {
             return;
         }
-        if let Some(entry) = panel.entries.get(panel.cursor) {
-            match crate::file_info::InfoDialog::open(entry.path.clone()) {
-                Ok(info) => self.modals.set_file_info(Some(info)),
-                Err(error) => self.error(format!("Cannot read file information: {error}")),
+        if let Some(path) = panel.entries.get(panel.cursor).map(|e| e.path.clone()) {
+            if !crate::tool_windows::open(
+                self,
+                crate::tool_windows::Kind::FileInfo,
+                Some(path.clone()),
+            ) {
+                return;
+            }
+            match crate::file_info::InfoDialog::open(path) {
+                Ok(info) => self.set_file_info(Some(info)),
+                Err(error) => crate::tool_windows::failed(
+                    self,
+                    format!("Cannot read file information: {error}"),
+                ),
             }
         }
     }

@@ -157,12 +157,12 @@ fn history_help_and_tree_restore_the_same_copy_owner_without_panel_navigation() 
     assert_eq!(copy_dialog::parent(&app), Some(owner));
     copy_dialog::action(&mut app, Action::Tree);
     key(&mut app, K::Esc);
-    assert!(app.modals.directory_tree().is_none());
+    assert!(app.directory_tree().is_none());
     copy_dialog::action(&mut app, Action::Tree);
     wait(&mut app, |a| {
-        a.modals.directory_tree().is_some_and(|t| !t.loading())
+        a.directory_tree().is_some_and(|t| !t.loading())
     });
-    let tree = app.modals.directory_tree_mut().unwrap();
+    let tree = app.directory_tree_mut().unwrap();
     tree.cursor = tree
         .rows
         .iter()
@@ -177,7 +177,7 @@ fn history_help_and_tree_restore_the_same_copy_owner_without_panel_navigation() 
     // Retire a parent with an in-flight child, then reject its old path receipt.
     copy_dialog::action(&mut app, Action::Tree);
     app.modals.set_prompt(None);
-    assert!(app.modals.directory_tree().is_none());
+    assert!(app.directory_tree().is_none());
     app.prompt_operation(Kind::Copy, false);
     copy_dialog::pick(&mut app, owner, t.0.join("wrong"));
     app.poll();

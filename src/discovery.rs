@@ -10,6 +10,7 @@ pub struct Preferences {
     pub pattern: String,
     pub recursive: bool,
     pub hidden: bool,
+    pub advanced: Advanced,
 }
 impl Default for Preferences {
     fn default() -> Self {
@@ -17,7 +18,30 @@ impl Default for Preferences {
             pattern: "*".into(),
             recursive: true,
             hidden: true,
+            advanced: Default::default(),
         }
+    }
+}
+#[derive(Clone, Debug, Default)]
+pub struct Advanced {
+    pub fields: [String; 5], // text, minimum, maximum, after, before
+    pub case_sensitive: bool,
+    pub kind: crate::traversal::find::FileKind,
+}
+impl Advanced {
+    pub fn options(&self) -> std::io::Result<crate::traversal::find::Options> {
+        use crate::traversal::find::{date, size, Options};
+        let options = Options {
+            text: self.fields[0].clone(),
+            case_sensitive: self.case_sensitive,
+            min_size: size(&self.fields[1])?,
+            max_size: size(&self.fields[2])?,
+            after: date(&self.fields[3], false)?,
+            before: date(&self.fields[4], true)?,
+            kind: self.kind,
+        };
+        options.validate()?;
+        Ok(options)
     }
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -29,6 +53,9 @@ pub enum Kind {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Action {
     Field,
+    Input(usize),
+    FileKind,
+    NewSearch,
     Toggle(usize),
     Start,
     Stop,
@@ -46,6 +73,7 @@ pub struct Modal {
     pub panel: usize,
     pub prefs: Preferences,
     pub input_cursor: usize,
+    pub advanced_cursors: [usize; 5],
     pub replace_input: bool,
     pub focus: usize,
     pub hits: Vec<Hit>,
@@ -74,6 +102,7 @@ impl Modal {
             root: app.panels[app.active].path.clone(),
             panel: app.active,
             input_cursor: prefs.pattern.len(),
+            advanced_cursors: std::array::from_fn(|i| prefs.advanced.fields[i].len()),
             replace_input: true,
             prefs,
             focus: 0,
@@ -120,19 +149,27 @@ fn prepare(app: &mut App) {
     app.modals.set_quick_search(None);
 }
 pub fn open_find(app: &mut App) {
+    if crate::tool_windows::reopen(app, crate::tool_windows::Kind::Find) {
+        return;
+    }
     if app.panels[app.active].loading {
         return;
     }
     prepare(app);
+    if !crate::tool_windows::open(app, crate::tool_windows::Kind::Find, None) {
+        return;
+    }
     if !app.discovery.initialized {
         app.discovery.prefs.hidden = app.config.show_hidden;
         app.discovery.initialized = true;
     }
-    app.discovery
-        .modals
-        .set_discovery(Some(Modal::new(app, Kind::FindForm)));
+    let state = Modal::new(app, Kind::FindForm);
+    app.set_discovery(Some(state));
 }
 pub fn open_sizes(app: &mut App) {
+    if crate::tool_windows::reopen(app, crate::tool_windows::Kind::Sizes) {
+        return;
+    }
     prepare(app);
     let panel = &app.panels[app.active];
     if panel.loading {
@@ -153,39 +190,74 @@ pub fn open_sizes(app: &mut App) {
         app.error("Select one or more visible directories first.");
         return;
     }
+    if !crate::tool_windows::open(app, crate::tool_windows::Kind::Sizes, None) {
+        return;
+    }
     let mut modal = Modal::new(app, Kind::Sizes);
     modal.sources = sources;
-    app.discovery.modals.set_discovery(Some(modal));
+    app.set_discovery(Some(modal));
     action(app, Action::Recalculate);
 }
 pub fn paste(app: &mut App, text: &str) {
-    if let Some(m) = app.discovery.modals.discovery_mut() {
-        if m.kind == Kind::FindForm && m.focus == 0 {
+    if let Some(m) = app.discovery_mut().filter(|m| m.kind == Kind::FindForm) {
+        if m.focus == 0 {
             if m.replace_input {
                 m.prefs.pattern.clear();
                 m.input_cursor = 0;
                 m.replace_input = false;
             }
             dialog::paste_input(&mut m.prefs.pattern, &mut m.input_cursor, text);
+        } else if (5..=9).contains(&m.focus) {
+            let i = m.focus - 5;
+            dialog::paste_input(
+                &mut m.prefs.advanced.fields[i],
+                &mut m.advanced_cursors[i],
+                text,
+            );
         }
     }
 }
 pub fn action(app: &mut App, command: Action) {
     if command == Action::Close {
-        app.discovery.modals.set_discovery(None);
+        app.set_discovery(None);
         return;
     }
-    let Some(m) = app.discovery.modals.discovery_mut() else {
+    if command == Action::Start {
+        if let Some(m) = app
+            .discovery()
+            .filter(|m| m.kind == Kind::FindForm && !m.prefs.pattern.is_empty())
+        {
+            app.discovery.prefs = m.prefs.clone();
+        }
+    }
+    let Some(m) = app.discovery_mut() else {
         return;
     };
     match command {
         Action::Field => m.focus = 0,
+        Action::Input(id) if (5..=9).contains(&id) => m.focus = id,
+        Action::FileKind => {
+            m.focus = 10;
+            m.prefs.advanced.kind = m.prefs.advanced.kind.next();
+        }
+        Action::NewSearch if m.kind == Kind::FindResults => {
+            m.job = None;
+            m.kind = Kind::FindForm;
+            m.focus = 0;
+            m.replace_input = true;
+            m.hits.clear();
+            m.stats = Default::default();
+            m.cursor = 0;
+            m.offset = 0;
+        }
         Action::Toggle(i) => {
             m.focus = i;
             if i == 1 {
                 m.prefs.recursive = !m.prefs.recursive;
             } else if i == 2 {
                 m.prefs.hidden = !m.prefs.hidden;
+            } else if i == 11 {
+                m.prefs.advanced.case_sensitive = !m.prefs.advanced.case_sensitive;
             }
         }
         Action::Start if m.kind == Kind::FindForm => {
@@ -193,12 +265,20 @@ pub fn action(app: &mut App, command: Action) {
                 app.error("Enter a filename pattern.");
                 return;
             }
-            app.discovery.prefs = m.prefs.clone();
-            match Job::start(Request::Find {
+
+            let options = match m.prefs.advanced.options() {
+                Ok(v) => v,
+                Err(e) => {
+                    app.error(e.to_string());
+                    return;
+                }
+            };
+            match Job::start(Request::AdvancedFind {
                 root: m.root.clone(),
                 pattern: m.prefs.pattern.clone(),
                 recursive: m.prefs.recursive,
                 hidden: m.prefs.hidden,
+                options,
             }) {
                 Ok(mut job) => {
                     job.bind(m.requests.owner());
@@ -252,13 +332,13 @@ pub fn action(app: &mut App, command: Action) {
                 return;
             };
             let path = hit.path.clone();
+            let line = hit.line;
             let panel = m.panel;
             if command == Action::Jump {
                 let Some(parent) = path.parent() else {
                     return;
                 };
                 let parent = parent.to_owned();
-                app.discovery.modals.set_discovery(None);
                 app.panels[panel].set_filter(String::new());
                 if path
                     .file_name()
@@ -269,14 +349,32 @@ pub fn action(app: &mut App, command: Action) {
                 app.panels[panel].go_to(parent, app.config.show_hidden);
                 app.panels[panel].focus_after_refresh = path.file_name().map(|n| n.to_owned());
                 app.active = panel;
+                crate::windowing::activate(app, crate::desktop::WindowId::MANAGER);
             } else if hit.regular {
                 if command == Action::View {
-                    match crate::viewer::Viewer::open(path) {
-                        Ok(v) => app.show_viewer(v),
+                    match crate::viewer::Viewer::open_mode(
+                        path,
+                        if line.is_some() {
+                            crate::viewer::ViewMode::Text
+                        } else {
+                            crate::viewer::ViewMode::Auto
+                        },
+                    ) {
+                        Ok(mut v) => {
+                            if let Some(line) = line {
+                                v.go_to_line(line);
+                            }
+                            app.show_viewer(v);
+                        }
                         Err(e) => app.error(e.to_string()),
                     }
                 } else {
                     crate::editor::open_path(app, path);
+                    if let Some(line) = line {
+                        if let Some(e) = app.desktop.active_editor_mut() {
+                            e.go_to_line(line);
+                        }
+                    }
                 }
             }
         }
@@ -284,18 +382,32 @@ pub fn action(app: &mut App, command: Action) {
     }
 }
 pub fn key(app: &mut App, event: KeyEvent) {
-    if let Some(m) = app.discovery.modals.discovery_mut() {
+    if event.code == KeyCode::F(1) {
+        app.push_dialog(crate::dialog::Dialog { title:" Find and directory sizes help ", message: app.config.language.text("Find accepts filename wildcards and literal UTF-8 content.\nBlank size/date fields impose no limits. Sizes: bytes or K/M/G (1024-based).\nDates are inclusive YYYY-MM-DD in UTC. Type filters use entry metadata.\nMatch text case controls content matching; filename masks remain case-sensitive.\nStop keeps partial results. New search retains criteria.\nF3/F4 opens the first matching text line; editor/viewer size limits still apply.\nDirectory sizes are independent snapshots. Links are never traversed.").into() });
+        return;
+    }
+
+    if let Some(m) = app.discovery_mut() {
         m.last_click = None;
     }
     if crate::dialog_controls::key(app, event, crate::focus::Focus::Discovery) {
         return;
     }
-    let Some(m) = app.discovery.modals.discovery_mut() else {
+    let Some(m) = app.discovery_mut() else {
         return;
     };
     m.last_click = None;
     if m.kind == Kind::FindForm {
         match event.code {
+            code if (5..=9).contains(&m.focus) => {
+                let i = m.focus - 5;
+                dialog::edit_input(
+                    &mut m.prefs.advanced.fields[i],
+                    &mut m.advanced_cursors[i],
+                    code,
+                );
+            }
+            KeyCode::Left | KeyCode::Right if m.focus == 10 => action(app, Action::FileKind),
             code if m.focus == 0 => {
                 if m.replace_input
                     && matches!(
@@ -333,7 +445,7 @@ pub fn mouse(app: &mut App, event: MouseEvent, target: Option<crate::mouse::Targ
             }
         }
         MouseEventKind::ScrollUp | MouseEventKind::ScrollDown => {
-            if let Some(m) = app.discovery.modals.discovery_mut() {
+            if let Some(m) = app.discovery_mut() {
                 m.step(crate::list_state::wheel_delta(event.kind));
             }
         }
@@ -341,7 +453,7 @@ pub fn mouse(app: &mut App, event: MouseEvent, target: Option<crate::mouse::Targ
     }
 }
 pub fn poll(app: &mut App) -> bool {
-    let Some(m) = app.discovery.modals.discovery_mut() else {
+    let Some(m) = app.discovery_mut() else {
         return false;
     };
     let mut changed = false;

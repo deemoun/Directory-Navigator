@@ -24,10 +24,19 @@ fn run() -> io::Result<()> {
     }
     let mut app = App::new(std::env::current_dir()?)?;
     app.load_initial_config();
+    match app
+        .config_store
+        .path()
+        .map(|p| p.with_file_name("editor-recovery"))
+    {
+        Ok(root) => dn::editor::recovery::start(&mut app, root),
+        Err(e) => app.error(format!("Editor recovery unavailable: {e}")),
+    }
     let (session, mut terminal) = Session::start()?;
     terminal.bind_desktop(app.desktop.native());
     let mut dirty = true;
     let mut showing_output = false;
+    let mut exit_settings_saved = false;
     loop {
         dirty |= app.poll();
         if app.output_visible != showing_output {
@@ -48,8 +57,14 @@ fn run() -> io::Result<()> {
 
             dirty = false;
         }
+        if !app.quit {
+            exit_settings_saved = false;
+        }
         if app.quit {
-            if app.save_settings_on_exit() {
+            if !exit_settings_saved {
+                exit_settings_saved = app.save_settings_on_exit();
+            }
+            if exit_settings_saved && dn::editor::recovery::finish(&mut app) {
                 break;
             }
             dirty = true;
@@ -65,6 +80,7 @@ fn run() -> io::Result<()> {
                 .or_else(|| app.command_line.pending.take())
         };
         if let Some(plan) = pending {
+            dn::editor::recovery::checkpoint_now(&mut app);
             session.suspend();
             let result = dn::user_menu::runner::run(&plan);
             match &result {

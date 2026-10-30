@@ -89,23 +89,21 @@ fn completed_discovery_disables_stop_and_retires_its_published_mouse_action() ->
     let (_t, mut a) = fixture()?;
     dn::discovery::open_find(&mut a);
     dn::discovery::action(&mut a, dn::discovery::Action::Start);
-    a.discovery.modals.discovery_mut().unwrap().focus = 4;
+    a.discovery_mut().unwrap().focus = 4;
     draw(&mut a, 80, 25)?;
     let stale = hit(&a, Target::Discovery(dn::discovery::Action::Stop));
     let revision = a.layout_revision;
-    wait(&mut a, |a| {
-        a.discovery.modals.discovery().unwrap().job.is_none()
-    });
+    wait(&mut a, |a| a.discovery().unwrap().job.is_none());
     dn::layout::update(&mut a);
     assert!(a.layout_revision > revision);
     click_at(&mut a, stale);
-    assert!(a.discovery.modals.discovery().is_some());
+    assert!(a.discovery().is_some());
     key(&mut a, K::Enter);
-    assert_eq!(a.discovery.modals.discovery().unwrap().focus, 4);
+    assert_eq!(a.discovery().unwrap().focus, 4);
     key(&mut a, K::BackTab);
-    assert_eq!(a.discovery.modals.discovery().unwrap().focus, 5);
+    assert_eq!(a.discovery().unwrap().focus, 6);
     key(&mut a, K::Enter);
-    assert!(a.discovery.modals.discovery().is_none());
+    assert!(a.discovery().is_none());
     Ok(())
 }
 #[test]
@@ -167,7 +165,7 @@ fn setup(a: &mut App, case: usize) -> (u16, u16) {
                 cursor,
                 base,
                 ..
-            }) = a.file_tools.modals.file_tools_mut()
+            }) = a.file_tools_mut()
             {
                 *base = PathBuf::from("/fixture");
                 *field = "list 界.txt".into();

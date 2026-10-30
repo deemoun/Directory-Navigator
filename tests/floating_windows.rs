@@ -184,11 +184,14 @@ fn moving_a_modal_consumes_escape_without_cancelling_its_draft() -> io::Result<(
 }
 
 fn modal_surface(a: &mut App, w: u16, h: u16) -> Surface {
-    let id = a.modal_top().unwrap().id;
+    let key = a
+        .modal_top()
+        .map(|m| SurfaceKey::Modal(m.id))
+        .unwrap_or(SurfaceKey::Document(a.desktop.active().id));
     layout::prepare(a, Rect::new(0, 0, w, h))
         .surfaces
         .into_iter()
-        .find(|s| s.id.key == SurfaceKey::Modal(id))
+        .find(|s| s.id.key == key)
         .unwrap()
 }
 #[test]

@@ -36,6 +36,7 @@ pub trait Frame {
     fn regions(&mut self) -> &mut Vec<(Rect, crate::mouse::Target)>;
     fn compose(&mut self, scene: crate::turbo::scene::Scene);
     fn modal_scope(&mut self, _scope: Option<crate::modals::ModalInfo>) {}
+    fn document_scope(&mut self, _owner: Option<crate::desktop::WindowId>) {}
     fn native_shadow(&mut self, _bounds: Rect) {}
 }
 pub trait Widget {
@@ -389,6 +390,7 @@ pub struct NativeFrame {
     dialog_background: Option<crate::turbo::scene::Scene>,
     composition: Option<crate::turbo::composition::DialogGroup>,
     scope: Option<crate::modals::ModalInfo>,
+    document_owner: Option<crate::desktop::WindowId>,
     dialogs: Vec<std::rc::Rc<std::cell::RefCell<crate::turbo::composition::DialogGroup>>>,
 }
 impl NativeFrame {
@@ -398,6 +400,7 @@ impl NativeFrame {
             dialog_background: None,
             composition: None,
             scope: None,
+            document_owner: None,
             dialogs: Vec::new(),
             scene: crate::turbo::scene::Scene {
                 width: area.width,
@@ -434,6 +437,9 @@ impl NativeFrame {
     pub(crate) fn dialog_scope(&self) -> Option<crate::modals::ModalInfo> {
         self.scope
     }
+    pub(crate) fn document_owner(&self) -> Option<crate::desktop::WindowId> {
+        self.document_owner
+    }
     pub(crate) fn start_dialog(&mut self, widget: crate::turbo::widgets::Native, area: Rect) {
         self.flush_dialog();
         // Captions paint sparsely. Their image children must capture the dialog
@@ -442,11 +448,15 @@ impl NativeFrame {
         self.scene.cursor = None;
         self.scene
             .fill(area.x, area.y, area.width, area.height, 0x70);
-        self.composition = Some(crate::turbo::composition::DialogGroup::new(
-            widget,
-            area,
-            self.scope.unwrap(),
-        ));
+        self.composition = Some(if let Some(scope) = self.scope {
+            crate::turbo::composition::DialogGroup::new(widget, area, scope)
+        } else {
+            crate::turbo::composition::DialogGroup::document(
+                widget,
+                area,
+                self.document_owner.unwrap(),
+            )
+        });
     }
     pub(crate) fn stage_control(&mut self, widget: crate::turbo::widgets::Native, area: Rect) {
         self.composition.as_mut().unwrap().control(
@@ -462,7 +472,7 @@ impl NativeFrame {
                 .placements
                 .iter()
                 .find(|s| {
-                    matches!(s.id.key,crate::windowing::geometry::SurfaceKey::Modal(id)|crate::windowing::geometry::SurfaceKey::ModalPage(id,_) if id==dialog.scope.id)
+                    matches!(s.id.key,crate::windowing::geometry::SurfaceKey::Modal(id)|crate::windowing::geometry::SurfaceKey::ModalPage(id,_) if Some(id)==dialog.scope.map(|m|m.id))
                         && s.default.x==dialog.bounds().x && s.default.y==dialog.bounds().y
                         && s.default.width==dialog.bounds().width
                 })
@@ -606,6 +616,12 @@ impl Frame for NativeFrame {
     fn modal_scope(&mut self, scope: Option<crate::modals::ModalInfo>) {
         self.flush_dialog();
         self.scope = scope;
+        self.document_owner = None;
+    }
+    fn document_scope(&mut self, owner: Option<crate::desktop::WindowId>) {
+        self.flush_dialog();
+        self.scope = None;
+        self.document_owner = owner;
     }
     fn compose(&mut self, scene: crate::turbo::scene::Scene) {
         if let Some(dialog) = &mut self.composition {

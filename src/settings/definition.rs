@@ -66,7 +66,7 @@ impl SettingsKind {
                 &[Space, DeleteKey, Backspace, Tags, Highlight, Trash],
                 true,
             ),
-            Self::Highlight => (" Highlight Groups ", 60, 18, &[Highlight], false),
+            Self::Highlight => (" Highlight Groups ", 76, 19, &[Highlight], false),
         };
         Form {
             title,

@@ -245,6 +245,10 @@ fn viewed_and_edited_histories_record_only_success_and_guard_open() -> io::Resul
         .histories
         .record(HistoryKind::View, t.0.join("missing"));
     file_tools::open_history(&mut app, HistoryKind::View);
+    app.poll();
+    if let Some(ToolDialog::History { cursor, .. }) = app.file_tools_mut() {
+        *cursor = 0;
+    }
     file_tools::accept(&mut app);
     wait(&mut app, |a| a.desktop.active_viewer().is_none());
     assert!(!app.dialogs().is_empty());
@@ -272,16 +276,16 @@ fn history_dialog_navigation_mouse_resize_and_empty_state() -> io::Result<()> {
     key(&mut app, KeyCode::End, KeyModifiers::NONE);
     draw(&mut app, 80, 25)?;
     assert!(
-        matches!(app.file_tools.modals.file_tools(),Some(ToolDialog::History {cursor:35,offset,..}) if *offset>0)
+        matches!(app.file_tools(),Some(ToolDialog::History {cursor:35,offset,..}) if *offset>0)
     );
     draw(&mut app, 130, 40)?;
-    if let Some(ToolDialog::History { cursor, offset, .. }) = app.file_tools.modals.file_tools() {
+    if let Some(ToolDialog::History { cursor, offset, .. }) = app.file_tools() {
         assert!(*cursor >= *offset);
     }
     key(&mut app, KeyCode::Home, KeyModifiers::NONE);
     draw(&mut app, 80, 25)?;
     click(&mut app, Target::Tool(ToolAction::HistoryRow(0)));
-    assert!(app.file_tools.modals.file_tools().is_some());
+    assert!(app.file_tools().is_some());
     click(&mut app, Target::Tool(ToolAction::HistoryRow(0)));
     wait(&mut app, |a| !a.panels[0].loading);
     assert!(!app.dialogs().is_empty());
@@ -389,7 +393,7 @@ fn comparison_marks_cancellation_shortcuts_and_mouse() -> io::Result<()> {
     app.clear_dialogs();
     app.panels[0].refresh(false);
     file_tools::open_compare(&mut app);
-    assert!(app.file_tools.modals.file_tools().is_none());
+    assert!(app.file_tools().is_none());
     assert!(!app.dialogs().is_empty());
     Ok(())
 }
@@ -474,7 +478,7 @@ fn export_dialog_background_refresh_preserves_selection_cursor_and_format() -> i
     assert!(!t.0.join("files.lst").exists());
     file_tools::open_export(&mut app);
     draw(&mut app, 120, 35)?;
-    if let Some(ToolDialog::Export { field, cursor, .. }) = app.file_tools.modals.file_tools_mut() {
+    if let Some(ToolDialog::Export { field, cursor, .. }) = app.file_tools_mut() {
         *field = "out.lst".into();
         *cursor = field.len();
     }
@@ -497,7 +501,7 @@ fn export_dialog_background_refresh_preserves_selection_cursor_and_format() -> i
         .all(|p| p.entries.iter().any(|e| e.name == "out.lst")));
     app.panels[0].selected.clear();
     file_tools::open_export(&mut app);
-    if let Some(ToolDialog::Export { paths, .. }) = app.file_tools.modals.file_tools() {
+    if let Some(ToolDialog::Export { paths, .. }) = app.file_tools() {
         assert_eq!(paths, &[t.0.join("beta")]);
     } else {
         panic!("export dialog")
@@ -525,16 +529,16 @@ fn menu_entries_and_modal_precedence() -> io::Result<()> {
     file_tools::open_compare(&mut app);
     app.error("top dialog");
     key(&mut app, KeyCode::Esc, KeyModifiers::NONE);
-    assert!(app.file_tools.modals.file_tools().is_some());
+    assert!(app.file_tools().is_some());
     assert!(app.dialogs().is_empty());
     key(&mut app, KeyCode::Esc, KeyModifiers::NONE);
-    assert!(app.file_tools.modals.file_tools().is_none());
+    assert!(app.file_tools().is_none());
     editor::open(&mut app, true);
     editor::paste(&mut app, "copy");
     key(&mut app, KeyCode::Char('a'), KeyModifiers::CONTROL);
     key(&mut app, KeyCode::Char('c'), KeyModifiers::CONTROL);
     assert_eq!(app.editor_clipboard, "copy");
-    assert!(app.file_tools.modals.file_tools().is_none());
+    assert!(app.file_tools().is_none());
     assert!(!app.quit);
     Ok(())
 }
@@ -574,7 +578,7 @@ fn export_worker_failure_and_exit_wait_for_publication() -> io::Result<()> {
     assert_eq!(fs::read_to_string(t.0.join("files.lst"))?, "keep");
     app.clear_dialogs();
     file_tools::open_export(&mut app);
-    if let Some(ToolDialog::Export { field, cursor, .. }) = app.file_tools.modals.file_tools_mut() {
+    if let Some(ToolDialog::Export { field, cursor, .. }) = app.file_tools_mut() {
         *field = "complete.lst".into();
         *cursor = field.len();
     }

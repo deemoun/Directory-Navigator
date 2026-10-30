@@ -12,6 +12,9 @@ impl App {
         self.request_exit();
     }
     pub fn abort_quit(&mut self) {
+        if let Some(m) = &mut self.editor_recovery {
+            m.resume();
+        }
         self.quit_review = None;
         for id in self
             .desktop
@@ -39,7 +42,7 @@ impl App {
             .rev()
             .find(|id| !self.quit_review.as_ref().unwrap().approved.contains(id));
         if let Some(id) = next {
-            self.desktop.activate(id);
+            crate::windowing::restore_focus(self, id);
             self.exit_pending = false;
             self.with_document(id, |app| {
                 crate::editor::request_close(app, crate::editor::CloseIntent::Quit)

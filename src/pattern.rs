@@ -171,6 +171,59 @@ impl PatternDialog {
     }
 }
 
+/// Mark only visible peers. Hidden/filtered marks are deliberately retained.
+pub fn related(
+    panel: &mut Panel,
+    groups: &crate::highlight_groups::Groups,
+    extension: bool,
+    selecting: bool,
+) -> usize {
+    let Some(current) = panel.entries.get(panel.cursor).filter(|e| !e.parent) else {
+        return 0;
+    };
+    if panel.loading || extension && (current.directory || current.symlink) {
+        return 0;
+    }
+    let suffix = |e: &crate::filesystem::Entry| {
+        e.path.extension().map(|s| {
+            s.to_str()
+                .map(|v| std::ffi::OsString::from(v.to_lowercase()))
+                .unwrap_or_else(|| s.to_owned())
+        })
+    };
+    let category = |e: &crate::filesystem::Entry| {
+        let group = groups.matching_group(e);
+        (
+            e.directory,
+            e.symlink,
+            group,
+            if group.is_some() {
+                0
+            } else {
+                crate::highlight_groups::builtin_color(e)
+            },
+        )
+    };
+    let current_suffix = suffix(current);
+    let current_category = category(current);
+    let mut changed = 0;
+    for e in &panel.entries {
+        let matches = if extension {
+            !e.directory && !e.symlink && suffix(e) == current_suffix
+        } else {
+            category(e) == current_category
+        };
+        if !e.parent && matches {
+            changed += usize::from(if selecting {
+                panel.selected.insert(e.name.clone())
+            } else {
+                panel.selected.remove(&e.name)
+            });
+        }
+    }
+    changed
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

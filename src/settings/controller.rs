@@ -62,6 +62,38 @@ pub(super) fn reduce(state: &mut Settings, action: Action, language: Language) -
     Effect::None
 }
 pub(super) fn key(state: &mut Settings, code: K) -> Key {
+    if state.kind == SettingsKind::Highlight {
+        let id = state.cursor;
+        if (2..=14).contains(&id)
+            && id % 3 == 2
+            && !matches!(
+                code,
+                K::Tab | K::BackTab | K::Enter | K::Esc | K::Up | K::Down
+            )
+        {
+            let i = (id - 2) / 3;
+            let old = state.draft.highlight_groups.0[i].masks.clone();
+            let cursor = state.mask_cursors[i];
+            crate::dialog::edit_input(
+                &mut state.draft.highlight_groups.0[i].masks,
+                &mut state.mask_cursors[i],
+                code,
+            );
+            if state.draft.highlight_groups.0[i].masks.len() > 512 {
+                state.draft.highlight_groups.0[i].masks = old;
+                state.mask_cursors[i] = cursor;
+            }
+            return Key::Handled;
+        }
+        if (3..=15).contains(&id)
+            && id.is_multiple_of(3)
+            && matches!(code, K::Left | K::Right | K::Char(' '))
+        {
+            let g = &mut state.draft.highlight_groups.0[(id - 3) / 3];
+            g.color = (g.color + if code == K::Left { 15 } else { 1 }) % 16;
+            return Key::Handled;
+        }
+    }
     if code == K::F(4) {
         return Key::Choice(state.cursor);
     }

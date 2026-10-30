@@ -65,6 +65,27 @@ pub(crate) fn windows_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
                     )
                 )
             }
+            Some(WindowKind::Tool(kind)) => {
+                let title = language.text(kind.title());
+                app.desktop
+                    .tool(*id)
+                    .and_then(|t| t.path.as_ref())
+                    .map_or_else(
+                        || title.to_owned(),
+                        |path| {
+                            format!(
+                                "{title}: {}",
+                                crate::formatting::tail(
+                                    &display_name(&path.to_string_lossy()),
+                                    width.saturating_sub(
+                                        crate::presentation::text::Line::from(title).width() as u16
+                                            + 2
+                                    )
+                                )
+                            )
+                        },
+                    )
+            }
             Some(WindowKind::Plugin(id)) => app
                 .desktop
                 .plugins
@@ -144,7 +165,7 @@ pub(crate) fn windows_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
         );
         control.enabled = match command {
             Action::Tile | Action::Cascade => crate::windowing::can_arrange(app),
-            Action::Move => document.is_some(),
+            Action::Move => document.is_some_and(|s| s.caps.movable),
             Action::Zoom => document.is_some_and(|s| s.caps.zoom),
             _ => true,
         };

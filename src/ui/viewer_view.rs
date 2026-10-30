@@ -124,6 +124,59 @@ pub(crate) fn viewer_search_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>
         .palette
         .styles_for(crate::palette::theme::Group::Viewer);
     let viewer = app.desktop.active_viewer()?;
+    if let Some(dialog) = viewer.modals.viewer_goto() {
+        let rect = centered(area, 58, 10);
+        let mut spec = DialogSpec::new(
+            rect,
+            scope(app, crate::focus::Focus::ViewerSearch)?,
+            dialog.focus,
+            app.config.language.text(" Viewer Go to "),
+            Target::Viewer(Action::Submit),
+            Target::Viewer(Action::Cancel),
+        );
+        let input = Rect::new(rect.x + 2, rect.y + 3, rect.width - 4, 1);
+        spec.caption(
+            Paragraph::new(app.config.language.text(
+                if viewer.contents.as_ref().is_some_and(|c| c.binary) {
+                    "Byte offset (decimal or 0x hexadecimal, from 0)"
+                } else {
+                    "Line number (from 1)"
+                },
+            ))
+            .style(dos(0x70)),
+            Rect::new(input.x, rect.y + 1, input.width, 2),
+        );
+        let column = Line::from(&dialog.field[..dialog.cursor]).width();
+        let scroll = column.saturating_sub(input.width.saturating_sub(1) as usize);
+        spec.control(Control::new(
+            0,
+            input,
+            ControlKind::ScrolledInput {
+                value: display_name(&dialog.field),
+                scroll,
+            },
+            Target::Viewer(Action::Field),
+        ));
+        if dialog.focus == 0 && app.dialogs().is_empty() {
+            spec.cursor = Some((input.x + (column - scroll) as u16, input.y));
+        }
+        spec.caption(
+            Paragraph::new(app.config.language.text(&viewer.notice)).style(dos(0x70)),
+            Rect::new(input.x, rect.y + 5, input.width, 2),
+        );
+        for (id, label, action, x) in [
+            (1, "[ Go ]", Action::Submit, rect.x + 8),
+            (2, "[ Cancel ]", Action::Cancel, rect.right() - 24),
+        ] {
+            spec.control(Control::new(
+                id,
+                Rect::new(x, rect.bottom() - 2, 16, 1),
+                ControlKind::Button(app.config.language.text(label).into()),
+                Target::Viewer(action),
+            ));
+        }
+        return Some(spec);
+    }
     let dialog = viewer.modals.viewer_search()?;
     let width = 58;
     let rect = centered(area, width, 10);

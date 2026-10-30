@@ -177,7 +177,7 @@ impl CalculatorPlugin {
 }
 impl ToolPlugin for CalculatorPlugin {
     fn definition(&self) -> Definition {
-        Definition::builtin(CALCULATOR, "Calculator", Presentation::Dialog)
+        Definition::builtin(CALCULATOR, "Calculator", Presentation::Document)
     }
     fn as_any(&self) -> &dyn Any {
         self

@@ -20,6 +20,7 @@ pub struct Settings {
     pub kind: SettingsKind,
     pub draft: Config,
     pub cursor: usize,
+    pub(crate) mask_cursors: [usize; 5],
     pub(crate) plugins: Vec<(crate::plugins::PluginId, &'static str)>,
     pub(crate) preview_time: chrono::DateTime<chrono::Local>,
 }
@@ -29,6 +30,7 @@ impl Settings {
             kind,
             draft: config.clone(),
             cursor: 0,
+            mask_cursors: std::array::from_fn(|i| config.highlight_groups.0[i].masks.len()),
             plugins: Vec::new(),
             preview_time: chrono::Local::now(),
         }
@@ -47,7 +49,9 @@ impl Settings {
         }
     }
     pub fn control_count(&self) -> usize {
-        if self.kind == SettingsKind::Plugins {
+        if self.kind == SettingsKind::Highlight {
+            self.draft.highlight_groups.0.len() * 3 + 2
+        } else if self.kind == SettingsKind::Plugins {
             self.plugins.len()
         } else if !self.choice_fields().is_empty() {
             self.choice_fields().len()
@@ -75,6 +79,25 @@ impl Settings {
         (setting.definition().get)(&self.draft)
     }
     pub fn toggle(&mut self, index: usize) {
+        if self.kind == SettingsKind::Highlight {
+            self.cursor = index;
+            if index == 0 {
+                self.draft.highlight_files = !self.draft.highlight_files;
+            } else if index == 16 {
+                self.draft.highlight_groups = Default::default();
+                self.mask_cursors =
+                    std::array::from_fn(|i| self.draft.highlight_groups.0[i].masks.len());
+            } else if (1..=15).contains(&index) {
+                let g = &mut self.draft.highlight_groups.0[(index - 1) / 3];
+                match (index - 1) % 3 {
+                    0 => g.enabled = !g.enabled,
+                    2 => g.color = (g.color + 1) % 16,
+                    _ => {}
+                }
+            }
+            return;
+        }
+
         if self.kind == SettingsKind::Plugins {
             if let Some((id, _)) = self.plugins.get(index) {
                 self.cursor = index;
@@ -94,13 +117,51 @@ impl Settings {
     }
 }
 
+pub fn paste(app: &mut App, text: &str) {
+    if app.modals.settings_choice().is_some() {
+        return;
+    }
+    if let Some(s) = app.modals.settings_mut().filter(|s| {
+        s.kind == SettingsKind::Highlight && (2..=14).contains(&s.cursor) && s.cursor % 3 == 2
+    }) {
+        let i = (s.cursor - 2) / 3;
+        let old = s.draft.highlight_groups.0[i].masks.clone();
+        let cursor = s.mask_cursors[i];
+        crate::dialog::paste_input(
+            &mut s.draft.highlight_groups.0[i].masks,
+            &mut s.mask_cursors[i],
+            text,
+        );
+        if s.draft.highlight_groups.0[i].masks.len() > 512 {
+            s.draft.highlight_groups.0[i].masks = old;
+            s.mask_cursors[i] = cursor;
+        }
+    }
+}
 pub fn accept(app: &mut App) {
+    if let Some(s) = app.modals.settings() {
+        if let Err(e) = s.draft.highlight_groups.validate() {
+            app.error(e.to_string());
+            return;
+        }
+    }
+
     if let Some(settings) = app.modals.take_settings() {
         app.apply_config(settings.draft);
         app.notice = "Options applied · Saved on exit when enabled; Save desktop saves now".into();
     }
 }
 pub fn key(app: &mut App, code: KeyCode) {
+    if code == KeyCode::F(1)
+        && app
+            .modals
+            .settings()
+            .is_some_and(|s| s.kind == SettingsKind::Highlight)
+    {
+        app.push_dialog(crate::dialog::Dialog {title:" Highlight groups help ",message:app.config.language.text("Enable a group, edit semicolon-separated * and ? masks, then choose color 0–15.\nMatching ignores case. The first matching enabled group wins.\nFolders, links, marks and the cursor keep their own colors.\nArrow keys or Space change color; Tab/Shift+Tab navigate.\nDefaults resets sample groups to disabled. OK applies; Esc cancels.").into()});
+        return;
+    }
+
     if app.modals.settings_choice().is_some() {
         choice_key(app, code);
         return;

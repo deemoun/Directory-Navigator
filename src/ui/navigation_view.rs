@@ -13,19 +13,14 @@ use crate::{
 pub(crate) fn navigation_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
     let profile = app.config.palette;
     let dos = profile.styles_for(crate::palette::theme::Group::Dialogs);
-    let modal = app.modals.navigation_dialog()?;
+    let modal = app.navigation_dialog()?;
     let height = if matches!(modal, Modal::Bookmarks { .. }) {
         18
     } else {
         11
     };
     let width = area.width.saturating_sub(6).min(94);
-    let rect = Rect::new(
-        area.x + (area.width - width) / 2,
-        area.y + (area.height - height) / 2,
-        width,
-        height,
-    );
+    let rect = crate::tool_windows::bounds(app, area, width, height);
     let title = if matches!(modal, Modal::Bookmarks { .. }) {
         " Quick directories "
     } else {

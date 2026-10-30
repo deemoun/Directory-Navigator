@@ -84,7 +84,7 @@ fn interface_hide_option_is_a_cancelable_draft_and_round_trips() -> io::Result<(
     Ok(())
 }
 #[test]
-fn tetris_hides_manager_menus_and_uses_dn_faces_mnemonics_and_offset_shadows() -> io::Result<()> {
+fn tetris_exposes_manager_menus_and_uses_dn_faces_mnemonics_and_offset_shadows() -> io::Result<()> {
     let (_temp, mut app) = fixture()?;
     for profile in [
         dn::palette::PaletteProfile::ClassicDn,
@@ -93,8 +93,8 @@ fn tetris_hides_manager_menus_and_uses_dn_faces_mnemonics_and_offset_shadows() -
         app.config.palette = profile;
         dn::tetris::open(&mut app);
         let b = draw(&mut app)?;
-        assert!(!top(&b).contains("Utilities"));
-        assert!(!app
+        assert!(top(&b).contains("Utilities"));
+        assert!(app
             .mouse
             .regions
             .iter()
@@ -117,11 +117,12 @@ fn tetris_hides_manager_menus_and_uses_dn_faces_mnemonics_and_offset_shadows() -
             assert_eq!(b[(r.x + 2, r.y + 1)].bg, profile.color(0));
         }
         key(&mut app, K::F(9), M::NONE);
-        assert!(app.modals.menu().is_none());
-        key(&mut app, K::Char('p'), M::ALT);
+        assert!(app.modals.menu().is_some());
+        key(&mut app, K::Esc, M::NONE);
+        key(&mut app, K::F(3), M::NONE);
         assert!(app.desktop.game().unwrap().paused);
         app.config.language = dn::localization::Language::Russian;
-        key(&mut app, K::Char('п'), M::ALT);
+        key(&mut app, K::F(3), M::NONE);
         assert!(!app.desktop.game().unwrap().paused);
         key(&mut app, K::Char('а'), M::ALT);
         assert!(matches!(

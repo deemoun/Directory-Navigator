@@ -1,5 +1,205 @@
 # Directory Navigator — beta
 
+## Help expand/restore control
+
+- Removed the HelpWindow's independent native zoom glyph. DN's shared desktop
+  chrome supplies the sole painted control and mouse target; maximized Help no
+  longer leaves an inert second icon at the right edge. The fixed-size Welcome
+  browser also hides its unsupported expand icon.
+- Clamp effective Help placement before native drawing, since terminal shrink
+  preparation can precede desktop geometry synchronization. This avoids reading
+  cells outside the resized terminal while preserving preferred window bounds,
+  topic, scroll position, links and history.
+- Added regression coverage for document/modal Help zoom and restoration,
+  keyboard/mouse agreement, resize/shrink/grow, parent focus and Welcome controls.
+  A real-terminal workflow repeatedly clicks the painted expand/restore icons.
+- macOS ARM64: 714 tests passed across 76 executables, one opt-in Trash test
+  ignored; all 320 shared frame captures remain unchanged. Formatting, all-target
+  Clippy with warnings denied, release, no-default-features and doc checks passed.
+  All 15 debug/release terminal tests passed. Windows/Linux validation skipped.
+
+
+## Editor recovery and explicit save outcomes
+
+- Added private, versioned/checksummed crash checkpoints for all dirty editors,
+  including untitled and inactive documents. The workspace-owned background
+  service serializes writes, transfers and retirement cleanup; it checks dirty
+  revisions about every five seconds and requests a checkpoint before shell
+  handoff. Startup scanning and reading are bounded and run in the existing pool.
+  Recovery uses session leases, excludes live instances, and retains claims for
+  the session, including deferred entries. Source paths are lossless metadata only.
+- Startup offers shared native Recover/Inspect/Discard/Later controls. Recovery
+  opens a dirty untitled copy with BOM/cursor/selection retained; owned Help
+  previews text without changing it. Later entries remain reachable through File.
+  Invalid checkpoints have disabled restore/preview actions and remain until
+  explicit discard. Unsafe directories, linked records and incomplete stages are
+  never restored. On macOS/Unix, stores require private ownership/permissions.
+- Checkpoints survive failed saves, cancelled quit and settings-save failures.
+  Transfers delete the original only after the new copy is durable. Final exit
+  waits for checkpoint work before cleanup. Failed cleanup preserves remaining
+  data and permits acknowledged exit; it does not trap the user in the app.
+- Editor saves now return a published snapshot separately from an optional
+  durability warning. Failure before publication leaves the destination intact;
+  directory-sync failure after publication updates identity while retaining dirty
+  state, aborting pending close/quit and preserving recovery. Retrying an unchanged
+  revision synchronizes/verifies it without another replacement. Existing Save As
+  no-overwrite, identity/content checks, metadata, BOM and EOL safeguards remain.
+- Recovery restores the last completed snapshot, not every final keystroke or undo
+  history. Atomic compare-and-replace with uncooperative external writers remains
+  outside this change. No dependencies or existing config formats were changed.
+- macOS ARM64 validation: 710 tests passed across 75 executables, one existing
+  opt-in Trash test ignored. New checks cover pre/post-publication faults,
+  confirmation without replacement, forced process exit/interrupted staging,
+  corruption, private storage/leases, inactive documents, repeated recovery,
+  nested preview/focus, save/close/quit/settings failures and cleanup acknowledgement.
+  All 320 shared frame captures remain unchanged. The new native recovery dialog
+  is exercised in English/Russian, default/custom colors, two sizes and repeated
+  immutable rendering. The 14 debug/release terminal tests include the complete
+  Inspect/Later/Recover/Discard workflow and terminal restoration. Formatting,
+  all-target Clippy with warnings denied, release build, no-default-features and
+  documentation checks passed. Windows/Linux validation remains skipped.
+
+
+## DN selection and editor/viewer commands
+
+- Panel → Selection groups wildcard/all/invert actions with new select/unselect
+  peers by extension or configured highlight-group identity. Group identity is
+  independent of chosen colors; default file categories remain the fallback.
+  Extension matching is case-insensitive and lossless for undecodable suffixes.
+  Parent rows and directories/links are excluded from extension matching;
+  filtered-out marks survive both operations. Ctrl+Plus/Minus and distinctly
+  reported Ctrl+Shift+Plus/Minus retain DN's type/extension distinction. The
+  submenu keeps all Panel entries reachable at the 80×25 terminal minimum.
+- Editor Block adds whole-line indentation/dedentation, Unicode upper/lower/
+  word capitalization and stable case-sensitive line sorting. Each operation is
+  one bounded undo transaction, preserves selection direction and does not save.
+  Tab indents selections; Shift+Tab unindents selections/current lines; plain
+  Tab still inserts using editor preferences. Sorting preserves line terminators
+  at their positions and final-newline state, refusing ambiguous blank-line moves
+  that would silently fuse separate CR/LF endings. No-ops preserve clean state.
+- Misc → Matching bracket / Ctrl+] supports nested parentheses, square and curly
+  brackets at or immediately before the cursor. Lexer token semantics exclude
+  strings/comments independently of palette or syntax visibility. Mismatched
+  nesting leaves document content, undo state and cursor untouched.
+- Viewer Go to / Ctrl+G / Alt+G / Mac Ctrl+O,G uses the shared owned native
+  dialog/control route. Text navigation is 1-based; Hex accepts decimal or 0x
+  byte offsets, highlights the exact destination and honors loaded byte limits.
+  Invalid input retains the draft and scroll position. Mouse, traversal, resize,
+  inactive owners and stale targets follow the existing desktop machinery.
+- Reference behaviors come from original EDITOR.PAS, FVIEWER.PAS and DNHELP.HTX;
+  original attribution remains in THIRD_PARTY_NOTICES.md. No dependencies,
+  persistence formats, file-operation guards or other utilities were changed.
+- macOS ARM64 validation: all 74 native test executables covered, with 693 tests
+  passing after targeted corrections and one opt-in Trash test ignored. Added
+  17 regressions plus a real-terminal block-edit/navigation workflow. Updated the
+  208 intentional viewer-background/help captures; the other 112 stay unchanged.
+  Localized menu mnemonics are checked, including the Selection submenu. The
+  older menu mouse workflow follows its new submenu, and the highlight PTY flow
+  acknowledges its final color change before resizing. Formatting, all-target
+  Clippy with warnings denied, release build, no-default-features and doc checks
+  passed; all 13 debug and release terminal tests passed. Windows/Linux skipped.
+
+
+## Advanced Find, parameterized F2 actions and highlight groups
+
+- Find adds literal UTF-8 content with optional case matching, metadata type,
+  inclusive size bounds and inclusive UTC date bounds. Searches stay with their
+  originating document, retain partial results and support New search without
+  closing the tool. Content reads use bounded buffers, cancellation checks,
+  no-follow regular-file opens and before/after identity/size/time validation.
+  Matching lines are shown in results and revealed after editor/viewer loading;
+  existing document storage/preview limits and file-operation guards remain.
+- F2 definitions accept up to eight `? name "Label" "default"` prompts and
+  whole-argument `{param:name}` expansion. Pane context is captured before input;
+  parameter entry/Help/cancellation cannot run commands. Existing review/Run is
+  preserved. Added `{other_selected}`, `{selected_list}` and
+  `{other_selected_list}`. Lists are planned without filesystem changes, created
+  privately only on Run, and cleaned after success, failure or nonzero exit;
+  collisions retain existing files. Arguments preserve native paths and never
+  acquire implicit shell parsing.
+- Highlight Groups uses shared controls for five ordered enable/mask/color rules,
+  global highlighting, Defaults and OK/Cancel. Semicolon-separated wildcard
+  matching ignores case. Existing file-type colors remain the fallback; folders,
+  links, marks and cursor colors retain priority. Explicit group foregrounds
+  preserve custom panel backgrounds. Drafts/Unicode paste/Help are isolated;
+  accepted rules persist as validated optional TOML v2 fields, preserving unknown
+  values. Older configurations keep their previous file colors.
+- Added temporary-fixture regressions for Unicode chunk boundaries, filters,
+  cancellation, background ownership/match navigation, argument isolation,
+  parameter snapshots, list cleanup/collisions, configuration persistence and
+  palette/selection precedence. A real-terminal workflow covers all three forms,
+  resize, Unicode input, reviewed-command cancellation and terminal restoration.
+  Updated only the 16 intentional Highlight Groups frame captures; the other
+  304 shared captures remain unchanged. Windows/Linux validation stays skipped.
+- macOS ARM64 validation: all 73 native test executables passed (675 tests,
+  one opt-in Trash test ignored). Formatting, all-target Clippy with warnings
+  denied, release, no-default-features and doc checks passed. All 12 debug and
+  release terminal tests passed. The existing held-button walkthrough now waits
+  for the populated initial directory listing before sending its first command.
+
+## Typed tool state and shared window policy
+
+- Independent tools now store their controller payloads in dedicated typed
+  document state. Modal stacks contain blocking forms/children only; tool roots
+  no longer allocate hidden ModalIds or require modal-enumeration exceptions.
+  Shared typed access preserves the separate Copy/Move destination picker and
+  workspace forms. Utilities separate their model from modal ownership; Help
+  documents own their browser directly. Requests bind to the WindowId before
+  completion delivery and retire with the payload.
+- All host-side document installations and explicit activation routes reconcile
+  native selection through one focus transition. Reopening, close fallback,
+  alias coalescing and guarded parent/quit restoration share transient-menu,
+  shortcut, button-capture, layout-revision and plugin-activity cleanup.
+  Background publication preserves foreground focus intent and open menus.
+  Inactive plugin Activity events cannot request foreground services.
+- Window presentation policy centralizes editor/viewer/tool/modal minimum sizes,
+  initial maximization and title rows. Native capabilities explicitly declare
+  movement, resizing, zoom and Tile/Cascade participation. Plugin declarations
+  retain their own capabilities; the native host has no game-size assumption.
+- The existing 320 appearance captures remain unchanged. Added regression
+  coverage for typed request retirement, blocking-child lifetime, focus cleanup,
+  background publication and capability enforcement. Windows/Linux validation
+  remains skipped.
+- Validation on macOS ARM64: all 72 native test executables passed (664 tests,
+  one opt-in Trash test ignored). Formatting, all-target Clippy with warnings
+  denied, release build, no-default-features and doc checks passed. All 11
+  release terminal tests passed; all 320 existing appearance captures matched.
+
+## Independent tools and consistent window switching
+
+- Added session-owned tool documents with stable WindowIds, typed tool kinds,
+  captured panel/directory contexts, native shells and ID-targeted state access.
+  Existing typed controller storage treats a document's root separately from
+  blocking modal children; requests bind to the document before worker delivery.
+- Tree, Find/results, Sizes, archives, file information, bookmarks, histories,
+  character table and system/memory information can coexist. Calculator is now
+  a document plugin. Reopening activates retained state; archives/file info use
+  the existing background resolved-path identity machinery. Background polling
+  does not select windows; retired owners drop pending reads.
+- Native geometry governs activation and z-order. Added stable next/previous
+  cycling (Alt+F6/Alt+Shift+F6, distinct Ctrl+Tab encodings), shared menu/window
+  actions and an independent-tool status bar. Menus remain above background
+  editors/viewers. File/panel menu operations use the current manager pane.
+- Main/context Help is switchable outside blocking forms; Help inside a decision
+  remains modal. Context Help retires with its document. Destination trees,
+  settings, confirmations and Tetris pages retain blocking semantics. Tetris
+  now exposes the main menu; archive metadata moved from F9 to Alt+I.
+- Modeless native Dialog/Group composition preserves native widgets, shadows
+  and focus. Popup painting follows each native page shell after move/resize.
+  Tool bounds initialize from declarations; resizable tools maximize within the
+  desktop, preserving the main menu. Cursor composition remains owner-local.
+- Updated only the 80 appearance captures for Calculator, standalone Help,
+  command/file histories and bookmarks; all other 240 captures stay unchanged.
+  Added ownership, overlapping activation, cycling, source-panel navigation,
+  retained utility state, background completion, clipping/immutable rendering,
+  blocking-decision and live-terminal workflows. Windows/Linux remain skipped.
+- Validation on macOS ARM64: all 71 native test executables passed (659 tests,
+  one opt-in Trash test ignored), including 11 tool-window regressions and the
+  real-terminal workflows. Formatting, all-target Clippy with warnings denied,
+  release build, no-default-features check and doc tests passed. All 11 release
+  terminal tests passed, including menu access from Tree, Calculator switching,
+  overlapping documents, resizing, shell handoff and terminal restoration.
+
 ## Visible button presses
 
 - Shared push buttons now follow DN DIALOGS.PAS DrawState: the face shifts one

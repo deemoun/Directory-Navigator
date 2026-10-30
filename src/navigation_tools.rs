@@ -22,10 +22,12 @@ pub enum Modal {
     },
 }
 pub fn open_bookmarks(app: &mut App) {
+    if !crate::tool_windows::open(app, crate::tool_windows::Kind::Bookmarks, None) {
+        return;
+    }
     menu::close(app);
     app.modals.set_quick_search(None);
-    app.modals
-        .set_navigation_dialog(Some(Modal::Bookmarks { slot: 0, focus: 0 }));
+    app.set_navigation_dialog(Some(Modal::Bookmarks { slot: 0, focus: 0 }));
 }
 pub fn open_filter(app: &mut App) {
     if app.panels[app.active].loading {
@@ -43,31 +45,40 @@ pub fn open_filter(app: &mut App) {
 }
 pub fn assign(app: &mut App, slot: usize) {
     if slot < 9 {
-        app.config.bookmarks[slot] = Some(app.panels[app.active].path.clone());
+        let panel = app
+            .desktop
+            .tool(app.desktop.target())
+            .map_or(app.active, |t| t.panel);
+        app.config.bookmarks[slot] = Some(app.panels[panel].path.clone());
         app.notice = format!("Bookmark {} set", slot + 1);
     }
 }
 pub fn go(app: &mut App, slot: usize) {
-    if app.panels[app.active].loading {
+    let panel = app
+        .desktop
+        .tool(app.desktop.target())
+        .map_or(app.active, |t| t.panel);
+    if app.panels[panel].loading {
         app.error("Wait for directory navigation to finish.");
         return;
     }
     if let Some(path) = app.config.bookmarks.get(slot).and_then(Clone::clone) {
-        app.modals.set_navigation_dialog(None);
-        app.panels[app.active].go_to(path, app.config.show_hidden);
+        app.panels[panel].go_to(path, app.config.show_hidden);
+        app.active = panel;
+        crate::windowing::activate(app, crate::desktop::WindowId::MANAGER);
     } else {
         app.notice = format!("Bookmark {} is empty", slot + 1);
     }
 }
 pub fn action(app: &mut App, action: Action) {
-    let slot = match app.modals.navigation_dialog() {
+    let slot = match app.navigation_dialog() {
         Some(Modal::Bookmarks { slot, .. }) => *slot,
         _ => 0,
     };
     match action {
         Action::Slot(n) => {
             if n < 9 {
-                if let Some(Modal::Bookmarks { slot, focus }) = app.modals.navigation_dialog_mut() {
+                if let Some(Modal::Bookmarks { slot, focus }) = app.navigation_dialog_mut() {
                     *slot = n;
                     *focus = 0;
                 }
@@ -76,14 +87,14 @@ pub fn action(app: &mut App, action: Action) {
         Action::Go => go(app, slot),
         Action::Set => assign(app, slot),
         Action::Clear => app.config.bookmarks[slot] = None,
-        Action::Close => app.modals.set_navigation_dialog(None),
+        Action::Close => app.set_navigation_dialog(None),
         Action::ApplyFilter => {
-            if let Some(Modal::Filter { field, .. }) = app.modals.take_navigation_dialog() {
+            if let Some(Modal::Filter { field, .. }) = app.take_navigation_dialog() {
                 app.panels[app.active].set_filter(field);
             }
         }
         Action::FilterField => {
-            if let Some(Modal::Filter { focus, .. }) = app.modals.navigation_dialog_mut() {
+            if let Some(Modal::Filter { focus, .. }) = app.navigation_dialog_mut() {
                 *focus = 0;
             }
         }
@@ -94,7 +105,7 @@ pub fn paste(app: &mut App, text: &str) {
         field,
         cursor,
         focus: 0,
-    }) = app.modals.navigation_dialog_mut()
+    }) = app.navigation_dialog_mut()
     {
         dialog::paste_input(field, cursor, text);
     }
@@ -103,7 +114,7 @@ pub fn key(app: &mut App, key: KeyEvent) {
     if crate::dialog_controls::key(app, key, crate::focus::Focus::Navigation) {
         return;
     }
-    match app.modals.navigation_dialog_mut() {
+    match app.navigation_dialog_mut() {
         Some(Modal::Bookmarks { slot, .. }) => {
             if let Some(row) = crate::turbo::widgets::list_key(*slot, 9, 9, key.code) {
                 *slot = row;

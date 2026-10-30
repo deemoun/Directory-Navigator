@@ -1001,8 +1001,8 @@ fn native_requested_surfaces_match_headless_frames() -> io::Result<()> {
                         }
                         49 => {
                             utilities::open(&mut app, Kind::Characters);
-                            app.utilities.chart.page = utilities::characters::Page::Cp437;
-                            app.utilities.chart.cells[1] = 255;
+                            app.utility_state_mut().chart.page = utilities::characters::Page::Cp437;
+                            app.utility_state_mut().chart.cells[1] = 255;
                         }
                         52 | 53 => {
                             utilities::open(
@@ -1015,16 +1015,16 @@ fn native_requested_surfaces_match_headless_frames() -> io::Result<()> {
                             );
                             let deadline = Instant::now() + Duration::from_secs(5);
                             while app
-                                .utilities
+                                .utility_state()
                                 .information
                                 .as_ref()
                                 .is_some_and(|i| i.loading())
                             {
-                                app.utilities.information.as_mut().unwrap().poll();
+                                app.utility_state_mut().information.as_mut().unwrap().poll();
                                 assert!(Instant::now() < deadline);
                                 thread::sleep(Duration::from_millis(1));
                             }
-                            let info = app.utilities.information.as_mut().unwrap();
+                            let info = app.utility_state_mut().information.as_mut().unwrap();
                             info.horizontal = 3;
                             info.offset = 2;
                         }

@@ -70,7 +70,10 @@ fn draw(app: &mut App, w: u16, h: u16) -> io::Result<String> {
 }
 fn click(app: &mut App, target: Target) {
     let target = match target {
-        Target::Utility(a) if app.modals.plugin_dialog() == Some(dn::plugins::CALCULATOR) => {
+        Target::Utility(a)
+            if app.desktop.active().kind
+                == dn::desktop::WindowKind::Plugin(dn::plugins::CALCULATOR) =>
+        {
             utilities::calculator_target(a)
         }
         t => t,
@@ -244,7 +247,10 @@ fn calculator_mouse_keyboard_paste_copy_reopen_and_editor_clipboard() -> io::Res
     let mut app = t.app()?;
     draw(&mut app, 80, 25)?;
     key(&mut app, KeyCode::Char('k'), KeyModifiers::CONTROL);
-    assert_eq!(app.modals.plugin_dialog(), Some(dn::plugins::CALCULATOR));
+    assert_eq!(
+        app.desktop.active().kind,
+        dn::desktop::WindowKind::Plugin(dn::plugins::CALCULATOR)
+    );
     input::paste(&mut app, "(0x20+1)*2");
     key(&mut app, KeyCode::Enter, KeyModifiers::NONE);
     assert_eq!(
@@ -313,16 +319,16 @@ fn character_grid_mouse_navigation_pages_copy_and_resize() -> io::Result<()> {
     click(&mut app, Target::Utility(Action::Copy));
     assert_eq!(app.editor_clipboard, "│");
     key(&mut app, KeyCode::Right, KeyModifiers::NONE);
-    assert_eq!(app.utilities.chart.selected(), 180);
+    assert_eq!(app.utility_state().chart.selected(), 180);
     key(&mut app, KeyCode::Home, KeyModifiers::NONE);
-    assert_eq!(app.utilities.chart.selected(), 0);
+    assert_eq!(app.utility_state().chart.selected(), 0);
     key(&mut app, KeyCode::End, KeyModifiers::NONE);
-    assert_eq!(app.utilities.chart.selected(), 255);
+    assert_eq!(app.utility_state().chart.selected(), 255);
     utilities::action(&mut app, Action::Page(Page::Ascii));
-    assert_eq!(app.utilities.chart.selected(), 65);
+    assert_eq!(app.utility_state().chart.selected(), 65);
     key(&mut app, KeyCode::Esc, KeyModifiers::NONE);
     utilities::open(&mut app, Kind::Characters);
-    assert_eq!(app.utilities.chart.selected(), 65);
+    assert_eq!(app.utility_state().chart.selected(), 65);
     Ok(())
 }
 #[test]
@@ -349,12 +355,12 @@ fn native_information_refresh_close_and_stale_replies() -> io::Result<()> {
     draw(&mut app, 80, 25)?;
     utilities::open(&mut app, Kind::System);
     wait(&mut app, |a| {
-        a.utilities
+        a.utility_state()
             .information
             .as_ref()
             .is_some_and(|i| !i.loading())
     });
-    let info = app.utilities.information.as_ref().unwrap();
+    let info = app.utility_state().information.as_ref().unwrap();
     assert!(info
         .fields
         .iter()
@@ -366,13 +372,13 @@ fn native_information_refresh_close_and_stale_replies() -> io::Result<()> {
     draw(&mut app, 120, 40)?;
     click(&mut app, Target::Utility(Action::Refresh));
     wait(&mut app, |a| {
-        a.utilities
+        a.utility_state()
             .information
             .as_ref()
             .is_some_and(|i| !i.loading())
     });
     assert!(app
-        .utilities
+        .utility_state()
         .information
         .as_ref()
         .unwrap()
@@ -380,27 +386,27 @@ fn native_information_refresh_close_and_stale_replies() -> io::Result<()> {
         .iter()
         .any(|(k, v)| k == "Terminal size" && v == "120 × 40"));
     key(&mut app, KeyCode::Esc, KeyModifiers::NONE);
-    assert!(app.utilities.information.is_none());
+    assert!(app.utility_state().information.is_none());
     key(&mut app, KeyCode::Char('y'), KeyModifiers::ALT);
     utilities::open(&mut app, Kind::System);
     wait(&mut app, |a| {
-        a.utilities
+        a.utility_state()
             .information
             .as_ref()
             .is_some_and(|i| !i.loading())
     });
     assert_eq!(
-        app.utilities.information.as_ref().unwrap().kind,
+        app.utility_state().information.as_ref().unwrap().kind,
         information::Kind::System
     );
     utilities::open(&mut app, Kind::Memory);
     wait(&mut app, |a| {
-        a.utilities
+        a.utility_state()
             .information
             .as_ref()
             .is_some_and(|i| !i.loading())
     });
-    let fields = &app.utilities.information.as_ref().unwrap().fields;
+    let fields = &app.utility_state().information.as_ref().unwrap().fields;
     assert!(fields.iter().any(|(k, _)| k == "Physical RAM"));
     assert!(fields.iter().any(|(k, _)| k == "DN resident memory"));
     #[cfg(any(target_os = "linux", target_os = "macos"))]
@@ -415,12 +421,13 @@ fn native_information_refresh_close_and_stale_replies() -> io::Result<()> {
         }
     }
     draw(&mut app, 80, 25)?;
+    let closing = app.desktop.active().id;
     click(&mut app, Target::Utility(Action::Refresh));
+    draw(&mut app, 80, 25)?;
     click(&mut app, Target::Utility(Action::Close));
     thread::sleep(Duration::from_millis(10));
     app.poll();
-    assert!(app.utilities.information.is_none());
-    assert!(app.utilities.modals.utility_dialog().is_none());
+    assert!(!app.desktop.contains(closing));
     Ok(())
 }
 #[test]
@@ -429,12 +436,12 @@ fn information_long_fields_scroll_sanitization_and_unavailable() -> io::Result<(
     let mut app = t.app()?;
     utilities::open(&mut app, Kind::System);
     wait(&mut app, |a| {
-        a.utilities
+        a.utility_state()
             .information
             .as_ref()
             .is_some_and(|i| !i.loading())
     });
-    let info = app.utilities.information.as_mut().unwrap();
+    let info = app.utility_state_mut().information.as_mut().unwrap();
     info.fields = (0..40)
         .map(|n| {
             (
@@ -450,7 +457,10 @@ fn information_long_fields_scroll_sanitization_and_unavailable() -> io::Result<(
     key(&mut app, KeyCode::End, KeyModifiers::NONE);
     assert!(draw(&mut app, 80, 25)?.contains("Unavailable: injected failure"));
     key(&mut app, KeyCode::Right, KeyModifiers::NONE);
-    assert_eq!(app.utilities.information.as_ref().unwrap().horizontal, 8);
+    assert_eq!(
+        app.utility_state().information.as_ref().unwrap().horizontal,
+        8
+    );
     draw(&mut app, 130, 40)?;
     let mut info = Information::open(information::Kind::System, t.0.clone(), (80, 25))?;
     let deadline = Instant::now() + Duration::from_secs(5);
@@ -488,12 +498,15 @@ fn utility_menus_modal_precedence_editor_keys_and_small_terminal() -> io::Result
     utilities::open(&mut app, Kind::Calculator);
     app.error("top dialog");
     key(&mut app, KeyCode::Esc, KeyModifiers::NONE);
-    assert!(app.modals.plugin_dialog().is_some());
+    assert_eq!(
+        app.desktop.active().kind,
+        dn::desktop::WindowKind::Plugin(dn::plugins::CALCULATOR)
+    );
     key(&mut app, KeyCode::Esc, KeyModifiers::NONE);
-    assert!(app.utilities.modals.utility_dialog().is_none());
+    assert!(app.utility_dialog().is_none());
     dn::editor::open(&mut app, true);
     key(&mut app, KeyCode::Char('b'), KeyModifiers::CONTROL);
-    assert!(app.utilities.modals.utility_dialog().is_none());
+    assert!(app.utility_dialog().is_none());
     assert!(app.desktop.active_editor().is_some());
     Ok(())
 }
@@ -544,7 +557,10 @@ fn calculator_history_dropdown_recalls_without_evaluation_and_returns_to_draft()
     assert!(app.desktop.plugins.calculator_mut().expression.is_empty());
     key(&mut app, KeyCode::Esc, KeyModifiers::NONE);
     assert!(!app.desktop.plugins.calculator_mut().history_open);
-    assert_eq!(app.modals.plugin_dialog(), Some(dn::plugins::CALCULATOR));
+    assert_eq!(
+        app.desktop.active().kind,
+        dn::desktop::WindowKind::Plugin(dn::plugins::CALCULATOR)
+    );
     for expression in ["1+2", "sqrt(81)"] {
         let calc = &mut app.desktop.plugins.calculator_mut();
         calc.expression = expression.into();
@@ -708,7 +724,10 @@ fn calculator_classic_layout_results_help_mouse_focus_and_resize() -> io::Result
             assert_eq!(focus::current(&app), Focus::Message);
             key(&mut app, KeyCode::Esc, KeyModifiers::NONE);
             draw(&mut app, 60, 15)?;
-            assert_eq!(app.modals.plugin_dialog(), Some(dn::plugins::CALCULATOR));
+            assert_eq!(
+                app.desktop.active().kind,
+                dn::desktop::WindowKind::Plugin(dn::plugins::CALCULATOR)
+            );
             draw(&mut app, 80, 25)?;
             key(&mut app, KeyCode::Char('e'), KeyModifiers::ALT);
             assert_eq!(
@@ -735,9 +754,9 @@ fn native_character_table_is_read_only_clipped_and_rejects_stale_page_hits() -> 
         Instant::now(),
     );
     let before = (
-        app.utilities.chart.page,
-        app.utilities.chart.cells,
-        app.utilities.chart.focus,
+        app.utility_state().chart.page,
+        app.utility_state().chart.cells,
+        app.utility_state().chart.focus,
     );
     let first = ui::render(&app, &snapshot);
     assert!(first
@@ -752,9 +771,9 @@ fn native_character_table_is_read_only_clipped_and_rejects_stale_page_hits() -> 
     assert_eq!(
         before,
         (
-            app.utilities.chart.page,
-            app.utilities.chart.cells,
-            app.utilities.chart.focus
+            app.utility_state().chart.page,
+            app.utility_state().chart.cells,
+            app.utility_state().chart.focus
         )
     );
     draw(&mut app, 80, 25)?;
@@ -779,12 +798,13 @@ fn native_character_table_is_read_only_clipped_and_rejects_stale_page_hits() -> 
         },
     );
     assert_eq!(
-        app.utilities.chart.selected(),
+        app.utility_state().chart.selected(),
         0,
         "old CP437 row cannot select an ASCII byte"
     );
     assert_eq!(
-        app.utilities.chart.cells[1], 179,
+        app.utility_state().chart.cells[1],
+        179,
         "other page retains its selection"
     );
     Ok(())

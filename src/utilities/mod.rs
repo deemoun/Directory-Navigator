@@ -28,6 +28,21 @@ pub enum Action {
 #[derive(Default)]
 pub struct Utilities {
     pub modals: crate::modals::ModalStack,
+    pub state: State,
+}
+impl std::ops::Deref for Utilities {
+    type Target = State;
+    fn deref(&self) -> &State {
+        &self.state
+    }
+}
+impl std::ops::DerefMut for Utilities {
+    fn deref_mut(&mut self) -> &mut State {
+        &mut self.state
+    }
+}
+#[derive(Default)]
+pub struct State {
     pub chart: characters::Chart,
     pub information: Option<information::Information>,
     pub size: (u16, u16),
@@ -41,62 +56,93 @@ pub fn open(app: &mut App, kind: Kind) {
     }
     menu::close(app);
     app.modals.set_quick_search(None);
-    app.utilities.modals.set_utility_dialog(Some(kind));
-    app.utilities.notice.clear();
-    app.utilities.focus = 0;
-    app.utilities.chart.focus = 0;
+    let tool = match kind {
+        Kind::Characters => crate::tool_windows::Kind::Characters,
+        Kind::System => crate::tool_windows::Kind::System,
+        Kind::Memory => crate::tool_windows::Kind::Memory,
+        Kind::Calculator => unreachable!(),
+    };
+    if !crate::tool_windows::open(app, tool, None) {
+        return;
+    }
+    app.set_utility_dialog(Some(kind));
+    if kind == Kind::Characters {
+        let page = app.utilities.chart.page;
+        let cells = app.utilities.chart.cells;
+        app.utility_state_mut().chart.page = page;
+        app.utility_state_mut().chart.cells = cells;
+    }
+    app.utility_state_mut().notice.clear();
+    app.utility_state_mut().focus = 0;
+    app.utility_state_mut().chart.focus = 0;
     if matches!(kind, Kind::System | Kind::Memory) {
-        app.utilities.information = None;
+        app.utility_state_mut().information = None;
         refresh(app);
     } else {
-        app.utilities.information = None;
+        app.utility_state_mut().information = None;
     }
 }
 fn refresh(app: &mut App) {
     if app
-        .utilities
+        .utility_state()
         .information
         .as_ref()
         .is_some_and(|i| i.loading())
     {
         return;
     }
-    let kind = match app.utilities.modals.utility_dialog() {
+    let kind = match app.utility_dialog() {
         Some(Kind::System) => information::Kind::System,
         Some(Kind::Memory) => information::Kind::Memory,
         _ => return,
     };
     match information::Information::open(
         kind,
-        app.panels[app.active].path.clone(),
+        app.desktop.tool(app.desktop.target()).map_or_else(
+            || app.panels[app.active].path.clone(),
+            |t| t.source_directory.clone(),
+        ),
         app.utilities.size,
     ) {
         Ok(info) => {
-            if let Some(modal) = app.utilities.modals.infos().last() {
+            if app.desktop.tool(app.desktop.target()).is_some() {
+                info.requests
+                    .bind(crate::requests::Owner::Document(app.desktop.target()));
+            } else if let Some(modal) = app.utilities.modals.infos().last() {
                 info.requests.bind(crate::requests::Owner::Modal(modal.id));
             }
-            app.utilities.information = Some(info);
+            app.utility_state_mut().information = Some(info);
         }
         Err(e) => app.error(format!("Cannot start information worker: {e}")),
     }
 }
 pub fn poll(app: &mut App) -> bool {
-    let owner = app
-        .utilities
-        .modals
-        .infos()
-        .find(|m| m.focus == crate::focus::Focus::Utility)
-        .map(|m| crate::requests::Owner::Modal(m.id));
+    let owner = if app
+        .desktop
+        .tool(app.desktop.target())
+        .is_some_and(|t| t.kind.focus() == crate::focus::Focus::Utility)
+    {
+        Some(crate::requests::Owner::Document(app.desktop.target()))
+    } else {
+        app.utilities
+            .modals
+            .infos()
+            .find(|m| m.focus == crate::focus::Focus::Utility)
+            .map(|m| crate::requests::Owner::Modal(m.id))
+    };
     if app
-        .utilities
+        .utility_state()
         .information
         .as_ref()
         .is_some_and(|info| Some(info.requests.owner()) != owner)
     {
-        app.utilities.information = None;
+        app.utility_state_mut().information = None;
         return true;
     }
-    app.utilities.information.as_mut().is_some_and(|i| i.poll())
+    app.utility_state_mut()
+        .information
+        .as_mut()
+        .is_some_and(|i| i.poll())
 }
 /// Compatibility launcher/actions; the calculator controller lives in plugins.
 pub fn calculator_target(a: Action) -> crate::mouse::Target {
@@ -133,33 +179,33 @@ pub fn action(app: &mut App, a: Action) {
     }
     match a {
         Action::Close => {
-            app.utilities.modals.set_utility_dialog(None);
-            app.utilities.information = None;
+            app.set_utility_dialog(None);
+            app.utility_state_mut().information = None;
         }
         Action::Copy => {
-            if app.utilities.modals.utility_dialog() != Some(Kind::Characters) {
+            if app.utility_dialog() != Some(Kind::Characters) {
                 return;
             }
             match app
-                .utilities
+                .utility_state()
                 .chart
                 .copy_text()
                 .ok_or("ASCII controls cannot be copied")
             {
                 Ok(text) => {
                     app.editor_clipboard = text;
-                    app.utilities.notice = "Copied to DN internal clipboard".into();
+                    app.utility_state_mut().notice = "Copied to DN internal clipboard".into();
                 }
-                Err(e) => app.utilities.notice = e.into(),
+                Err(e) => app.utility_state_mut().notice = e.into(),
             }
         }
         Action::Page(page) => {
-            app.utilities.chart.page = page;
-            app.utilities.chart.focus = 0;
+            app.utility_state_mut().chart.page = page;
+            app.utility_state_mut().chart.focus = 0;
         }
         Action::Cell(cell) => {
-            crate::turbo::characters::select(&mut app.utilities.chart, cell);
-            app.utilities.chart.focus = 0;
+            crate::turbo::characters::select(&mut app.utility_state_mut().chart, cell);
+            app.utility_state_mut().chart.focus = 0;
         }
         Action::Refresh => refresh(app),
         _ => {}
@@ -175,10 +221,10 @@ pub fn key(app: &mut App, key: KeyEvent) {
         return;
     }
     let mut command = None;
-    match app.utilities.modals.utility_dialog() {
+    match app.utility_dialog() {
         Some(Kind::Calculator) => {}
         Some(Kind::Characters) => {
-            let chart = &mut app.utilities.chart;
+            let chart = &mut app.utility_state_mut().chart;
             match key.code {
                 code if chart.focus == 0 => {
                     crate::turbo::characters::key(chart, code);
@@ -189,7 +235,7 @@ pub fn key(app: &mut App, key: KeyEvent) {
         Some(Kind::System | Kind::Memory) => match key.code {
             KeyCode::Char('r') | KeyCode::F(5) => command = Some(Action::Refresh),
             code => {
-                if let Some(info) = &mut app.utilities.information {
+                if let Some(info) = &mut app.utility_state_mut().information {
                     match code {
                         KeyCode::Up => info.step(-1),
                         KeyCode::Down => info.step(1),
@@ -221,7 +267,7 @@ pub fn mouse(app: &mut App, event: MouseEvent, target: Option<crate::mouse::Targ
             }
         }
         MouseEventKind::ScrollUp | MouseEventKind::ScrollDown => {
-            if let Some(info) = &mut app.utilities.information {
+            if let Some(info) = &mut app.utility_state_mut().information {
                 info.step(if event.kind == MouseEventKind::ScrollUp {
                     -3
                 } else {

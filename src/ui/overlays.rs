@@ -170,7 +170,7 @@ pub(super) fn draw_info_dialog(
     app: &App,
     message: Option<&crate::layout::MessageLayout>,
 ) {
-    if let Some(help) = app.modals.native_help(app.desktop.active().id) {
+    if let Some(help) = app.native_help() {
         frame.regions().clear();
         if let Some(scene) = help.scene() {
             frame.compose(scene.clone());

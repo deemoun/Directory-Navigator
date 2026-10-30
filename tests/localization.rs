@@ -127,6 +127,7 @@ fn translated_mnemonics_are_unique_and_keep_english_aliases() {
     for m in [
         MenuId::Associations,
         MenuId::CopyNames,
+        MenuId::Selection,
         MenuId::View,
         MenuId::Sort,
         MenuId::Layout,
@@ -295,6 +296,7 @@ fn russian_menus_editor_modals_and_metadata_fit_without_translating_paths() -> i
         for id in [
             MenuId::Associations,
             MenuId::CopyNames,
+            MenuId::Selection,
             MenuId::View,
             MenuId::Sort,
             MenuId::Layout,

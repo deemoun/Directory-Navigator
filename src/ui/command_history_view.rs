@@ -10,11 +10,12 @@ use crate::{
     mouse::Target,
 };
 pub(crate) fn command_history_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
-    let d = app.command_line.modals.command_history()?;
+    let d = app.command_history()?;
     let language = app.config.language;
     let profile = app.config.palette;
     let dos = profile.styles_for(crate::palette::theme::Group::Dialogs);
-    let (rect, _) = history::geometry(area);
+    let (default, _) = history::geometry(area);
+    let rect = crate::tool_windows::bounds(app, area, default.width, default.height);
     let mut spec = DialogSpec::new(
         rect,
         scope(app, crate::focus::Focus::CommandHistory)?,
@@ -46,7 +47,7 @@ pub(crate) fn command_history_spec(app: &App, area: Rect) -> Option<DialogSpec<'
     }
     if d.matches.is_empty() {
         spec.caption(
-            Paragraph::new(language.text(if app.command_line.history().is_empty() {
+            Paragraph::new(language.text(if d.source.is_empty() {
                 "No commands in this session."
             } else {
                 "No matching commands."
@@ -58,7 +59,7 @@ pub(crate) fn command_history_spec(app: &App, area: Rect) -> Option<DialogSpec<'
     let items = d
         .matches
         .iter()
-        .filter_map(|i| app.command_line.history().get(*i))
+        .filter_map(|i| d.source.get(*i))
         .map(|s| display_name(s))
         .collect();
     let mut list = Control::new(

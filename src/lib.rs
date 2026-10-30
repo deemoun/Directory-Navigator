@@ -32,6 +32,7 @@ pub mod settings;
 pub mod shortcuts;
 pub mod terminal;
 pub mod tetris;
+pub mod tool_windows;
 pub mod ui;
 pub mod viewer;
 pub mod welcome;
@@ -100,3 +101,5 @@ pub mod terminal_output;
 
 pub(crate) mod eligibility;
 pub(crate) mod retirement;
+
+pub mod highlight_groups;

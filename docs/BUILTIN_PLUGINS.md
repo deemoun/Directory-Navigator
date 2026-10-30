@@ -79,6 +79,10 @@ result, base and history across closes; opening resets focus and its history pag
 Tetris releases its current game on close, while the score store and pending
 unsaved records remain in the module for later reopening/retry. The existing
 `tetris.conf` path, format, DOS import, merging and write safeguards are unchanged.
+Calculator, Tetris and MP3 Player are singleton documents in the window list.
+Calculator now uses Document presentation while retaining its shared native
+form, session history and controls. Main menus and window switching remain
+available; owned decision pages keep their blocking behavior.
 Tetris appears in the window list; inactivity, blocking dialogs, output/screensaver
 and viewports below 80×25 suspend its clock without catch-up.
 
@@ -141,9 +145,10 @@ resize and terminal restoration. Windows/Linux validation is skipped.
 Utilities → MP3 Player opens a single movable document. Its compact 36×9 and
 expanded 36×16 layouts follow DOS Navigator's CD player, with fixed zero counters,
 a vertical MP3 label and the current configured dialog palette. Transport and
-secondary buttons only demonstrate native focus and activation; there is no
-playback, file picker, metadata reading, timer, audio dependency or saved player
-preference. Open is a placeholder too.
+secondary buttons demonstrate native focus and activation. List opens the
+UI-only play-order dialog described below. There is no playback, file picker,
+metadata reading, timer, audio dependency or saved player preference. Open is a
+placeholder too.
 
 Alt+Z, the title zoom control, title double-click and window-list Zoom toggle
 compact/expanded views. The internal optional `ToolPlugin::zoom_action` hook
@@ -153,3 +158,14 @@ participate in Tile/Cascade without stretching. Their first geometry comes from
 the declared `LocalWindow`, not a Tetris-specific fallback; later size changes
 retain preferred placement and clamp effective bounds. Closing/reopening the
 player starts compact with Play focused. F1 opens owned prototype help.
+
+The expanded player's List button opens a 68×20 play-order page, modelled on
+`CDUTIL.PAS`'s `TOrder`, with No./Time/Description columns and native list/scrollbar
+controls. Twelve explicitly labelled demo tracks use unknown durations. Add opens
+an owned track-chooser page; Delete removes a draft row; OK keeps the demo order
+only for that opening, and Cancel discards the draft. Already queued tracks are
+marked with `*`, as in DN. Save is disabled, and duplicate demo entries are allowed
+up to a bounded 64-entry order. Empty-list actions and keyboard traversal skip
+unavailable controls. Standard plugin page layers provide parent focus, movement,
+clipping, owned Help and stale-surface guards. All state lives inside the MP3
+plugin and resets on reopening; counters and transport controls remain inert.

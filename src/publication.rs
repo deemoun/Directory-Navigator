@@ -43,6 +43,11 @@ impl StagedFile {
         &self.path
     }
     pub fn publish(&self, destination: &Path) -> io::Result<()> {
+        self.publish_unsynced(destination)?;
+        crate::platform_fs::sync_parent(destination)
+    }
+    /// Success means the destination is published; directory durability is separate.
+    pub(crate) fn publish_unsynced(&self, destination: &Path) -> io::Result<()> {
         self.file.sync_all()?;
         if !crate::platform_fs::owns_file(&self.path, &self.file) {
             return Err(io::Error::other("Temporary output was replaced"));
@@ -54,7 +59,7 @@ impl StagedFile {
             }
             Err(e) => return Err(e),
         }
-        crate::platform_fs::sync_parent(destination)
+        Ok(())
     }
 }
 impl Drop for StagedFile {

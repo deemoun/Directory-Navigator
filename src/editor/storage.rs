@@ -7,7 +7,7 @@ use std::{
     time::SystemTime,
 };
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Snapshot {
     bytes: Vec<u8>,
     modified: Option<SystemTime>,
@@ -97,15 +97,36 @@ fn verify(path: &Path, original: &Snapshot) -> io::Result<()> {
     }
     Ok(())
 }
-/// Save As publishes without overwriting. Saving the opened file checks its
-/// identity/content before atomic replacement; no target is truncated in place.
+/// An error means this attempt did not publish. A successful result always
+/// carries the published identity, even when its durability is uncertain.
+#[derive(Debug)]
+pub struct SaveOutcome {
+    pub snapshot: Snapshot,
+    pub warning: Option<String>,
+}
+#[derive(Clone, Copy)]
+enum Stage {
+    Write,
+    FileSync,
+    Publish,
+    ParentSync,
+}
 pub fn save(
     path: &Path,
     text: &str,
     bom: bool,
     original: Option<&Snapshot>,
-) -> Result<Snapshot, String> {
-    let save = || -> io::Result<Snapshot> {
+) -> Result<SaveOutcome, String> {
+    save_with(path, text, bom, original, |_| Ok(()))
+}
+fn save_with(
+    path: &Path,
+    text: &str,
+    bom: bool,
+    original: Option<&Snapshot>,
+    mut check: impl FnMut(Stage) -> io::Result<()>,
+) -> Result<SaveOutcome, String> {
+    let prepare = || -> io::Result<_> {
         if text.len() + if bom { 3 } else { 0 } > MAX_BYTES {
             return Err(io::Error::other(
                 "Saved file exceeds the 2 MiB editor limit.",
@@ -119,21 +140,26 @@ pub fn save(
                 "Destination exists; choose a new name.",
             ));
         }
-        let mut staged = crate::publication::StagedFile::create(path)?;
-        let output = &mut staged.file;
+        crate::publication::StagedFile::create(path)
+    };
+    let mut staged = prepare().map_err(|e| e.to_string())?;
+    let mut publish = || -> io::Result<_> {
         let mut bytes = Vec::with_capacity(text.len() + 3);
         if bom {
             bytes.extend_from_slice(&[0xef, 0xbb, 0xbf]);
         }
         bytes.extend_from_slice(text.as_bytes());
-        output.write_all(&bytes)?;
+        check(Stage::Write)?;
+        staged.file.write_all(&bytes)?;
         if let Some(original) = original {
             let input = filesystem::open_regular(path)?;
-            crate::platform_fs::copy_extended_metadata(&input, output)?;
-            output.set_permissions(original.permissions.clone())?;
+            crate::platform_fs::copy_extended_metadata(&input, &staged.file)?;
+            staged.file.set_permissions(original.permissions.clone())?;
         }
-        output.sync_all()?;
-        let metadata = output.metadata()?;
+        check(Stage::FileSync)?;
+        staged.file.sync_all()?;
+        let metadata = staged.file.metadata()?;
+        check(Stage::Publish)?;
         if let Some(original) = original {
             verify(path, original)?;
             if !crate::platform_fs::owns_file(staged.path(), &staged.file) {
@@ -141,11 +167,132 @@ pub fn save(
             }
             fs::rename(staged.path(), path)?;
         } else {
-            // Atomic no-clobber publication, including a racing destination/link.
-            staged.publish(path)?;
+            staged.publish_unsynced(path)?;
         }
-        crate::platform_fs::sync_parent(path)?;
         Ok(Snapshot::new(bytes, &metadata))
     };
-    save().map_err(|error| error.to_string())
+    let snapshot = publish().map_err(|e| e.to_string())?;
+    // No ordinary error may escape after publication: callers need this snapshot
+    // to retry safely and must retain dirty/recovery state until confirmed.
+    let warning = check(Stage::ParentSync)
+        .and_then(|_| crate::platform_fs::sync_parent(path))
+        .err()
+        .map(|e| e.to_string());
+    Ok(SaveOutcome { snapshot, warning })
+}
+/// Retry an already published revision without replacing the file again.
+pub fn confirm_durability(path: &Path, snapshot: &Snapshot) -> Result<SaveOutcome, String> {
+    verify(path, snapshot).map_err(|e| e.to_string())?;
+    let warning = filesystem::open_regular(path)
+        .and_then(|f| f.sync_all())
+        .and_then(|_| crate::platform_fs::sync_parent(path))
+        .err()
+        .map(|e| e.to_string());
+    Ok(SaveOutcome {
+        snapshot: snapshot.clone(),
+        warning,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    struct Temp(std::path::PathBuf);
+    impl Drop for Temp {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+    fn fixture(label: &str) -> Temp {
+        static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        let p = std::env::temp_dir().join(format!(
+            "dn-save-outcome-{label}-{}-{}",
+            std::process::id(),
+            NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+        ));
+        fs::create_dir(&p).unwrap();
+        Temp(p)
+    }
+    #[test]
+    fn failures_before_publication_leave_original_or_absent_destination_untouched() {
+        for fault in [Stage::Write, Stage::FileSync, Stage::Publish] {
+            let f = fixture("early");
+            let p = f.0.join("source");
+            fs::write(&p, "original").unwrap();
+            let (_, snapshot, _) = load(&p).unwrap();
+            let inject = |s: Stage| {
+                if std::mem::discriminant(&s) == std::mem::discriminant(&fault) {
+                    Err(io::Error::other("injected save failure"))
+                } else {
+                    Ok(())
+                }
+            };
+            assert!(save_with(&p, "edited", false, Some(&snapshot), inject).is_err());
+            assert_eq!(fs::read(&p).unwrap(), b"original");
+            let new = f.0.join("new");
+            assert!(save_with(&new, "edited", false, None, inject).is_err());
+            assert!(!new.exists());
+            assert_eq!(fs::read_dir(&f.0).unwrap().count(), 1);
+        }
+    }
+    #[test]
+    fn late_failure_returns_published_identity_and_retry_does_not_replace_it() {
+        for existing in [false, true] {
+            let f = fixture("late");
+            let p = f.0.join("file");
+            let original = if existing {
+                fs::write(&p, "old").unwrap();
+                Some(load(&p).unwrap().1)
+            } else {
+                None
+            };
+            let out = save_with(&p, "new\r\n界", true, original.as_ref(), |s| {
+                if matches!(s, Stage::ParentSync) {
+                    Err(io::Error::other("injected directory sync failure"))
+                } else {
+                    Ok(())
+                }
+            })
+            .unwrap();
+            assert!(out.warning.is_some());
+            assert_eq!(fs::read(&p).unwrap(), "\u{feff}new\r\n界".as_bytes());
+            #[cfg(unix)]
+            let inode = {
+                use std::os::unix::fs::MetadataExt;
+                fs::metadata(&p).unwrap().ino()
+            };
+            let retried = confirm_durability(&p, &out.snapshot).unwrap();
+            assert!(retried.warning.is_none());
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::MetadataExt;
+                assert_eq!(fs::metadata(&p).unwrap().ino(), inode);
+            }
+            fs::write(&p, "external change").unwrap();
+            assert!(confirm_durability(&p, &retried.snapshot).is_err());
+            assert_eq!(fs::read(&p).unwrap(), b"external change");
+        }
+    }
+    #[test]
+    fn racing_new_destination_and_replaced_open_file_are_not_overwritten() {
+        let f = fixture("race");
+        let p = f.0.join("new");
+        assert!(save_with(&p, "ours", false, None, |s| {
+            if matches!(s, Stage::Publish) {
+                fs::write(&p, "winner")?;
+            }
+            Ok(())
+        })
+        .is_err());
+        assert_eq!(fs::read(&p).unwrap(), b"winner");
+        let original = load(&p).unwrap().1;
+        assert!(save_with(&p, "ours", false, Some(&original), |s| {
+            if matches!(s, Stage::Publish) {
+                fs::write(&p, "later")?;
+            }
+            Ok(())
+        })
+        .is_err());
+        assert_eq!(fs::read(&p).unwrap(), b"later");
+    }
 }

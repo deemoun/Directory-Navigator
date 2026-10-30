@@ -219,6 +219,17 @@ impl Proposal {
     }
 }
 pub(crate) fn scope(app: &App, focus: Focus) -> Option<ControlScope> {
+    if (app.desktop.contextual() || app.modal_top().is_none_or(|m| m.focus != focus))
+        && app
+            .desktop
+            .tool(app.desktop.target())
+            .is_some_and(|t| t.kind.focus() == focus)
+    {
+        return Some(ControlScope::Document {
+            window: app.desktop.target(),
+            revision: app.layout_revision,
+        });
+    }
     // Settings' choice child uses the same input scope. The first entry is the
     // parent whose controls this definition describes, not its owned child.
     app.visible_modals()
@@ -532,8 +543,71 @@ impl<'a> DialogSpec<'a> {
         }
         Some(result)
     }
+    pub(crate) fn place_document_windows(
+        &mut self,
+        owner: crate::desktop::WindowId,
+        native: &crate::turbo::desktop::NativeDesktop,
+    ) {
+        fn walk(
+            s: &mut DialogSpec<'_>,
+            owner: crate::desktop::WindowId,
+            native: &crate::turbo::desktop::NativeDesktop,
+            index: &mut u64,
+        ) {
+            let local = *index;
+            *index += 1;
+            let key = if local == 0 {
+                crate::windowing::geometry::SurfaceKey::Document(owner)
+            } else {
+                crate::windowing::geometry::SurfaceKey::Page(owner, local)
+            };
+            if let Some(surface) = native.surface(key) {
+                s.move_to(surface.bounds.x, surface.bounds.y);
+            }
+            for p in &mut s.parts {
+                if let Part::Overlay(child) = p {
+                    walk(child, owner, native, index);
+                }
+            }
+        }
+        walk(self, owner, native, &mut 0);
+    }
+    pub(crate) fn move_to(&mut self, x: u16, y: u16) {
+        let dx = i32::from(x) - i32::from(self.bounds.x);
+        let dy = i32::from(y) - i32::from(self.bounds.y);
+        self.translate(dx, dy);
+    }
+    fn translate(&mut self, dx: i32, dy: i32) {
+        fn rect(r: &mut Rect, dx: i32, dy: i32) {
+            r.x = (i32::from(r.x) + dx).max(0) as u16;
+            r.y = (i32::from(r.y) + dy).max(0) as u16;
+        }
+        rect(&mut self.bounds, dx, dy);
+        for c in &mut self.controls {
+            rect(&mut c.bounds, dx, dy);
+            for (r, _) in &mut c.hits {
+                rect(r, dx, dy);
+            }
+        }
+        for p in &mut self.parts {
+            match p {
+                Part::Caption(_, r) | Part::Memo(_, r) | Part::Native(_, r) | Part::Hit(r, _) => {
+                    rect(r, dx, dy)
+                }
+                Part::Overlay(child) => child.translate(dx, dy),
+                _ => {}
+            }
+        }
+        if let Some((x, y)) = &mut self.cursor {
+            *x = (i32::from(*x) + dx).max(0) as u16;
+            *y = (i32::from(*y) + dy).max(0) as u16;
+        }
+    }
     pub fn paint(self, frame: &mut impl Frame, app: &App) {
         frame.modal_scope(self.scope.modal());
+        if let ControlScope::Document { window, .. } = self.scope {
+            frame.document_scope(Some(window));
+        }
         frame.render_widget(super::widgets::dialog(&self.title), self.bounds);
         frame.regions().clear();
         // Existing native title chrome is drawn by the standard close helper.

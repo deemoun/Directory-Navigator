@@ -32,7 +32,8 @@ pub(crate) struct DialogGroup {
     root: Box<dyn View>,
     rect: Rect,
     planes: Vec<Plane>,
-    pub scope: ModalInfo,
+    pub scope: Option<ModalInfo>,
+    pub document: Option<crate::desktop::WindowId>,
     buttons: Vec<(Rect, Rect, Target)>,
 }
 struct Image {
@@ -90,11 +91,22 @@ fn decode(ch: char, text: &TextCells) -> String {
     })
 }
 impl DialogGroup {
-    pub fn new(mut control: Native, rect: Rect, scope: ModalInfo) -> Self {
+    pub fn new(control: Native, rect: Rect, scope: ModalInfo) -> Self {
+        Self::owned(control, rect, Some(scope), None)
+    }
+    pub fn document(control: Native, rect: Rect, owner: crate::desktop::WindowId) -> Self {
+        Self::owned(control, rect, None, Some(owner))
+    }
+    fn owned(
+        mut control: Native,
+        rect: Rect,
+        scope: Option<ModalInfo>,
+        document: Option<crate::desktop::WindowId>,
+    ) -> Self {
         control.view.set_bounds(tv(rect));
         let dialog = control.view.as_any_mut().downcast_mut::<Dialog>().unwrap();
         dialog.set_close_on(CloseOn::Commands(Vec::new()));
-        dialog.set_state_flag(State::MODAL, true);
+        dialog.set_state_flag(State::MODAL, scope.is_some());
         Self {
             offset: (0, 0),
             root: control.view,
@@ -109,6 +121,7 @@ impl DialogGroup {
                 original: rect,
             }],
             scope,
+            document,
             buttons: Vec::new(),
         }
     }
@@ -455,7 +468,7 @@ mod tests {
             let bounds = group.dialog().group().child_at(0).bounds();
             assert_eq!(bounds.width(), 12);
             assert_eq!(bounds.height(), 2);
-            assert_eq!(group.scope, scope);
+            assert_eq!(group.scope, Some(scope));
             let mut scene = Scene {
                 width: 100,
                 height: screen_height,

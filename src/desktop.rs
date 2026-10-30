@@ -21,6 +21,7 @@ pub enum WindowKind {
     Viewer,
     Editor,
     Plugin(crate::plugins::PluginId),
+    Tool(crate::tool_windows::Kind),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -33,6 +34,7 @@ enum Content {
     Editor(Box<Editor>),
     Viewer(Box<Viewer>),
     Plugin(crate::plugins::PluginId),
+    Tool(Box<crate::tool_windows::ToolWindow>),
 }
 impl Content {
     fn kind(&self) -> WindowKind {
@@ -41,6 +43,7 @@ impl Content {
             Self::Editor(_) => WindowKind::Editor,
             Self::Viewer(_) => WindowKind::Viewer,
             Self::Plugin(id) => WindowKind::Plugin(*id),
+            Self::Tool(t) => WindowKind::Tool(t.kind),
         }
     }
 }
@@ -70,6 +73,7 @@ pub struct Desktop {
     next_id: u64,
     context: std::cell::Cell<Option<WindowId>>,
     activation_revision: u64,
+    selection_revision: u64,
     reservations: std::collections::BTreeMap<std::path::PathBuf, WindowId>,
     retired: Vec<WindowId>,
 }
@@ -94,12 +98,37 @@ impl Default for Desktop {
             next_id: 1,
             context: std::cell::Cell::new(None),
             activation_revision: 0,
+            selection_revision: 0,
             reservations: Default::default(),
             retired: Vec::new(),
         }
     }
 }
 impl Desktop {
+    pub(crate) fn open_tool(&mut self, t: crate::tool_windows::ToolWindow) -> io::Result<WindowId> {
+        self.install(Content::Tool(Box::new(t)), true)
+    }
+    pub fn tool(&self, id: WindowId) -> Option<&crate::tool_windows::ToolWindow> {
+        self.windows
+            .iter()
+            .find(|w| w.id == id)
+            .and_then(|w| match &w.content {
+                Content::Tool(t) => Some(t.as_ref()),
+                _ => None,
+            })
+    }
+    pub(crate) fn tool_mut(
+        &mut self,
+        id: WindowId,
+    ) -> Option<&mut crate::tool_windows::ToolWindow> {
+        self.windows
+            .iter_mut()
+            .find(|w| w.id == id)
+            .and_then(|w| match &mut w.content {
+                Content::Tool(t) => Some(t.as_mut()),
+                _ => None,
+            })
+    }
     pub fn active(&self) -> WindowInfo {
         self.native.active()
     }
@@ -137,6 +166,9 @@ impl Desktop {
     pub fn activation_revision(&self) -> u64 {
         self.activation_revision
     }
+    pub(crate) fn selection_revision(&self) -> u64 {
+        self.selection_revision
+    }
     pub fn activate(&mut self, id: WindowId) -> bool {
         self.activate_inner(id, true)
     }
@@ -144,6 +176,12 @@ impl Desktop {
         let Some(index) = self.windows.iter().position(|w| w.id == id) else {
             return false;
         };
+        if bump || self.active().id != id {
+            self.selection_revision = self
+                .selection_revision
+                .checked_add(1)
+                .expect("selection revision exhausted");
+        }
         if bump {
             self.activation_revision = self
                 .activation_revision
@@ -158,6 +196,7 @@ impl Desktop {
     }
     fn install(&mut self, mut content: Content, foreground: bool) -> io::Result<WindowId> {
         let previous = self.active().id;
+        let previous_selection = self.selection_revision;
         let kind = content.kind();
         let next = self
             .next_id
@@ -168,6 +207,7 @@ impl Desktop {
         let path = match &content {
             Content::Editor(e) => e.path.clone(),
             Content::Viewer(v) => Some(v.path.clone()),
+            Content::Tool(t) => t.path.clone(),
             _ => None,
         };
         let key = path.as_deref().map(crate::requests::absolute_key);
@@ -235,6 +275,9 @@ impl Desktop {
             }
             _ => {}
         }
+        if let Content::Tool(t) = &mut content {
+            t.bind(id);
+        }
         self.windows.push(Window {
             id,
             open_revision: id.0,
@@ -249,6 +292,9 @@ impl Desktop {
             self.activate(id);
         } else {
             self.activate_inner(previous, false);
+            // Native insertion briefly selects the new shell; background
+            // publication does not constitute a foreground focus transition.
+            self.selection_revision = previous_selection;
         }
         Ok(id)
     }
@@ -305,6 +351,9 @@ impl Desktop {
             .find(|w| w.id == self.target())
             .unwrap()
             .info()
+    }
+    pub(crate) fn contextual(&self) -> bool {
+        self.context.get().is_some()
     }
     pub fn target(&self) -> WindowId {
         self.context.get().unwrap_or_else(|| self.active().id)

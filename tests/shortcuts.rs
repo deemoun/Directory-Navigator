@@ -245,10 +245,10 @@ fn manager_letters_reach_search_history_bookmarks_and_keyboard_settings() -> io:
     assert!(app.modals.quick_search().is_some());
     key(&mut app, K::Esc);
     prefix(&mut app, 'h');
-    assert!(app.command_line.modals.command_history().is_some());
+    assert!(app.command_history().is_some());
     key(&mut app, K::Esc);
     prefix(&mut app, 'b');
-    assert!(app.modals.navigation_dialog().is_some());
+    assert!(app.navigation_dialog().is_some());
     key(&mut app, K::Esc);
     prefix(&mut app, 'z');
     assert_eq!(app.modals.submenus().last().unwrap().0, menu::MenuId::Sort);
@@ -258,7 +258,7 @@ fn manager_letters_reach_search_history_bookmarks_and_keyboard_settings() -> io:
     assert!(app.modals.settings().is_some());
     key(&mut app, K::Esc);
     prefix(&mut app, 'i');
-    assert!(app.modals.file_info().is_some());
+    assert!(app.file_info().is_some());
     key(&mut app, K::Esc);
     Ok(())
 }

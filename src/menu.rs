@@ -8,6 +8,7 @@ pub use navigation::{activate, close, key, open, open_mnemonic, open_root, open_
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Action {
+    RecoverEditors,
     TerminalOutput,
     ImportDosSettings,
     EditAssociations,
@@ -45,12 +46,15 @@ pub enum Action {
     SelectAll,
     ClearSelection,
     SelectGroup,
+    SelectRelated { extension: bool, selecting: bool },
     UnselectGroup,
     FileInfo,
     Columns,
     InvertSelection,
     SwapPanels,
     WindowList,
+    WindowNext,
+    WindowPrevious,
     WindowMove,
     WindowZoom,
     WindowTile,
@@ -117,10 +121,12 @@ pub(crate) fn plugin_placement(id: crate::plugins::PluginId) -> Option<(RootId, 
     })
 }
 
-/// Hide preferences affect the manager; the game never advertises its menus.
+/// Tools and plugins share the manager menu; documents keep their own menus.
 pub(crate) fn bar_visible(app: &App) -> bool {
-    app.desktop.active().kind == crate::desktop::WindowKind::Manager
-        && (!app.config.hide_menu || app.modals.menu().is_some())
+    !matches!(
+        app.desktop.active().kind,
+        crate::desktop::WindowKind::Editor | crate::desktop::WindowKind::Viewer
+    ) && (!app.config.hide_menu || app.modals.menu().is_some())
 }
 
 pub fn plain(label: &str) -> String {
@@ -202,7 +208,10 @@ pub fn execute(app: &mut App, action: Action) {
         Action::ExportList => crate::file_tools::open_export(app),
         Action::Parent => app.panels[app.active].parent(app.config.show_hidden),
         Action::Refresh => app.refresh(),
-        Action::Key(number) => crate::input::handle(app, KeyEvent::new(KeyCode::F(number), KeyModifiers::NONE)),
+        Action::Key(number) => {
+            if !crate::windowing::blocked(app) {crate::windowing::activate(app,crate::desktop::WindowId::MANAGER);}
+            crate::input::handle(app, KeyEvent::new(KeyCode::F(number), KeyModifiers::NONE));
+        },
         Action::Layout(layout) => app.config.layouts[app.active] = layout,
         Action::QuickSearch => crate::quick_search::open(app),
         Action::Find => crate::discovery::open_find(app),
@@ -218,6 +227,11 @@ pub fn execute(app: &mut App, action: Action) {
         Action::Sort(mode) => app.panels[app.active].set_sort(mode),
         Action::Hidden => app.toggle_hidden(),
         Action::GoTo => app.prompt_goto(),
+        Action::SelectRelated {extension, selecting} => {
+            let count = crate::pattern::related(&mut app.panels[app.active], &app.config.highlight_groups, extension, selecting);
+            app.notice = format!("{} {count} entries", if selecting {"Marked"} else {"Unmarked"});
+        }
+        Action::RecoverEditors =>crate::editor::recovery::open(app),
         Action::SelectGroup => app.open_pattern(true),
         Action::UnselectGroup => app.open_pattern(false),
         Action::FileInfo => app.open_file_info(),
@@ -241,11 +255,13 @@ pub fn execute(app: &mut App, action: Action) {
         Action::ClearSelection => app.panels[app.active].selected.clear(),
         Action::InvertSelection => app.panels[app.active].invert_visible(),
         Action::WindowList => crate::windowing::open(app),
+        Action::WindowNext=>crate::windowing::cycle(app,false),
+        Action::WindowPrevious=>crate::windowing::cycle(app,true),
         Action::WindowMove=>crate::windowing::move_active(app,false),
         Action::WindowZoom=>crate::windowing::move_active(app,true),
         Action::WindowTile=>crate::windowing::arrange(app,crate::windowing::Arrangement::Tile),
         Action::WindowCascade=>crate::windowing::arrange(app,crate::windowing::Arrangement::Cascade),
-        Action::SwapPanels => { app.panels.swap(0, 1); app.active ^= 1; }
+        Action::SwapPanels => crate::tool_windows::swap_panels(app),
         _ => {}
     }
 }

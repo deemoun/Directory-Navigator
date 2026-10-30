@@ -168,11 +168,11 @@ fn translated_archive_and_game_buttons_keep_both_arrows() -> io::Result<()> {
             app.config.palette = palette;
             dn::archive::open(&mut app, path.clone());
             support::wait_until(&mut app, Duration::from_secs(5), |a| {
-                a.modals.archive().is_some_and(|b| !b.loading())
+                a.archive().is_some_and(|b| !b.loading())
             });
             support::draw(&mut app, w, h)?;
             for _ in 0..10 {
-                if app.modals.archive().unwrap().focus == 4 {
+                if app.archive().unwrap().focus == 4 {
                     break;
                 }
                 support::key(&mut app, K::Tab);

@@ -2,20 +2,31 @@
 use super::App;
 
 impl App {
+    /// All host-side installations publish selection through the same transition
+    /// path. Background insertion preserves the selection revision.
+    pub(crate) fn install_document<T>(
+        &mut self,
+        install: impl FnOnce(&mut crate::desktop::Desktop) -> std::io::Result<T>,
+    ) -> std::io::Result<T> {
+        let result = install(&mut self.desktop);
+        crate::windowing::reconcile_activation(self);
+        result
+    }
+
     pub fn show_editor(&mut self, editor: crate::editor::Editor) {
-        if let Err(error) = self.desktop.open_editor(editor) {
+        if let Err(error) = self.install_document(|desktop| desktop.open_editor(editor)) {
             self.error(error.to_string());
         }
     }
 
     pub fn show_viewer(&mut self, viewer: crate::viewer::Viewer) {
-        if let Err(error) = self.desktop.open_viewer(viewer) {
+        if let Err(error) = self.install_document(|desktop| desktop.open_viewer(viewer)) {
             self.error(error.to_string());
         }
     }
 
     pub fn show_game(&mut self, game: crate::tetris::Game) {
-        if let Err(error) = self.desktop.open_game(game) {
+        if let Err(error) = self.install_document(|desktop| desktop.open_game(game)) {
             self.error(error.to_string());
         }
     }
@@ -52,7 +63,7 @@ impl App {
                 .desktop
                 .find_path(crate::desktop::WindowKind::Viewer, &entry.path)
             {
-                self.desktop.activate(id);
+                crate::windowing::activate(self, id);
                 return;
             }
         }

@@ -1,10 +1,10 @@
 //! Original-style configurable menus; execution is always explicitly reviewed.
+pub mod expand;
 pub mod format;
 pub mod runner;
 use crate::{app::App, task::Task};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use std::{
-    ffi::OsString,
     fs,
     io::{self, Read, Write},
     path::{Path, PathBuf},
@@ -26,6 +26,8 @@ pub enum Action {
     Close,
     Run,
     Cancel,
+    Parameter(usize),
+    ParametersAccept,
 }
 pub struct Data {
     pub path: PathBuf,
@@ -47,6 +49,13 @@ pub struct State {
     editing_document: Option<crate::desktop::WindowId>,
     pub pending: Option<runner::Plan>,
 }
+pub struct Parameters {
+    pub definitions: Vec<format::Parameter>,
+    pub values: Vec<String>,
+    pub cursors: Vec<usize>,
+    commands: Vec<Vec<String>>,
+    context: expand::Context,
+}
 pub struct Modal {
     pub data: Option<Data>,
     pub branch: Vec<usize>,
@@ -55,6 +64,7 @@ pub struct Modal {
     pub rows: usize,
     pub focus: usize,
     pub review: Option<runner::Plan>,
+    pub parameters: Option<Parameters>,
     pub review_lines: Vec<String>,
     return_cursor: usize,
     pub status: String,
@@ -69,6 +79,7 @@ impl Default for Modal {
             rows: 10,
             focus: 0,
             review: None,
+            parameters: None,
             review_lines: Vec::new(),
             return_cursor: 0,
             status: "Loading menu…".into(),
@@ -376,113 +387,68 @@ fn selected(panel: &crate::panel::Panel) -> io::Result<Vec<PathBuf>> {
     }
 }
 pub fn plan(app: &App, commands: &[Vec<String>]) -> io::Result<runner::Plan> {
-    let active = &app.panels[app.active];
-    let other = &app.panels[app.active ^ 1];
-    let file = active
-        .entries
-        .get(active.cursor)
-        .filter(|e| !e.parent)
-        .map(|e| e.path.as_os_str().to_owned());
-    let other_file = other
-        .entries
-        .get(other.cursor)
-        .filter(|e| !e.parent)
-        .map(|e| e.path.as_os_str().to_owned());
-    let mut result = runner::Plan {
-        cwd: active.path.clone(),
-        commands: Vec::new(),
-        env: vec![
-            ("DN_DIR".into(), active.path.as_os_str().to_owned()),
-            ("DN_OTHER_DIR".into(), other.path.as_os_str().to_owned()),
-            ("DN_FILE".into(), file.clone().unwrap_or_default()),
-            (
-                "DN_OTHER_FILE".into(),
-                other_file.clone().unwrap_or_default(),
-            ),
-        ],
+    expand::Context::capture(app).plan(commands, &Default::default())
+}
+pub fn paste(app: &mut App, text: &str) {
+    if let Some(m) = app.user_menu.modals.user_menu_mut() {
+        if let Some(p) = m.parameters.as_mut().filter(|p| m.focus < p.values.len()) {
+            let i = m.focus;
+            let old = p.values[i].clone();
+            let cursor = p.cursors[i];
+            crate::dialog::paste_input(&mut p.values[i], &mut p.cursors[i], text);
+            if p.values[i].len() > 4096 {
+                p.values[i] = old;
+                p.cursors[i] = cursor;
+            }
+        }
+    }
+}
+fn review(app: &mut App, plan: runner::Plan) {
+    let Some(m) = app.user_menu.modals.user_menu_mut() else {
+        return;
     };
-    let mut total_bytes = 0usize;
-    for command in commands {
-        let mut args = Vec::<OsString>::new();
-        for (position, token) in command.iter().enumerate() {
-            let value = match token.as_str() {
-                "{selected}" => {
-                    if position == 0 {
-                        return Err(io::Error::other("{selected} cannot be an executable"));
-                    }
-                    let paths = selected(active)?;
-                    if paths.is_empty() {
-                        return Err(io::Error::other("No visible marked or highlighted entry"));
-                    }
-                    args.extend(paths.into_iter().map(PathBuf::into_os_string));
-                    continue;
-                }
-                "{dir}" => active.path.as_os_str().to_owned(),
-                "{other_dir}" => other.path.as_os_str().to_owned(),
-                "{file}" => file
-                    .clone()
-                    .ok_or_else(|| io::Error::other("Highlight a file or folder first"))?,
-                "{name}" => active
-                    .entries
-                    .get(active.cursor)
-                    .filter(|e| !e.parent)
-                    .map(|e| e.name.clone())
-                    .ok_or_else(|| io::Error::other("Highlight a file or folder first"))?,
-                "{other_file}" => other_file
-                    .clone()
-                    .ok_or_else(|| io::Error::other("Other panel has no highlighted entry"))?,
-                "{shell}" => std::env::var_os(if cfg!(windows) { "COMSPEC" } else { "SHELL" })
-                    .unwrap_or_else(|| {
-                        if cfg!(windows) {
-                            "cmd.exe".into()
-                        } else {
-                            "/bin/sh".into()
-                        }
-                    }),
-                _ => {
-                    if [
-                        "{selected}",
-                        "{dir}",
-                        "{other_dir}",
-                        "{file}",
-                        "{name}",
-                        "{other_file}",
-                        "{shell}",
-                    ]
-                    .iter()
-                    .any(|p| token.contains(p))
-                    {
-                        return Err(io::Error::other(
-                            "Placeholders must occupy a whole argument",
-                        ));
-                    }
-                    token.into()
-                }
-            };
-            args.push(value);
-        }
-        if args.is_empty() || args[0].is_empty() || args.len() > 2048 {
-            return Err(io::Error::other(
-                "Empty executable or more than 2048 arguments",
-            ));
-        }
-        let bytes = args
-            .iter()
-            .map(|a| a.as_encoded_bytes().len() + 1)
-            .sum::<usize>();
-        total_bytes = total_bytes.saturating_add(bytes);
-        if bytes > 64 * 1024 || total_bytes > 256 * 1024 {
-            return Err(io::Error::other(
-                "Expanded command exceeds 64 KiB, or menu action exceeds 256 KiB",
-            ));
-        }
-        let program = args.remove(0);
-        result.commands.push(runner::CommandSpec { program, args });
+    m.review_lines = vec![
+        format!(
+            "Working directory: {}",
+            crate::filesystem::display_name(&plan.cwd.to_string_lossy())
+        ),
+        "Arguments are passed directly; no implicit shell.".into(),
+        String::new(),
+    ];
+    for (k, v) in &plan.env {
+        m.review_lines.push(format!("{k}: {}", runner::display(v)));
     }
-    if result.commands.is_empty() {
-        return Err(io::Error::other("Menu item has no commands"));
+    m.review_lines.push(String::new());
+    for list in &plan.list_files {
+        m.review_lines.push(format!(
+            "Temporary file list (created only on Run): {}",
+            runner::display(list.path().as_os_str())
+        ));
+        m.review_lines.extend(
+            list.entries()
+                .iter()
+                .map(|p| format!("  {}", runner::display(p.as_os_str()))),
+        );
     }
-    Ok(result)
+    for c in &plan.commands {
+        m.review_lines
+            .push(format!("Program: {}", runner::display(&c.program)));
+        m.review_lines
+            .extend(c.args.iter().map(|a| format!("  {}", runner::display(a))));
+    }
+    m.review_lines.push(String::new());
+    m.review_lines
+        .push("Run only commands you trust. Enter / Run executes.".into());
+    m.review_lines = m
+        .review_lines
+        .iter()
+        .flat_map(|s| crate::layout::wrap(s, 72))
+        .collect();
+    m.review = Some(plan);
+    m.parameters = None;
+    m.focus = 1;
+    m.cursor = 0;
+    m.offset = 0;
 }
 pub fn action(app: &mut App, action: Action) {
     if action == Action::Close {
@@ -511,7 +477,28 @@ pub fn action(app: &mut App, action: Action) {
         return;
     };
     match action {
+        Action::Parameter(i) => {
+            if m.parameters.as_ref().is_some_and(|p| i < p.values.len()) {
+                m.focus = i;
+            }
+        }
+        Action::ParametersAccept => {
+            let Some(p) = m.parameters.as_ref() else {
+                return;
+            };
+            let values = p
+                .definitions
+                .iter()
+                .zip(&p.values)
+                .map(|(d, v)| (d.name.clone(), v.clone()))
+                .collect();
+            match p.context.plan(&p.commands, &values) {
+                Ok(plan) => review(app, plan),
+                Err(e) => app.error(e.to_string()),
+            }
+        }
         Action::Cancel => {
+            m.parameters = None;
             m.review = None;
             m.review_lines.clear();
             m.focus = 0;
@@ -548,46 +535,26 @@ pub fn action(app: &mut App, action: Action) {
                 return;
             }
             let commands = item.commands.clone();
-            match plan(app, &commands) {
-                Ok(plan) => {
-                    let Some(m) = app.user_menu.modals.user_menu_mut() else {
-                        return;
-                    };
-                    m.return_cursor = index;
-                    m.review_lines = vec![
-                        format!(
-                            "Working directory: {}",
-                            crate::filesystem::display_name(&plan.cwd.to_string_lossy())
-                        ),
-                        "Arguments are passed directly; no implicit shell.".into(),
-                        "".into(),
-                    ];
-                    for (key, value) in &plan.env {
-                        m.review_lines
-                            .push(format!("{key}: {}", runner::display(value)));
-                    }
-                    m.review_lines.push(String::new());
-                    for command in &plan.commands {
-                        m.review_lines
-                            .push(format!("Program: {}", runner::display(&command.program)));
-                        for arg in &command.args {
-                            m.review_lines.push(format!("  {}", runner::display(arg)));
-                        }
-                    }
-                    m.review_lines.push("".into());
-                    m.review_lines
-                        .push("Run only commands you trust. Enter / Run executes.".into());
-                    m.review_lines = m
-                        .review_lines
-                        .iter()
-                        .flat_map(|line| crate::layout::wrap(line, 72))
-                        .collect();
-                    m.review = Some(plan);
-                    m.focus = 1;
-                    m.cursor = 0;
-                    m.offset = 0;
+            let prompts = item.prompts.clone();
+            let context = expand::Context::capture(app);
+            app.user_menu.modals.user_menu_mut().unwrap().return_cursor = index;
+            if !prompts.is_empty() {
+                let values: Vec<_> = prompts.iter().map(|p| p.default.clone()).collect();
+                let cursors = values.iter().map(String::len).collect();
+                let m = app.user_menu.modals.user_menu_mut().unwrap();
+                m.parameters = Some(Parameters {
+                    definitions: prompts,
+                    values,
+                    cursors,
+                    commands,
+                    context,
+                });
+                m.focus = 0;
+            } else {
+                match context.plan(&commands, &Default::default()) {
+                    Ok(plan) => review(app, plan),
+                    Err(e) => app.error(e.to_string()),
                 }
-                Err(e) => app.error(e.to_string()),
             }
         }
         _ => {}
@@ -604,9 +571,26 @@ pub fn key(app: &mut App, key: KeyEvent) {
         action(app, Action::Reload);
         return;
     }
+    if let Some(p) = m.parameters.as_mut() {
+        if key.code == KeyCode::F(1) {
+            app.push_dialog(crate::dialog::Dialog {title:" User menu parameters help ",message:"Enter values as single arguments. Review shows the expanded command before Run. Esc cancels without creating lists or running commands.".into()});
+            return;
+        }
+        if m.focus < p.values.len() {
+            let i = m.focus;
+            let old = p.values[i].clone();
+            let cursor = p.cursors[i];
+            crate::dialog::edit_input(&mut p.values[i], &mut p.cursors[i], key.code);
+            if p.values[i].len() > 4096 {
+                p.values[i] = old;
+                p.cursors[i] = cursor;
+            }
+        }
+        return;
+    }
     let review = m.review.is_some();
     match key.code {
-        KeyCode::F(1) => app.push_dialog(crate::dialog::Dialog {title:" User menu help ",message:"Arrows/Page keys move; Enter activates; Right opens a submenu.\nLeft/Esc returns; ~letters~ are hotkeys.\nF2 switches local/global; F4 edits the definition.\nCtrl+R reloads after external changes.\nCommands use separate arguments, with quotes for spaces.\nWhole arguments: {file}, {name}, {dir}, {other_file},\n{other_dir}, {selected}, {shell}.\nUse an explicit shell for pipelines and scripts.\nEvery command action is reviewed before Run; arrows scroll.\nPrograms run in the normal terminal; Enter returns to DN.".into()}),
+        KeyCode::F(1) => app.push_dialog(crate::dialog::Dialog {title:" User menu help ",message:"Arrows/Page keys move; Enter activates; Right opens a submenu.\nLeft/Esc returns; ~letters~ are hotkeys.\nF2 switches local/global; F4 edits the definition.\nCtrl+R reloads after external changes.\nCommands use separate arguments, with quotes for spaces.\nWhole arguments: {file}, {name}, {dir}, {other_file},\n{other_dir}, {selected}, {other_selected}, {shell}.\n{selected_list}/{other_selected_list} provide temporary lists.\n? name 'Label' 'default' declares {param:name}.\nUse an explicit shell for pipelines and scripts.\nEvery command action is reviewed before Run; arrows scroll.\nPrograms run in the normal terminal; Enter returns to DN.".into()}),
         KeyCode::Up => m.step(-1),
         KeyCode::Down => m.step(1),
         KeyCode::PageUp => m.step(-(m.rows as isize)),

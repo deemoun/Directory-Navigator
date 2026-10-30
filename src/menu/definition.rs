@@ -19,6 +19,7 @@ pub enum RootId {
 pub enum MenuId {
     Associations,
     CopyNames,
+    Selection,
     View,
     Sort,
     Layout,
@@ -60,6 +61,7 @@ pub const ROOTS: &[Root] = &[
             item("~M~ake directory", "F7", Key(7)),
             item("~D~elete", "F8", Key(8)),
             item("File ~A~ttributes / Info...", "Alt+E", FileInfo),
+            item("Recover unsaved documents...", "", RecoverEditors),
             line(),
             item("E~x~it", "Alt+X / F10", Key(10)),
         ],
@@ -118,11 +120,7 @@ pub const ROOTS: &[Root] = &[
             ),
             item("Sort ~b~y...", "Alt+B", Submenu(MenuId::Sort)),
             line(),
-            item("Select grou~p~...", "+", SelectGroup),
-            item("~U~nselect group...", "-", UnselectGroup),
-            item("In~v~ert selection", "*", InvertSelection),
-            item("Select all", "Ctrl+A", SelectAll),
-            item("Clear all marks", "Ctrl+U", ClearSelection),
+            item("Select~i~on", "", Submenu(MenuId::Selection)),
             line(),
             item("Change direc~t~ory...", "Alt+T", GoTo),
             item("~R~e-read", "Alt+R", Refresh),
@@ -147,6 +145,8 @@ pub const ROOTS: &[Root] = &[
             line(),
             item("~S~wap panels", "", SwapPanels),
             item("~W~indows...", "Alt+0", WindowList),
+            item("Next window", "Alt+F6", WindowNext),
+            item("Previous window", "Alt+Shift+F6", WindowPrevious),
             item("Si~z~e/Move", "Ctrl+F5", WindowMove),
             item("Zoo~m~/Restore", "Alt+Z", WindowZoom),
             item("~T~ile", "", WindowTile),
@@ -179,6 +179,45 @@ pub(super) fn submenu_items(menu: MenuId) -> Vec<Item> {
         MenuId::Associations => vec![
             item("~E~dit associations...", "", EditAssociations),
             item("~R~eload associations", "", ReloadAssociations),
+        ],
+        MenuId::Selection => vec![
+            item("Select grou~p~...", "+", SelectGroup),
+            item("~U~nselect group...", "-", UnselectGroup),
+            item(
+                "Select same highlight type",
+                "Ctrl++",
+                SelectRelated {
+                    extension: false,
+                    selecting: true,
+                },
+            ),
+            item(
+                "Unselect same highlight type",
+                "Ctrl+-",
+                SelectRelated {
+                    extension: false,
+                    selecting: false,
+                },
+            ),
+            item(
+                "Select same extension",
+                "Ctrl+Shift++",
+                SelectRelated {
+                    extension: true,
+                    selecting: true,
+                },
+            ),
+            item(
+                "Unselect same extension",
+                "Ctrl+Shift+-",
+                SelectRelated {
+                    extension: true,
+                    selecting: false,
+                },
+            ),
+            item("In~v~ert selection", "*", InvertSelection),
+            item("Select all", "Ctrl+A", SelectAll),
+            item("Clear all marks", "Ctrl+U", ClearSelection),
         ],
         MenuId::CopyNames => vec![
             item("~N~ames", "", CopyNames(false)),
@@ -338,6 +377,13 @@ pub const EDITOR_ROOTS: &[EditorRoot] = &[
             editor_item("Cu~t~", "Shift+Del", A::Cut),
             editor_item("~C~opy", "Ctrl+Ins", A::Copy),
             editor_item("~P~aste", "Shift+Ins", A::Paste),
+            editor_line(),
+            editor_item("~I~ndent lines", "Tab", A::Indent),
+            editor_item("~U~nindent lines", "Shift+Tab", A::Unindent),
+            editor_item("Uppe~r~case", "", A::Uppercase),
+            editor_item("Lo~w~ercase", "", A::Lowercase),
+            editor_item("Capitali~z~e words", "", A::Capitalize),
+            editor_item("~S~ort selected lines", "", A::SortLines),
         ],
     },
     EditorRoot {
@@ -346,6 +392,7 @@ pub const EDITOR_ROOTS: &[EditorRoot] = &[
         enabled: true,
         entries: &[
             editor_item("~D~uplicate line", "F6", A::Duplicate),
+            editor_item("Matching ~b~racket", "Ctrl+]", A::MatchBracket),
             editor_line(),
             editor_item("Si~z~e/Move", "Ctrl+F5", A::WindowMove),
             editor_item("Zoo~m~/Restore", "Alt+Z", A::WindowZoom),
@@ -461,6 +508,12 @@ pub const VIEWER_BAR: &[BarItem<V>] = &[
         key: "C-F7",
         label: "Reverse",
         action: Some(V::Reverse),
+        width: C::Length(18),
+    },
+    BarItem {
+        key: "Ctrl+G",
+        label: "Go to",
+        action: Some(V::GoTo),
         width: C::Min(1),
     },
 ];
