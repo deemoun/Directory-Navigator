@@ -235,9 +235,9 @@ are retained for 30 days. These are unsigned builds; this workflow does not publ
 a GitHub Release. **Rust checks** is also manual-only: open it in Actions and choose
 **Run workflow**. Neither workflow runs on pushes, pull requests or a schedule.
 
-### Unified draft releases
+### Unified releases
 
-After pushing the workflow to the default branch, open **Actions → Build unified draft
+After pushing the workflow to the default branch, open **Actions → Build unified
 release → Run workflow**, choose the source branch and enter a version **without
 `v`**, for example `1.0.0` or `1.1.0-beta.1`.
 
@@ -249,6 +249,8 @@ the app, About and CLI, then creates an **unpublished draft release** tagged
 Downloads are five versioned binary archives (four TAR.GZ files and a Windows ZIP),
 each including the executable, README, user guide and MIT license. Checksum files
 are used internally to verify the builds and are not attached to the release.
+Linux archives use `dn-<version>-linux-x86_64.tar.gz` and
+`dn-<version>-linux-aarch64.tar.gz` names.
 
 The tag points to the exact versioned source tree used for all builds. If needed,
 a release-only commit updates Cargo.toml/Cargo.lock; your development branch is
@@ -266,7 +268,7 @@ All workflows remain manual-only; nothing runs on pushes or tags.
 
 ### Separate Windows and Linux builds
 
-These workflows remain independent of the unified draft release and run only when you
+These workflows remain independent of the unified release and run only when you
 choose **Run workflow**. Select a source branch and enter the version without `v`.
 
 | Actions workflow | Targets | Download under the run's Artifacts |

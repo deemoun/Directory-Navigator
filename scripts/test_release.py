@@ -157,6 +157,21 @@ class ReleaseTests(unittest.TestCase):
         self.assertEqual((output / "SHA256SUMS.txt").read_text(),
                          f"{release.digest(output / name)}  {name}\n")
 
+    def test_linux_download_names_and_checksums_use_clean_architecture_labels(self):
+        output = self.root / "dist"
+        names = ["dn-1.2.3-linux-aarch64.tar.gz", "dn-1.2.3-linux-x86_64.tar.gz"]
+        with self.package_fixture():
+            for target, name in zip(release.PLATFORM_TARGETS["linux"], names):
+                self.assertEqual(release.archive_name("1.2.3", target), name)
+                release.package(self.root, "1.2.3", target, output)
+                self.assertEqual((output / (name + ".sha256")).read_text(),
+                                 f"{release.digest(output / name)}  {name}\n")
+        self.assertEqual({path.name for path in output.iterdir()},
+                         set(names + [name + ".sha256" for name in names]))
+        release.verify_assets(output, "1.2.3", "linux")
+        self.assertEqual([line.split("  ")[1] for line in
+                          (output / "SHA256SUMS.txt").read_text().splitlines()], names)
+
     def test_remote_collision_auth_errors_and_unknown_network_failures_fail_closed(self):
         env = {"GH_TOKEN": "fake-test-token", "GITHUB_REPOSITORY": "example/dn", "GITHUB_API_URL": "https://api.github.com"}
         def missing(*_args, **_kwargs):

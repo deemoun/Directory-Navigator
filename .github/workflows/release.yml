@@ -1,5 +1,5 @@
-name: Build unified draft release
-run-name: Draft Directory Navigator ${{ inputs.version }}
+name: Build unified release
+run-name: Directory Navigator ${{ inputs.version }}
 
 on:
   workflow_dispatch:
@@ -13,7 +13,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: draft-release-${{ github.repository }}-${{ inputs.version }}
+  group: unified-release-${{ github.repository }}-${{ inputs.version }}
   cancel-in-progress: false
 
 defaults:
@@ -118,8 +118,8 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-  draft:
-    name: Create draft release
+  release:
+    name: Create release
     needs: [validate, build]
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -161,7 +161,7 @@ jobs:
           fi
           git tag -a "$RELEASE_TAG" -m "Directory Navigator $RELEASE_VERSION"
           git push origin "refs/tags/$RELEASE_TAG"
-      - name: Create unpublished draft and attach assets
+      - name: Create release and attach assets
         run: |
           set -euo pipefail
           cat > release-notes.md <<EOF
@@ -176,8 +176,6 @@ jobs:
 
           Source revision: $(git rev-parse HEAD)
           Build: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
-
-          Draft: review these notes and test the downloads before publishing.
           EOF
           flags=()
           if [ "$PRERELEASE" = true ]; then

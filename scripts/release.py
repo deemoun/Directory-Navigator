@@ -21,6 +21,11 @@ TARGETS = (
     "x86_64-pc-windows-msvc",
 )
 PLATFORM_TARGETS = {"all": TARGETS, "macos": TARGETS[:2], "linux": TARGETS[2:4], "windows": TARGETS[4:]}
+# Download labels are independent of Rust's compiler target triples.
+LINUX_ASSET_LABELS = {
+    "aarch64-unknown-linux-gnu": "linux-aarch64",
+    "x86_64-unknown-linux-gnu": "linux-x86_64",
+}
 SEMVER = re.compile(
     r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)"
     r"(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?"
@@ -81,7 +86,8 @@ def archive_name(version, target):
     if target not in TARGETS:
         raise ValueError("Unsupported release target")
     extension = "zip" if target.endswith("windows-msvc") else "tar.gz"
-    return f"dn-{version}-{target}.{extension}"
+    label = LINUX_ASSET_LABELS.get(target, target)
+    return f"dn-{version}-{label}.{extension}"
 
 
 def digest(path):
