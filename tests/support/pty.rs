@@ -20,12 +20,7 @@ pub struct Session {
     slave: File,
     original: libc::termios,
     output: Vec<u8>,
-    pending: Vec<u8>,
-    cells: Vec<String>,
-    width: usize,
-    height: usize,
-    x: usize,
-    y: usize,
+    screen: Screen,
 }
 impl Session {
     pub fn new(label: &str) -> io::Result<Self> {
@@ -105,20 +100,29 @@ impl Session {
             slave,
             original,
             output: vec![],
-            pending: vec![],
-            cells: vec![" ".into(); 80 * 25],
-            width: 80,
-            height: 25,
-            x: 0,
-            y: 0,
+            screen: Screen::new(80, 25),
         })
     }
     pub fn text(&self) -> String {
-        self.cells
-            .chunks(self.width)
-            .map(|row| row.concat())
-            .collect::<Vec<_>>()
-            .join("\n")
+        self.screen.text()
+    }
+    pub fn command_prompt_active(&self) -> bool {
+        self.screen.command_prompt_active()
+    }
+    pub fn select_file(&mut self, name: &str) -> io::Result<()> {
+        // A burst of relative arrows assumes a specific selection throughout
+        // asynchronous panel preparation. Select and acknowledge a stable name.
+        self.send(b"\x1b[18;3~", "fixture quick search", |s| {
+            s.text().contains("Find:")
+        })?;
+        let query = format!("Find: {name}▌");
+        self.send(name.as_bytes(), "fixture file selected", |s| {
+            let text = s.text();
+            text.contains(&query) && !text.contains("No match")
+        })?;
+        self.send(b"\r", "fixture selection accepted", |s| {
+            !s.text().contains("Find:") && s.command_prompt_active()
+        })
     }
     pub fn occurrences(&self, bytes: &[u8]) -> usize {
         self.output
@@ -127,6 +131,19 @@ impl Session {
             .count()
     }
     pub fn send(
+        &mut self,
+        bytes: &[u8],
+        stage: &str,
+        ready: impl Fn(&Self) -> bool,
+    ) -> io::Result<()> {
+        self.pump()?;
+        let previous = self.screen.revision;
+        self.master.write_all(bytes)?;
+        self.wait(stage, |s| s.screen.revision > previous && ready(s))
+    }
+    // Shell/output handoff has no DN screen commit. Its assertions inspect raw
+    // alternate-screen or shell acknowledgements rather than application pixels.
+    pub fn send_output(
         &mut self,
         bytes: &[u8],
         stage: &str,
@@ -162,8 +179,8 @@ impl Session {
                     if self.output.len() > 2 * 1024 * 1024 {
                         return Err(io::Error::other("terminal output exceeded limit"));
                     }
-                    self.pending.extend_from_slice(&bytes[..n]);
-                    self.decode();
+                    self.screen.pending.extend_from_slice(&bytes[..n]);
+                    self.screen.decode();
                 }
                 Err(e)
                     if matches!(
@@ -178,11 +195,116 @@ impl Session {
         }
         Ok(())
     }
+    pub fn resize(&mut self, width: u16, height: u16) -> io::Result<()> {
+        self.pump()?;
+        self.screen.resize(width as usize, height as usize);
+        let size = libc::winsize {
+            ws_row: height,
+            ws_col: width,
+            ws_xpixel: 0,
+            ws_ypixel: 0,
+        };
+        // TIOCSWINSZ notifies the private foreground process group itself.
+        // Sending SIGWINCH again can queue a second resize behind test input.
+        // SAFETY: valid owned terminal descriptor and initialized winsize.
+        unsafe {
+            if libc::ioctl(self.slave.as_raw_fd(), libc::TIOCSWINSZ as _, &size) < 0 {
+                return Err(io::Error::last_os_error());
+            }
+        }
+        Ok(())
+    }
+    pub fn finish(&mut self) -> io::Result<()> {
+        self.send_output(b"\x1b[21~", "normal exit", |s| {
+            s.occurrences(b"DN_STATUS:0") > 0
+        })?;
+        let restored = mode(&self.slave)?;
+        assert_eq!(
+            (
+                self.original.c_iflag,
+                self.original.c_oflag,
+                self.original.c_cflag,
+                self.original.c_lflag,
+                self.original.c_cc
+            ),
+            (
+                restored.c_iflag,
+                restored.c_oflag,
+                restored.c_cflag,
+                restored.c_lflag,
+                restored.c_cc
+            )
+        );
+        self.send_output(b"RESTORED\n", "shell accepts input", |s| {
+            s.occurrences(b"DN_INPUT:RESTORED") > 0
+        })?;
+        assert!(self.child.wait()?.success());
+        Ok(())
+    }
+}
+// Transport::write_raw terminates each complete pixel batch with this reset.
+// A title or footer can arrive several PTY reads before that terminator.
+const FRAME_END: &[u8] = b"\x1b[39m\x1b[49m\x1b[0m";
+struct Screen {
+    pending: Vec<u8>,
+    cells: Vec<String>,
+    committed: Vec<String>,
+    width: usize,
+    height: usize,
+    x: usize,
+    y: usize,
+    cursor_visible: bool,
+    revision: u64,
+}
+impl Screen {
+    fn new(width: usize, height: usize) -> Self {
+        Self {
+            pending: vec![],
+            cells: vec![" ".into(); width * height],
+            committed: vec![" ".into(); width * height],
+            width,
+            height,
+            x: 0,
+            y: 0,
+            cursor_visible: false,
+            revision: 0,
+        }
+    }
+    fn text(&self) -> String {
+        self.committed
+            .chunks(self.width)
+            .map(|row| row.concat())
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+    fn command_prompt_active(&self) -> bool {
+        self.cursor_visible && self.y == self.height - 2
+    }
+    fn resize(&mut self, width: usize, height: usize) {
+        self.width = width;
+        self.height = height;
+        self.cells = vec![" ".into(); width * height];
+        self.committed = self.cells.clone();
+        self.cursor_visible = false;
+    }
+    fn commit(&mut self) {
+        self.committed.clone_from(&self.cells);
+        self.revision += 1;
+    }
     fn decode(&mut self) {
         let mut i = 0;
         while i < self.pending.len() {
             let b = self.pending[i];
             if b == 27 {
+                let remaining = &self.pending[i..];
+                if remaining.starts_with(FRAME_END) {
+                    self.commit();
+                    i += FRAME_END.len();
+                    continue;
+                }
+                if FRAME_END.starts_with(remaining) {
+                    break;
+                }
                 if i + 1 >= self.pending.len() {
                     break;
                 }
@@ -193,7 +315,16 @@ impl Session {
                         break;
                     };
                     let raw = &self.pending[i + 2..end];
-                    if !raw.starts_with(b"?") {
+                    if raw == b"?25" {
+                        if self.pending[end] == b'h' {
+                            self.cursor_visible = true;
+                            // Showing/repositioning the cursor can be the only
+                            // output when an exposed manager gains focus.
+                            self.commit();
+                        } else if self.pending[end] == b'l' {
+                            self.cursor_visible = false;
+                        }
+                    } else if !raw.starts_with(b"?") {
                         let nums = String::from_utf8_lossy(raw)
                             .split(';')
                             .map(|s| s.parse::<usize>().unwrap_or(0))
@@ -264,54 +395,6 @@ impl Session {
         }
         self.pending.drain(..i);
     }
-    pub fn resize(&mut self, width: u16, height: u16) -> io::Result<()> {
-        self.width = width as usize;
-        self.height = height as usize;
-        self.cells = vec![" ".into(); self.width * self.height];
-        let size = libc::winsize {
-            ws_row: height,
-            ws_col: width,
-            ws_xpixel: 0,
-            ws_ypixel: 0,
-        };
-        // SAFETY: valid descriptor, winsize and private child session/process group.
-        unsafe {
-            if libc::ioctl(self.slave.as_raw_fd(), libc::TIOCSWINSZ as _, &size) < 0 {
-                return Err(io::Error::last_os_error());
-            }
-            if libc::kill(-(self.child.id() as i32), libc::SIGWINCH) < 0 {
-                return Err(io::Error::last_os_error());
-            }
-        }
-        Ok(())
-    }
-    pub fn finish(&mut self) -> io::Result<()> {
-        self.send(b"\x1b[21~", "normal exit", |s| {
-            s.occurrences(b"DN_STATUS:0") > 0
-        })?;
-        let restored = mode(&self.slave)?;
-        assert_eq!(
-            (
-                self.original.c_iflag,
-                self.original.c_oflag,
-                self.original.c_cflag,
-                self.original.c_lflag,
-                self.original.c_cc
-            ),
-            (
-                restored.c_iflag,
-                restored.c_oflag,
-                restored.c_cflag,
-                restored.c_lflag,
-                restored.c_cc
-            )
-        );
-        self.send(b"RESTORED\n", "shell accepts input", |s| {
-            s.occurrences(b"DN_INPUT:RESTORED") > 0
-        })?;
-        assert!(self.child.wait()?.success());
-        Ok(())
-    }
 }
 fn mode(f: &File) -> io::Result<libc::termios> {
     let mut mode = std::mem::MaybeUninit::uninit();
@@ -332,5 +415,71 @@ impl Drop for Session {
         }
         let _ = self.child.wait();
         let _ = fs::remove_dir_all(&self.root);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Screen, FRAME_END};
+    fn feed(screen: &mut Screen, bytes: &[u8]) {
+        screen.pending.extend_from_slice(bytes);
+        screen.decode();
+    }
+    #[test]
+    fn partial_screen_and_split_frame_terminator_cannot_satisfy_a_new_step() {
+        for split in 0..FRAME_END.len() {
+            let mut s = Screen::new(80, 25);
+            feed(&mut s, b"\x1b[1;1HColors");
+            feed(&mut s, FRAME_END);
+            let previous = s.revision;
+            feed(&mut s, b"\x1b[2;1HArrows move");
+            // Even though the title already matches, this is still the old
+            // committed screen until the entire new pixel batch arrives.
+            assert!(s.text().contains("Colors"));
+            assert!(!s.text().contains("Arrows move"));
+            feed(&mut s, &FRAME_END[..split]);
+            assert_eq!(s.revision, previous);
+            assert!(!s.text().contains("Arrows move"));
+            feed(&mut s, &FRAME_END[split..]);
+            assert_eq!(s.revision, previous + 1);
+            assert!(s.text().contains("Arrows move"));
+        }
+    }
+    #[test]
+    fn background_function_bar_is_not_manager_focus_and_cursor_only_reply_is_valid() {
+        let mut s = Screen::new(80, 25);
+        feed(&mut s, b"\x1b[?25l\x1b[25;1HF5 Copy");
+        feed(&mut s, FRAME_END);
+        assert!(s.text().contains("F5 Copy"));
+        assert!(!s.command_prompt_active());
+        let previous = s.revision;
+        feed(&mut s, b"\x1b[24;3H\x1b[?25");
+        assert!(!s.command_prompt_active());
+        assert_eq!(s.revision, previous);
+        feed(&mut s, b"h");
+        assert!(s.command_prompt_active());
+        assert!(s.revision > previous);
+    }
+    #[test]
+    fn old_resize_frame_and_byte_fragmented_unicode_do_not_publish_partial_screens() {
+        let mut s = Screen::new(80, 25);
+        s.resize(100, 32);
+        feed(&mut s, b"\x1b[25;1HF10 Quit");
+        feed(&mut s, FRAME_END);
+        feed(&mut s, b"\x1b[24;1H\x1b[?25h");
+        assert!(!s.command_prompt_active());
+        assert!(!s.text().lines().last().unwrap().contains("F10 Quit"));
+        let previous = s.revision;
+        for byte in "\x1b[1;1H界 e\u{301}\x1b[32;1HF10 Quit".as_bytes() {
+            feed(&mut s, &[*byte]);
+            assert_eq!(s.revision, previous);
+        }
+        for byte in FRAME_END {
+            feed(&mut s, &[*byte]);
+        }
+        assert!(s.text().contains("界 e\u{301}"));
+        assert!(s.text().lines().last().unwrap().contains("F10 Quit"));
+        feed(&mut s, b"\x1b[31;1H\x1b[?25h");
+        assert!(s.command_prompt_active());
     }
 }

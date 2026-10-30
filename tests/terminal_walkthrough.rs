@@ -9,7 +9,10 @@ fn settings_and_unicode_prompt_workflow_restores_terminal_and_preserves_cancelle
 ) -> io::Result<()> {
     let mut s = Session::new("controllers")?;
     s.wait("manager ready", |s| {
-        s.text().contains("item-000.") && s.text().contains("F5 Copy")
+        s.text().contains("item-000.")
+            && s.text().contains("F5 Copy")
+            && !s.text().contains("Reading directory")
+            && s.command_prompt_active()
     })?;
     let config = fs::read(s.root.join("settings/dn/config.conf"))?;
     s.send(b"\x1boci", "interface settings", |s| {
@@ -59,9 +62,13 @@ fn settings_and_unicode_prompt_workflow_restores_terminal_and_preserves_cancelle
 fn overlapping_documents_native_dialogs_game_pages_resize_and_output_handoff() -> io::Result<()> {
     let mut s = Session::new("desktop")?;
     s.wait("manager ready", |s| {
-        s.text().contains("item-000.") && s.text().contains("F5 Copy")
+        s.text().contains("item-000.")
+            && s.text().contains("F5 Copy")
+            && !s.text().contains("Reading directory")
+            && s.command_prompt_active()
     })?;
-    s.send(b"\x1b[B\x1b[B\x1b[B\x1b[14~", "editor opened", |s| {
+    s.select_file("item-000.txt")?;
+    s.send(b"\x1b[14~", "editor opened", |s| {
         s.text().contains("F2 Save")
     })?;
     s.send(b"\x1bz", "editor restored", |s| {
@@ -77,9 +84,9 @@ fn overlapping_documents_native_dialogs_game_pages_resize_and_output_handoff() -
     )?;
     assert!(!s.text().contains("SHOULD_NOT_EDIT"));
     s.send(b"\x1b[<0;1;2M\x1b[<0;1;2m", "exposed manager", |s| {
-        s.text().contains("F5 Copy")
+        s.command_prompt_active()
     })?;
-    s.send(b"\x1b[B\x1b[13~", "viewer opened", |s| {
+    s.send(b"\x1b[13~", "viewer opened", |s| {
         s.text().contains("Viewer")
     })?;
     s.send(
@@ -109,13 +116,14 @@ fn overlapping_documents_native_dialogs_game_pages_resize_and_output_handoff() -
         !s.text().contains("Open file")
     })?;
     s.send(b"\x1b", "close editor", |s| !s.text().contains("F2 Save"))?;
-    // Activate exposed manager background explicitly. An Escape followed by
-    // an Alt sequence can be combined by the terminal key decoder under load.
-    s.send(
-        b"\x1b[<0;79;22M\x1b[<0;79;22m\x1b[20;3~",
-        "game opened",
-        |s| s.text().contains("Navigator's game"),
-    )?;
+    // The function bar is also visible behind a floating viewer. Confirm
+    // manager ownership through its command cursor before sending Alt+F9.
+    s.send(b"\x1b[<0;79;22M\x1b[<0;79;22m", "manager focused", |s| {
+        s.command_prompt_active()
+    })?;
+    s.send(b"\x1b[20;3~", "game opened", |s| {
+        s.text().contains("Navigator's game")
+    })?;
     s.send(b"\x1b[15~", "game setup", |s| {
         s.text().contains("Setup game")
     })?;
@@ -128,7 +136,9 @@ fn overlapping_documents_native_dialogs_game_pages_resize_and_output_handoff() -
     s.send(b"\x1b", "cancel game page", |s| {
         !s.text().contains("Setup game")
     })?;
-    s.send(b"\x1b", "close game", |s| s.text().contains("F5 Copy"))?;
+    s.send(b"\x1b", "close game", |s| {
+        !s.text().contains("Navigator's game") && s.command_prompt_active()
+    })?;
     s.send(b"\x1bOP", "native help", |s| s.text().contains("Contents"))?;
     s.send(b"\x1b[15;5~", "resize help", |s| {
         s.text().contains("Arrows move")
@@ -138,7 +148,7 @@ fn overlapping_documents_native_dialogs_game_pages_resize_and_output_handoff() -
     })?;
     s.send(b"\x1b", "close help", |s| !s.text().contains("Contents"))?;
     let exits = s.occurrences(b"\x1b[?1049l");
-    s.send(b"\x0f", "output handoff", |s| {
+    s.send_output(b"\x0f", "output handoff", |s| {
         s.occurrences(b"\x1b[?1049l") > exits
     })?;
     let enters = s.occurrences(b"\x1b[?1049h");
@@ -146,7 +156,7 @@ fn overlapping_documents_native_dialogs_game_pages_resize_and_output_handoff() -
         s.occurrences(b"\x1b[?1049h") > enters && s.text().contains("F5 Copy")
     })?;
     s.resize(100, 32)?;
-    s.wait("resize redraw", |s| s.text().contains("F5 Copy"))?;
+    s.wait("resize redraw", |s| s.command_prompt_active())?;
     for n in 0..65 {
         assert_eq!(
             fs::read(s.root.join(format!("item-{n:03}.txt")))?,
@@ -161,7 +171,10 @@ fn colors_window_edits_cancel_saves_moves_and_restores_terminal() -> io::Result<
     use dn::palette::theme::Slot;
     let mut s = Session::new("colors")?;
     s.wait("manager ready", |s| {
-        s.text().contains("item-000.") && s.text().contains("F5 Copy")
+        s.text().contains("item-000.")
+            && s.text().contains("F5 Copy")
+            && !s.text().contains("Reading directory")
+            && s.command_prompt_active()
     })?;
     let config = s.root.join("settings/dn/config.conf");
     let original = fs::read(&config)?;
@@ -185,7 +198,7 @@ fn colors_window_edits_cancel_saves_moves_and_restores_terminal() -> io::Result<
         s.text().contains("Foreground")
     })?;
     s.send(b"c", "preview default colors", |s| {
-        s.text().contains("Default colors set")
+        s.text().contains("[X] Default colors set")
     })?;
     s.resize(100, 32)?;
     // A queued pre-resize frame can still contain the title. Wait for the
@@ -221,19 +234,24 @@ fn colors_window_edits_cancel_saves_moves_and_restores_terminal() -> io::Result<
 fn tile_and_cascade_from_window_list_preserve_documents_and_restore_terminal() -> io::Result<()> {
     let mut s = Session::new("arrangement")?;
     s.wait("manager ready", |s| {
-        s.text().contains("item-000.") && s.text().contains("F5 Copy")
+        s.text().contains("item-000.")
+            && s.text().contains("F5 Copy")
+            && !s.text().contains("Reading directory")
+            && s.command_prompt_active()
     })?;
-    s.send(b"\x1b[B\x1b[B\x1b[B\x1b[14~", "editor opened", |s| {
+    s.select_file("item-000.txt")?;
+    s.send(b"\x1b[14~", "editor opened", |s| {
         s.text().contains("F2 Save")
     })?;
     s.send(b"\x1bz", "editor restored", |s| {
         s.text().contains("F5 Copy")
     })?;
-    s.send(
-        b"\x1b[<0;1;2M\x1b[<0;1;2m\x1b[B\x1b[13~",
-        "viewer opened",
-        |s| s.text().contains("Viewer"),
-    )?;
+    s.send(b"\x1b[<0;1;2M\x1b[<0;1;2m", "manager focused", |s| {
+        s.command_prompt_active()
+    })?;
+    s.send(b"\x1b[13~", "viewer opened", |s| {
+        s.text().contains("Viewer")
+    })?;
     s.send(b"\x1b0", "window list", |s| {
         s.text().contains("Open windows") && s.text().contains("Cascade")
     })?;
@@ -270,13 +288,17 @@ fn game_and_editor_arrangements_are_visible_and_game_board_keeps_its_size() -> i
             .last()
             .is_some_and(|r| r.contains("F10 Quit"))
     })?;
-    s.send(b"\x1b[B\x1b[B\x1b[B\x1b[14~", "editor opened", |s| {
+    s.select_file("item-000.txt")?;
+    s.send(b"\x1b[14~", "editor opened", |s| {
         s.text().contains("F2 Save")
     })?;
     s.send(b"\x1bz", "editor restored", |s| {
         s.text().contains("F5 Copy")
     })?;
-    s.send(b"\x1b[<0;1;2M\x1b[<0;1;2m\x1b[20;3~", "game opened", |s| {
+    s.send(b"\x1b[<0;1;2M\x1b[<0;1;2m", "manager focused", |s| {
+        s.command_prompt_active()
+    })?;
+    s.send(b"\x1b[20;3~", "game opened", |s| {
         s.text().contains("Navigator's game")
     })?;
     s.send(b"\x1b0", "game window list", |s| {
