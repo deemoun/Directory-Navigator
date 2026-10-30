@@ -28,7 +28,7 @@ fn private(path: &Path, directory: bool) -> io::Result<()> {
     Ok(())
 }
 fn directory(path: &Path) -> io::Result<()> {
-    let mut b = fs::DirBuilder::new();
+    let b = &mut fs::DirBuilder::new();
     #[cfg(unix)]
     {
         use std::os::unix::fs::DirBuilderExt;

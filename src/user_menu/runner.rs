@@ -151,7 +151,7 @@ impl ListGuard {
         let mut guard = Self(Vec::new());
         for list in lists {
             let root = list.path.parent().expect("planned list directory");
-            let mut dir = std::fs::DirBuilder::new();
+            let dir = &mut std::fs::DirBuilder::new();
             #[cfg(unix)]
             {
                 use std::os::unix::fs::DirBuilderExt;
