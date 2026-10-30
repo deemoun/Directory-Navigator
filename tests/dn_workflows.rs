@@ -115,10 +115,17 @@ fn advanced_filters_validate_ranges_dates_types_and_skip_links() -> io::Result<(
     assert!(size("18446744073709551615G").is_err());
     let from = date("2026-10-30", false)?.unwrap();
     let to = date("2026-10-30", true)?.unwrap();
+    let next_day = date("2026-10-31", false)?.unwrap();
     assert_eq!(
-        to.duration_since(from).unwrap(),
-        Duration::new(86399, 999_999_999)
+        next_day.duration_since(from).unwrap(),
+        Duration::from_secs(86400)
     );
+    // SystemTime has 100 ns resolution on Windows. Check the inclusive date
+    // boundary without assuming Unix nanosecond precision.
+    assert!(to > from);
+    let remainder = next_day.duration_since(to).unwrap();
+    assert!(!remainder.is_zero());
+    assert!(remainder <= Duration::from_nanos(100));
     #[cfg(unix)]
     {
         std::os::unix::fs::symlink(f.0.join("small"), f.0.join("link"))?;
@@ -278,6 +285,17 @@ fn parameter_prompts_keep_single_arguments_cancel_and_owned_help() -> io::Result
     Ok(())
 }
 #[test]
+fn selected_list_copy_child() -> io::Result<()> {
+    let Some(source) = std::env::var_os("DN_WORKFLOW_LIST_INPUT") else {
+        return Ok(());
+    };
+    let destination = std::env::var_os("DN_WORKFLOW_LIST_OUTPUT")
+        .ok_or_else(|| io::Error::other("Missing test copy destination"))?;
+    fs::copy(source, destination)?;
+    Ok(())
+}
+
+#[test]
 fn both_pane_selections_lists_are_dry_until_run_and_clean_on_failure() -> io::Result<()> {
     let f = support::Fixture::new("f2-lists")?.canonicalized()?;
     fs::write(f.0.join("one space.txt"), "preserved")?;
@@ -287,11 +305,26 @@ fn both_pane_selections_lists_are_dry_until_run_and_clean_on_failure() -> io::Re
         a.panels[side].selected.insert(name.into());
     }
     let commands = vec![vec![
-        "/bin/cp".into(),
+        std::env::current_exe()?.to_string_lossy().into_owned(),
         "{selected_list}".into(),
         f.0.join("output").to_string_lossy().into_owned(),
     ]];
-    let p = user_menu::plan(&a, &commands)?;
+    let mut p = user_menu::plan(&a, &commands)?;
+    // Exercise the real planner and runner without relying on a Unix utility
+    // or shell quoting. Only the child receives these environment variables.
+    let copy_args = std::mem::replace(
+        &mut p.commands[0].args,
+        vec![
+            "--exact".into(),
+            "selected_list_copy_child".into(),
+            "--nocapture".into(),
+        ],
+    );
+    assert_eq!(copy_args.len(), 2);
+    p.env
+        .push(("DN_WORKFLOW_LIST_INPUT".into(), copy_args[0].clone()));
+    p.env
+        .push(("DN_WORKFLOW_LIST_OUTPUT".into(), copy_args[1].clone()));
     let list = p.list_files[0].path().to_owned();
     assert!(!list.exists());
     assert!(user_menu::runner::run(&p)?.success());
