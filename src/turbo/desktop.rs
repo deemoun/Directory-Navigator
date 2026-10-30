@@ -581,6 +581,70 @@ impl NativeDesktop {
     pub(crate) fn manipulating(&self) -> bool {
         self.0.borrow().interaction.capture.is_some()
     }
+    pub(crate) fn manipulated_surface(&self) -> Option<SurfaceId> {
+        self.0.borrow().interaction.capture.as_ref().map(|c| c.id)
+    }
+    pub(crate) fn arrangeable_count(&self) -> usize {
+        let h = self.0.borrow();
+        (0..h.desktop.child_count())
+            .filter(|&i| {
+                h.desktop
+                    .child_at(i)
+                    .as_any()
+                    .downcast_ref::<Document>()
+                    .is_some_and(|d| d.scope == Scope::Content && d.info.id != WindowId::MANAGER)
+            })
+            .count()
+    }
+    pub(crate) fn arrange_documents(
+        &self,
+        mode: crate::windowing::Arrangement,
+    ) -> Result<usize, crate::windowing::ArrangementError> {
+        use crate::windowing::{Arrangement, ArrangementError};
+        let mut h = self.0.borrow_mut();
+        if h.interaction.capture.is_some()
+            || h.interaction.modal.is_some()
+            || matches!(
+                h.interaction.top,
+                Some(SurfaceKey::Page(..) | SurfaceKey::ModalPage(..) | SurfaceKey::Modal(_))
+            )
+        {
+            return Err(ArrangementError::Blocked);
+        }
+        if h.interaction.size.0 < 80 || h.interaction.size.1 < 25 {
+            return Err(ArrangementError::NoRoom);
+        }
+        let mut surfaces = (0..h.desktop.child_count())
+            .filter_map(|i| h.desktop.child_at(i).as_any().downcast_ref::<Document>())
+            .filter(|d| d.scope == Scope::Content && d.info.id != WindowId::MANAGER)
+            .map(|d| d.shell.surface)
+            .collect::<Vec<_>>();
+        if mode == Arrangement::Tile {
+            surfaces.sort_by_key(|s| s.id.key);
+        }
+        let capabilities = surfaces.iter().map(|s| s.caps).collect::<Vec<_>>();
+        let bounds = crate::windowing::arrangement::windows(
+            geometry::workspace(h.interaction.size),
+            &capabilities,
+            mode,
+        )?;
+        // Planning and mutation share this native borrow. No owner can retire,
+        // resize or change generation between validation and the complete commit.
+        let changed = surfaces
+            .iter()
+            .zip(&bounds)
+            .any(|(s, r)| s.maximized || s.bounds != *r);
+        for (surface, bounds) in surfaces.iter().zip(bounds) {
+            h.shell_mut(surface.id.key)
+                .expect("live arranged document")
+                .arrange(bounds);
+        }
+        if changed {
+            h.interaction.revision += 1;
+            h.interaction.last_title = None;
+        }
+        Ok(surfaces.len())
+    }
     pub(crate) fn zoom_surface(&self, id: SurfaceId) -> bool {
         let mut h = self.0.borrow_mut();
         let size = h.interaction.size;

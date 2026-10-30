@@ -53,6 +53,8 @@ pub enum Action {
     WindowList,
     WindowMove,
     WindowZoom,
+    WindowTile,
+    WindowCascade,
     SaveSettings,
     LoadSettings,
     About,
@@ -241,6 +243,8 @@ pub fn execute(app: &mut App, action: Action) {
         Action::WindowList => crate::windowing::open(app),
         Action::WindowMove=>crate::windowing::move_active(app,false),
         Action::WindowZoom=>crate::windowing::move_active(app,true),
+        Action::WindowTile=>crate::windowing::arrange(app,crate::windowing::Arrangement::Tile),
+        Action::WindowCascade=>crate::windowing::arrange(app,crate::windowing::Arrangement::Cascade),
         Action::SwapPanels => { app.panels.swap(0, 1); app.active ^= 1; }
         _ => {}
     }

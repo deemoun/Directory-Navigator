@@ -216,3 +216,105 @@ fn colors_window_edits_cancel_saves_moves_and_restores_terminal() -> io::Result<
     );
     s.finish()
 }
+
+#[test]
+fn tile_and_cascade_from_window_list_preserve_documents_and_restore_terminal() -> io::Result<()> {
+    let mut s = Session::new("arrangement")?;
+    s.wait("manager ready", |s| {
+        s.text().contains("item-000.") && s.text().contains("F5 Copy")
+    })?;
+    s.send(b"\x1b[B\x1b[B\x1b[B\x1b[14~", "editor opened", |s| {
+        s.text().contains("F2 Save")
+    })?;
+    s.send(b"\x1bz", "editor restored", |s| {
+        s.text().contains("F5 Copy")
+    })?;
+    s.send(
+        b"\x1b[<0;1;2M\x1b[<0;1;2m\x1b[B\x1b[13~",
+        "viewer opened",
+        |s| s.text().contains("Viewer"),
+    )?;
+    s.send(b"\x1b0", "window list", |s| {
+        s.text().contains("Open windows") && s.text().contains("Cascade")
+    })?;
+    // Home selects the manager row, disabling Size/Move and Zoom. Tab visits
+    // Switch, Tile, then Cascade without activating that selected manager row.
+    s.send(b"\x1b[H\t\t\r", "tile accepted", |s| {
+        !s.text().contains("Open windows")
+            && s.text().contains("F2 Save")
+            && s.text().contains("F2 Wrap")
+    })?;
+    s.send(b"\x1b0", "window list again", |s| {
+        s.text().contains("Open windows")
+    })?;
+    s.send(b"\x1b[H\t\t\t\r", "cascade accepted", |s| {
+        !s.text().contains("Open windows") && s.text().contains("F2 Wrap")
+    })?;
+    for n in 0..65 {
+        assert_eq!(
+            fs::read(s.root.join(format!("item-{n:03}.txt")))?,
+            b"fixture\n"
+        );
+    }
+    s.finish()
+}
+
+#[test]
+fn game_and_editor_arrangements_are_visible_and_game_board_keeps_its_size() -> io::Result<()> {
+    let mut s = Session::new("arrange-game")?;
+    s.wait("manager ready", |s| s.text().contains("F5 Copy"))?;
+    s.resize(160, 40)?;
+    s.wait("large desktop ready", |s| {
+        s.text()
+            .lines()
+            .last()
+            .is_some_and(|r| r.contains("F10 Quit"))
+    })?;
+    s.send(b"\x1b[B\x1b[B\x1b[B\x1b[14~", "editor opened", |s| {
+        s.text().contains("F2 Save")
+    })?;
+    s.send(b"\x1bz", "editor restored", |s| {
+        s.text().contains("F5 Copy")
+    })?;
+    s.send(b"\x1b[<0;1;2M\x1b[<0;1;2m\x1b[20;3~", "game opened", |s| {
+        s.text().contains("Navigator's game")
+    })?;
+    s.send(b"\x1b0", "game window list", |s| {
+        s.text().contains("Open windows")
+    })?;
+    s.send(b"\x1b[H\t\t\r", "editor and game tiled", |s| {
+        let text = s.text();
+        !text.contains("Open windows")
+            && text.contains("Navigator's game")
+            && text.contains("F2 Save")
+            && text
+                .lines()
+                .nth(1)
+                .is_some_and(|r| r.starts_with('╔') && r.chars().nth(80) == Some('╔'))
+    })?;
+    s.send(b"\x1b0", "game list again", |s| {
+        s.text().contains("Open windows")
+    })?;
+    s.send(b"\x1b[H\t\t\t\r", "editor and game cascaded", |s| {
+        let text = s.text();
+        !text.contains("Open windows")
+            && text.contains("Navigator's game")
+            && text
+                .lines()
+                .nth(2)
+                .is_some_and(|r| r.chars().nth(1) == Some('╔') && r.chars().nth(54) == Some('╗'))
+    })?;
+    s.send(b"\x1b[15~", "arranged game setup", |s| {
+        s.text().contains("Setup game")
+    })?;
+    s.send(b"\x1b", "cancel game setup", |s| {
+        !s.text().contains("Setup game")
+    })?;
+    for n in 0..65 {
+        assert_eq!(
+            fs::read(s.root.join(format!("item-{n:03}.txt")))?,
+            b"fixture\n"
+        );
+    }
+    s.finish()
+}

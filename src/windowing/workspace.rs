@@ -97,6 +97,24 @@ pub(crate) fn chrome(scene: &mut Scene, s: Surface) {
         }
     }
 }
+/// Like DN's TFrame sfDragging palette: recolour only the captured frame/title.
+/// This is a transient scene effect, never a change to the user's saved palette.
+pub(crate) fn highlight_manipulation(scene: &mut Scene, surface: Surface) {
+    let r = surface.bounds;
+    let title = r.y + surface.title_row;
+    let green = scene.profile.color(10);
+    for (&(x, y), glyph) in &mut scene.cells {
+        if x >= r.x
+            && x < r.right()
+            && y >= title
+            && y < r.bottom()
+            && (y == title || y == r.bottom() - 1 || x == r.x || x == r.right() - 1)
+        {
+            glyph.style = Some(glyph.style.unwrap_or_default().fg(green));
+        }
+    }
+}
+
 pub(crate) fn definitions(app: &App, area: Rect) -> Vec<Definition> {
     let mut result = app
         .desktop

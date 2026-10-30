@@ -196,3 +196,28 @@ original profile; existing config saving persists accepted attributes in `[color
 with integer values 0..255. Unknown keys remain preserved. Old terminal-palette
 configuration is accepted and normalized to DN defaults; the old selector has no
 UI entry. The compatibility renderer remains available for legacy test fixtures.
+
+
+## Bulk desktop arrangement
+
+`windowing::arrangement` plans Tile/Cascade rectangles from the desktop and
+per-surface minimum sizes without touching models or native views. The native
+host collects eligible document shells and validates the entire plan
+before applying it under one borrow. Failure leaves every document's current and
+preferred bounds unchanged. Success updates native bounds, floating restore
+geometry and the shared layout revision, without activation, MRU or z-order
+changes. Tile uses creation order; Cascade uses native back-to-front order.
+Manager and all modal surfaces are excluded. Fixed-size plugin documents participate
+in placement while retaining their exact dimensions; Cascade clamps their offsets
+so full-height windows still fit at 80×25. If balanced columns reject a mixed
+layout, the pure planner tries a separate fixed-size strip before reporting NoRoom. Existing
+preparation, immutable painting, clipping and stale-frame checks then use the
+arranged native bounds; arrangement introduces no second geometry authority.
+
+
+The layout snapshot also records the captured surface identity for temporary
+DN-style movement feedback. Painting recolors only that surface's perimeter and
+title green, before the shared coordinate transform and clipping. It does not
+change document content, native control state or saved theme slots; a snapshot
+without capture paints normal frame colors again. Resize, owner retirement and
+modal changes reuse the existing capture cancellation rules.

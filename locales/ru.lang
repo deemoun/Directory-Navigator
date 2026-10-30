@@ -653,3 +653,10 @@ Colors: File dialog selected	Выделение файлового диалог�
 Colors: Input / list focus	Ввод / фокус списка
 Colors: List inactive selection	Неактивное выделение
 Colors: List cursor	Курсор списка
+~T~ile	Мо~з~аика
+C~a~scade	~К~аскад
+Tile	Мозаика
+Cascade	Каскад
+Not enough desktop space to arrange windows. Enlarge the terminal or close some document windows.	Недостаточно места для окон. Увеличьте терминал или закройте часть окон документов.
+No document windows are open.	Нет открытых окон документов.
+Close the current dialog before arranging windows.	Закройте текущий диалог перед упорядочиванием окон.

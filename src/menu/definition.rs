@@ -148,6 +148,8 @@ pub const ROOTS: &[Root] = &[
             item("~W~indows...", "Alt+0", WindowList),
             item("Si~z~e/Move", "Ctrl+F5", WindowMove),
             item("Zoo~m~/Restore", "Alt+Z", WindowZoom),
+            item("~T~ile", "", WindowTile),
+            item("C~a~scade", "", WindowCascade),
         ],
     },
     Root {

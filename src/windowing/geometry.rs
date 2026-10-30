@@ -231,6 +231,12 @@ impl Shell {
             self.set(maximized_bounds(self.surface.id.key, size));
         }
     }
+    pub(crate) fn arrange(&mut self, bounds: Rect) {
+        self.surface.maximized = false;
+        self.surface.title_row = 0;
+        self.preferred = bounds;
+        self.set(bounds);
+    }
     pub fn commit(&mut self) {
         self.surface.bounds = rect(self.window.bounds());
         if !self.surface.maximized {

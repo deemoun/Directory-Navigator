@@ -653,3 +653,10 @@ Colors: File dialog selected	Colors: File dialog selected
 Colors: Input / list focus	Colors: Input / list focus
 Colors: List inactive selection	Colors: List inactive selection
 Colors: List cursor	Colors: List cursor
+~T~ile	~T~ile
+C~a~scade	C~a~scade
+Tile	Tile
+Cascade	Cascade
+Not enough desktop space to arrange windows. Enlarge the terminal or close some document windows.	Not enough desktop space to arrange windows. Enlarge the terminal or close some document windows.
+No document windows are open.	No document windows are open.
+Close the current dialog before arranging windows.	Close the current dialog before arranging windows.

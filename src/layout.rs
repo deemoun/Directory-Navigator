@@ -119,6 +119,7 @@ pub struct LayoutSnapshot {
     pub panels: [PanelGeometry; 2],
     pub message: Option<MessageLayout>,
     pub surfaces: Vec<crate::windowing::geometry::Surface>,
+    pub manipulation: Option<crate::windowing::geometry::SurfaceId>,
 }
 pub fn editor_gutter(editor: &crate::editor::Editor) -> u16 {
     editor
@@ -167,10 +168,10 @@ pub fn prepare_window(
     };
     let area = Rect::new(0, 0, bounds.width, bounds.height);
     if let Some(list) = app.modals.window_list_mut() {
-        list.rows = (list.ids.len() + 6)
-            .max(12)
+        list.rows = (list.ids.len() + 8)
+            .max(14)
             .min(usize::from(area.height.saturating_sub(2)))
-            .saturating_sub(6)
+            .saturating_sub(8)
             .max(1);
         list.keep_visible();
     }
@@ -360,6 +361,7 @@ pub fn prepare_window(
         clip,
         screen: crate::presentation::layout::Size::new(screen.right(), screen.bottom()),
         message,
+        manipulation: app.desktop.native().manipulated_surface(),
         surfaces,
         regions,
         panel_areas,

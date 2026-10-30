@@ -14,8 +14,8 @@ pub(crate) fn windows_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
     let rect = crate::turbo::dialog_spec::centered(
         area,
         72,
-        (list.ids.len() + 6)
-            .max(12)
+        (list.ids.len() + 8)
+            .max(14)
             .min(usize::from(area.height.saturating_sub(2))) as u16,
     );
     let mut spec = DialogSpec::new(
@@ -109,7 +109,7 @@ pub(crate) fn windows_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
     spec.caption(
         Paragraph::new(language.text("Switching keeps documents open"))
             .style(profile.for_group(crate::palette::theme::Group::Dialogs, theme::TEXT)),
-        Rect::new(rect.x + 2, rect.bottom() - 4, rect.width - 4, 1),
+        Rect::new(rect.x + 2, rect.bottom() - 6, rect.width - 4, 1),
     );
     let selected = list.ids.get(list.cursor).copied();
     let document = selected
@@ -123,12 +123,19 @@ pub(crate) fn windows_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
         ("Switch", Action::Switch, 1),
         ("Size/Move", Action::Move, 3),
         ("Zoom", Action::Zoom, 4),
+        ("Tile", Action::Tile, 5),
+        ("Cascade", Action::Cascade, 6),
         ("Cancel", Action::Cancel, 2),
     ]
     .into_iter()
     .enumerate()
     {
-        let bounds = Rect::new(rect.x + 2 + index as u16 * 17, rect.bottom() - 2, 17, 1);
+        let bounds = Rect::new(
+            rect.x + 2 + (index % 3) as u16 * 23,
+            rect.bottom() - 5 + (index / 3) as u16 * 2,
+            22,
+            1,
+        );
         let mut control = Control::new(
             id,
             bounds,
@@ -136,6 +143,7 @@ pub(crate) fn windows_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
             Target::Window(command),
         );
         control.enabled = match command {
+            Action::Tile | Action::Cascade => crate::windowing::can_arrange(app),
             Action::Move => document.is_some(),
             Action::Zoom => document.is_some_and(|s| s.caps.zoom),
             _ => true,

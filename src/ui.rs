@@ -126,7 +126,7 @@ pub fn render(app: &App, snapshot: &crate::layout::LayoutSnapshot) -> RenderedFr
             }
         }
     }
-    if app.desktop.native().manipulating() {
+    if snapshot.manipulation.is_some() {
         frame.render_widget(
             Paragraph::new(
                 app.config
@@ -145,6 +145,13 @@ pub fn render(app: &App, snapshot: &crate::layout::LayoutSnapshot) -> RenderedFr
     }
     shortcuts_view::draw_prefix(&mut frame, app);
     let (mut scene, dialogs) = frame.finish_dialogs();
+    if let Some(surface) = snapshot
+        .surfaces
+        .iter()
+        .find(|s| Some(s.id) == snapshot.manipulation)
+    {
+        crate::windowing::workspace::highlight_manipulation(&mut scene, *surface);
+    }
     scene.normalize_wide();
     snapshot.transform(&mut scene);
     scene.normalize_wide();

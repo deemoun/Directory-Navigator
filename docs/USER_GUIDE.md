@@ -783,7 +783,9 @@ also offers **Size/Move** and **Zoom** when the selected window supports them.
 **Ctrl+F5** starts Size/Move for the active document or top dialog. Arrows move one
 cell; Shift+arrows resize supported windows; Ctrl+Left/Right move eight columns.
 Home/End align left/right, PgUp/PgDn align top/bottom, and Tab/Shift+Tab move
-horizontally. Enter accepts; Esc restores the starting geometry. Editing and paste
+horizontally. Enter accepts; Esc restores the starting geometry. While dragging
+or using Size/Move, the captured frame and title turn green; releasing the mouse,
+accepting or cancelling restores their normal colors. Editing and paste
 are suspended during movement. Ctrl+F5 still sorts by date in the file manager.
 
 Clicking an exposed background document raises it; its first client-area click
@@ -794,8 +796,23 @@ sizes. Tetris pauses during movement and while another window has focus.
 
 Geometry lasts until a window closes. Terminal resizing clamps windows while
 retaining their preferred floating geometry for a later expansion. Open documents
-and window positions are not restored after restarting. File panes remain fixed;
-Tile and Cascade are not implemented.
+and window positions are not restored after restarting. File panes remain fixed.
+
+**Manager → Tile / Cascade**, also available in **Alt+0 → Open windows**, arrange
+all document windows (editors, viewers and Tetris). Tile divides the desktop into a
+balanced grid in creation order, adjusting cells for each document's minimum size.
+If a balanced grid cannot fit the game alongside other documents, Tile tries a
+separate strip for the fixed-size game before refusing the arrangement.
+Cascade follows the current stacking order with diagonally offset title bars and
+a shared bottom-right corner, like DOS Navigator. Both preserve the active
+document, stacking order, edits, undo history and scroll state. Arranged bounds
+become each resizable window's restore size for Alt+Z. Tetris participates at its
+fixed 54×23 size: Tile places it at its cell's top-left, and Cascade limits its
+offset to keep the entire board on screen. Dialogs and file panels are excluded.
+Close blocking dialogs or finish Size/Move first. If the documents
+cannot fit their minimum sizes, a message appears and every document keeps its
+previous geometry. Resize the terminal or close some documents before retrying;
+terminal resizing never automatically retiles the desktop.
 
 ## Context help
 

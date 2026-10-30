@@ -146,8 +146,9 @@ or editor, use F1 for that screen's controls. macOS may require Fn with function
 and viewers. The Mac-friendly profile also offers **Ctrl+O, then U**. Each document
 keeps its own edits, undo history, search and scroll position. F4 opens the
 highlighted file; reopening a file activates its existing document. Close and quit
-check unsaved changes across the relevant editors. Windows remain full-screen and
-session-only.
+check unsaved changes across the relevant editors. Editors and viewers open maximized,
+can be moved or resized, and support **Tile** and **Cascade** through the Manager
+menu or window list. Window geometry lasts for the session.
 
 The bottom row is a command prompt. Type a command and press **Enter** to run it
 in the active panel's directory; **Esc** clears it. **Ctrl+E / Ctrl+X** recall command

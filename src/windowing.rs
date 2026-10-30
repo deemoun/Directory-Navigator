@@ -1,4 +1,7 @@
 //! Session-only switching; content and asynchronous work remain owned by Desktop.
+pub(crate) mod arrangement;
+pub use arrangement::Arrangement;
+pub(crate) use arrangement::Error as ArrangementError;
 pub mod geometry;
 pub(crate) mod workspace;
 use crate::{
@@ -36,6 +39,8 @@ pub enum Action {
     Move,
     Zoom,
     Cancel,
+    Tile,
+    Cascade,
 }
 fn ids(app: &App) -> Vec<WindowId> {
     let mut windows = app.desktop.windows().map(|w| w.id).collect::<Vec<_>>();
@@ -101,6 +106,8 @@ pub fn poll(app: &mut App) -> bool {
 }
 pub fn action(app: &mut App, action: Action) {
     match action {
+        Action::Tile => arrange(app, Arrangement::Tile),
+        Action::Cascade => arrange(app, Arrangement::Cascade),
         Action::Move | Action::Zoom => {
             let id = app
                 .modals
@@ -230,4 +237,58 @@ pub(crate) fn move_active(app: &mut App, zoom: bool) {
             app.desktop.native().begin_move(s.id, None);
         }
     }
+}
+
+/// Arrangement changes only presentation, never activation, MRU or document state.
+pub fn arrange(app: &mut App, mode: Arrangement) {
+    if app.exit_pending
+        || app.output_visible
+        || app.screensaver.active
+        || app.desktop.native().manipulating()
+        || !matches!(
+            focus::current(app),
+            Focus::Manager
+                | Focus::QuickSearch
+                | Focus::Menu
+                | Focus::Editor
+                | Focus::EditorMenu
+                | Focus::Viewer
+                | Focus::Plugin
+                | Focus::WindowList
+        )
+    {
+        return;
+    }
+    crate::menu::close(app);
+    if let Some(editor) = app.desktop.active_editor_mut() {
+        editor.modals.set_editor_menu(None);
+    }
+    app.modals.set_quick_search(None);
+    app.modals.set_window_list(None);
+    app.sync_modals();
+    if app.layout_key.is_some() {
+        crate::layout::update(app);
+    } else {
+        let (w, h) = app.utilities.size;
+        crate::layout::prepare(app, crate::presentation::layout::Rect::new(0, 0, w, h));
+    }
+    match app.desktop.native().arrange_documents(mode) {
+        Ok(_) => {
+            crate::layout::update(app);
+        }
+        Err(ArrangementError::NoRoom) => {
+            app.error("Not enough desktop space to arrange windows. Enlarge the terminal or close some document windows.");
+        }
+        Err(ArrangementError::NoWindows) => {
+            app.notice = "No document windows are open.".into();
+        }
+        Err(ArrangementError::Blocked) => {
+            app.notice = "Close the current dialog before arranging windows.".into();
+        }
+    }
+    app.shortcuts.clear();
+    app.mouse.reset_click();
+}
+pub(crate) fn can_arrange(app: &App) -> bool {
+    app.desktop.native().arrangeable_count() > 0
 }

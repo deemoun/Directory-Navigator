@@ -1,5 +1,55 @@
 # Directory Navigator — beta
 
+## Temporary drag highlighting
+
+- Following VIEWS.PAS TFrame's sfDragging palette, the captured window's frame
+  and title turn white on green while dragging, resizing or using Size/Move.
+  Contents remain unchanged. Release, acceptance, cancellation, terminal resize
+  and owner retirement restore normal colors, including custom frame palettes.
+- Capture identity is recorded in LayoutSnapshot. Immutable scene composition
+  applies the temporary perimeter colors before shared translation/clipping;
+  no saved palette slots or native control state are modified by painting.
+- Focused macOS validation: 43 regression tests across six executables passed,
+  including native transport, existing appearance captures, floating windows,
+  arrangement and all five real-terminal walkthroughs. Formatting, all-target
+  Clippy with warnings denied, release build, no-default-features, doc tests and
+  the five optimized-release walkthroughs pass. Windows/Linux remain skipped.
+
+
+## Tile and Cascade
+
+- Manager menu and the shared Alt+0 window list expose Tile and Cascade for
+  documents, including fixed-size Tetris. File panels and modal windows retain
+  their placement. No new shortcuts or saved workspace format are introduced.
+- Tile follows DN's divider/remainder layout, with minimum-aware partitioning
+  and alternative column counts. A fixed-window strip fallback fits mixed
+  editor/viewer/Tetris layouts that balanced columns alone would reject.
+  Creation order keeps repeated tiling stable.
+  Cascade follows DNAPP.PAS's diagonal offsets and common bottom/right edge in
+  native stacking order. Both preserve activation, MRU and z-order.
+- A pure planner validates all rectangles before the native host commits the
+  complete layout. Failure changes no document bounds or restore preferences.
+  Success uses existing clipping, stale-frame validation and immutable painting;
+  arranged floating rectangles become Alt+Z restore geometry. Terminal resizing
+  clamps without automatically retiling or forgetting preferred rectangles.
+- Tests cover mixed documents, translated minimum sizes, Unicode/cursors, repeated
+  painting, independent undo, focus, restore/resize, atomic fit failure, blocking
+  dialogs/manipulation, fixed game dimensions and placement, disabled controls and window-list
+  mouse/keyboard agreement. A real-PTY walkthrough arranges overlapping editor
+  and viewer windows and verifies untouched files and terminal restoration.
+- Only the 16 window-list appearance captures changed to accommodate the two
+  additional controls; the other 304 shared appearance captures are unchanged.
+- Corrected the initial exclusion of Tetris: its Tile/Cascade actions now work
+  even when it is the only document. The game keeps its 54×23 board and Cascade
+  clamps its offsets at 80×25 instead of clipping/rejecting a full-height game.
+  Added rendered-border, polling, actual Alt+0/mouse, editor typing/undo and
+  real-terminal mixed-game regressions rather than only geometry assertions.
+- macOS validation: 623 tests passed across 67 native executables, with one
+  existing opt-in Trash test ignored. Formatting, all-target Clippy with warnings
+  denied, release build, no-default-features, doc tests and all five optimized
+  real-PTY walkthroughs pass. Windows/Linux validation remains skipped.
+
+
 ## DN-style color editor
 
 - Replaced the Classic/Terminal picker with native group/item lists, 4×4

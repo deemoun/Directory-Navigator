@@ -409,6 +409,7 @@ pub(crate) fn viewer_key(key: KeyEvent) -> Option<V> {
 pub(crate) fn manager_available(app: &App, action: Action) -> bool {
     match action {
         Action::Plugin(id) => app.config.plugin_enabled(id),
+        Action::WindowTile | Action::WindowCascade => crate::windowing::can_arrange(app),
         Action::WindowMove => crate::windowing::workspace::foreground(app).is_some(),
         Action::WindowZoom => {
             crate::windowing::workspace::foreground(app).is_some_and(|s| s.caps.zoom)
