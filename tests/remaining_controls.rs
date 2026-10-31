@@ -204,7 +204,7 @@ fn setup(a: &mut App, case: usize) -> (u16, u16) {
             a.screensaver
                 .modals
                 .set_screensaver(Some(Default::default()));
-            (58, 20)
+            (76, 23)
         }
         11 => {
             dn::navigation_tools::open_bookmarks(a);

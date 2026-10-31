@@ -25,6 +25,84 @@ fn top(buffer: &Buffer) -> String {
     (0..80).map(|x| buffer[(x, 0)].symbol()).collect()
 }
 #[test]
+fn desktop_menu_remains_available_above_floating_documents() -> io::Result<()> {
+    use dn::{
+        desktop::WindowKind,
+        localization::Language,
+        windowing::{self, Action},
+    };
+    let (_temp, mut app) = fixture()?;
+    app.config.show_clock = false;
+    dn::editor::open(&mut app, true);
+    draw(&mut app)?;
+    windowing::action(&mut app, Action::Zoom);
+    dn::editor::open_smartpad(&mut app);
+    draw(&mut app)?;
+    app.show_viewer(dn::viewer::Viewer::from_contents(
+        "menu-fixture.txt".into(),
+        dn::viewer::from_bytes(b"fixture".to_vec(), dn::viewer::ViewMode::Text),
+    ));
+    draw(&mut app)?;
+    windowing::action(&mut app, Action::Zoom);
+    for language in [Language::English, Language::Russian] {
+        app.config.language = language;
+        for custom in [false, true] {
+            app.config.palette = if custom {
+                dn::palette::PaletteProfile::ClassicDn
+                    .with_slot(dn::palette::theme::Slot::MenuNormal, 0x1e)
+            } else {
+                dn::palette::PaletteProfile::ClassicDn
+            };
+            for (width, height) in [(80, 25), (132, 40), (80, 25)] {
+                for _ in 0..3 {
+                    let active = app.desktop.active();
+                    assert!(matches!(
+                        active.kind,
+                        WindowKind::Editor | WindowKind::Viewer
+                    ));
+                    let buffer = support::draw(&mut app, width, height)?;
+                    let caption = dn::menu::plain(language.text("~U~tilities"));
+                    assert!(top(&buffer).contains(&caption));
+                    assert!(app
+                        .mouse
+                        .regions
+                        .iter()
+                        .any(|(r, t)| r.y == 0 && *t == Target::Menu(0)));
+                    assert_eq!(buffer, support::draw(&mut app, width, height)?);
+                    click(&mut app, Target::Menu(0));
+                    assert_eq!(app.modals.menu().map(|m| m.0), Some(0));
+                    assert_eq!(app.desktop.active().id, active.id);
+                    support::draw(&mut app, width, height)?;
+                    key(&mut app, K::Esc, M::NONE);
+                    assert_eq!(app.desktop.active().id, active.id);
+                    windowing::action(&mut app, Action::Next);
+                    if app.desktop.active().kind == WindowKind::Manager {
+                        windowing::action(&mut app, Action::Next);
+                    }
+                }
+            }
+        }
+    }
+    // Fullscreen documents continue to own the menu row.
+    draw(&mut app)?;
+    windowing::action(&mut app, Action::Zoom);
+    draw(&mut app)?;
+    assert!(!app
+        .mouse
+        .regions
+        .iter()
+        .any(|(_, t)| matches!(t, Target::Menu(_))));
+    windowing::action(&mut app, Action::Zoom);
+    app.config.hide_menu = true;
+    draw(&mut app)?;
+    assert!(!app
+        .mouse
+        .regions
+        .iter()
+        .any(|(_, t)| matches!(t, Target::Menu(_))));
+    Ok(())
+}
+#[test]
 fn hidden_menu_reclaims_row_temporarily_reveals_and_keeps_mouse_hits_above_panes() -> io::Result<()>
 {
     let (_temp, mut app) = fixture()?;

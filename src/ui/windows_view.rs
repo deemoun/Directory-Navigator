@@ -44,7 +44,7 @@ pub(crate) fn windows_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
                 let prefix = format!(
                     "{}{}: ",
                     if editor.dirty() { "* " } else { "" },
-                    language.text("Editor")
+                    language.text(editor.label())
                 );
                 let available = width
                     .saturating_sub(crate::presentation::text::Span::raw(&prefix).width() as u16);

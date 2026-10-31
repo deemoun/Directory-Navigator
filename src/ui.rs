@@ -92,6 +92,31 @@ impl RenderedFrame {
     }
 }
 pub fn render(app: &App, snapshot: &crate::layout::LayoutSnapshot) -> RenderedFrame {
+    render_inner(app, snapshot, false)
+}
+pub(crate) fn saver_background(
+    app: &App,
+    snapshot: &crate::layout::LayoutSnapshot,
+) -> crate::turbo::scene::Scene {
+    render_inner(app, snapshot, true).scene
+}
+fn render_inner(
+    app: &App,
+    snapshot: &crate::layout::LayoutSnapshot,
+    skip_saver: bool,
+) -> RenderedFrame {
+    if app.screensaver.active && !skip_saver {
+        let mut scene = app.screensaver.effect_scene(app.config.palette);
+        snapshot.transform(&mut scene);
+        scene.normalize_wide();
+        return RenderedFrame {
+            scene,
+            context: snapshot.context,
+            surfaces: Vec::new(),
+            surface_frames: Vec::new(),
+            dialogs: Vec::new(),
+        };
+    }
     let mut frame = crate::painting::NativeFrame::new(
         crate::presentation::layout::Rect::new(0, 0, snapshot.bounds.width, snapshot.bounds.height),
         app.config.palette,
@@ -164,7 +189,11 @@ pub fn render(app: &App, snapshot: &crate::layout::LayoutSnapshot) -> RenderedFr
         crate::windowing::workspace::highlight_manipulation(&mut scene, *surface);
     }
     scene.normalize_wide();
-    snapshot.transform(&mut scene);
+    // Snapshot pixels stay in workspace coordinates; projection happens when
+    // the frozen effect is eventually painted into its current terminal bounds.
+    if !skip_saver {
+        snapshot.transform(&mut scene);
+    }
     if let Some(rect) = snapshot.pressed_button {
         crate::button_feedback::paint(&mut scene, rect);
     }
@@ -255,10 +284,6 @@ fn draw_content(
     let area = frame.area();
     let screen = app.desktop.target_info().kind;
     frame.regions().clear();
-    if app.screensaver.active {
-        screensaver_view::draw_sky(frame, app, area);
-        return;
-    }
     frame.render_widget(Block::default().style(dos(0x87)), area);
     if area.width < 80 || area.height < 25 {
         frame.render_widget(
@@ -480,18 +505,13 @@ fn draw_workspace(
         .surfaces
         .iter()
         .find(|s| s.id.key == SurfaceKey::Document(active.id));
-    if app.screensaver.active
-        || frame.area().width < 80
+    if frame.area().width < 80
         || frame.area().height < 25
         || active_surface.is_some_and(|s| s.maximized)
             && matches!(active.kind, WindowKind::Editor | WindowKind::Viewer)
     {
         draw_content(frame, app, prepared, true);
-        if app.modal_top().is_none()
-            && !app.screensaver.active
-            && frame.area().width >= 80
-            && frame.area().height >= 25
-        {
+        if app.modal_top().is_none() && frame.area().width >= 80 && frame.area().height >= 25 {
             if let Some(surface) = active_surface {
                 let mut overlay =
                     crate::painting::NativeFrame::new(frame.area(), app.config.palette).finish();
@@ -689,12 +709,10 @@ fn draw_workspace(
     }
     let content_cursor = frame.cursor();
     let (bar, menu_positions) = crate::turbo::manager::menu_bar(app, frame.area().width);
-    if !matches!(active.kind, WindowKind::Editor | WindowKind::Viewer) {
-        frame.compose(bar);
-        if crate::menu::bar_visible(app) {
-            for (i, r) in menu_positions.iter().enumerate() {
-                frame.regions().push((*r, Target::Menu(i)));
-            }
+    frame.compose(bar);
+    if crate::menu::bar_visible(app) {
+        for (i, r) in menu_positions.iter().enumerate() {
+            frame.regions().push((*r, Target::Menu(i)));
         }
     }
     if matches!(active.kind, WindowKind::Tool(_)) && app.modal_top().is_none() {

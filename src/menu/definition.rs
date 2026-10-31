@@ -71,6 +71,7 @@ pub const ROOTS: &[Root] = &[
         label: "~U~tilities",
         entries: &[
             item("~U~ser menu", "F2", UserMenu),
+            item("Smart~P~ad", "Alt+Q", SmartPad),
             item(
                 "~M~emory Information",
                 "Alt+Y",

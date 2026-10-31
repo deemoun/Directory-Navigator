@@ -9,8 +9,22 @@ pub(crate) fn key(app: &mut App, event: KeyEvent, scope: Focus) -> bool {
         return false;
     }
     let code = match (scope, event.code) {
-        (Focus::SaverSetup, KeyCode::Down) => KeyCode::Tab,
-        (Focus::SaverSetup, KeyCode::Up) => KeyCode::BackTab,
+        (Focus::SaverSetup, KeyCode::Down)
+            if app.screensaver.modals.screensaver().is_none_or(|s| {
+                s.cursor != crate::screensaver::SELECTED
+                    && s.cursor != crate::screensaver::AVAILABLE
+            }) =>
+        {
+            KeyCode::Tab
+        }
+        (Focus::SaverSetup, KeyCode::Up)
+            if app.screensaver.modals.screensaver().is_none_or(|s| {
+                s.cursor != crate::screensaver::SELECTED
+                    && s.cursor != crate::screensaver::AVAILABLE
+            }) =>
+        {
+            KeyCode::BackTab
+        }
         (Focus::SaverSetup, KeyCode::Right) => KeyCode::Tab,
         (Focus::SaverSetup, KeyCode::Left) => KeyCode::BackTab,
         (Focus::FileTools, KeyCode::Down)

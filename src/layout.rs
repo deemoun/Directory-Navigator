@@ -349,7 +349,7 @@ pub fn prepare_window(
         app.layout_state = Some(state);
         context.revision = app.layout_revision;
     }
-    LayoutSnapshot {
+    let snapshot = LayoutSnapshot {
         pressed_button: crate::button_feedback::pressed(app, context),
         context,
         bounds,
@@ -361,7 +361,12 @@ pub fn prepare_window(
         regions,
         panel_areas,
         panels,
+    };
+    if app.screensaver.needs_snapshot() {
+        let scene = crate::ui::saver_background(app, &snapshot);
+        app.screensaver.capture(scene);
     }
+    snapshot
 }
 /// Prepare after commands, even when no terminal draw is requested.
 pub fn update(app: &mut App) {

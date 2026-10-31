@@ -11,7 +11,18 @@ pub(super) fn draw_bar(frame: &mut impl Frame, app: &App, area: Rect) {
     let profile = app.config.palette;
     let dos = profile.styles_for(crate::palette::theme::Group::Dialogs);
     frame.render_widget(Block::default().style(dos(0x70)), area);
-    let header = super::clock::header(app, area);
+    let floating = app
+        .desktop
+        .native()
+        .surface(crate::windowing::geometry::SurfaceKey::Document(
+            app.desktop.target(),
+        ))
+        .is_some_and(|surface| !surface.maximized);
+    let header = if floating {
+        area
+    } else {
+        super::clock::header(app, area)
+    };
     let current = app
         .desktop
         .active_editor()
@@ -41,7 +52,9 @@ pub(super) fn draw_bar(frame: &mut impl Frame, app: &App, area: Rect) {
         }
         x += rect.width;
     }
-    super::clock::draw(frame, app, area);
+    if !floating {
+        super::clock::draw(frame, app, area);
+    }
 }
 pub(super) fn draw_dropdown(frame: &mut impl Frame, app: &App, area: Rect) {
     let language = app.config.language;

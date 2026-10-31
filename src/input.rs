@@ -50,6 +50,9 @@ fn handle_key(app: &mut App, key: KeyEvent) {
     let Some(key) = crate::shortcuts::key(app, key) else {
         return;
     };
+    if crate::commands::global_key(app, key) {
+        return;
+    }
     if !crate::windowing::blocked(app) {
         let back = key.modifiers.contains(KeyModifiers::SHIFT) || key.code == KeyCode::BackTab;
         if matches!(key.code, KeyCode::Tab | KeyCode::BackTab)

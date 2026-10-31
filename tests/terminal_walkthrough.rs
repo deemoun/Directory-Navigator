@@ -1189,3 +1189,211 @@ fn mp3_folder_tags_modes_info_and_resize_restore_terminal() -> io::Result<()> {
     s.send(b"\x1b", "close player", |s| s.command_prompt_active())?;
     s.finish()
 }
+
+#[test]
+fn original_screen_savers_lists_all_effects_preview_and_terminal_restoration() -> io::Result<()> {
+    let mut s = Session::new("original-screen-savers")?;
+    s.wait("manager ready", |s| {
+        s.command_prompt_active() && s.text().contains("item-000.")
+    })?;
+    s.send(b"\x1bocv", "original screen saver lists", |s| {
+        s.text().contains("Selected savers") && s.text().contains("Available savers")
+    })?;
+    s.send(b"\t", "available list focus", |s| {
+        s.text().contains("Available savers")
+    })?;
+    for (index, name) in ["Star flight", "Flash-light", "Clock", "Blackness"]
+        .into_iter()
+        .enumerate()
+    {
+        if index > 0 {
+            s.send(b"\x1b[B", "next available saver", |s| {
+                s.text().contains(name)
+            })?;
+            s.send(b"\x1b[2~", "add saver to selected", |s| {
+                s.text().matches(name).count() >= 2
+            })?;
+        }
+        s.send(b"p", "preview starts", |s| {
+            !s.text().contains("Selected savers") && !s.command_prompt_active()
+        })?;
+        if name == "Clock" {
+            s.wait("moving clock visible", |s| {
+                s.text().chars().filter(char::is_ascii_digit).count() >= 4
+            })?;
+        } else if name == "Blackness" {
+            s.wait("black screen", |s| {
+                s.text().chars().all(char::is_whitespace)
+            })?;
+        }
+        if name == "Flash-light" {
+            for (width, height) in [(120, 40), (80, 25)] {
+                s.resize(width, height)?;
+                let viewport = format!("viewport=({width}, {height})");
+                s.wait("flashlight resize committed", |s| {
+                    fs::read_to_string(s.root.join("settings/dn/diagnostics.txt"))
+                        .is_ok_and(|state| state.contains(&viewport))
+                })?;
+            }
+        }
+        // F10 only wakes the preview; the original draft must remain open.
+        s.send(b"\x1b[21~", "preview wakes without quitting", |s| {
+            s.text().contains("Selected savers") && s.text().contains("Available savers")
+        })?;
+    }
+    s.send(b"\x1b", "cancel draft", |s| s.command_prompt_active())?;
+    s.finish()
+}
+
+#[test]
+fn smartpad_notes_toggle_save_and_dirty_close_restore_terminal() -> io::Result<()> {
+    let mut s = Session::new("smartpad-notes")?;
+    s.wait("manager ready", |s| s.command_prompt_active())?;
+    s.send(b"\x1bq", "SmartPad opened", |s| {
+        s.text().contains("SmartPad") && !s.command_prompt_active()
+    })?;
+    s.send("Заметка 界".as_bytes(), "Unicode notes", |s| {
+        s.text().contains("Заметка 界")
+    })?;
+    s.send(b"\x1bq", "back to manager", |s| s.command_prompt_active())?;
+    s.send(b"\x1bq", "same notes restored", |s| {
+        !s.command_prompt_active() && s.text().contains("Заметка 界")
+    })?;
+    s.send(b"\x1b[15;5~", "SmartPad move", |s| {
+        s.text().contains("Arrows move")
+    })?;
+    s.send(b"\x1b[C\x1b[B\r", "SmartPad moved", |s| {
+        !s.text().contains("Arrows move") && s.text().contains("SmartPad")
+    })?;
+    s.send(b"\x1b[12~", "save notes", |s| s.text().contains("Save As"))?;
+    s.send(b"smartpad.txt\r", "notes saved", |s| {
+        !s.text().contains("Save As") && s.text().contains("Saved")
+    })?;
+    assert_eq!(
+        fs::read_to_string(s.root.join("smartpad.txt"))?,
+        "Заметка 界"
+    );
+    s.send(b"!", "unsaved extra note", |s| {
+        s.text().contains("Заметка 界!")
+    })?;
+    s.send(b"\x1b", "dirty close guard", |s| {
+        s.text().contains("unsaved")
+    })?;
+    s.send(b"\x1b", "cancel close", |s| {
+        !s.text().contains("unsaved") && s.text().contains("Заметка 界!")
+    })?;
+    s.send(b"\x1b", "dirty close again", |s| {
+        s.text().contains("unsaved")
+    })?;
+    s.send(b"d", "discard only final edit", |s| {
+        s.command_prompt_active()
+    })?;
+    assert_eq!(
+        fs::read_to_string(s.root.join("smartpad.txt"))?,
+        "Заметка 界"
+    );
+    s.finish()
+}
+
+#[test]
+fn floating_smartpad_clock_is_not_duplicated_after_zoom_restore_and_idle() -> io::Result<()> {
+    fn clocks(s: &Session) -> Vec<String> {
+        s.text()
+            .as_bytes()
+            .windows(8)
+            .filter(|b| {
+                b[2] == b':'
+                    && b[5] == b':'
+                    && [0, 1, 3, 4, 6, 7]
+                        .into_iter()
+                        .all(|i| b[i].is_ascii_digit())
+            })
+            .map(|b| String::from_utf8(b.to_vec()).unwrap())
+            .collect()
+    }
+    let mut s = Session::new("floating-editor-clock")?;
+    s.wait("manager clock ready", |s| {
+        s.command_prompt_active() && clocks(s).len() == 1
+    })?;
+    s.send(b"\x1bq", "floating SmartPad has one desktop clock", |s| {
+        s.text().contains("SmartPad") && clocks(s).len() == 1
+    })?;
+    let before = clocks(&s);
+    s.wait("idle clock redraw keeps one clock", |s| {
+        let current = clocks(s);
+        current.len() == 1 && current != before
+    })?;
+    s.send(b"\x1bz", "maximized editor retains its clock", |s| {
+        s.text().contains("[↕]") && clocks(s).len() == 1
+    })?;
+    s.send(b"\x1bz", "restored editor has no duplicate clock", |s| {
+        s.text().contains("[↑]") && !s.text().contains("[↕]") && clocks(s).len() == 1
+    })?;
+    s.send(b"\x1bq", "focus manager", |s| {
+        s.command_prompt_active() && clocks(s).len() == 1
+    })?;
+    s.send(b"\x1bq", "focus SmartPad", |s| {
+        !s.command_prompt_active() && s.text().contains("SmartPad") && clocks(s).len() == 1
+    })?;
+    s.send(b"\x1b", "close empty SmartPad", |s| {
+        s.command_prompt_active()
+    })?;
+    s.finish()
+}
+
+#[test]
+fn desktop_menu_above_multiple_documents_opens_on_first_click() -> io::Result<()> {
+    fn menu_visible(s: &Session) -> bool {
+        s.text()
+            .lines()
+            .next()
+            .is_some_and(|line| line.contains("Utilities"))
+    }
+    let mut s = Session::new("floating-desktop-menu")?;
+    s.wait("manager menu ready", |s| {
+        s.command_prompt_active() && menu_visible(s)
+    })?;
+    s.select_file("item-000.txt")?;
+    s.send(b"\x1b[14~", "fullscreen editor", |s| {
+        s.text().contains("fixture") && !menu_visible(s)
+    })?;
+    s.send(
+        b"\x1bz",
+        "floating editor retains desktop menu",
+        menu_visible,
+    )?;
+    s.send(
+        b"\x1bq",
+        "SmartPad above another editor retains desktop menu",
+        |s| s.text().contains("SmartPad") && menu_visible(s),
+    )?;
+    let before = s.text().lines().next().unwrap().to_owned();
+    s.wait("idle redraw retains desktop menu", |s| {
+        menu_visible(s) && s.text().lines().next().is_some_and(|line| line != before)
+    })?;
+    s.send(
+        b"\x1b[<0;2;1M\x1b[<0;2;1m",
+        "desktop menu opens on first click",
+        |s| s.text().contains("About...") && s.text().contains("Screensaver"),
+    )?;
+    s.send(b"\x1b", "menu closes back to SmartPad", |s| {
+        !s.text().contains("About...") && menu_visible(s) && !s.command_prompt_active()
+    })?;
+    s.send(b"\x1bz", "fullscreen SmartPad owns its menu", |s| {
+        !menu_visible(s)
+    })?;
+    s.send(b"\x1bz", "restore desktop menu", menu_visible)?;
+    s.send(b"\x1bq", "return focus to editor", |s| {
+        s.text().contains("fixture") && menu_visible(s)
+    })?;
+    s.send(b"\x1bq", "return focus to SmartPad", |s| {
+        s.text().contains("SmartPad") && menu_visible(s)
+    })?;
+    s.send(b"\x1b", "close empty SmartPad", |s| {
+        !s.text().contains("SmartPad") && menu_visible(s)
+    })?;
+    s.send(b"\x1b", "close unmodified editor", |s| {
+        s.command_prompt_active() && menu_visible(s)
+    })?;
+    s.finish()
+}

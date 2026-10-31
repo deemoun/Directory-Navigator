@@ -859,3 +859,22 @@ Change drive	Change drive
 Drive is no longer available.	Drive is no longer available.
 ~L~eft drive...	~L~eft drive...
 ~R~ight drive...	~R~ight drive...
+
+# Original DN screen savers
+Star flight	Star flight
+Flash-light	Flash-light
+Clock	Clock
+Blackness	Blackness
+Selected savers	Selected savers
+Available savers	Available savers
+[ Add ]	[ Add ]
+[ Remove ]	[ Remove ]
+Randomly chosen from Selected savers	Randomly chosen from Selected savers
+Select at least one screen saver in Options > Configuration > Screen savers.	Select at least one screen saver in Options > Configuration > Screen savers.
+Screen savers help	Screen savers help
+Choose one or more screen savers in Selected savers. Add copies the highlighted Available saver without duplicates; Remove deletes the highlighted Selected saver. DN randomly chooses from Selected savers each time screen rest starts. An empty selection disables automatic screen rest.\nStar flight: accelerating stars. Flash-light: a moving light reveals a frozen view of DN. Clock: moving local HH:MM time. Blackness: a black screen.\nPreview shows the last highlighted saver from either list without applying changes. Any key, paste or mouse input ends the preview and is consumed.\nTab / Shift+Tab moves between controls; arrows choose list entries; Insert / Delete adds / removes; P previews; F1 opens help. OK applies the draft; Cancel discards it. Save desktop or normal exit with Save on exit persists accepted settings. External DOS .SS programs are not supported.	Choose one or more screen savers in Selected savers. Add copies the highlighted Available saver without duplicates; Remove deletes the highlighted Selected saver. DN randomly chooses from Selected savers each time screen rest starts. An empty selection disables automatic screen rest.\nStar flight: accelerating stars. Flash-light: a moving light reveals a frozen view of DN. Clock: moving local HH:MM time. Blackness: a black screen.\nPreview shows the last highlighted saver from either list without applying changes. Any key, paste or mouse input ends the preview and is consumed.\nTab / Shift+Tab moves between controls; arrows choose list entries; Insert / Delete adds / removes; P previews; F1 opens help. OK applies the draft; Cancel discards it. Save desktop or normal exit with Save on exit persists accepted settings. External DOS .SS programs are not supported.
+
+# SmartPad
+SmartPad	SmartPad
+Smart~P~ad	Smart~P~ad
+SmartPad: Alt+Q returns; F2 saves notes.	SmartPad: Alt+Q returns; F2 saves notes.

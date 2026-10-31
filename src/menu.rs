@@ -11,6 +11,7 @@ pub enum Action {
     Transfers,
     RecoverEditors,
     TerminalOutput,
+    SmartPad,
     ImportDosSettings,
     EditAssociations,
     ReloadAssociations,
@@ -128,12 +129,18 @@ pub(crate) fn plugin_placement(id: crate::plugins::PluginId) -> Option<(RootId, 
     })
 }
 
-/// Tools and plugins share the manager menu; documents keep their own menus.
+/// Only fullscreen documents replace the desktop menu with their own menu.
 pub(crate) fn bar_visible(app: &App) -> bool {
-    !matches!(
-        app.desktop.active().kind,
+    let active = app.desktop.active();
+    let fullscreen_document = matches!(
+        active.kind,
         crate::desktop::WindowKind::Editor | crate::desktop::WindowKind::Viewer
-    ) && (!app.config.hide_menu || app.modals.menu().is_some())
+    ) && app
+        .desktop
+        .native()
+        .surface(crate::windowing::geometry::SurfaceKey::Document(active.id))
+        .is_none_or(|surface| surface.maximized);
+    !fullscreen_document && (!app.config.hide_menu || app.modals.menu().is_some())
 }
 
 pub fn plain(label: &str) -> String {
@@ -203,11 +210,12 @@ pub fn execute(app: &mut App, action: Action) {
     close(app);
     app.modals.set_quick_search(None);
     match action {
+        Action::SmartPad => crate::editor::open_smartpad(app),
         Action::TerminalOutput => crate::terminal_output::request(app),
         Action::CommandHistory => crate::command_line::history::open(app),
         Action::CopyNames(full) => crate::file_tools::clipboard::copy(app,full),
         Action::ScreensaverSetup => crate::screensaver::open(app),
-        Action::ScreenRest => app.screensaver.start(std::time::Instant::now()),
+        Action::ScreenRest => crate::screensaver::start(app),
         Action::Colors => crate::palette::open(app),
         #[cfg(windows)]
         Action::Drive(panel) => crate::windows_drives::open(app, panel),

@@ -425,9 +425,30 @@ existing configuration. The former Classic/Terminal selector is removed; older
 `palette="terminal"` settings load DN defaults. VGA hardware palette controls and
 blinking are omitted. Interface → Show clock controls the upper-right clock.
 
-Screen savers: Options → Configuration → Screen savers offers DN’s Star Sky,
-Preview, and Never / 1 / 2 / 5 / 10 / 30 / 60 minute idle delays (default: 10 minutes).
-Save desktop persists the delay. The ≡ menu’s Screensaver starts it immediately.
+Screen savers: Options → Configuration → Screen savers follows DN 1.51 with
+**Selected savers** on the left, **Available savers** on the right, and **Add / Remove**
+between them. The four built-in effects are available on macOS, Linux and Windows:
+
+- **Star flight** (formerly Star Sky): accelerating stars moving out from the center.
+- **Flash-light**: a moving light reveals a frozen snapshot of DN on a black screen.
+  Resizing clips or pads that same snapshot; it never follows live file/editor changes.
+- **Clock**: moving local `HH:MM` time in 24-hour format, with a blinking colon.
+- **Blackness**: a plain black screen.
+
+Add appends the highlighted available effect without duplicates; Remove deletes the
+highlighted selected effect. Each automatic or manual start randomly chooses one
+of the selected effects; repeats are possible. An empty selection disables automatic
+screen rest, and a manual start explains where to select an effect. External DOS
+`SSAVERS/*.SS` programs and hardware mouse-corner controls are not supported.
+
+Tab / Shift+Tab moves between controls; arrows select list entries; Insert / Delete
+adds / removes. **Preview** (P) shows the last highlighted effect from either list,
+even if it has not been added. F1 or Help explains the controls. OK applies the draft;
+Cancel, Esc or the close button discards it. Preview does not apply or save changes.
+Never / 1 / 2 / 5 / 10 / 30 / 60 minute idle delays remain available. Existing settings
+without a selected list retain Star flight and their previous delay; new settings
+default to Star flight and 10 minutes. Save desktop or normal exit with Save on exit
+persists accepted choices. The ≡ menu’s Screensaver starts screen rest immediately.
 Any key, paste or mouse input dismisses it and is consumed. Idle activation waits
 until jobs, games, menus and dialogs finish; editor/viewer contents are preserved.
 
@@ -671,6 +692,30 @@ or unready drives report a directory error and leave the previous folder open.
 UNC paths remain supported and do not highlight a drive letter. This strip and
 these shortcuts are absent on macOS and Linux.
 
+## SmartPad
+
+**Utilities → SmartPad** or **Alt+Q** opens a floating scratch editor on every
+platform. In the Mac-friendly profile, **Ctrl+O**, release, then **;** is an
+alternative. Existing Ctrl+O then Q quick-view behavior is unchanged.
+
+There is one SmartPad per session. Calling it again reuses the same document,
+including text, undo history and cursor position. Alt+Q from SmartPad returns to
+the document that called it; if that document has closed, it returns to the file
+manager. Switching away retains unsaved notes without a confirmation.
+
+SmartPad uses the normal editor: Unicode, search, undo, F2 / Ctrl+S save, Save As,
+window movement/zoom and the Open windows list. It starts with a plain empty
+buffer and uses the active panel directory as the initial Save As location.
+No destination file is created until you save. Save As retains the SmartPad identity and
+normal no-overwrite checks. Closing or quitting protects unsaved notes through
+the existing save/discard/cancel guard. Closing the document ends that scratchpad;
+the next invocation creates a new empty one.
+
+Existing editor crash recovery also checkpoints hidden SmartPad drafts. Recovered
+notes open as ordinary editor documents. There is no separate notes file,
+automatic startup restore or new configuration preference. Blocking dialogs,
+file pickers, confirmations and exit review retain focus and prevent invocation.
+
 ## MP3 Player
 
 Enable **MP3 Player** in **Options → Configuration → Plugins** first; it is
@@ -841,6 +886,7 @@ time_separator = ":"
 
 [screensaver]
 minutes = 10
+selected = ["star_flight"]
 ```
 
 Omitted fields use current defaults. Known fields require the right TOML type

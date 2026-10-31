@@ -225,9 +225,10 @@ impl NativeDesktop {
     pub fn active(&self) -> WindowInfo {
         self.0.borrow().active()
     }
-    pub(crate) fn add(&self, info: WindowInfo) {
+    pub(crate) fn add(&self, info: WindowInfo, defer_geometry: bool) {
         let mut host = self.0.borrow_mut();
-        let document = Document::new(host.bounds, info, Scope::Content, host.mailbox.clone());
+        let mut document = Document::new(host.bounds, info, Scope::Content, host.mailbox.clone());
+        document.awaiting_geometry |= defer_geometry;
         let id = host.desktop.add(document);
         host.ids.push((info, id));
         host.focus_content(info.id);

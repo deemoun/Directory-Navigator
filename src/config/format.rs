@@ -253,6 +253,21 @@ pub(super) fn parse(bytes: &[u8]) -> io::Result<Config> {
             )?;
         }
     }
+    if let Some(value) = section(&root, "screensaver")?.and_then(|t| t.get("selected")) {
+        let items = value
+            .as_array()
+            .ok_or_else(|| invalid("Expected a screensaver selection array"))?;
+        config.savers.clear();
+        for value in items {
+            let kind = value
+                .as_str()
+                .and_then(crate::screensaver::Kind::parse)
+                .ok_or_else(|| invalid("Unknown screensaver identifier"))?;
+            if !config.savers.contains(&kind) {
+                config.savers.push(kind);
+            }
+        }
+    }
     if let Some(value) = section(&root, "plugins")?.and_then(|t| t.get("disabled")) {
         config.disabled_plugins = plugin_ids(value)?;
     }
@@ -328,6 +343,18 @@ pub(super) fn encode(config: &Config, previous: Option<&[u8]>) -> io::Result<Vec
         return Err(invalid("A plugin cannot be both enabled and disabled"));
     }
     set(&mut root, "plugins", "enabled".into(), enabled)?;
+    set(
+        &mut root,
+        "screensaver",
+        "selected".into(),
+        Value::Array(
+            config
+                .savers
+                .iter()
+                .map(|kind| Value::String(kind.key().into()))
+                .collect(),
+        ),
+    )?;
     config.highlight_groups.validate()?;
     let old = root.get("highlight_groups").and_then(Value::as_array);
     let groups = config

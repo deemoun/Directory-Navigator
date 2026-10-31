@@ -15,6 +15,9 @@ pub fn label(profile: Profile, screen: Screen, classic: &str) -> Cow<'_, str> {
     if !profile.is_mac() {
         return Cow::Borrowed(classic);
     }
+    if GLOBAL_KEYS.iter().any(|b| b.classic == classic) {
+        return Cow::Borrowed(binding_label(GLOBAL_KEYS.iter(), classic));
+    }
     if classic == "Alt+0" {
         return Cow::Borrowed("^Ou");
     }
@@ -52,6 +55,9 @@ pub fn label(profile: Profile, screen: Screen, classic: &str) -> Cow<'_, str> {
 
 pub(crate) fn mac_key(app: &mut App, c: char, key: KeyEvent) -> Option<KeyEvent> {
     let mapped = |code, modifiers| Some(KeyEvent::new(code, modifiers));
+    if let Some(event) = prefix_binding(GLOBAL_KEYS.iter(), c) {
+        return Some(event);
+    }
     match focus::screen(app) {
         Screen::Manager => {
             let action = match c {
@@ -425,6 +431,7 @@ pub(crate) fn viewer_key(key: KeyEvent) -> Option<V> {
 /// Existing availability policy, shared by menu and function-bar presentation.
 pub(crate) fn manager_available(app: &App, action: Action) -> bool {
     match action {
+        Action::SmartPad => !crate::windowing::blocked(app) && !app.blocking_operation(),
         Action::Plugin(id) => app.config.plugin_enabled(id),
         Action::AddMp3 => {
             cfg!(target_os = "macos") && app.config.plugin_enabled(crate::plugins::MP3_PLAYER)
@@ -457,6 +464,26 @@ fn binding_label<'a, A: Copy + 'a>(
         .unwrap_or(classic)
 }
 
+const GLOBAL_KEYS: &[Binding<fn(&mut App)>] = &[bind(
+    K::Char('q'),
+    M::ALT,
+    M::CONTROL.union(M::SHIFT).union(M::SUPER),
+    "Alt+Q",
+    Some("^O;"),
+    crate::editor::open_smartpad,
+)];
+pub(crate) fn global_key(app: &mut App, key: KeyEvent) -> bool {
+    let Some(action) = Binding::resolve(GLOBAL_KEYS, key) else {
+        return false;
+    };
+    if !crate::windowing::blocked(app) && !app.blocking_operation() {
+        if key.kind == crossterm::event::KeyEventKind::Press {
+            action(app);
+        }
+        return true;
+    }
+    false
+}
 const MANAGER_ALT_KEYS: &[Binding<fn(&mut App)>] = &[
     #[cfg(windows)]
     bind(K::F(1), M::ALT, M::empty(), "Alt+F1", None, |app| {

@@ -53,6 +53,48 @@ pub enum EditorAction {
     MenuRow(usize),
     Position(usize, bool),
 }
+/// One session-owned scratch document, using the normal editor lifecycle.
+pub fn open_smartpad(app: &mut App) {
+    if crate::windowing::blocked(app) || app.blocking_operation() {
+        return;
+    }
+    let previous = app.desktop.active().id;
+    let existing = app
+        .desktop
+        .document_ids(crate::desktop::WindowKind::Editor)
+        .into_iter()
+        .find(|id| app.desktop.editor(*id).is_some_and(Editor::is_smartpad));
+    if let Some(id) = existing {
+        if previous == id {
+            let back = app
+                .desktop
+                .editor(id)
+                .and_then(|e| e.smartpad_return)
+                .filter(|back| *back != id && app.desktop.contains(*back))
+                .unwrap_or(crate::desktop::WindowId::MANAGER);
+            crate::windowing::activate(app, back);
+        } else {
+            app.desktop.editor_mut(id).unwrap().smartpad_return = Some(previous);
+            crate::windowing::activate(app, id);
+        }
+        return;
+    }
+    match Editor::new(app.panels[app.active].path.clone()) {
+        Ok(mut editor) => {
+            editor.smartpad = true;
+            editor.smartpad_return = Some(previous);
+            editor.apply_preferences(app.config.editor);
+            editor.search = app.editor_search.query.clone();
+            editor.replacement = app.editor_search.replacement.clone();
+            editor.search_options = app.editor_search.options;
+            editor.notice = "SmartPad: Alt+Q returns; F2 saves notes.".into();
+            menu::close(app);
+            app.modals.set_quick_search(None);
+            app.show_editor(editor);
+        }
+        Err(error) => app.error(error),
+    }
+}
 pub fn open(app: &mut App, new: bool) {
     if app.blocking_operation()
         || matches!(crate::focus::screen(app), crate::focus::Screen::Plugin(_))

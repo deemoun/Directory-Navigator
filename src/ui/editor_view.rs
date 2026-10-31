@@ -21,10 +21,11 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
         .as_ref()
         .map(|path| display_name(&path.to_string_lossy()))
         .unwrap_or_else(|| app.config.language.text("[New file]").into());
+    let shortcut = if editor.is_smartpad() { "Alt+Q" } else { "F4" };
     let title = format!(
         " {} {} {} │ {}",
-        crate::shortcuts::label(app.config.shortcuts, crate::focus::Screen::Editor, "F4"),
-        app.config.language.text("Editor"),
+        crate::shortcuts::label(app.config.shortcuts, crate::focus::Screen::Editor, shortcut),
+        app.config.language.text(editor.label()),
         if editor.dirty() { "*" } else { " " },
         formatting::tail(
             &path,
@@ -32,7 +33,7 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
                 27 + crate::shortcuts::label(
                     app.config.shortcuts,
                     crate::focus::Screen::Editor,
-                    "F4"
+                    shortcut
                 )
                 .len() as u16
             )

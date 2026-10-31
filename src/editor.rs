@@ -14,7 +14,8 @@ mod search_controls;
 pub mod storage;
 use buffer::Buffer;
 pub use controls::{
-    action, open, open_path, open_path_background, paste, poll, request_close, EditorAction,
+    action, open, open_path, open_path_background, open_smartpad, paste, poll, request_close,
+    EditorAction,
 };
 pub(crate) use controls::{file_key, file_mouse};
 use highlight::{Cache, Language};
@@ -82,6 +83,8 @@ struct SaveDestination {
 pub struct Editor {
     pub(crate) requests: crate::requests::RequestScope,
     pub modals: crate::modals::ModalStack,
+    smartpad: bool,
+    smartpad_return: Option<crate::desktop::WindowId>,
     pub path: Option<PathBuf>,
     pub base: PathBuf,
     pub buffer: Option<Buffer>,
@@ -110,6 +113,17 @@ pub struct Editor {
     save_prepare: Option<crate::task::Task<Result<SaveDestination, String>>>,
 }
 impl Editor {
+    pub fn is_smartpad(&self) -> bool {
+        self.smartpad
+    }
+    pub fn label(&self) -> &'static str {
+        if self.smartpad {
+            "SmartPad"
+        } else {
+            "Editor"
+        }
+    }
+
     pub fn go_to_line(&mut self, line: usize) {
         if let Some(buffer) = &mut self.buffer {
             let row = line
@@ -128,6 +142,8 @@ impl Editor {
         Ok(Self {
             requests: Default::default(),
             modals: Default::default(),
+            smartpad: false,
+            smartpad_return: None,
             path: None,
             base,
             buffer: Some(Buffer::new(String::new())?),

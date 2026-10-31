@@ -287,7 +287,10 @@ impl Desktop {
             identity,
             _requests: requests,
         });
-        self.native.add(WindowInfo { id, kind });
+        // Specialized document presentation is declared by the first prepared
+        // definition; do not commit the generic editor's maximized shell first.
+        let defer_geometry = self.editor(id).is_some_and(Editor::is_smartpad);
+        self.native.add(WindowInfo { id, kind }, defer_geometry);
         if foreground {
             self.activate(id);
         } else {

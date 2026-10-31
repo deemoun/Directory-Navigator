@@ -690,3 +690,49 @@ fn color_dialog_shares_dn_button_faces_and_moves_default_markers_to_cancel() -> 
     }
     Ok(())
 }
+
+#[test]
+fn floating_editors_and_smartpad_use_only_the_desktop_clock() -> io::Result<()> {
+    for smartpad in [false, true] {
+        let t = Temp::new()?;
+        let mut app = t.app()?;
+        app.clock.text = " 12:34:56 ".into();
+        if smartpad {
+            dn::editor::open_smartpad(&mut app);
+        } else {
+            dn::editor::open(&mut app, true);
+        }
+        draw(&mut app, 80, 25)?;
+        if !smartpad {
+            dn::windowing::action(&mut app, dn::windowing::Action::Zoom);
+        }
+        for language in [
+            dn::localization::Language::English,
+            dn::localization::Language::Russian,
+        ] {
+            app.config.language = language;
+            app.config.palette =
+                PaletteProfile::ClassicDn.with_slot(palette::theme::Slot::DialogText, 0x1e);
+            for (w, h) in [(80, 25), (132, 40), (80, 25)] {
+                let floating = draw(&mut app, w, h)?;
+                assert_eq!(
+                    floating.matches(&app.clock.text).count(),
+                    1,
+                    "floating editor duplicates clock"
+                );
+                assert_eq!(floating, draw(&mut app, w, h)?);
+            }
+            dn::windowing::action(&mut app, dn::windowing::Action::Zoom);
+            assert_eq!(
+                draw(&mut app, 80, 25)?.matches(&app.clock.text).count(),
+                1,
+                "maximized editor clock missing"
+            );
+            dn::windowing::action(&mut app, dn::windowing::Action::Zoom);
+            app.config.show_clock = false;
+            assert!(!draw(&mut app, 80, 25)?.contains(&app.clock.text));
+            app.config.show_clock = true;
+        }
+    }
+    Ok(())
+}

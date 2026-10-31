@@ -127,8 +127,19 @@ pub(crate) fn definitions(app: &App, area: Rect) -> Vec<Definition> {
         .desktop
         .windows()
         .filter_map(|w| {
-            super::presentation::Policy::document(app, w.kind)
-                .map(|p| p.definition(SurfaceKey::Document(w.id), area, None))
+            super::presentation::Policy::document(app, w.kind).map(|mut p| {
+                let bounds = if app
+                    .desktop
+                    .editor(w.id)
+                    .is_some_and(crate::editor::Editor::is_smartpad)
+                {
+                    p.maximized = false;
+                    crate::dialog_theme::centered(area, p.caps.minimum.0.max(76), 18)
+                } else {
+                    area
+                };
+                p.definition(SurfaceKey::Document(w.id), bounds, None)
+            })
         })
         .collect::<Vec<_>>();
     result.extend(crate::tool_windows::definitions(app, area));
@@ -278,10 +289,16 @@ pub(crate) fn float_document(
                 _ => unreachable!(),
             })
             .map(|e| {
-                e.path
+                let path = e
+                    .path
                     .as_ref()
                     .map(|p| crate::filesystem::display_name(&p.to_string_lossy()))
-                    .unwrap_or_else(|| app.config.language.text("[New file]").to_owned())
+                    .unwrap_or_else(|| app.config.language.text("[New file]").to_owned());
+                if e.is_smartpad() {
+                    format!("SmartPad{} │ {path}", if e.dirty() { " *" } else { "" })
+                } else {
+                    path
+                }
             })
             .unwrap_or_default(),
         WindowKind::Viewer => app

@@ -143,8 +143,19 @@ original `FILEFIND.PAS`, `USERMENU.PAS`, `SETUPS.PAS` and English `DNHELP.HTX`.
 Related selection, editor block commands/bracket navigation and viewer addressing
 also reference `EDITOR.PAS`, `FVIEWER.PAS` and the original keyboard help; UTF-8
 transformations and undo transactions use the current Rust editor.
+SmartPad follows the quick-notes command documented in the original English
+`DNHELP.HTX` and `DN.DNR`; its implementation reuses the current Rust editor.
 The implementation uses DN's current Rust workers, controls and file safeguards.
 The original DOS Navigator notice and license reproduced above are retained.
+
+## DOS Navigator screen savers
+
+Based on Dos Navigator by RIT Research Labs, Copyright (C) 1991–99.
+The Star flight, Flash-light, Clock and Blackness effects and the two-list selection
+window adapt DOS Navigator 1.51 `original-dn/IDLERS.PAS`, `SETUPS.PAS` and their
+resource strings. The native Rust implementation uses prepared terminal scenes
+instead of direct DOS video-memory access, and does not execute external `.SS`
+programs. The original DOS Navigator notice and license reproduced above are retained.
 
 ## MP3 audio libraries (macOS)
 

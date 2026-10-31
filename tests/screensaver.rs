@@ -150,7 +150,7 @@ fn setup_preview_cancel_apply_mouse_and_menu() -> io::Result<()> {
         assert!(!sky.contains("Screen savers"));
         assert!(!sky.contains("Help"));
         assert!(app.mouse.regions.is_empty());
-        key(&mut app, KeyCode::F(10), KeyModifiers::NONE);
+        crate::key(&mut app, KeyCode::F(10), KeyModifiers::NONE);
         assert!(!app.quit);
         assert!(!app.screensaver.active);
     }
@@ -158,9 +158,9 @@ fn setup_preview_cancel_apply_mouse_and_menu() -> io::Result<()> {
     click(&mut app, Target::Screensaver(screensaver::CANCEL));
     assert_eq!(app.config.saver_minutes, 10);
     screensaver::open(&mut app);
-    key(&mut app, KeyCode::Down, KeyModifiers::NONE);
-    key(&mut app, KeyCode::Char(' '), KeyModifiers::NONE);
-    key(&mut app, KeyCode::Char('p'), KeyModifiers::NONE);
+    draw(&mut app, 80, 25)?;
+    click(&mut app, Target::Screensaver(5));
+    crate::key(&mut app, KeyCode::Char('p'), KeyModifiers::NONE);
     assert!(app.screensaver.active);
     mouse::handle(
         &mut app,
@@ -192,7 +192,7 @@ fn wake_events_do_not_edit_exit_or_activate_mouse_targets() -> io::Result<()> {
     app.screensaver.activity(idle);
     assert!(screensaver::poll(&mut app, idle + Duration::from_secs(600)));
     assert!(app.screensaver.active);
-    key(&mut app, KeyCode::Esc, KeyModifiers::NONE);
+    crate::key(&mut app, KeyCode::Esc, KeyModifiers::NONE);
     assert!(app
         .desktop
         .active_editor()
@@ -234,7 +234,7 @@ fn wake_events_do_not_edit_exit_or_activate_mouse_targets() -> io::Result<()> {
         assert!(draw(&mut app, 80, 25)?.contains("unsaved text"));
     }
     app.screensaver.start(Instant::now());
-    key(&mut app, KeyCode::Char('x'), KeyModifiers::ALT);
+    crate::key(&mut app, KeyCode::Char('x'), KeyModifiers::ALT);
     assert!(!app.quit);
     assert!(app.dialogs().is_empty());
     assert!(app
@@ -289,5 +289,229 @@ fn config_round_trip_defaults_and_invalid_values() -> io::Result<()> {
         )?;
         assert!(Config::read(&path).is_err());
     }
+    Ok(())
+}
+
+#[test]
+fn original_lists_draft_preview_help_and_cancel_preserve_configuration() -> io::Result<()> {
+    use screensaver::*;
+    let t = Temp::new()?;
+    let mut app = t.app()?;
+    let original = app.config.clone();
+    open(&mut app);
+    let title = draw(&mut app, 80, 25)?;
+    for label in [
+        "Selected savers",
+        "Available savers",
+        "Star flight",
+        "Flash-light",
+        "Clock",
+        "Blackness",
+    ] {
+        assert!(title.contains(label), "{label}");
+    }
+    click(&mut app, Target::Screensaver(AVAILABLE_ROW + 1));
+    crate::key(&mut app, KeyCode::Insert, KeyModifiers::NONE);
+    command(&mut app, ADD);
+    assert_eq!(
+        app.screensaver.modals.screensaver().unwrap().selected,
+        [Kind::StarFlight, Kind::FlashLight]
+    );
+    command(&mut app, PREVIEW);
+    assert_eq!(app.screensaver.kind(), Kind::FlashLight);
+    draw(&mut app, 80, 25)?;
+    crate::key(&mut app, KeyCode::F(10), KeyModifiers::NONE);
+    assert!(!app.quit && !app.screensaver.active);
+    assert!(app.screensaver.modals.screensaver().is_some());
+    assert_eq!(app.config, original);
+    draw(&mut app, 80, 25)?;
+    crate::key(&mut app, KeyCode::F(1), KeyModifiers::NONE);
+    assert!(app.last_dialog().is_some());
+    crate::key(&mut app, KeyCode::Esc, KeyModifiers::NONE);
+    assert!(app.screensaver.modals.screensaver().is_some());
+    assert!(app.last_dialog().is_none());
+    crate::key(&mut app, KeyCode::Esc, KeyModifiers::NONE);
+    assert!(app.screensaver.modals.screensaver().is_none());
+    assert_eq!(app.config, original);
+    Ok(())
+}
+#[test]
+fn remove_keeps_nearest_row_empty_selection_disables_auto_and_manual_launch() -> io::Result<()> {
+    use screensaver::*;
+    let t = Temp::new()?;
+    let mut app = t.app()?;
+    open(&mut app);
+    for i in 0..Kind::ALL.len() {
+        command(&mut app, AVAILABLE_ROW + i);
+        command(&mut app, ADD);
+    }
+    assert_eq!(
+        app.screensaver.modals.screensaver().unwrap().selected,
+        Kind::ALL
+    );
+    command(&mut app, SELECTED_ROW + 3);
+    command(&mut app, REMOVE);
+    assert_eq!(
+        app.screensaver.modals.screensaver().unwrap().selected_row,
+        2
+    );
+    for _ in 0..3 {
+        command(&mut app, REMOVE);
+    }
+    assert!(app
+        .screensaver
+        .modals
+        .screensaver()
+        .unwrap()
+        .selected
+        .is_empty());
+    command(&mut app, ACCEPT);
+    assert!(app.config.savers.is_empty());
+    assert!(!poll(&mut app, Instant::now() + Duration::from_secs(3600)));
+    menu::execute(&mut app, menu::Action::ScreenRest);
+    assert!(!app.screensaver.active);
+    assert!(app
+        .last_dialog()
+        .unwrap()
+        .message
+        .contains("Select at least one"));
+    Ok(())
+}
+#[test]
+fn native_selection_array_retains_old_defaults_order_empty_and_unknown_fields() -> io::Result<()> {
+    use screensaver::Kind;
+    let t = Temp::new()?;
+    let path = t.0.join("savers.conf");
+    fs::write(&path,"config_version=2\n[screensaver]\nminutes=30\nselected=['clock','blackness','clock']\nfuture='retained'\n[extra]\nflag=true\n")?;
+    let mut c = Config::read(&path)?;
+    assert_eq!(c.savers, [Kind::Clock, Kind::Blackness]);
+    c.save(&path)?;
+    assert_eq!(Config::read(&path)?, c);
+    let table = fs::read_to_string(&path)?.parse::<toml::Table>().unwrap();
+    assert_eq!(table["screensaver"]["future"].as_str(), Some("retained"));
+    assert_eq!(table["extra"]["flag"].as_bool(), Some(true));
+    c.savers.clear();
+    c.save(&path)?;
+    assert!(Config::read(&path)?.savers.is_empty());
+    assert_eq!(
+        Config::parse(b"config_version=2\n[screensaver]\nminutes=5")?.savers,
+        [Kind::StarFlight]
+    );
+    for value in ["'clock'", "[true]", "['unknown']", "42", "{}"] {
+        assert!(Config::parse(
+            format!("config_version=2\n[screensaver]\nselected={value}").as_bytes()
+        )
+        .is_err());
+    }
+    Ok(())
+}
+#[test]
+fn all_effects_paint_immutably_resize_localize_and_consume_wake_input() -> io::Result<()> {
+    use dn::localization::Language;
+    use screensaver::*;
+    let t = Temp::new()?;
+    let mut app = t.app()?;
+    for language in [Language::English, Language::Russian] {
+        app.config.language = language;
+        for custom in [false, true] {
+            app.config.palette = Default::default();
+            if custom {
+                app.config.palette = app
+                    .config
+                    .palette
+                    .with_slot(dn::palette::theme::Slot::DialogText, 0x1e);
+            }
+            for kind in Kind::ALL {
+                app.screensaver.start_kind(Instant::now(), kind);
+                for (width, height) in [(80, 25), (132, 40), (40, 15), (80, 25)] {
+                    let area = dn::testing::layout::Rect::new(0, 0, width, height);
+                    let snapshot = dn::layout::prepare(&mut app, area);
+                    let first = dn::testing::Buffer::rendered(ui::render(&app, &snapshot));
+                    for _ in 0..3 {
+                        assert_eq!(
+                            first,
+                            dn::testing::Buffer::rendered(ui::render(&app, &snapshot))
+                        );
+                    }
+                    let rendered = ui::render(&app, &snapshot);
+                    assert!(rendered.hit_regions().is_empty());
+                    assert!(rendered.cursor().is_none());
+                    if kind == Kind::Blackness {
+                        assert!(first
+                            .content
+                            .iter()
+                            .all(|c| c.symbol() == " " && c.bg == app.config.palette.color(0)));
+                    }
+                }
+                crate::key(&mut app, KeyCode::F(10), KeyModifiers::NONE);
+                assert!(!app.quit && !app.screensaver.active);
+            }
+        }
+    }
+    Ok(())
+}
+#[test]
+fn selection_form_keyboard_highlights_both_lists_and_survives_small_terminal() -> io::Result<()> {
+    use screensaver::*;
+    let t = Temp::new()?;
+    let mut app = t.app()?;
+    for language in [
+        dn::localization::Language::English,
+        dn::localization::Language::Russian,
+    ] {
+        app.config.language = language;
+        open(&mut app);
+        crate::key(&mut app, KeyCode::Tab, KeyModifiers::NONE);
+        assert_eq!(
+            app.screensaver.modals.screensaver().unwrap().cursor,
+            AVAILABLE
+        );
+        crate::key(&mut app, KeyCode::Down, KeyModifiers::NONE);
+        assert_eq!(
+            app.screensaver.modals.screensaver().unwrap().preview,
+            Kind::FlashLight
+        );
+        crate::key(&mut app, KeyCode::Insert, KeyModifiers::NONE);
+        for (w, h) in [(80, 25), (120, 40), (40, 15), (80, 25)] {
+            draw(&mut app, w, h)?;
+        }
+        crate::key(&mut app, KeyCode::BackTab, KeyModifiers::SHIFT);
+        crate::key(&mut app, KeyCode::End, KeyModifiers::NONE);
+        assert_eq!(
+            app.screensaver.modals.screensaver().unwrap().preview,
+            Kind::FlashLight
+        );
+        crate::key(&mut app, KeyCode::Esc, KeyModifiers::NONE);
+        assert_eq!(app.config.savers, [Kind::StarFlight]);
+    }
+    Ok(())
+}
+
+#[test]
+fn flashlight_captures_prepared_workspace_once_before_projection() -> io::Result<()> {
+    use dn::{
+        panel_layout::PanelLayout,
+        testing::{layout::Rect, Buffer},
+    };
+    let t = Temp::new()?;
+    for i in 0..30 {
+        fs::write(t.0.join(format!("entry-{i:02}")), "fixture")?;
+    }
+    let mut app = t.app()?;
+    app.config.show_clock = false;
+    app.config.layouts = [PanelLayout::Details; 2];
+    let bounds = Rect::new(7, 3, 80, 25);
+    let screen = Rect::new(0, 0, 100, 35);
+    let now = Instant::now();
+    let background = dn::layout::prepare_window(&mut app, bounds, screen, now);
+    let expected = Buffer::rendered(ui::render(&app, &background));
+    app.screensaver
+        .start_kind(now, screensaver::Kind::FlashLight);
+    let prepared = dn::layout::prepare_window(&mut app, bounds, screen, now);
+    let frozen = Buffer::rendered(ui::render(&app, &prepared));
+    assert_eq!(frozen[(47, 15)], expected[(47, 15)]);
+    app.panels[1].entries.clear();
+    let again = dn::layout::prepare_window(&mut app, bounds, screen, now);
+    assert_eq!(frozen, Buffer::rendered(ui::render(&app, &again)));
     Ok(())
 }
