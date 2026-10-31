@@ -16,7 +16,7 @@ pub(crate) fn prompt_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
     let prompt = app.modals.prompt().filter(|p| p.copy.is_none())?;
     let deleting = matches!(
         prompt.kind,
-        PromptKind::Operation(Kind::Delete | Kind::Trash)
+        PromptKind::Operation(Kind::Delete | Kind::Trash) | PromptKind::ClearTempDrive(_)
     );
     let simple = matches!(
         prompt.kind,
@@ -38,7 +38,9 @@ pub(crate) fn prompt_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
         Target::CancelPrompt,
     );
     if deleting {
-        let mut lines = if matches!(prompt.kind, PromptKind::Operation(Kind::Trash)) {
+        let trash = matches!(prompt.kind, PromptKind::Operation(Kind::Trash))
+            || matches!(&prompt.kind, PromptKind::ClearTempDrive(clear) if clear.kind == Kind::Trash);
+        let mut lines = if trash {
             vec![
                 app.config
                     .language
@@ -61,7 +63,28 @@ pub(crate) fn prompt_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
                     .to_string(),
             ]
         };
-        for path in prompt.sources.iter().take(3) {
+        if matches!(prompt.kind, PromptKind::ClearTempDrive(_)) {
+            lines.push(
+                app.config
+                    .language
+                    .text("All contents, including hidden items.")
+                    .into(),
+            );
+            lines.push(formatting::tail(
+                &display_name(&prompt.base.to_string_lossy()),
+                rect.width - 4,
+            ));
+        }
+        for path in
+            prompt
+                .sources
+                .iter()
+                .take(if matches!(prompt.kind, PromptKind::ClearTempDrive(_)) {
+                    1
+                } else {
+                    3
+                })
+        {
             lines.push(formatting::tail(
                 &display_name(&path.file_name().unwrap_or_default().to_string_lossy()),
                 rect.width - 4,

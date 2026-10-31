@@ -30,6 +30,7 @@ pub mod plugins;
 pub mod quick_search;
 pub mod settings;
 pub mod shortcuts;
+mod temp_drive;
 pub mod terminal;
 pub mod tetris;
 pub mod tool_windows;

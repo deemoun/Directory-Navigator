@@ -18,6 +18,7 @@ impl State {
 pub struct Draft {
     pub options: CopyOptions,
     pub picked: Option<PathBuf>,
+    pub(crate) temp_drive: Option<crate::temp_drive::Root>,
 }
 pub struct History {
     pub parent: ModalId,

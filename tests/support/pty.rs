@@ -30,7 +30,13 @@ impl Session {
     pub fn new_recovery(label: &str) -> io::Result<Self> {
         Self::with_checkpoint(label, true)
     }
+    pub fn with_preferences(label: &str, preferences: &str) -> io::Result<Self> {
+        Self::with_settings(label, false, preferences)
+    }
     fn with_checkpoint(label: &str, checkpoint: bool) -> io::Result<Self> {
+        Self::with_settings(label, checkpoint, "")
+    }
+    fn with_settings(label: &str, checkpoint: bool, preferences: &str) -> io::Result<Self> {
         static NEXT: AtomicU64 = AtomicU64::new(0);
         let root = std::env::temp_dir().join(format!(
             "dn-walk-{label}-{}-{}",
@@ -40,7 +46,7 @@ impl Session {
         fs::create_dir_all(root.join("settings/dn"))?;
         fs::write(
             root.join("settings/dn/config.conf"),
-            "config_version=2\n[application]\nsave_on_exit=false\nshortcuts=\"classic_dn\"\n",
+            format!("config_version=2\n[application]\nsave_on_exit=false\nshortcuts=\"classic_dn\"\n{preferences}"),
         )?;
         fs::create_dir(root.join("inside"))?;
         fs::write(root.join("inside/child.txt"), "child\n")?;

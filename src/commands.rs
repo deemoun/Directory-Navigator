@@ -431,6 +431,8 @@ pub(crate) fn viewer_key(key: KeyEvent) -> Option<V> {
 /// Existing availability policy, shared by menu and function-bar presentation.
 pub(crate) fn manager_available(app: &App, action: Action) -> bool {
     match action {
+        Action::TempDrive | Action::CopyToTempDrive => crate::temp_drive::available(app, false),
+        Action::ClearTempDrive => crate::temp_drive::available(app, true),
         Action::SmartPad => !crate::windowing::blocked(app) && !app.blocking_operation(),
         Action::Plugin(id) => app.config.plugin_enabled(id),
         Action::AddMp3 => {

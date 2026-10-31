@@ -249,6 +249,12 @@ impl App {
             self.error("Enter a new directory name.");
             return;
         }
+        if let Some(root) = prompt.copy.as_ref().and_then(|c| c.temp_drive.as_ref()) {
+            if let Err(error) = root.validate() {
+                self.error(error.to_string());
+                return;
+            }
+        }
         let destination = if let Some(path) = prompt.copy.as_ref().and_then(|c| c.picked.clone()) {
             path
         } else if prompt.field.is_empty() {
@@ -257,6 +263,10 @@ impl App {
             prompt.base.join(&prompt.field)
         };
         match prompt.kind {
+            PromptKind::ClearTempDrive(clear) => match clear.start(self, prompt.sources) {
+                Ok(job) => self.job = Some(job),
+                Err(error) => self.error(error.to_string()),
+            },
             PromptKind::ImportDos => {
                 if let Err(error) = crate::config_import::start(self, destination) {
                     self.error(error.to_string());
@@ -275,7 +285,12 @@ impl App {
                     sources: prompt.sources,
                     destination: destination.clone(),
                 };
-                match crate::transfers::submit(self, plan, options) {
+                match crate::transfers::submit_with_root(
+                    self,
+                    plan,
+                    options,
+                    prompt.copy.and_then(|c| c.temp_drive),
+                ) {
                     Ok(_) => {
                         self.copy_dialog.record(destination);
                     }

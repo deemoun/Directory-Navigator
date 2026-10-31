@@ -129,6 +129,16 @@ impl Job {
         Self::start_with_options(plan, CopyOptions::default())
     }
     pub fn start_with_options(plan: Plan, options: CopyOptions) -> io::Result<Self> {
+        Self::start_inner(plan, options, None)
+    }
+    pub(crate) fn start_prepared(plan: Plan, prepared: transfer::Prepared) -> io::Result<Self> {
+        Self::start_inner(plan, CopyOptions::default(), Some(prepared))
+    }
+    fn start_inner(
+        plan: Plan,
+        options: CopyOptions,
+        prepared: Option<transfer::Prepared>,
+    ) -> io::Result<Self> {
         let requests = crate::requests::RequestScope::new(crate::requests::Owner::Workspace);
         let token = requests.start("file-operation");
         let (sender, events) = mpsc::sync_channel(8);
@@ -152,18 +162,30 @@ impl Job {
             .name("dn-operation".into())
             .spawn(move || {
                 let mut last = Instant::now() - Duration::from_secs(1);
-                let result = execute_with_options(
+                let mut latest = Progress {
+                    path: plan.destination.clone(),
+                    ..Progress::default()
+                };
+                let result = run_checked_expected(
                     &plan,
                     options,
                     &worker_cancel,
                     |progress| {
+                        latest = progress.clone();
                         if last.elapsed() >= Duration::from_millis(80) {
                             let _ = sender.try_send(Event::Progress(progress.clone()));
                             last = Instant::now();
                         }
                     },
                     MoveStrategy::PreferRename,
-                );
+                    |path| crate::volume_space::read(path).map(|s| s.available),
+                    prepared.as_ref(),
+                )
+                .map_err(|error| OperationFailure {
+                    kind: error.kind(),
+                    progress: Box::new(latest),
+                    message: error.to_string(),
+                });
                 let _ = sender.send(Event::Done(result));
             })?;
         Ok(Self {
@@ -519,7 +541,12 @@ fn run_checked_expected(
             cancel,
             &mut progress,
             &mut notify,
-            crate::trash_support::send,
+            |path| {
+                if let Some(prepared) = expected {
+                    prepared.verify_source(path)?;
+                }
+                crate::trash_support::send(path)
+            },
         )?;
         return Ok(progress);
     }
@@ -859,4 +886,121 @@ fn run_checked_expected(
         }
     }
     Ok(progress)
+}
+
+#[cfg(test)]
+mod prepared_delete_tests {
+    use super::*;
+    struct Fixture(PathBuf);
+    impl Fixture {
+        fn new() -> io::Result<Self> {
+            static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+            let path = std::env::temp_dir().join(format!(
+                "dn-prepared-delete-{}-{}",
+                std::process::id(),
+                NEXT.fetch_add(1, Ordering::Relaxed)
+            ));
+            fs::create_dir(&path)?;
+            fs::create_dir(path.join("drive"))?;
+            for name in ["a", "b"] {
+                fs::write(path.join("drive").join(name), b"keep")?;
+            }
+            Ok(Self(fs::canonicalize(path)?))
+        }
+        fn plan(&self, kind: Kind) -> Plan {
+            Plan {
+                kind,
+                sources: ["a", "b"]
+                    .map(|name| self.0.join("drive").join(name))
+                    .into(),
+                destination: self.0.join("drive"),
+            }
+        }
+    }
+    impl Drop for Fixture {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+    #[test]
+    fn prepared_clear_cancel_preserves_remaining_files_and_root() -> io::Result<()> {
+        let f = Fixture::new()?;
+        let plan = f.plan(Kind::Delete);
+        let prepared = transfer::Prepared::capture(&plan)?;
+        let cancel = AtomicBool::new(false);
+        let result = run_checked_expected(
+            &plan,
+            Default::default(),
+            &cancel,
+            |p| {
+                if p.files == 1 {
+                    cancel.store(true, Ordering::Relaxed);
+                }
+            },
+            MoveStrategy::PreferRename,
+            |_| Ok(u128::MAX),
+            Some(&prepared),
+        );
+        assert_eq!(result.unwrap_err().kind(), io::ErrorKind::Interrupted);
+        assert!(!plan.sources[0].exists());
+        assert_eq!(fs::read(&plan.sources[1])?, b"keep");
+        assert!(plan.destination.is_dir());
+        Ok(())
+    }
+    #[test]
+    fn prepared_trash_checks_each_source_and_keeps_partial_failure_recoverable() -> io::Result<()> {
+        let f = Fixture::new()?;
+        let plan = f.plan(Kind::Trash);
+        let prepared = transfer::Prepared::capture(&plan)?;
+        fs::create_dir(f.0.join("private-trash"))?;
+        let mut progress = Progress::default();
+        let mut calls = 0;
+        let result = crate::trash_support::move_items(
+            &plan.sources,
+            &AtomicBool::new(false),
+            &mut progress,
+            |_| {},
+            |path| {
+                prepared.verify_source(path)?;
+                calls += 1;
+                if calls == 2 {
+                    return Err(io::Error::other("Injected Trash failure"));
+                }
+                fs::rename(path, f.0.join("private-trash/a"))
+            },
+        );
+        assert!(result.is_err());
+        assert_eq!(calls, 2);
+        assert_eq!(progress.files, 1);
+        assert_eq!(fs::read(f.0.join("private-trash/a"))?, b"keep");
+        assert_eq!(fs::read(&plan.sources[1])?, b"keep");
+        assert!(plan.destination.is_dir());
+        Ok(())
+    }
+    #[test]
+    fn prepared_worker_rejects_a_source_replaced_after_confirmation() -> io::Result<()> {
+        let f = Fixture::new()?;
+        let plan = f.plan(Kind::Delete);
+        let prepared = transfer::Prepared::capture(&plan)?;
+        fs::rename(&plan.sources[0], f.0.join("saved"))?;
+        fs::write(&plan.sources[0], b"replacement")?;
+        let job = Job::start_prepared(plan.clone(), prepared)?;
+        let deadline = Instant::now() + Duration::from_secs(5);
+        loop {
+            match job
+                .events
+                .recv_timeout(deadline.saturating_duration_since(Instant::now()))
+            {
+                Ok(Event::Done(result)) => {
+                    assert!(result.is_err());
+                    break;
+                }
+                Ok(Event::Progress(_)) => {}
+                Err(error) => panic!("prepared worker did not finish: {error}"),
+            }
+        }
+        assert_eq!(fs::read(&plan.sources[0])?, b"replacement");
+        assert_eq!(fs::read(&plan.sources[1])?, b"keep");
+        Ok(())
+    }
 }

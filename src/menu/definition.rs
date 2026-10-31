@@ -56,6 +56,7 @@ pub const ROOTS: &[Root] = &[
             item("~O~pen with default app", "Ctrl+Enter", OpenExternal),
             item("~F~ind...", "Ctrl+F7", Find),
             item("~C~opy...", "F5", Key(5)),
+            item("Copy to ~T~emp Drive...", "", CopyToTempDrive),
             item("Copy ~n~ames / paths", "", Submenu(MenuId::CopyNames)),
             item("~R~ename/Move...", "F6", Key(6)),
             item("~M~ake directory", "F7", Key(7)),
@@ -72,6 +73,8 @@ pub const ROOTS: &[Root] = &[
         entries: &[
             item("~U~ser menu", "F2", UserMenu),
             item("Smart~P~ad", "Alt+Q", SmartPad),
+            item("~T~emp Drive", "", TempDrive),
+            item("Clear Temp ~D~rive...", "", ClearTempDrive),
             item(
                 "~M~emory Information",
                 "Alt+Y",

@@ -29,6 +29,7 @@ use std::path::PathBuf;
 pub enum PromptKind {
     ImportDos,
     Operation(Kind),
+    ClearTempDrive(crate::temp_drive::Clear),
     GoTo,
 }
 
@@ -59,6 +60,7 @@ impl Prompt {
     }
     pub fn title(&self) -> &'static str {
         match self.kind {
+            PromptKind::ClearTempDrive(_) => " Clear Temp Drive ",
             PromptKind::Operation(Kind::Copy) => " Copy to ",
             PromptKind::Operation(Kind::Move) => " Move / rename to ",
             PromptKind::Operation(Kind::Delete) => " Confirm permanent deletion ",
@@ -105,6 +107,7 @@ pub fn prompt_help(app: &mut crate::app::App) {
         return;
     };
     let message = match prompt.kind {
+        PromptKind::ClearTempDrive(_) => "Clears every item in Temp Drive, including hidden files and folders. The Temp Drive directory is kept. The confirmation shows whether items go to Trash or are permanently deleted. Cancel leaves everything unchanged.",
         PromptKind::Operation(Kind::Mkdir) => "Enter a directory name or path.\nRelative paths use the active panel directory.\nExisting files and directories are never overwritten.",
         PromptKind::ImportDos => "Choose an original DN.CFG file. A read-only preview shows supported preferences before Apply. DOS paths, commands and desktop windows are not imported.",
         PromptKind::GoTo => "Enter an absolute or relative directory path.\nRelative paths use the active panel directory.",

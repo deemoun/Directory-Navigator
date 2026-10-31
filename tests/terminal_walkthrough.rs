@@ -1397,3 +1397,70 @@ fn desktop_menu_above_multiple_documents_opens_on_first_click() -> io::Result<()
     })?;
     s.finish()
 }
+
+#[test]
+fn temp_drive_real_copy_cancel_clear_and_terminal_restoration() -> io::Result<()> {
+    let mut s = Session::with_preferences("temp-drive", "\n[file_manager]\nuse_trash=false\n")?;
+    let root = s.root.join("settings/dn/temp-drive");
+    s.wait("manager ready", |s| {
+        s.command_prompt_active() && s.text().contains("item-000.")
+    })?;
+    s.select_file("item-000.txt")?;
+    s.send(b"\x1bft", "quick copy targets Temp Drive", |s| {
+        s.text().contains("Copy file") && s.text().contains("temp-drive")
+    })?;
+    s.send(b"\x1b", "cancel quick copy", |s| s.command_prompt_active())?;
+    assert!(fs::read_dir(&root)?.next().is_none());
+    s.send(b"\x1bft", "reopen quick copy", |s| {
+        s.text().contains("Copy file")
+    })?;
+    s.send(b"\r", "copy finishes in Transfer Center", |s| {
+        s.text().contains("Transfer Center") && s.text().contains("Completed")
+    })?;
+    assert_eq!(fs::read(root.join("item-000.txt"))?, b"fixture\n");
+    assert_eq!(fs::read(s.root.join("item-000.txt"))?, b"fixture\n");
+    s.send(b"\x1b", "hide transfers", |s| s.command_prompt_active())?;
+    s.send(b"\t\x1but", "open Temp Drive in right panel", |s| {
+        s.command_prompt_active()
+            && s.text().contains("temp-drive")
+            && s.text().contains("item-000.")
+    })?;
+    s.send(b"\t", "return to source panel", |s| {
+        s.command_prompt_active()
+    })?;
+    s.select_file("item-001.txt")?;
+    s.send(b"\x1b[15~", "ordinary F5 targets Temp Drive", |s| {
+        s.text().contains("Copy file")
+    })?;
+    s.send(b"\r", "ordinary copy finishes", |s| {
+        s.text().contains("Completed") && root.join("item-001.txt").exists()
+    })?;
+    s.send(b"\x1b", "hide ordinary transfer", |s| {
+        s.command_prompt_active()
+    })?;
+    s.send(b"\x1bud", "clear confirmation", |s| {
+        s.text().contains("Clear Temp Drive") && s.text().contains("This cannot be undone.")
+    })?;
+    s.send(b"\r", "Enter cancels by default", |s| {
+        s.command_prompt_active()
+    })?;
+    assert!(root.join("item-000.txt").exists());
+    assert!(root.join("item-001.txt").exists());
+    s.send(b"\x1bud", "reopen clear confirmation", |s| {
+        s.text().contains("Clear Temp Drive")
+    })?;
+    s.send(b"\x1b[Z\r", "confirm clear", |s| {
+        s.command_prompt_active()
+            && fs::read_dir(&root).is_ok_and(|mut entries| entries.next().is_none())
+    })?;
+    assert!(root.is_dir());
+    assert_eq!(fs::read(s.root.join("item-000.txt"))?, b"fixture\n");
+    assert_eq!(fs::read(s.root.join("item-001.txt"))?, b"fixture\n");
+    s.send(b"\x1bud", "empty Temp Drive", |s| {
+        s.text().contains("Temp Drive is empty.")
+    })?;
+    s.send(b"\r", "acknowledge empty Temp Drive", |s| {
+        s.command_prompt_active()
+    })?;
+    s.finish()
+}

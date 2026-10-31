@@ -67,6 +67,7 @@ pub struct Entry {
     pub error: Option<String>,
     origin: Origin,
     prepared: Option<operations::transfer::Prepared>,
+    root: Option<crate::temp_drive::Root>,
     started: Option<Instant>,
     ended: Option<Instant>,
 }
@@ -233,6 +234,17 @@ pub fn open(app: &mut App) {
     crate::tool_windows::open(app, crate::tool_windows::Kind::Transfers, None);
 }
 pub fn submit(app: &mut App, plan: Plan, options: CopyOptions) -> Result<TransferId, String> {
+    submit_with_root(app, plan, options, None)
+}
+pub(crate) fn submit_with_root(
+    app: &mut App,
+    plan: Plan,
+    options: CopyOptions,
+    root: Option<crate::temp_drive::Root>,
+) -> Result<TransferId, String> {
+    if let Some(root) = &root {
+        root.validate().map_err(|e| e.to_string())?;
+    }
     if !matches!(plan.kind, operations::Kind::Copy | operations::Kind::Move) {
         return Err("Only Copy and Move belong to the Transfer Center".into());
     }
@@ -281,6 +293,7 @@ pub fn submit(app: &mut App, plan: Plan, options: CopyOptions) -> Result<Transfe
         error: None,
         origin,
         prepared: None,
+        root,
         started: None,
         ended: None,
     });
@@ -334,7 +347,13 @@ fn start_next(app: &mut App, now: Instant) {
     // The first request prepares in its dedicated worker. Queued requests must
     // retain their earlier asynchronous identity snapshot before execution.
     let id = e.id;
-    let result = Job::start_transfer(id, e.plan.clone(), e.options, e.prepared.take());
+    let result = Job::start_transfer(
+        id,
+        e.plan.clone(),
+        e.options,
+        e.prepared.take(),
+        e.root.clone(),
+    );
     match result {
         Ok(job) => {
             e.status = Status::Preparing;
@@ -383,11 +402,15 @@ fn prepare_queued(app: &mut App, now: Instant) -> bool {
             changed = true;
             let id = e.id;
             let plan = e.plan.clone();
+            let root = e.root.clone();
             match app
                 .transfers
                 .requests
                 .spawn("transfer-preparation", move |cancel| {
                     cancel.check()?;
+                    if let Some(root) = &root {
+                        root.validate()?;
+                    }
                     let prepared = operations::transfer::Prepared::capture(&plan)?;
                     cancel.check()?;
                     Ok(prepared)
@@ -977,6 +1000,7 @@ mod tests {
                 error: None,
                 origin: origin.clone(),
                 prepared: None,
+                root: None,
                 started: None,
                 ended: Some(base),
             };

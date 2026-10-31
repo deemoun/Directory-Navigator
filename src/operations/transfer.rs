@@ -47,6 +47,16 @@ impl Prepared {
             container,
         })
     }
+    pub(super) fn verify_source(&self, path: &Path) -> io::Result<()> {
+        self.guards.verify_parent(path)?;
+        let source = self
+            .sources
+            .iter()
+            .find(|s| s.path == path)
+            .ok_or_else(|| io::Error::other("Unconfirmed deletion source"))?;
+        verify_entry(path, &source.metadata)?;
+        Ok(())
+    }
     pub(crate) fn validate(&self, plan: &Plan) -> io::Result<()> {
         for (path, id) in &self.identities {
             if crate::platform_fs::entry_identity(path)? != *id {
@@ -147,6 +157,7 @@ impl Job {
         plan: Plan,
         options: CopyOptions,
         prepared: Option<Prepared>,
+        root: Option<crate::temp_drive::Root>,
     ) -> io::Result<Self> {
         let requests = crate::requests::RequestScope::new(crate::requests::Owner::Workspace);
         let token = requests.start("file-operation");
@@ -167,6 +178,9 @@ impl Job {
                 let mut last = Instant::now() - Duration::from_secs(1);
                 let result = (|| -> io::Result<Progress> {
                     check(&worker_cancel)?;
+                    if let Some(root) = &root {
+                        root.validate()?;
+                    }
                     let prepared = match prepared {
                         Some(p) => p,
                         None => Prepared::capture(&plan)?,

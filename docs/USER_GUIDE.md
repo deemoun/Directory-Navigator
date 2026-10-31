@@ -1143,3 +1143,28 @@ Help topic, scroll position and back history. Expanded Help stays within the
 workspace when the terminal shrinks and restores its remembered floating bounds.
 Welcome uses the same Expand/Restore and resize controls, preserving its selected
 action and returning to its remembered bounds.
+
+## Temp Drive
+
+`Utilities → Temp Drive` opens DN's persistent storage directory in the active
+panel. These are real files, not references to originals. Use F5 from the other
+panel, or `File → Copy to Temp Drive…` to open the standard Copy dialog for marked
+items (the current item when nothing is marked). Existing destinations are refused
+by default; the usual queue, Skip, cancellation and copy options apply.
+
+The directory is `temp-drive` beside the actual configuration file: normally
+`~/.config/dn/temp-drive` on macOS/Linux (honouring `XDG_CONFIG_HOME`), or
+`%APPDATA%\Directory Navigator\temp-drive` on Windows. It is created when first
+opened or used for copying. Contents survive restarts even with Save on exit off;
+they are never automatically cleared. No system temporary directory is used.
+
+`Utilities → Clear Temp Drive…` asks before clearing **all** contents, including
+hidden and filtered files and folders. Cancel is selected initially. The command
+uses the ordinary Trash/permanent-delete preference and never deletes the Temp
+Drive directory itself. It is unavailable while file operations are pending.
+Completed deletions remain completed if cancelled or interrupted; remaining items
+are retained. Root or source replacement after confirmation is rejected.
+
+Inside Temp Drive all ordinary panel operations apply. F8 acts on real stored
+files, and F6 can move them elsewhere. Parent navigation leaves the directory
+normally. A file or link substituted for the Temp Drive root is rejected.

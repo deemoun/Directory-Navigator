@@ -12,6 +12,9 @@ pub enum Action {
     RecoverEditors,
     TerminalOutput,
     SmartPad,
+    TempDrive,
+    CopyToTempDrive,
+    ClearTempDrive,
     ImportDosSettings,
     EditAssociations,
     ReloadAssociations,
@@ -210,6 +213,9 @@ pub fn execute(app: &mut App, action: Action) {
     close(app);
     app.modals.set_quick_search(None);
     match action {
+        Action::TempDrive => crate::temp_drive::open(app),
+        Action::CopyToTempDrive => crate::temp_drive::copy(app),
+        Action::ClearTempDrive => crate::temp_drive::clear(app),
         Action::SmartPad => crate::editor::open_smartpad(app),
         Action::TerminalOutput => crate::terminal_output::request(app),
         Action::CommandHistory => crate::command_line::history::open(app),

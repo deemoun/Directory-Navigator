@@ -878,3 +878,14 @@ Choose one or more screen savers in Selected savers. Add copies the highlighted 
 SmartPad	SmartPad
 Smart~P~ad	Smart~P~ad
 SmartPad: Alt+Q returns; F2 saves notes.	SmartPad: Alt+Q returns; F2 saves notes.
+Copy to ~T~emp Drive...	Copy to ~T~emp Drive...
+~T~emp Drive	~T~emp Drive
+Clear Temp ~D~rive...	Clear Temp ~D~rive...
+Clear Temp Drive	Clear Temp Drive
+All contents, including hidden items.	All contents, including hidden items.
+Temp Drive is empty.	Temp Drive is empty.
+Temp Drive must be a real directory, not a link or file	Temp Drive must be a real directory, not a link or file
+Cannot determine the Temp Drive directory	Cannot determine the Temp Drive directory
+Temp Drive changed; reopen the command	Temp Drive changed; reopen the command
+Unconfirmed deletion source	Unconfirmed deletion source
+Clears every item in Temp Drive, including hidden files and folders. The Temp Drive directory is kept. The confirmation shows whether items go to Trash or are permanently deleted. Cancel leaves everything unchanged.	Clears every item in Temp Drive, including hidden files and folders. The Temp Drive directory is kept. The confirmation shows whether items go to Trash or are permanently deleted. Cancel leaves everything unchanged.
