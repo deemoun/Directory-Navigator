@@ -142,33 +142,43 @@ fn assert_release_policy(text: &str) {
     assert!(text.contains("git write-tree"));
 }
 
-#[test]
-fn release_policy_accepts_windows_and_mixed_line_endings() -> io::Result<()> {
+fn release_workflow() -> io::Result<String> {
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(".github/workflows/release.yml");
-    let lf = fs::read_to_string(path)?.replace("\r\n", "\n");
-    assert_release_policy(&lf);
-    assert_release_policy(&lf.replace('\n', "\r\n"));
+    // Normalize before editing fixtures as well as before checking policy.
+    Ok(fs::read_to_string(path)?.replace("\r\n", "\n"))
+}
+
+fn line_ending_variants(lf: &str) -> [String; 3] {
     let mixed = lf
         .lines()
         .enumerate()
         .map(|(index, line)| format!("{line}{}", if index % 2 == 0 { "\r\n" } else { "\n" }))
         .collect::<String>();
-    assert_release_policy(&mixed);
+    [lf.to_owned(), lf.replace('\n', "\r\n"), mixed]
+}
+
+#[test]
+fn release_policy_accepts_windows_and_mixed_line_endings() -> io::Result<()> {
+    for text in line_ending_variants(&release_workflow()?) {
+        assert_release_policy(&text);
+    }
     Ok(())
 }
 
 #[test]
 fn release_policy_is_independent_of_publishing_job_name() -> io::Result<()> {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(".github/workflows/release.yml");
-    let text = fs::read_to_string(path)?;
-    assert_release_policy(&text.replace("  release:\n", "  publish_downloads:\n"));
+    let text = release_workflow()?;
+    let renamed = text.replace("  release:\n", "  publish_downloads:\n");
+    assert_ne!(renamed, text, "Renaming must exercise the policy");
+    for variant in line_ending_variants(&renamed) {
+        assert_release_policy(&variant);
+    }
     Ok(())
 }
 
 #[test]
 fn release_policy_rejects_unsafe_publishing_changes() -> io::Result<()> {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(".github/workflows/release.yml");
-    let text = fs::read_to_string(path)?;
+    let text = release_workflow()?;
     for unsafe_text in [
         text.replacen("contents: read", "contents: write", 1),
         text.replace("needs: [validate, build]", "needs: validate"),
@@ -179,7 +189,9 @@ fn release_policy_rejects_unsafe_publishing_changes() -> io::Result<()> {
         ),
     ] {
         assert_ne!(unsafe_text, text, "Mutation must exercise the policy");
-        assert!(std::panic::catch_unwind(|| assert_release_policy(&unsafe_text)).is_err());
+        for variant in line_ending_variants(&unsafe_text) {
+            assert!(std::panic::catch_unwind(|| assert_release_policy(&variant)).is_err());
+        }
     }
     Ok(())
 }
