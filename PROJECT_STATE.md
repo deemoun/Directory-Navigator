@@ -678,10 +678,10 @@ older increment entries below also record earlier migration stages.
   Native terminal checks cover three editors/two viewers, independent undo,
   discard/quit cancellation, Save As, resize, shell handoff and restoration.
   See docs/DOCUMENT_FOUNDATIONS.md for invariants and validation.
-- Turbo Vision is now the sole renderer and a mandatory dependency. Ratatui,
-  its text/style/layout aliases, legacy renderer/transport, feature gates and
-  duplicate pane/Tetris painters are removed. The lockfile and resolved dependency
-  graph contain no Ratatui. `--no-default-features` still builds the native UI.
+- Turbo Vision is now the sole renderer and a mandatory dependency. The previous
+  toolkit's text/style/layout aliases, legacy renderer/transport, feature gates and
+  duplicate pane/Tetris painters are removed. `--no-default-features` still builds
+  the native UI.
 - Owned presentation types handle bounded layout allocation, styles and full
   Unicode text. The native codec has one glyph-reference plane and no retained
   legacy pixels. Existing behavioral tests use a native headless snapshot sink;
@@ -719,7 +719,7 @@ older increment entries below also record earlier migration stages.
   modal scope gates input. Native close cannot bypass application save/exit
   guards. Welcome and path/operation prompts use native Dialog/Group focus and
   Button commands plus a Unicode custom field. Existing mouse targets and
-  Ratatui visual composition remain; other controls/menus still require porting.
+  legacy visual composition remain; other controls/menus still require porting.
   Full migration is NOT complete. No workflow runs, UI redesign, configuration
   changes or filesystem-policy changes belong to this increment.
   macOS ARM64: fmt, all-target Clippy, 391 passing Rust tests (one existing
@@ -731,7 +731,7 @@ older increment entries below also record earlier migration stages.
   windows-numerics path-source/cache error; native Intel/Windows/Linux untested.
 - Turbo Vision migration IN PROGRESS on feature/turbo-vision: pinned 4.1.0 core,
   real TV custom View/diff buffer and event transport enabled by default. The
-  existing Ratatui canvas/control/focus layers remain; this is NOT a full native
+  existing legacy canvas/control/focus layers remain; this is NOT a full native
   widget/window migration. See docs/TURBO_VISION_MIGRATION.md for required work.
   Transport preserves indexed palette semantics, complete graphemes, wide-cell
   continuations and cursor order. One Session keeps paste and exit/suspend guards.

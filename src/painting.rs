@@ -283,81 +283,8 @@ struct Run {
     width: u16,
     space: bool,
 }
-fn reflow(glyphs: Vec<Run>, limit: u16, trim: bool) -> Vec<Vec<Run>> {
-    use std::collections::VecDeque;
-    // Preserve the reference renderer's word-boundary behavior, adapted from
-    // Ratatui 0.29's MIT-licensed reflow implementation (see third-party notices).
-    let limit = usize::from(limit);
-    let mut output = Vec::new();
-    let mut line = Vec::new();
-    let mut word = Vec::new();
-    let mut spaces: VecDeque<Run> = VecDeque::new();
-    let (mut line_width, mut word_width, mut space_width) = (0, 0, 0);
-    let mut previous_word = false;
-    for glyph in glyphs {
-        let width = usize::from(glyph.width);
-        if width > limit {
-            continue;
-        }
-        let ended_word = previous_word && glyph.space;
-        let pending_overflow = line.is_empty()
-            && if trim {
-                word_width + width > limit || space_width + width > limit
-            } else {
-                word_width + space_width + width > limit
-            };
-        if ended_word || pending_overflow {
-            if !line.is_empty() || !trim {
-                line.extend(spaces.drain(..));
-                line_width += space_width;
-            }
-            line.append(&mut word);
-            line_width += word_width;
-            spaces.clear();
-            word_width = 0;
-            space_width = 0;
-        }
-        if line_width >= limit || (width > 0 && line_width + space_width + word_width >= limit) {
-            output.push(std::mem::take(&mut line));
-            let mut remaining = limit.saturating_sub(line_width);
-            line_width = 0;
-            while let Some(space) = spaces.front() {
-                let width = usize::from(space.width);
-                if width > remaining {
-                    break;
-                }
-                space_width -= width;
-                remaining -= width;
-                spaces.pop_front();
-            }
-            if glyph.space && spaces.is_empty() {
-                continue;
-            }
-        }
-        previous_word = !glyph.space;
-        if glyph.space {
-            space_width += width;
-            spaces.push_back(glyph);
-        } else {
-            word_width += width;
-            word.push(glyph);
-        }
-    }
-    if line.is_empty() && word.is_empty() && !spaces.is_empty() {
-        output.push(Vec::new());
-    }
-    if !line.is_empty() || !trim {
-        line.extend(spaces);
-    }
-    line.append(&mut word);
-    if !line.is_empty() {
-        output.push(line);
-    }
-    if output.is_empty() {
-        output.push(Vec::new());
-    }
-    output
-}
+mod wrapping;
+use wrapping::reflow;
 
 pub(crate) fn wrap_plain(value: &str, width: u16) -> Vec<String> {
     use unicode_segmentation::UnicodeSegmentation;

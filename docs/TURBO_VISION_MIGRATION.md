@@ -1,7 +1,7 @@
 # Turbo Vision migration status
 
-Turbo Vision 4.1.0 is the sole application UI toolkit. Ratatui is absent from
-Cargo.toml, Cargo.lock, source/test imports and the resolved dependency graph.
+Turbo Vision 4.1.0 is the sole application UI toolkit. The previous UI toolkit is
+absent from Cargo.toml, Cargo.lock, source/test imports and the dependency graph.
 The legacy renderer, transport adapter, feature gates and duplicate pane/game
 painters have been deleted. Windows and Linux validation remains out of scope
 for this finishing pass. Local runtime validation targets macOS ARM64.
@@ -208,10 +208,9 @@ See [document foundations](DOCUMENT_FOUNDATIONS.md) for lifecycle and validation
 - `presentation/text.rs` owns styled spans/lines/text. Segmentation and width use
   unicode-segmentation/unicode-width directly; graphemes and span styles remain
   intact. These are owned implementations, not aliases into another UI toolkit.
-- The painter owns block borders, text wrapping/scrolling and clearing. Its
-  retained MIT-licensed word-reflow adaptation is acknowledged in
-  THIRD_PARTY_NOTICES.md. That source attribution remains required even though
-  the Ratatui package and renderer are gone.
+- The painter owns block borders, text wrapping/scrolling and clearing. Styled
+  wrapping uses an independent source-range planner in `painting/wrapping.rs`;
+  frozen row-membership and rendered-frame fixtures preserve existing behavior.
 - The codec has one native glyph-reference plane. Tokens survive until the
   terminal commits its diff and are then reclaimed. No reference canvas,
   background pixel plane or legacy cell type remains.
