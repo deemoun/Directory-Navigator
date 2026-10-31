@@ -417,3 +417,75 @@ fn reopening_sizes_retains_results_even_with_a_different_manager_selection() -> 
         .is_none());
     Ok(())
 }
+
+#[test]
+fn quick_directories_geometry_and_controls_stay_stable_across_redraws() -> io::Result<()> {
+    use dn::{localization::Language, navigation_tools, palette::PaletteProfile};
+    let f = support::Fixture::new("tools-bookmarks-stable")?;
+    for language in [Language::English, Language::Russian] {
+        for (width, height) in [(80, 25), (132, 40)] {
+            let mut a = f.app()?;
+            a.config.language = language;
+            a.config.show_clock = false;
+            a.config.palette = if width == 80 {
+                PaletteProfile::ClassicDn
+            } else {
+                PaletteProfile::ClassicDn.with_slot(dn::palette::theme::Slot::DialogText, 0x1e)
+            };
+            navigation_tools::open_bookmarks(&mut a);
+            let id = a.desktop.active().id;
+            support::draw(&mut a, width, height)?;
+            let initial = layout::prepare(&mut a, Rect::new(0, 0, width, height))
+                .surfaces
+                .into_iter()
+                .find(|s| s.id.key == SurfaceKey::Document(id))
+                .unwrap()
+                .bounds;
+            for _ in 0..20 {
+                let frame = support::draw(&mut a, width, height)?;
+                let current = layout::prepare(&mut a, Rect::new(0, 0, width, height))
+                    .surfaces
+                    .into_iter()
+                    .find(|s| s.id.key == SurfaceKey::Document(id))
+                    .unwrap()
+                    .bounds;
+                assert_eq!(
+                    current, initial,
+                    "Quick directories must not shrink on redraw"
+                );
+                for slot in 0..9 {
+                    let row = a
+                        .mouse
+                        .regions
+                        .iter()
+                        .find(|(_, target)| {
+                            *target == Target::Navigation(navigation_tools::Action::Slot(slot))
+                        })
+                        .expect("All nine bookmark rows remain reachable")
+                        .0;
+                    assert!(row.y > current.y && row.bottom() < current.bottom());
+                    assert_eq!(frame[(row.x, row.y)].symbol(), (slot + 1).to_string());
+                }
+                for action in [
+                    navigation_tools::Action::Go,
+                    navigation_tools::Action::Set,
+                    navigation_tools::Action::Clear,
+                    navigation_tools::Action::Close,
+                ] {
+                    let button = a
+                        .mouse
+                        .regions
+                        .iter()
+                        .filter(|(_, target)| *target == Target::Navigation(action))
+                        .max_by_key(|(bounds, _)| bounds.y)
+                        .expect("Bookmark buttons remain reachable")
+                        .0;
+                    assert!(button.y > current.y + 9);
+                    assert!(button.bottom() + 1 < current.bottom());
+                }
+                key(&mut a, K::Down, M::NONE);
+            }
+        }
+    }
+    Ok(())
+}

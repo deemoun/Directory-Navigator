@@ -721,3 +721,49 @@ fn mp3_demo_playlist_track_picker_help_and_cancel_are_ui_only() -> io::Result<()
     assert_eq!(fs::read(s.root.join("item-000.txt"))?, b"fixture\n");
     s.finish()
 }
+
+#[test]
+fn quick_directories_stays_in_place_during_idle_and_focus_changes() -> io::Result<()> {
+    let mut s = Session::new("quick-directories-stable")?;
+    s.wait("manager ready", |s| s.command_prompt_active())?;
+    s.send(b"\x1bpq\r", "quick directories opened", |s| {
+        s.text().contains("<empty>")
+    })?;
+    s.send(b"\t\t\r", "one bookmark assigned", |s| {
+        s.text().matches("<empty>").count() == 8
+    })?;
+    fn positions(s: &Session) -> Vec<usize> {
+        s.text()
+            .lines()
+            .enumerate()
+            .filter_map(|(index, line)| {
+                (line.contains("Quick directories")
+                    || line.contains("<empty>")
+                    || line.contains("1  ")
+                    || line.contains("Set Current")
+                    || line.contains("Ctrl+1–9 set"))
+                .then_some(index)
+            })
+            .collect()
+    }
+    let before = positions(&s);
+    assert_eq!(
+        before.len(),
+        12,
+        "title, nine slots, buttons and hint\n{}",
+        s.text()
+    );
+    let until = std::time::Instant::now() + std::time::Duration::from_secs(2);
+    s.wait("idle redraws", |_| std::time::Instant::now() >= until)?;
+    assert_eq!(positions(&s), before);
+    for _ in 0..12 {
+        s.send(b"\t", "bookmark focus changed", |s| {
+            s.text().contains("Quick directories")
+        })?;
+        assert_eq!(positions(&s), before);
+    }
+    s.send(b"\x1b", "quick directories closed", |s| {
+        !s.text().contains("Quick directories")
+    })?;
+    s.finish()
+}

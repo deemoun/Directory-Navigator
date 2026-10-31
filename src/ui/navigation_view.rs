@@ -89,8 +89,10 @@ pub(crate) fn navigation_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
                 (2, "[ Clear ]", Action::Clear),
                 (3, "[ Close ]", Action::Close),
             ] {
+                // Reserve the native button shadow row, as other tool forms do.
+                // Omitting it feeds a smaller height back into desktop geometry.
                 buttons.push((
-                    Rect::new(x + i as u16 * (w / 4), rect.bottom() - 3, w / 4, 1),
+                    Rect::new(x + i as u16 * (w / 4), rect.bottom() - 2, w / 4, 1),
                     label,
                     action,
                     *focus == i + 1,
