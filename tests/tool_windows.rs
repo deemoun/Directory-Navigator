@@ -498,10 +498,33 @@ fn calculator_title_close_retires_document_and_keeps_session_state() -> io::Resu
     let id = a.desktop.active().id;
     input::paste(&mut a, "2+3");
     support::draw(&mut a, 100, 32)?;
-    key(&mut a, K::F(5), M::CONTROL);
-    key(&mut a, K::Right, M::NONE);
-    key(&mut a, K::Down, M::NONE);
-    key(&mut a, K::Enter, M::NONE);
+    let bounds = |a: &mut App| {
+        layout::prepare(a, Rect::new(0, 0, 100, 32))
+            .surfaces
+            .into_iter()
+            .find(|s| s.id.key == SurfaceKey::Document(id))
+            .unwrap()
+            .bounds
+    };
+    let before = bounds(&mut a);
+    for (kind, dx, dy) in [
+        (E::Down(B::Left), 0, 0),
+        (E::Drag(B::Left), 3, 2),
+        (E::Up(B::Left), 3, 2),
+    ] {
+        mouse::handle_ui(
+            &mut a,
+            MouseEvent {
+                kind,
+                column: before.x + 12 + dx,
+                row: before.y + dy,
+                modifiers: M::NONE,
+            },
+        );
+    }
+    let after = bounds(&mut a);
+    assert_eq!((after.x, after.y), (before.x + 3, before.y + 2));
+    assert_eq!((after.width, after.height), (before.width, before.height));
     let frame = support::draw(&mut a, 100, 32)?;
     let close = a
         .mouse

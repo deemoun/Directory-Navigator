@@ -294,6 +294,20 @@ pub(crate) fn draw(frame: &mut impl Frame, app: &App, area: Rect, b: Binding) {
                 s.place_document_windows(id, &app.desktop.native());
             }
             (*s).paint(frame, app);
+            if let Owner::Document(id) = b.owner {
+                if let Some(surface) = app
+                    .desktop
+                    .native()
+                    .surface(crate::windowing::geometry::SurfaceKey::Document(id))
+                {
+                    let mut chrome =
+                        crate::painting::NativeFrame::new(area, app.config.palette).finish();
+                    crate::windowing::workspace::chrome(&mut chrome, surface);
+                    // The dialog already paints its frame; publish its native
+                    // title targets without changing its contents or cursor.
+                    frame.regions().extend(chrome.regions);
+                }
+            }
         }
     }
 }

@@ -866,11 +866,23 @@ fn calculator_green_title_close_works_after_movement() -> io::Result<()> {
     s.send(b"2+3\r", "calculator evaluated", |s| {
         s.text().contains("2+3")
     })?;
-    s.send(b"\x1b[15;5~", "move calculator", |s| {
-        s.text().contains("Arrows move")
-    })?;
-    s.send(b"\x1b[C\x1b[B\r", "calculator moved", |s| {
-        !s.text().contains("Arrows move")
+    let title_position = |s: &Session| {
+        s.text().lines().enumerate().find_map(|(y, line)| {
+            line.contains("Calculator")
+                .then(|| (line.chars().position(|c| c == '■').unwrap(), y))
+        })
+    };
+    let (close_x, title_y) = title_position(&s).unwrap();
+    let (x, y) = (close_x + 9, title_y + 1);
+    let drag = format!(
+        "\x1b[<0;{x};{y}M\x1b[<32;{};{}M\x1b[<0;{};{}m",
+        x + 1,
+        y + 1,
+        x + 1,
+        y + 1
+    );
+    s.send(drag.as_bytes(), "calculator dragged by title", |s| {
+        title_position(s) == Some((close_x + 1, title_y + 1)) && !s.text().contains("Arrows move")
     })?;
     let text = s.text();
     let (y, line) = text
