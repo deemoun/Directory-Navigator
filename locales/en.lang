@@ -745,7 +745,7 @@ Untitled document	Untitled document
 Recover unsaved documents...	Recover unsaved documents...
 Recovery Help	Recovery Help
 Recovered unsaved copy	Recovered unsaved copy
-No recovery checkpoints are waiting.	No recovery checkpoints are waiting.
+No files to recover	No files to recover
 Written — durability unconfirmed; retry Save	Written — durability unconfirmed; retry Save
 File was written, but durability could not be confirmed:	File was written, but durability could not be confirmed:
 Your buffer is retained and recovery checkpointing continues. Retry Save to confirm it without rewriting unchanged text.	Your buffer is retained and recovery checkpointing continues. Retry Save to confirm it without rewriting unchanged text.

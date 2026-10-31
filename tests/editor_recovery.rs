@@ -449,3 +449,50 @@ fn cleanup_failure_keeps_data_and_allows_acknowledged_exit() -> io::Result<()> {
     assert!(p.is_symlink());
     Ok(())
 }
+
+#[test]
+fn explicit_empty_recovery_shows_one_message_after_scanning_and_startup_stays_quiet(
+) -> io::Result<()> {
+    use crossterm::event::KeyCode;
+    use dn::localization::Language;
+    for language in [Language::English, Language::Russian] {
+        for mode in 0..3 {
+            let f = support::Fixture::new("recovery-empty-message")?.canonicalized()?;
+            let mut a = f.app()?;
+            a.config.language = language;
+            if mode != 0 {
+                recovery::start(&mut a, f.0.join("editor-recovery"));
+                if mode == 1 {
+                    settled(&mut a);
+                    assert!(a.dialogs().is_empty(), "Empty startup recovery stays quiet");
+                }
+            }
+            menu::execute(&mut a, menu::Action::RecoverEditors);
+            let message = language.text("No files to recover");
+            wait(&mut a, |a| {
+                a.last_dialog().is_some_and(|d| d.message == message)
+            });
+            assert!(a.modals.recovery().is_none());
+            assert_eq!(a.dialogs().len(), 1);
+            for _ in 0..5 {
+                a.poll();
+            }
+            assert_eq!(a.dialogs().len(), 1);
+            support::draw(&mut a, 80, 25)?;
+            support::key(&mut a, KeyCode::Enter);
+            for _ in 0..5 {
+                a.poll();
+            }
+            assert!(
+                a.dialogs().is_empty(),
+                "Acknowledgement finishes the request"
+            );
+            menu::execute(&mut a, menu::Action::RecoverEditors);
+            wait(&mut a, |a| {
+                a.last_dialog().is_some_and(|d| d.message == message)
+            });
+            assert_eq!(a.dialogs().len(), 1);
+        }
+    }
+    Ok(())
+}

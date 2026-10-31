@@ -14,6 +14,7 @@ pub enum Modal {
     Bookmarks {
         slot: usize,
         focus: usize,
+        pending: Option<(std::path::PathBuf, u64)>,
     },
     Filter {
         field: String,
@@ -27,7 +28,11 @@ pub fn open_bookmarks(app: &mut App) {
     }
     menu::close(app);
     app.modals.set_quick_search(None);
-    app.set_navigation_dialog(Some(Modal::Bookmarks { slot: 0, focus: 0 }));
+    app.set_navigation_dialog(Some(Modal::Bookmarks {
+        slot: 0,
+        focus: 0,
+        pending: None,
+    }));
 }
 pub fn open_filter(app: &mut App) {
     if app.panels[app.active].loading {
@@ -63,12 +68,42 @@ pub fn go(app: &mut App, slot: usize) {
         return;
     }
     if let Some(path) = app.config.bookmarks.get(slot).and_then(Clone::clone) {
-        app.panels[panel].go_to(path, app.config.show_hidden);
+        let revision = app.panels[panel].revision;
+        app.panels[panel].go_to(path.clone(), app.config.show_hidden);
+        if app.panels[panel].loading {
+            if let Some(Modal::Bookmarks { pending, .. }) = app.navigation_dialog_mut() {
+                *pending = Some((path, revision));
+            }
+        }
         app.active = panel;
         crate::windowing::activate(app, crate::desktop::WindowId::MANAGER);
     } else {
         app.notice = format!("Bookmark {} is empty", slot + 1);
     }
+}
+
+/// The tool owns its pending navigation; failures leave its bookmarks available.
+pub(crate) fn poll(app: &mut App) -> bool {
+    let Some(tool) = app.desktop.tool(app.desktop.target()) else {
+        return false;
+    };
+    let panel = &app.panels[tool.panel];
+    let Some(Modal::Bookmarks {
+        pending: Some((path, revision)),
+        ..
+    }) = app.navigation_dialog()
+    else {
+        return false;
+    };
+    if panel.loading {
+        return false;
+    }
+    if panel.path == *path && panel.revision != *revision {
+        app.set_navigation_dialog(None);
+    } else if let Some(Modal::Bookmarks { pending, .. }) = app.navigation_dialog_mut() {
+        *pending = None;
+    }
+    true
 }
 pub fn action(app: &mut App, action: Action) {
     let slot = match app.navigation_dialog() {
@@ -78,7 +113,7 @@ pub fn action(app: &mut App, action: Action) {
     match action {
         Action::Slot(n) => {
             if n < 9 {
-                if let Some(Modal::Bookmarks { slot, focus }) = app.navigation_dialog_mut() {
+                if let Some(Modal::Bookmarks { slot, focus, .. }) = app.navigation_dialog_mut() {
                     *slot = n;
                     *focus = 0;
                 }

@@ -767,3 +767,169 @@ fn quick_directories_stays_in_place_during_idle_and_focus_changes() -> io::Resul
     })?;
     s.finish()
 }
+
+#[test]
+fn calculator_green_title_close_works_after_movement() -> io::Result<()> {
+    let mut s = Session::new("calculator-title-close")?;
+    s.wait("manager ready", |s| s.command_prompt_active())?;
+    s.send(b"\x1buc", "calculator opened", |s| {
+        s.text().contains("Calculator")
+    })?;
+    s.send(b"2+3\r", "calculator evaluated", |s| {
+        s.text().contains("2+3")
+    })?;
+    s.send(b"\x1b[15;5~", "move calculator", |s| {
+        s.text().contains("Arrows move")
+    })?;
+    s.send(b"\x1b[C\x1b[B\r", "calculator moved", |s| {
+        !s.text().contains("Arrows move")
+    })?;
+    let text = s.text();
+    let (y, line) = text
+        .lines()
+        .enumerate()
+        .find(|(_, line)| line.contains("Calculator"))
+        .unwrap();
+    let x = line
+        .chars()
+        .position(|c| c == '■')
+        .expect("Green title close glyph");
+    let click = format!("\x1b[<0;{};{}M\x1b[<0;{};{}m", x + 1, y + 1, x + 1, y + 1);
+    s.send(click.as_bytes(), "calculator closed by title", |s| {
+        !s.text().contains("Calculator") && s.command_prompt_active()
+    })?;
+    s.finish()
+}
+
+#[test]
+fn quick_directories_go_navigates_and_closes_in_the_release_ui() -> io::Result<()> {
+    let mut s = Session::new("bookmark-go-close")?;
+    s.wait("manager ready", |s| {
+        s.command_prompt_active() && s.text().contains("item-000.")
+    })?;
+    s.send(b"\x1b[B\r", "fixture directory opened", |s| {
+        s.text().contains("child.txt") && s.command_prompt_active()
+    })?;
+    s.send(b"\x1bpq\r", "bookmarks opened", |s| {
+        s.text().contains("<empty>")
+    })?;
+    s.send(b"\t\t\r", "bookmark assigned", |s| {
+        s.text().matches("<empty>").count() == 8
+    })?;
+    s.send(b"\x1b", "bookmarks closed", |s| {
+        !s.text().contains("Quick directories")
+    })?;
+    s.send(b"\x7f", "parent directory", |s| {
+        s.text().contains("item-000.") && s.command_prompt_active()
+    })?;
+    s.send(b"\x1bpq\r", "bookmarks reopened", |s| {
+        s.text().contains("Quick directories") && s.text().contains("<empty>")
+    })?;
+    s.send(b"\r", "Go To navigated and closed bookmarks", |s| {
+        !s.text().contains("Quick directories")
+            && s.text().contains("child.txt")
+            && s.command_prompt_active()
+    })?;
+    s.finish()
+}
+
+#[test]
+fn finished_game_buttons_remain_clickable_after_game_over() -> io::Result<()> {
+    let mut s = Session::new("game-over-buttons")?;
+    s.wait("manager ready", |s| s.command_prompt_active())?;
+    s.send(b"\x1b[20;3~", "game opened", |s| {
+        s.text().contains("Navigator's game")
+    })?;
+    s.send(b"+++++++++", "fast game", |s| {
+        s.text().contains("Level: 10")
+    })?;
+    for _ in 0..80 {
+        if s.text().contains("Game over") {
+            break;
+        }
+        let until = std::time::Instant::now() + std::time::Duration::from_millis(60);
+        s.send_output(b" ", "drop fixture piece", |_| {
+            std::time::Instant::now() >= until
+        })?;
+    }
+    assert!(
+        s.text().contains("Game over"),
+        "Fixture must reach game over\n{}",
+        s.text()
+    );
+    s.send(b"\x1b", "finished board", |s| {
+        s.text().contains("GAME OVER") && !s.text().contains("Game over")
+    })?;
+    fn new_position(s: &Session) -> (usize, usize) {
+        let text = s.text();
+        let (y, line) = text
+            .lines()
+            .enumerate()
+            .find(|(_, line)| line.contains("New") && !line.contains("F2"))
+            .expect("New button row");
+        (line[..line.find("New").unwrap()].chars().count(), y)
+    }
+    let (x, y) = new_position(&s);
+    let down = format!("\x1b[<0;{};{}M", x + 1, y + 1);
+    s.send(
+        down.as_bytes(),
+        "New visibly pressed on finished board",
+        |s| s.text().contains("GAME OVER") && new_position(s) == (x + 1, y),
+    )?;
+    let up = format!("\x1b[<0;{};{}m", x + 1, y + 1);
+    s.send(up.as_bytes(), "New starts on release", |s| {
+        !s.text().contains("GAME OVER") && s.text().contains("Navigator's game")
+    })?;
+    s.send(b"\x1b", "game closed", |s| s.command_prompt_active())?;
+    s.finish()
+}
+
+#[test]
+fn empty_recovery_menu_shows_one_message_and_returns_to_manager() -> io::Result<()> {
+    let mut s = Session::new("empty-recovery")?;
+    s.wait("empty startup stays quiet", |s| s.command_prompt_active())?;
+    s.send(b"\x1bf", "File menu", |s| {
+        s.text().contains("Recover unsaved documents")
+    })?;
+    s.send(b"\x1b[F\x1b[A\r", "empty recovery message", |s| {
+        s.text().contains("No files to recover")
+    })?;
+    s.send(b"\r", "empty recovery acknowledged", |s| {
+        !s.text().contains("No files to recover") && s.command_prompt_active()
+    })?;
+    s.finish()
+}
+
+#[test]
+fn welcome_expand_restore_resize_and_start_preserve_terminal() -> io::Result<()> {
+    let mut s = Session::new("welcome-zoom-resize")?;
+    s.wait("manager ready", |s| s.command_prompt_active())?;
+    s.send(b"\x1b[<0;3;1M\x1b[<0;3;1mw", "Welcome opened", |s| {
+        s.text().contains("Welcome to Directory Navigator") && s.text().contains("[↑]")
+    })?;
+    fn zoom(s: &Session, icon: &str) -> (usize, usize) {
+        let text = s.text();
+        let (y, line) = text
+            .lines()
+            .enumerate()
+            .find(|(_, l)| l.contains(icon))
+            .expect("Welcome zoom control");
+        (line[..line.find(icon).unwrap()].chars().count() + 2, y + 1)
+    }
+    let (x, y) = zoom(&s, "[↑]");
+    let click = format!("\x1b[<0;{x};{y}M\x1b[<0;{x};{y}m");
+    s.send(click.as_bytes(), "Welcome expanded", |s| {
+        s.text().contains("[↕]")
+    })?;
+    s.send(b"\x1bz", "Welcome restored", |s| {
+        s.text().contains("[↑]") && !s.text().contains("[↕]")
+    })?;
+    s.send(b"\x1b[15;5~", "Welcome Size/Move", |s| {
+        s.text().contains("Arrows move")
+    })?;
+    s.send(b"\x1b[1;2C\r", "Welcome resized", |s| {
+        !s.text().contains("Arrows move") && s.text().contains("Welcome to Directory Navigator")
+    })?;
+    s.send(b"\r", "Welcome Start", |s| s.command_prompt_active())?;
+    s.finish()
+}

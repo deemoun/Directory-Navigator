@@ -38,8 +38,8 @@ pub const ROOTS: &[Root] = &[
         id: RootId::Application,
         label: "≡",
         entries: &[
-            item("~W~elcome...", "", Welcome),
             item("~A~bout...", "", About),
+            item("~W~elcome...", "", Welcome),
             item("~R~efresh", "", Refresh),
             line(),
             item("~S~creensaver", "", ScreenRest),

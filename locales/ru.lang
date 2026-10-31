@@ -745,7 +745,7 @@ Untitled document	Документ без имени
 Recover unsaved documents...	Восстановить несохранённые документы...
 Recovery Help	Просмотр снимка восстановления
 Recovered unsaved copy	Восстановленная несохранённая копия
-No recovery checkpoints are waiting.	Нет снимков для восстановления.
+No files to recover	Нет файлов для восстановления
 Written — durability unconfirmed; retry Save	Файл записан — надёжность не подтверждена; повторите сохранение
 File was written, but durability could not be confirmed:	Файл записан, но надёжность записи не подтверждена:
 Your buffer is retained and recovery checkpointing continues. Retry Save to confirm it without rewriting unchanged text.	Текст остаётся в редакторе, снимки восстановления продолжаются. Повторите сохранение: неизменённый текст не будет перезаписан.

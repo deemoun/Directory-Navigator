@@ -400,6 +400,7 @@ pub(crate) fn poll(app: &mut App) -> bool {
             Kind::Find | Kind::Sizes => crate::discovery::poll(app),
             Kind::Archive => crate::archive::poll(app),
             Kind::FileInfo => app.file_info_mut().is_some_and(|i| i.poll()),
+            Kind::Bookmarks => crate::navigation_tools::poll(app),
             Kind::System | Kind::Memory => crate::utilities::poll(app),
             Kind::CommandHistory => {
                 let history = app.command_line.history().to_vec();

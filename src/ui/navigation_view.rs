@@ -46,7 +46,7 @@ pub(crate) fn navigation_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
     let w = rect.width - 4;
     let mut buttons = Vec::new();
     match modal {
-        Modal::Bookmarks { slot, focus } => {
+        Modal::Bookmarks { slot, focus, .. } => {
             let items = (0..9)
                 .map(|i| {
                     let value = app.config.bookmarks[i]

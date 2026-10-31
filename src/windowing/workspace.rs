@@ -175,7 +175,8 @@ pub(crate) fn definitions(app: &App, area: Rect) -> Vec<Definition> {
             _ => crate::ui::remaining_spec(app, area, modal.focus).map(|s| spec_bounds(s, area)),
         };
         if let Some(bounds) = bounds {
-            let help = modal.focus == Focus::Message && app.native_help().is_some();
+            let help = (modal.focus == Focus::Message && app.native_help().is_some())
+                || modal.focus == Focus::Welcome;
             let parent = modal.parent.map(SurfaceKey::Modal).or(match modal.owner {
                 crate::modals::ModalOwner::Document(id) => Some(SurfaceKey::Document(id)),
                 _ => None,

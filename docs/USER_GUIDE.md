@@ -21,7 +21,8 @@ current deletion mode. **Start**, Esc or the title close control dismisses it;
 opens it again without changing panel state. Tab/Shift+Tab select the action links;
 Enter or a click activates one. PageUp/PageDown and the mouse wheel scroll.
 Welcome and Help share the centered 72×20 frame, colors and shadow; the footer
-shows the controls for the active page.
+shows the controls for the active page. Both support resizing and the shared
+Expand/Restore title button.
 
 Dismissing the welcome writes no files. Normal settings saving on exit prevents
 it appearing on later launches. If saving is disabled and no configuration exists,
@@ -179,7 +180,9 @@ Sizes, archive browsing, file information, Calculator, character table,
 system/memory information, bookmarks, histories and standalone Help. They remain
 open when you switch away. Reopening activates the existing tool; archives and
 file-information windows distinguish file paths. Navigation and View/Edit retain
-the originating tool's selection and results.
+the originating tool's selection and results. Quick directories closes after
+Go To successfully navigates its source pane; empty slots or failed navigation
+leave the window available for another choice.
 
 Click an exposed window to raise it; the first client click activates without
 operating a control. Clicking exposed file-manager background focuses the panes
@@ -986,6 +989,10 @@ On startup, abandoned sessions offer **Recover / Inspect / Discard / Later**:
 - Corrupt or unsupported checkpoints cannot be recovered or inspected. They stay
   on disk until explicitly discarded. Partial staging files are not offered.
 
+If **File → Recover unsaved documents…** finds no waiting checkpoints, it shows
+one **No files to recover** dialog. Acknowledging it closes the message. Empty
+startup scans do not show this dialog automatically.
+
 Session leases exclude live DN instances and prevent two instances from claiming
 one abandoned session concurrently. Checkpoint files are versioned, checksummed,
 bounded, synchronized and published by sibling-file replacement. On macOS/Unix,
@@ -1023,4 +1030,5 @@ Help windows use the shared desktop **Expand/Restore** title button. The button,
 Alt+Z and title double-click use the same window geometry, preserving the current
 Help topic, scroll position and back history. Expanded Help stays within the
 workspace when the terminal shrinks and restores its remembered floating bounds.
-The fixed-size Welcome page has no expand control.
+Welcome uses the same Expand/Restore and resize controls, preserving its selected
+action and returning to its remembered bounds.

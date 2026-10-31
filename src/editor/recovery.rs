@@ -53,6 +53,7 @@ pub struct Manager {
     next: Instant,
     ready: Option<(PathBuf, io::Result<Record>)>,
     offering: bool,
+    empty_notice_requested: bool,
     exiting: bool,
     last_error: Option<String>,
     exit_message: Option<crate::modals::ModalId>,
@@ -70,6 +71,7 @@ impl Manager {
             next: Instant::now(),
             ready: None,
             offering: true,
+            empty_notice_requested: false,
             exiting: false,
             last_error: None,
             exit_message: None,
@@ -102,21 +104,19 @@ pub fn start(app: &mut App, root: PathBuf) {
 pub fn open(app: &mut App) {
     if let Some(m) = &mut app.editor_recovery {
         m.offering = true;
-        if !m.busy() && m.ready.is_none() && m.store.as_ref().is_some_and(|s| s.pending.is_empty())
-        {
-            app.notice = app
-                .config
-                .language
-                .text("No recovery checkpoints are waiting.")
-                .into();
-        }
+        m.empty_notice_requested = true;
     } else {
         match app
             .config_store
             .path()
             .map(|p| p.with_file_name("editor-recovery"))
         {
-            Ok(p) => start(app, p),
+            Ok(p) => {
+                start(app, p);
+                if let Some(m) = &mut app.editor_recovery {
+                    m.empty_notice_requested = true;
+                }
+            }
             Err(e) => app.error(e.to_string()),
         }
     }
@@ -181,6 +181,7 @@ pub fn poll(app: &mut App, now: Instant) -> bool {
         }
     }
     if m.ready.is_some() && app.modal_top().is_none() && !m.exiting {
+        m.empty_notice_requested = false;
         let (file, result) = m.ready.take().unwrap();
         let (record, error) = match result {
             Ok(r) => (r, None),
@@ -233,6 +234,17 @@ pub fn poll(app: &mut App, now: Instant) -> bool {
                 }
             } else {
                 m.offering = false;
+                if m.empty_notice_requested && m.store.is_some() {
+                    m.empty_notice_requested = false;
+                    app.push_owned_dialog(
+                        crate::modals::ModalOwner::Workspace,
+                        crate::dialog::Dialog {
+                            title: " Editor recovery ",
+                            message: app.config.language.text("No files to recover").into(),
+                        },
+                    );
+                    changed = true;
+                }
             }
         }
         if m.job.is_none() && now >= m.next {

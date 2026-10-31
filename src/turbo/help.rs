@@ -196,10 +196,10 @@ impl Browser {
             let file = Rc::new(RefCell::new(HelpFile::from_content(&encoded)));
             let title = self.text.text(language.text(&self.title));
             let mut window = HelpWindow::new(TvRect::new(0, 0, 72, 20), &title, file);
-            window.window_mut().set_resizable(self.landing.is_none());
+            window.window_mut().set_resizable(true);
             // Desktop chrome owns zoom geometry and hit regions. A second native
             // icon becomes an inert duplicate when the host moves its maximized
-            // control away from the clock; fixed-size Welcome cannot zoom at all.
+            // control away from the clock. Welcome uses the same shared chrome.
             window.window_mut().set_zoomable(false);
             window.set_state_flag(State::MODAL, true);
             window.show_topic("context");

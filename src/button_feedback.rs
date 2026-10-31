@@ -81,7 +81,7 @@ impl Press {
     fn valid(&self, app: &App) -> bool {
         crate::eligibility::Gate::new(app).frame(Some(self.context))
             && match self.target {
-                Some(t) => button(app, t) && rect(app, t) == Some(self.rect),
+                Some(t) => button(app, t) && app.mouse.regions.contains(&(self.rect, t)),
                 None => match self.event {
                     Activation::Key(k) => native_rect(app, k) == Some(self.rect),
                     _ => false,
@@ -107,7 +107,22 @@ fn start(app: &mut App, target: Target, event: Activation) -> bool {
     let Some(context) = app.mouse.frame else {
         return false;
     };
-    let Some(rect) = rect(app, target) else {
+    // An action can appear on a button, a function-bar shortcut and title chrome.
+    // Retain the clicked face, not whichever alias was published last. Narrow
+    // title close controls keep their immediate window/controller routing.
+    let rect = match event {
+        Activation::Mouse(mouse) => app
+            .mouse
+            .regions
+            .iter()
+            .rev()
+            .find(|(r, t)| {
+                *t == target && r.width > 3 && r.contains((mouse.column, mouse.row).into())
+            })
+            .map(|(r, _)| *r),
+        _ => rect(app, target),
+    };
+    let Some(rect) = rect else {
         return false;
     };
     let p = Press {

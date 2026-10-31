@@ -489,3 +489,130 @@ fn quick_directories_geometry_and_controls_stay_stable_across_redraws() -> io::R
     }
     Ok(())
 }
+
+#[test]
+fn calculator_title_close_retires_document_and_keeps_session_state() -> io::Result<()> {
+    let f = support::Fixture::new("calculator-title-close")?;
+    let mut a = f.app()?;
+    dn::utilities::open(&mut a, dn::utilities::Kind::Calculator);
+    let id = a.desktop.active().id;
+    input::paste(&mut a, "2+3");
+    support::draw(&mut a, 100, 32)?;
+    key(&mut a, K::F(5), M::CONTROL);
+    key(&mut a, K::Right, M::NONE);
+    key(&mut a, K::Down, M::NONE);
+    key(&mut a, K::Enter, M::NONE);
+    let frame = support::draw(&mut a, 100, 32)?;
+    let close = a
+        .mouse
+        .regions
+        .iter()
+        .filter(|(_, target)| {
+            *target == Target::Plugin(dn::plugins::CALCULATOR, dn::plugins::ActionId(0))
+        })
+        .min_by_key(|(r, _)| r.y)
+        .expect("Calculator close control")
+        .0;
+    assert_eq!(frame[(close.x + 1, close.y)].symbol(), "■");
+    for kind in [E::Down(B::Left), E::Up(B::Left)] {
+        mouse::handle_ui(
+            &mut a,
+            MouseEvent {
+                kind,
+                column: close.x + 1,
+                row: close.y,
+                modifiers: M::NONE,
+            },
+        );
+    }
+    wait(&mut a, |a| !a.desktop.contains(id));
+    assert!(!a.desktop.contains(id));
+    dn::utilities::open(&mut a, dn::utilities::Kind::Calculator);
+    assert_eq!(a.desktop.plugins.calculator().expression, "2+3");
+    Ok(())
+}
+
+#[test]
+fn quick_directories_go_closes_after_success_and_retains_failures() -> io::Result<()> {
+    use dn::navigation_tools::{self, Action};
+    for mouse in [false, true] {
+        let f = support::Fixture::new("bookmarks-go-close")?.canonicalized()?;
+        std::fs::create_dir(f.0.join("child"))?;
+        let mut a = f.app()?;
+        a.config.bookmarks[0] = Some(f.0.join("child"));
+        navigation_tools::open_bookmarks(&mut a);
+        let id = a.desktop.active().id;
+        support::draw(&mut a, 100, 32)?;
+        a.active = 1; // The window keeps its captured source pane.
+        if mouse {
+            support::click(&mut a, Target::Navigation(Action::Go));
+        } else {
+            key(&mut a, K::Enter, M::NONE);
+        }
+        assert!(
+            a.desktop.contains(id),
+            "Keep the window until navigation succeeds"
+        );
+        wait(&mut a, |a| !a.panels[0].loading);
+        assert_eq!(a.panels[0].path, f.0.join("child"));
+        assert_eq!(a.panels[1].path, f.0);
+        assert!(!a.desktop.contains(id));
+        assert_eq!(a.desktop.active().id, WindowId::MANAGER);
+
+        navigation_tools::open_bookmarks(&mut a);
+        let retry = a.desktop.active().id;
+        navigation_tools::action(&mut a, Action::Slot(1));
+        navigation_tools::action(&mut a, Action::Go);
+        assert!(
+            a.desktop.contains(retry),
+            "An empty slot keeps the window open"
+        );
+        a.config.bookmarks[1] = Some(f.0.join("missing"));
+        navigation_tools::action(&mut a, Action::Go);
+        wait(&mut a, |a| !a.panels[0].loading);
+        assert!(
+            a.desktop.contains(retry),
+            "Failed navigation keeps the window open"
+        );
+        assert_eq!(a.panels[0].path, f.0.join("child"));
+    }
+    Ok(())
+}
+
+#[test]
+fn quick_directories_completion_cannot_close_a_reopened_window_or_steal_focus() -> io::Result<()> {
+    use dn::navigation_tools::{self, Action};
+    let f = support::Fixture::new("bookmarks-go-owner")?.canonicalized()?;
+    std::fs::create_dir(f.0.join("child"))?;
+    let mut a = f.app()?;
+    dn::editor::open(&mut a, true);
+    let editor = a.desktop.active().id;
+    a.desktop.activate(WindowId::MANAGER);
+    a.sync_modals();
+    a.config.bookmarks[0] = Some(f.0.join("child"));
+    navigation_tools::open_bookmarks(&mut a);
+    let old = a.desktop.active().id;
+    navigation_tools::action(&mut a, Action::Go);
+    a.desktop.close(old);
+    a.sync_modals();
+    navigation_tools::open_bookmarks(&mut a);
+    let reopened = a.desktop.active().id;
+    a.desktop.activate(editor);
+    a.sync_modals();
+    wait(&mut a, |a| !a.panels[0].loading);
+    assert!(a.desktop.contains(reopened));
+    assert_eq!(a.desktop.active().id, editor);
+    navigation_tools::open_bookmarks(&mut a);
+    navigation_tools::action(&mut a, Action::Go);
+    a.desktop.activate(editor);
+    a.sync_modals();
+    assert_eq!(
+        a.desktop.active().id,
+        editor,
+        "Editor activated before completion"
+    );
+    wait(&mut a, |a| !a.panels[0].loading);
+    assert!(!a.desktop.contains(reopened));
+    assert_eq!(a.desktop.active().id, editor);
+    Ok(())
+}

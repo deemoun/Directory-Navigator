@@ -113,21 +113,94 @@ fn help_zoom_keeps_topic_scroll_and_keyboard_zoom_in_sync() -> io::Result<()> {
     Ok(())
 }
 #[test]
-fn fixed_welcome_has_no_inert_expand_icon() -> io::Result<()> {
-    let f = support::Fixture::new("welcome-no-zoom")?;
-    let mut a = f.app()?;
-    dn::welcome::open(&mut a);
-    let pixels = support::draw(&mut a, 100, 35)?;
-    let s = surface(&mut a);
-    assert!(!s.caps.zoom);
-    let row = (s.bounds.x..s.bounds.right())
-        .map(|x| pixels[(x, s.bounds.y)].symbol())
-        .collect::<String>();
-    assert!(!row.contains("[▲]") && !row.contains("[↑]") && !row.contains("[↕]"));
-    assert!(!a
-        .mouse
-        .regions
-        .iter()
-        .any(|(_, t)| *t == Target::Surface(s.id, Chrome::Zoom)));
+fn welcome_uses_help_zoom_resize_and_preserves_nested_settings() -> io::Result<()> {
+    use crossterm::event::{KeyCode as K, KeyModifiers as M};
+    for language in [
+        dn::localization::Language::English,
+        dn::localization::Language::Russian,
+    ] {
+        let f = support::Fixture::new("welcome-zoom-resize")?;
+        let mut a = f.app()?;
+        a.config.language = language;
+        dn::welcome::open(&mut a);
+        a.welcome.modals.welcome_mut().unwrap().focus = 1;
+        support::draw(&mut a, 100, 35)?;
+        let original = surface(&mut a);
+        assert!(original.caps.zoom && original.caps.resize);
+        support::click(&mut a, Target::Surface(original.id, Chrome::Zoom));
+        let pixels = support::draw(&mut a, 100, 35)?;
+        let expanded = surface(&mut a);
+        assert!(expanded.maximized);
+        assert!(expanded.bounds.width > original.bounds.width);
+        assert_eq!(a.welcome.modals.welcome().unwrap().focus, 1);
+        let title = (expanded.bounds.x..expanded.bounds.right())
+            .map(|x| pixels[(x, expanded.bounds.y)].symbol())
+            .collect::<String>();
+        assert_eq!(
+            title.matches('[').count(),
+            2,
+            "One close and one working zoom control"
+        );
+        support::modified(&mut a, K::Char('z'), M::ALT);
+        support::draw(&mut a, 100, 35)?;
+        assert_eq!(surface(&mut a).bounds, original.bounds);
+        support::modified(&mut a, K::F(5), M::CONTROL);
+        support::modified(&mut a, K::Right, M::SHIFT);
+        support::modified(&mut a, K::Down, M::SHIFT);
+        support::key(&mut a, K::Enter);
+        support::draw(&mut a, 100, 35)?;
+        let resized = surface(&mut a);
+        assert!(resized.bounds.width > original.bounds.width);
+        assert!(resized.bounds.height > original.bounds.height);
+        assert!(a
+            .mouse
+            .regions
+            .iter()
+            .any(|(_, t)| *t == Target::Surface(resized.id, Chrome::Resize)));
+        let grip = a
+            .mouse
+            .regions
+            .iter()
+            .find(|(_, t)| *t == Target::Surface(resized.id, Chrome::Resize))
+            .unwrap()
+            .0;
+        use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
+        let (x, y) = (grip.right() - 1, grip.y);
+        for (kind, column, row) in [
+            (MouseEventKind::Down(MouseButton::Left), x, y),
+            (MouseEventKind::Drag(MouseButton::Left), x + 2, y + 1),
+            (MouseEventKind::Up(MouseButton::Left), x + 2, y + 1),
+        ] {
+            dn::mouse::handle(
+                &mut a,
+                MouseEvent {
+                    kind,
+                    column,
+                    row,
+                    modifiers: M::NONE,
+                },
+            );
+        }
+        support::draw(&mut a, 100, 35)?;
+        let dragged = surface(&mut a);
+        assert!(dragged.bounds.width > resized.bounds.width);
+        assert!(dragged.bounds.height > resized.bounds.height);
+        let resized = dragged;
+        dn::welcome::action(&mut a, dn::welcome::Action::Keyboard);
+        support::draw(&mut a, 100, 35)?;
+        support::key(&mut a, K::Esc);
+        support::draw(&mut a, 100, 35)?;
+        assert_eq!(surface(&mut a).bounds, resized.bounds);
+        assert_eq!(a.welcome.modals.welcome().unwrap().focus, 1);
+        support::click(&mut a, Target::Surface(resized.id, Chrome::Zoom));
+        support::draw(&mut a, 80, 25)?;
+        assert!(a.welcome.modals.welcome().is_some());
+        support::draw(&mut a, 100, 35)?;
+        support::modified(&mut a, K::Char('z'), M::ALT);
+        support::draw(&mut a, 100, 35)?;
+        assert_eq!(surface(&mut a).bounds, resized.bounds);
+        support::key(&mut a, K::Esc);
+        assert!(a.welcome.modals.welcome().is_none());
+    }
     Ok(())
 }

@@ -306,3 +306,68 @@ fn copy_move_buttons_and_translated_viewports_keep_their_original_targets() -> i
     }
     Ok(())
 }
+
+#[test]
+fn finished_game_buttons_keep_the_clicked_face_until_release() -> io::Result<()> {
+    use dn::tetris::{self, GameAction, Screen};
+    for (w, h) in [(80, 25), (100, 32), (132, 40)] {
+        for action in [GameAction::New, GameAction::Setup, GameAction::Scores] {
+            let f = support::Fixture::new("game-over-button-aliases")?;
+            let mut a = f.app()?;
+            if w == 132 {
+                a.config.language = dn::localization::Language::Russian;
+                a.config.palette = a
+                    .config
+                    .palette
+                    .with_slot(dn::palette::theme::Slot::DialogText, 0x1e);
+            }
+            tetris::open(&mut a);
+            support::draw(&mut a, w, h)?;
+            {
+                let g = a.desktop.game_mut().unwrap();
+                g.over = true;
+                g.score = 166;
+                g.screen = Screen::GameOver;
+            }
+            support::draw(&mut a, w, h)?;
+            tetris::action(&mut a, GameAction::Back);
+            support::draw(&mut a, w, h)?;
+            input::handle(&mut a, KeyEvent::new(K::F(5), M::CONTROL));
+            input::handle(&mut a, KeyEvent::new(K::Right, M::NONE));
+            input::handle(&mut a, KeyEvent::new(K::Down, M::NONE));
+            input::handle(&mut a, KeyEvent::new(K::Enter, M::NONE));
+            let normal = support::draw(&mut a, w, h)?;
+            let r = a
+                .mouse
+                .regions
+                .iter()
+                .find(|(r, t)| *t == tetris::target(action) && r.y < h - 1)
+                .expect("Game button face")
+                .0;
+            pointer(&mut a, E::Down(B::Left), r.x + 3, r.y);
+            assert!(a.desktop.game().unwrap().over, "Wait for release");
+            assert_eq!(a.desktop.game().unwrap().screen, Screen::Play);
+            depressed(&normal, &support::draw(&mut a, w, h)?, r);
+            pointer(&mut a, E::Drag(B::Left), 0, 0);
+            pointer(&mut a, E::Up(B::Left), 0, 0);
+            finish(&mut a);
+            assert!(a.desktop.game().unwrap().over);
+            assert_eq!(a.desktop.game().unwrap().screen, Screen::Play);
+            pointer(&mut a, E::Down(B::Left), r.x + 3, r.y);
+            support::draw(&mut a, w, h)?;
+            pointer(&mut a, E::Up(B::Left), r.x + 3, r.y);
+            finish(&mut a);
+            let g = a.desktop.game().unwrap();
+            match action {
+                GameAction::New => {
+                    assert!(!g.over);
+                    assert_eq!(g.score, 0);
+                }
+                GameAction::Setup => assert!(matches!(g.screen, Screen::Setup { .. })),
+                GameAction::Scores => assert_eq!(g.screen, Screen::Scores),
+                _ => unreachable!(),
+            }
+        }
+    }
+    Ok(())
+}
