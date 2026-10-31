@@ -1,6 +1,6 @@
 [package]
 name = "dn"
-version = "1.0.0-beta"
+version = "1.1.2"
 edition = "2021"
 description = "Native terminal file manager inspired by DOS Navigator 1.51"
 authors = ["Dmitry Yarygin"]

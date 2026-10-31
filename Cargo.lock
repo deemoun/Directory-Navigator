@@ -121,7 +121,7 @@ dependencies = [
 
 [[package]]
 name = "dn"
-version = "1.0.0-beta"
+version = "1.1.2"
 dependencies = [
  "chrono",
  "crossterm",
