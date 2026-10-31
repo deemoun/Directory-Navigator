@@ -80,7 +80,7 @@ pub(crate) fn open(app: &mut App, id: PluginId) {
     };
     let definition = e.tool.definition();
     let opening = OpenContext {
-        job: app.job.is_some(),
+        job: app.blocking_operation(),
         blocking: crate::windowing::blocked(app),
         viewer: app.desktop.active().kind == WindowKind::Viewer,
     };

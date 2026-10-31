@@ -12,6 +12,10 @@ impl App {
         self.request_exit();
     }
     pub fn abort_quit(&mut self) {
+        if let Some(id) = self.transfers.quit_prompt.take() {
+            self.modals.remove_message(id);
+        }
+        self.transfers.exit = crate::transfers::ExitMode::None;
         if let Some(m) = &mut self.editor_recovery {
             m.resume();
         }
@@ -49,7 +53,9 @@ impl App {
             });
             return;
         }
-        if self.file_tools.busy() {
+        if self.transfers.has_work() {
+            crate::transfers::request_quit(self);
+        } else if self.file_tools.busy() {
             self.exit_pending = true;
             self.notice = "Finishing list export before exit…".into();
         } else if let Some(job) = &self.job {

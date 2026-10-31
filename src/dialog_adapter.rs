@@ -49,6 +49,13 @@ pub(crate) fn paint(frame: &mut impl Frame, app: &App, area: Rect, focus: Focus)
 
 const ADAPTERS: &[Adapter] = &[
     Adapter {
+        focus: Focus::Transfers,
+        key: crate::transfers::key,
+        mouse: crate::transfers::mouse,
+        spec: crate::transfers::spec,
+        set_focus: |app, next| app.transfers.focus = next,
+    },
+    Adapter {
         focus: Focus::Recovery,
         key: crate::editor::recovery::key,
         mouse: crate::editor::recovery::mouse,

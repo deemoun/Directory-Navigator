@@ -383,6 +383,14 @@ pub(crate) fn dialog_layout(
     language: crate::localization::Language,
 ) -> MessageLayout {
     let text = language.message(&dialog.message);
+    if dialog.title == " Transfers pending " {
+        return MessageLayout {
+            rect: crate::dialog_theme::centered(area, 78, 10),
+            lines: Vec::new(),
+            visible: 0,
+            maximum: 0,
+        };
+    }
     if !dialog.is_about() {
         return message_layout(area, language.text(dialog.title), &text);
     }

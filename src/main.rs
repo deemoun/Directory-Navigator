@@ -2,6 +2,7 @@ use crossterm::event::{Event, MouseEventKind};
 
 use dn::{app::App, input, mouse, terminal::Session};
 use std::io;
+mod diagnostics;
 
 fn run() -> io::Result<()> {
     let mut args = std::env::args_os().skip(1);
@@ -23,6 +24,7 @@ fn run() -> io::Result<()> {
         ));
     }
     let mut app = App::new(std::env::current_dir()?)?;
+    let mut diagnostics = diagnostics::Recorder::from_env();
     app.load_initial_config();
     match app
         .config_store
@@ -57,6 +59,7 @@ fn run() -> io::Result<()> {
 
             dirty = false;
         }
+        diagnostics.snapshot(&app);
         if !app.quit {
             exit_settings_saved = false;
         }
@@ -101,6 +104,7 @@ fn run() -> io::Result<()> {
         }
         let timeout = app.wait_duration(std::time::Instant::now());
         if let Some(event) = session.poll(&mut terminal, timeout)? {
+            diagnostics.event(&event);
             if showing_output {
                 dn::terminal_output::event(&mut app, &event);
                 continue;

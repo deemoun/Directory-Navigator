@@ -205,6 +205,51 @@ pub fn copy_extended_metadata(source: &File, target: &File) -> io::Result<()> {
 pub fn owns(path: &Path, identity: &Metadata) -> bool {
     fs::symlink_metadata(path).is_ok_and(|m| same_identity(identity, &m))
 }
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct EntryIdentity(u64, u64);
+/// A short-lived no-follow identity probe for queued roots. Unlike timestamps,
+/// Windows volume/file indices distinguish replacement entries on NTFS.
+pub(crate) fn entry_identity(path: &Path) -> io::Result<EntryIdentity> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        let m = fs::symlink_metadata(path)?;
+        Ok(EntryIdentity(m.dev(), m.ino()))
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::{fs::OpenOptionsExt, io::AsRawHandle};
+        use windows::Win32::{
+            Foundation::HANDLE,
+            Storage::FileSystem::{
+                GetFileInformationByHandle, BY_HANDLE_FILE_INFORMATION, FILE_FLAG_BACKUP_SEMANTICS,
+                FILE_FLAG_OPEN_REPARSE_POINT, FILE_SHARE_DELETE, FILE_SHARE_READ, FILE_SHARE_WRITE,
+            },
+        };
+        let file = fs::OpenOptions::new()
+            .read(true)
+            .access_mode(0)
+            .share_mode(FILE_SHARE_READ.0 | FILE_SHARE_WRITE.0 | FILE_SHARE_DELETE.0)
+            .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT.0 | FILE_FLAG_BACKUP_SEMANTICS.0)
+            .open(path)?;
+        let mut info = BY_HANDLE_FILE_INFORMATION::default();
+        // SAFETY: the borrowed file handle and writable information live through the call.
+        unsafe { GetFileInformationByHandle(HANDLE(file.as_raw_handle()), &mut info) }
+            .map_err(io::Error::other)?;
+        Ok(EntryIdentity(
+            u64::from(info.dwVolumeSerialNumber),
+            (u64::from(info.nFileIndexHigh) << 32) | u64::from(info.nFileIndexLow),
+        ))
+    }
+    #[cfg(not(any(unix, windows)))]
+    {
+        let _ = path;
+        Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "Queued file identities are unavailable",
+        ))
+    }
+}
 
 /// Compare a directory entry with a live file handle, without following links.
 /// Windows creation timestamps are not file identities (NTFS may reuse them).

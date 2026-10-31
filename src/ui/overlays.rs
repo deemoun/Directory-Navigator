@@ -187,6 +187,9 @@ pub(crate) fn message_spec<'a>(
     app: &'a App,
     message: &crate::layout::MessageLayout,
 ) -> Option<DialogSpec<'a>> {
+    if crate::transfers::quit_dialog(app) {
+        return crate::transfers::quit_spec(app, message.rect);
+    }
     let dialog = app.last_dialog()?;
     let profile = app.config.palette;
     let rect = message.rect;

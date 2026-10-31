@@ -238,7 +238,7 @@ Move/rename use DN's expanded dialog with these supported choices:
 - **Refuse existing destinations** (default): reject the batch before writing if
   any top-level destination already exists.
 - **Skip all existing files**: leave existing files, directories and broken links
-  untouched, copying/moving only the remaining items. A completion dialog reports
+  untouched, copying/moving only the remaining items. Transfer Center records
   any skips. Existing directories are skipped as a whole; their contents are never
   merged. Skipped sources are retained.
 - **Check free disk space**: estimate regular-file lengths before writing. This is
@@ -265,10 +265,39 @@ disk writes** uses staged copying even on the same volume, then guarded source
 cleanup after the whole copied batch succeeds. Cancellation/errors keep completed
 native renames and published copies; there is no automatic rollback.
 
-Operations run in a background worker with item/byte progress. Cancellation and
-errors retain completed work. Moves prefer native no-overwrite rename, with a
-copy fallback when needed. Symlinks are copied as links and are not recursively
-traversed. Copy metadata support varies by platform.
+Copy and Move open the **Transfer Center**, a switchable desktop window. One
+transfer runs at a time; additional requests join its queue. Browse, edit and
+switch windows while it runs. **Manager → Transfers…** or the clickable status
+beside the command line reopens the session's results. Esc, the title close
+control and Close hide the window without cancelling work.
+
+Select a request to see its phase, current path, item/skip counts, bytes and
+elapsed time. The native progress bar uses estimated totals where available;
+large, unreadable or changing trees can have unknown totals. Speed counts actual
+copied bytes, not native renames. Remaining time is shown only when meaningful.
+Enter opens details; F1 opens Help. Cancel selected requests cancellation of
+active work and waits for acknowledgement, or removes a queued request without
+writing. Errors and cancellation pause the queue; Resume queue starts waiting
+requests without retrying failures. Completed work is retained.
+
+The queue is session-only: up to 64 active/pending requests, 100 finished
+summaries and 100 skip/error details per request, with omitted-detail counts.
+Queued roots and destination mappings are revalidated before execution. Directory
+contents are inspected when execution starts, rather than frozen at queue time. A
+completion refreshes affected locations without changing foreground focus or
+unrelated selections. Delete, Trash and Mkdir keep blocking progress dialogs and
+remain unavailable while transfers are pending. Editor saves retain their normal
+independent safeguards.
+
+Quitting with transfers pending offers **Wait and quit**, **Cancel transfers and
+quit**, and **Return to DN** (the default). Cancellation waits for the worker;
+failure while waiting aborts exit. Dirty-document review, recovery and settings
+save checks still apply. No transfer queue is restored after restarting DN.
+
+Moves prefer native no-overwrite rename, with a copy fallback when needed.
+Symlinks are copied as links and are not recursively traversed. Copy metadata
+support varies by platform. No overwrite, automatic retry or concurrent transfers
+are introduced.
 
 F8 and Delete move items to Trash by default, with confirmation. Change
 **Options → File Manager → Setup → Move deleted files to Trash** to select

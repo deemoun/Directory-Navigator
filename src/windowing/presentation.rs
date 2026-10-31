@@ -77,6 +77,7 @@ impl Policy {
     }
     pub fn tool(kind: Kind, bounds: Rect) -> Self {
         let caps = match kind {
+            Kind::Transfers => Capabilities::tool(72, 14),
             Kind::Tree
             | Kind::Find
             | Kind::Sizes

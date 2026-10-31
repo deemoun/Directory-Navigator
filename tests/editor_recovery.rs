@@ -191,6 +191,67 @@ fn later_inspection_nested_focus_discard_and_corrupt_records_are_safe() -> io::R
     Ok(())
 }
 #[test]
+fn multi_document_quit_save_then_cancel_retains_other_buffers_and_checkpoints() -> io::Result<()> {
+    let f = support::Fixture::new("checkpoint-multi-quit")?.canonicalized()?;
+    let root = f.0.join("recovery");
+    let first_path = f.0.join("first.txt");
+    let second_path = f.0.join("second.txt");
+    fs::write(&first_path, "first source")?;
+    fs::write(&second_path, "second source")?;
+    let mut a = f.app()?;
+    recovery::start(&mut a, root.clone());
+    settled(&mut a);
+    editor::open_path(&mut a, first_path.clone());
+    support::wait(&mut a);
+    let first = a.desktop.active().id;
+    editor::paste(&mut a, "first edit ");
+    editor::open_path(&mut a, second_path.clone());
+    support::wait(&mut a);
+    let second = a.desktop.active().id;
+    editor::paste(&mut a, "second edit ");
+    tick(&mut a);
+    assert_eq!(files(&root).len(), 2);
+    a.request_exit();
+    assert_eq!(a.desktop.active().id, second);
+    editor::action(&mut a, E::Save);
+    wait(&mut a, |a| {
+        a.desktop.active().id == first && !a.desktop.editor(second).unwrap().busy()
+    });
+    editor::action(&mut a, E::Cancel);
+    assert!(!a.quit && a.quit_review.is_none());
+    tick(&mut a);
+    assert!(!a.desktop.editor(second).unwrap().dirty());
+    assert!(a.desktop.editor(first).unwrap().dirty());
+    assert_eq!(fs::read(&first_path)?, b"first source");
+    assert_eq!(fs::read(&second_path)?, b"second edit second source");
+    let checkpoints = files(&root);
+    assert_eq!(checkpoints.len(), 1);
+    assert_eq!(
+        store::read(&checkpoints[0])?.text,
+        "first edit first source"
+    );
+    // A later external modification must abort quit/save without losing recovery.
+    fs::write(&first_path, "external replacement")?;
+    a.request_exit();
+    editor::action(&mut a, E::Save);
+    wait(&mut a, |a| {
+        !a.desktop.editor(first).unwrap().busy() && a.quit_review.is_none()
+    });
+    assert!(!a.quit);
+    assert!(a.desktop.contains(first) && a.desktop.contains(second));
+    assert!(a.desktop.editor(first).unwrap().dirty());
+    assert_eq!(fs::read(&first_path)?, b"external replacement");
+    tick(&mut a);
+    let checkpoints = files(&root);
+    assert_eq!(checkpoints.len(), 1);
+    assert_eq!(
+        store::read(&checkpoints[0])?.text,
+        "first edit first source"
+    );
+    Ok(())
+}
+
+#[test]
 fn save_close_and_cancelled_quit_handle_checkpoint_lifecycle() -> io::Result<()> {
     let f = support::Fixture::new("checkpoint-lifecycle")?.canonicalized()?;
     let root = f.0.join("recovery");

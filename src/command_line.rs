@@ -234,6 +234,7 @@ pub(crate) fn prepare(app: &mut App, area: Rect) {
     app.command_line.view_start = start;
 }
 fn presentation_data(app: &App, area: Rect) -> (String, Option<(u16, u16)>, u16, usize) {
+    let area = crate::transfers::command_area(app, area);
     let prefix_armed = crate::shortcuts::armed(app);
     let focused = crate::focus::current(app) == crate::focus::Focus::Manager;
     let line = &app.command_line;

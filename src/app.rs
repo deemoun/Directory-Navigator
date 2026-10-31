@@ -13,6 +13,7 @@ mod modals;
 mod polling;
 
 pub struct App {
+    pub transfers: crate::transfers::State,
     pub(crate) button_feedback: crate::button_feedback::State,
     pub modals: crate::modals::ModalStack,
     pub welcome: crate::welcome::State,
@@ -66,6 +67,7 @@ impl App {
     pub fn new(path: PathBuf) -> io::Result<Self> {
         let config = Config::default();
         let mut app = Self {
+            transfers: Default::default(),
             button_feedback: Default::default(),
             modals: Default::default(),
             welcome: Default::default(),
@@ -142,7 +144,10 @@ impl App {
         } else {
             kind
         };
-        if self.job.is_some() || self.panels[self.active].loading {
+        if self.panels[self.active].loading
+            || self.job.as_ref().is_some_and(|j| j.transfer.is_none())
+            || (!matches!(kind, Kind::Copy | Kind::Move) && self.transfers.has_work())
+        {
             return;
         }
         let sources = if kind == Kind::Mkdir {
@@ -195,7 +200,7 @@ impl App {
     }
 
     pub fn open_pattern(&mut self, selecting: bool) {
-        if self.job.is_none() && !self.panels[self.active].loading {
+        if !self.blocking_operation() && !self.panels[self.active].loading {
             self.modals
                 .set_pattern(Some(crate::pattern::PatternDialog::new(
                     self.active,
@@ -207,7 +212,7 @@ impl App {
 
     pub fn open_file_info(&mut self) {
         let panel = &self.panels[self.active];
-        if self.job.is_some() || panel.loading {
+        if self.blocking_operation() || panel.loading {
             return;
         }
         if let Some(path) = panel.entries.get(panel.cursor).map(|e| e.path.clone()) {
@@ -270,10 +275,9 @@ impl App {
                     sources: prompt.sources,
                     destination: destination.clone(),
                 };
-                match Job::start_with_options(plan, options) {
-                    Ok(job) => {
+                match crate::transfers::submit(self, plan, options) {
+                    Ok(_) => {
                         self.copy_dialog.record(destination);
-                        self.job = Some(job);
                     }
                     Err(error) => self.error(error.to_string()),
                 }
@@ -292,5 +296,8 @@ impl App {
     pub fn toggle_hidden(&mut self) {
         self.config.show_hidden = !self.config.show_hidden;
         self.refresh();
+    }
+    pub(crate) fn blocking_operation(&self) -> bool {
+        self.job.as_ref().is_some_and(|j| j.transfer.is_none())
     }
 }

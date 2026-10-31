@@ -70,6 +70,11 @@ impl App {
         }
     }
     pub fn pop_dialog(&mut self) -> Option<Dialog> {
+        if crate::transfers::quit_dialog(self) {
+            let result = self.modals.pop_message(self.desktop.target());
+            self.abort_quit();
+            return result;
+        }
         let id = self.desktop.target();
         if self.help_document().is_some() {
             self.desktop
@@ -83,6 +88,9 @@ impl App {
         }
     }
     pub fn clear_dialogs(&mut self) {
+        if self.transfers.quit_prompt.is_some() {
+            self.abort_quit();
+        }
         if self.help_document().is_some() {
             self.pop_dialog();
         } else {
@@ -174,11 +182,11 @@ impl App {
             stack.bind(crate::desktop::WindowId::MANAGER);
         }
         use crate::modals::ModalOwner;
-        if self.job.is_some() && self.modals.job_progress().is_none() {
+        if self.blocking_operation() && self.modals.job_progress().is_none() {
             self.modals
                 .set_job_progress(Some(crate::modals::JobProgress));
         }
-        if self.job.is_none() {
+        if !self.blocking_operation() {
             self.modals.set_job_progress(None);
         }
         crate::retirement::documents(self);

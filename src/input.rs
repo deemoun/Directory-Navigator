@@ -9,7 +9,10 @@ pub fn cancel_feedback(app: &mut App) {
 
 /// Terminal entry point, including native-style push-button feedback.
 pub fn handle_ui(app: &mut App, key: KeyEvent) {
-    if !crate::button_feedback::key(app, key) {
+    handle_ui_at(app, key, std::time::Instant::now());
+}
+pub(crate) fn handle_ui_at(app: &mut App, key: KeyEvent, now: std::time::Instant) {
+    if !crate::button_feedback::key(app, key, now) {
         handle(app, key);
     }
 }

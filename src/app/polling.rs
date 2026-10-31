@@ -66,6 +66,7 @@ impl App {
             );
         }
 
+        changed |= crate::transfers::poll(self, std::time::Instant::now());
         changed |= self.poll_operation();
         changed |= crate::tool_windows::poll(self);
         self.sync_modals();
@@ -99,6 +100,7 @@ impl App {
             || self.archive().is_some_and(|a| a.loading())
             || self.launcher.loading()
             || self.job.is_some()
+            || self.transfers.pending_io()
             || self.file_tools.busy()
             || self.panels.iter().any(|p| {
                 p.loading
@@ -264,6 +266,9 @@ impl App {
     }
 
     fn poll_operation(&mut self) -> bool {
+        if self.job.as_ref().is_some_and(|j| j.transfer.is_some()) {
+            return false;
+        }
         let mut changed = false;
         let mut finished = None;
         let mut operation_focus = None;
@@ -281,7 +286,7 @@ impl App {
                     }
                     Err(std::sync::mpsc::TryRecvError::Empty) => break,
                     Err(std::sync::mpsc::TryRecvError::Disconnected) => {
-                        finished = Some(Err(crate::operations::OperationFailure {kind:io::ErrorKind::BrokenPipe,progress:job.progress.clone(),message:"File operation worker stopped unexpectedly; check partial destinations.".into()}));
+                        finished = Some(Err(crate::operations::OperationFailure {kind:io::ErrorKind::BrokenPipe,progress:Box::new(job.progress.clone()),message:"File operation worker stopped unexpectedly; check partial destinations.".into()}));
                         break;
                     }
                 }

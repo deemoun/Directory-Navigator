@@ -300,7 +300,11 @@ fn skip_completion_is_visible_and_default_conflicts_still_refuse() -> io::Result
         a.job.is_none() && a.panels.iter().all(|p| !p.loading)
     });
     assert!(app.last_operation.as_ref().unwrap().is_err());
-    assert_eq!(app.dialogs().len(), 1);
+    assert!(app.dialogs().is_empty());
+    assert_eq!(
+        app.transfers.selected().unwrap().status,
+        dn::transfers::Status::Failed
+    );
     key(&mut app, K::Esc);
     let panel = &mut app.panels[app.active];
     panel.cursor = panel
@@ -313,12 +317,14 @@ fn skip_completion_is_visible_and_default_conflicts_still_refuse() -> io::Result
     copy_dialog::pick(&mut app, owner, t.0.join("out"));
     copy_dialog::action(&mut app, Action::Skip);
     key(&mut app, K::Enter);
+    dn::transfers::action(&mut app, dn::transfers::Action::Resume);
     wait(&mut app, |a| {
-        a.job.is_none() && a.panels.iter().all(|p| !p.loading)
+        !a.transfers.has_work() && a.panels.iter().all(|p| !p.loading)
     });
     let p = app.last_operation.as_ref().unwrap().as_ref().unwrap();
     assert_eq!((p.files, p.skipped), (0, 1));
-    assert!(draw(&mut app, 80, 25)?.contains("Skipped existing items: 1"));
+    assert!(draw(&mut app, 80, 25)?.contains("Skipped: 1"));
+    assert_eq!(app.transfers.selected().unwrap().progress.details.len(), 1);
     assert_eq!(fs::read(t.0.join("out/source.txt"))?, b"existing winner");
     assert_eq!(fs::read(t.0.join("source.txt"))?, b"fixture bytes");
     key(&mut app, K::Esc);

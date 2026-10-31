@@ -13,6 +13,7 @@ use std::{
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Target {
+    Transfer(crate::transfers::Action),
     Recovery(crate::editor::recovery::Action),
     Surface(
         crate::windowing::geometry::SurfaceId,
@@ -96,7 +97,10 @@ impl MouseState {
 
 /// Terminal entry point: hold shared push buttons until release.
 pub fn handle_ui(app: &mut App, event: MouseEvent) {
-    if !crate::button_feedback::mouse(app, event) {
+    handle_ui_at(app, event, Instant::now());
+}
+pub(crate) fn handle_ui_at(app: &mut App, event: MouseEvent, now: Instant) {
+    if !crate::button_feedback::mouse(app, event, now) {
         handle(app, event);
     }
 }
@@ -306,6 +310,14 @@ fn handle_mouse(app: &mut App, event: MouseEvent) {
         return;
     }
     if focus == Focus::Message {
+        if crate::transfers::quit_dialog(app) {
+            if event.kind == MouseEventKind::Down(MouseButton::Left) {
+                if let Some(Target::Transfer(a)) = target {
+                    crate::transfers::action(app, a);
+                }
+            }
+            return;
+        }
         let offset = app.layout_key.map_or((0, 0), |(_, r, _)| (r.x, r.y));
         if let Some(help) = app.native_help_mut() {
             let close = help.mouse(event, offset);
@@ -629,6 +641,7 @@ fn handle_mouse(app: &mut App, event: MouseEvent) {
             }
         }
         Some(Target::CommandLine) => app.command_line.click(event.column),
+        Some(Target::Transfer(crate::transfers::Action::Open)) => crate::transfers::open(app),
         Some(Target::Entry(index, row)) => {
             app.active = index;
             let panel = &mut app.panels[index];

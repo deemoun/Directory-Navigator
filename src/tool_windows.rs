@@ -11,6 +11,7 @@ use crate::{
 use std::path::PathBuf;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Kind {
+    Transfers,
     Tree,
     Find,
     Sizes,
@@ -29,6 +30,7 @@ pub enum Kind {
 impl Kind {
     pub fn focus(self) -> Focus {
         match self {
+            Self::Transfers => Focus::Transfers,
             Self::Tree => Focus::Tree,
             Self::Find | Self::Sizes => Focus::Discovery,
             Self::Archive => Focus::Archive,
@@ -42,6 +44,7 @@ impl Kind {
     }
     pub fn title(self) -> &'static str {
         match self {
+            Self::Transfers => "Transfer Center",
             Self::Tree => "Directory tree",
             Self::Find => "Find files",
             Self::Sizes => "Directory sizes",
@@ -101,7 +104,7 @@ impl ToolWindow {
         self.state.bind(id);
     }
     fn root(&self) -> bool {
-        self.state.alive()
+        self.kind == Kind::Transfers || self.state.alive()
     }
 }
 impl App {
@@ -335,6 +338,13 @@ pub(crate) fn prepare(app: &mut App, area: Rect) {
         let Some(s) = app.desktop.native().surface(SurfaceKey::Document(id)) else {
             continue;
         };
+        if app
+            .desktop
+            .tool(id)
+            .is_some_and(|t| t.kind == Kind::Transfers)
+        {
+            app.transfers.rows = usize::from(s.bounds.height.saturating_sub(13)).max(1);
+        }
         let t = app.desktop.tool_mut(id).unwrap();
         if let Some(tree) = t.state.directory_tree_mut() {
             tree.page_rows = usize::from(s.bounds.height.saturating_sub(10)).max(1);

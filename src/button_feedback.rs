@@ -100,10 +100,26 @@ impl Press {
 pub(crate) fn busy(app: &App) -> bool {
     app.button_feedback.press.is_some()
 }
+pub(crate) fn diagnostic(app: &App) -> String {
+    app.button_feedback.press.as_ref().map_or_else(
+        || "none".into(),
+        |p| {
+            let phase = match p.event {
+                Activation::Key(_) => "keyboard",
+                Activation::Mouse(_) => "mouse-held",
+                Activation::Released(_) => "mouse-released",
+            };
+            format!(
+                "{phase} target={:?} bounds={:?} frame={:?} inside={}",
+                p.target, p.rect, p.context, p.inside
+            )
+        },
+    )
+}
 pub(crate) fn cancel(app: &mut App) {
     app.button_feedback.press = None;
 }
-fn start(app: &mut App, target: Target, event: Activation) -> bool {
+fn start(app: &mut App, target: Target, event: Activation, now: Instant) -> bool {
     let Some(context) = app.mouse.frame else {
         return false;
     };
@@ -131,7 +147,7 @@ fn start(app: &mut App, target: Target, event: Activation) -> bool {
         rect,
         event,
         inside: true,
-        earliest: Instant::now() + PRESS_TIME,
+        earliest: now + PRESS_TIME,
     };
     if !p.valid(app) {
         return false;
@@ -139,7 +155,7 @@ fn start(app: &mut App, target: Target, event: Activation) -> bool {
     app.button_feedback.press = Some(p);
     true
 }
-pub(crate) fn key(app: &mut App, key: KeyEvent) -> bool {
+pub(crate) fn key(app: &mut App, key: KeyEvent, now: Instant) -> bool {
     if key.kind == KeyEventKind::Release {
         return busy(app);
     }
@@ -165,7 +181,8 @@ pub(crate) fn key(app: &mut App, key: KeyEvent) -> bool {
     }
     let target = spec(app).and_then(|s| s.key(key)).and_then(|p| p.action);
     if target.is_some_and(|t| {
-        button(app, t) && (key.kind == KeyEventKind::Repeat || start(app, t, Activation::Key(key)))
+        button(app, t)
+            && (key.kind == KeyEventKind::Repeat || start(app, t, Activation::Key(key), now))
     }) {
         return true;
     }
@@ -179,7 +196,7 @@ pub(crate) fn key(app: &mut App, key: KeyEvent) -> bool {
             rect,
             event: Activation::Key(key),
             inside: true,
-            earliest: Instant::now() + PRESS_TIME,
+            earliest: now + PRESS_TIME,
         };
         if p.valid(app) {
             app.button_feedback.press = Some(p);
@@ -188,7 +205,7 @@ pub(crate) fn key(app: &mut App, key: KeyEvent) -> bool {
     }
     false
 }
-pub(crate) fn mouse(app: &mut App, event: MouseEvent) -> bool {
+pub(crate) fn mouse(app: &mut App, event: MouseEvent, now: Instant) -> bool {
     if let Some(mut p) = app.button_feedback.press.take() {
         if !p.valid(app) {
             return true;
@@ -198,7 +215,7 @@ pub(crate) fn mouse(app: &mut App, event: MouseEvent) -> bool {
             match event.kind {
                 MouseEventKind::Up(MouseButton::Left) => {
                     if p.inside {
-                        if Instant::now() >= p.earliest {
+                        if now >= p.earliest {
                             p.dispatch(app);
                         } else {
                             p.event = Activation::Released(down);
@@ -223,7 +240,7 @@ pub(crate) fn mouse(app: &mut App, event: MouseEvent) -> bool {
         .rev()
         .find(|(r, _)| r.contains((event.column, event.row).into()))
         .map(|(_, t)| *t);
-    target.is_some_and(|t| button(app, t) && start(app, t, Activation::Mouse(event)))
+    target.is_some_and(|t| button(app, t) && start(app, t, Activation::Mouse(event), now))
 }
 pub(crate) fn poll(app: &mut App, now: Instant) -> bool {
     let Some(p) = app.button_feedback.press.take() else {

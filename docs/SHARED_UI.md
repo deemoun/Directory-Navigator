@@ -162,6 +162,24 @@ Other tool forms retain their existing controllers until they need changes.
 
 ## Sequence and live-terminal regression coverage
 
+Copy/Move work is owned by the workspace's `transfers` service. Non-reusable
+`TransferId` records survive closing their optional native tool window; `App.job`
+is the compatibility adapter for the one active worker. Legacy Delete/Trash/Mkdir
+jobs retain their blocking modal. Queue preparation uses one bounded pool task
+at a time, and the active transfer uses the existing dedicated operation worker.
+Prepared roots pin no-follow native identities and canonical destination mappings;
+execution reuses the no-replace engine with those captured guards.
+
+Progress carries its transfer identity, phase, actual written bytes, optional
+estimated totals and bounded structured details. Completion is delivered without
+foreground activation; panel selection cleanup is conditional on the captured
+logical pane, path and selection. Copy estimates never authorize filesystem writes.
+The shared Transfer Center controls own focus/hits while service state owns jobs,
+results and quit choices. `tests/transfers.rs` and controlled-worker unit tests
+cover queue limits, stale identities/replies, cancellation acknowledgement,
+failure-paused queues, panel swaps, quit guards and immutable rendering. The PTY
+walkthrough covers queueing, independent editing, Help, resizing and terminal exit.
+
 `tests/lifecycle_sequences.rs` combines actual document loading/identity work,
 background focus, viewport changes, repeated opening, targeted closing, dirty
 close cancellation, nested Help and independent undo state. Unit sequences in
@@ -179,6 +197,21 @@ Tetris page movement, manipulation paste isolation, resize, Ctrl+O handoff,
 terminal flags and input back in the parent shell. No Python, terminal emulator
 application or new dependency is required. Windows/Linux validation is deferred.
 Run these cases with `cargo test --test lifecycle_sequences --test terminal_walkthrough`.
+
+`testing::InputClock` injects per-test time into the production button-feedback
+entry points. Deadline, hold, release and cancellation tests can advance time
+without sleeping or changing game/worker clocks. `stability_transitions` repeats
+switching, nested game pages, manipulation, resizing and owner retirement with
+held input; recovery sequences also cover partially saved multi-document quit
+and an external-change save failure that retains the remaining checkpoint.
+
+The PTY harness opts into `DN_TEST_DIAGNOSTICS` with a new private fixture file.
+Only when that variable is set, the executable records a bounded event history
+and its current focus, modal owners, pending button, capture and window geometry.
+Character values, pasted text, document contents and paths are omitted from that
+application snapshot. A failure report combines it with bounded test input and
+the last committed terminal screen. Diagnostics never overwrite an existing file
+and are disabled during normal use.
 
 ## Editable DN colors
 

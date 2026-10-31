@@ -70,6 +70,7 @@ fn set_focus(app: &mut App, scope: Focus, next: usize) {
         return;
     }
     match scope {
+        Focus::Message if crate::transfers::quit_dialog(app) => app.transfers.quit_focus = next,
         Focus::Settings => {
             if let Some(m) = app.modals.settings_mut() {
                 m.cursor = next;
@@ -136,6 +137,7 @@ fn set_focus(app: &mut App, scope: Focus, next: usize) {
 
 pub(crate) fn tool_action(app: &mut App, target: Target) {
     match Some(target) {
+        Some(Target::Transfer(a)) => crate::transfers::action(app, a),
         Some(Target::Recovery(a)) => crate::editor::recovery::action(app, a),
         Some(Target::CloseDialog) => {
             app.pop_dialog();

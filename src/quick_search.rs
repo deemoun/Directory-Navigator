@@ -72,7 +72,7 @@ impl QuickSearch {
 
 pub fn open(app: &mut App) {
     if !app.panels[app.active].loading
-        && app.job.is_none()
+        && !app.blocking_operation()
         && app.dialogs().is_empty()
         && crate::focus::screen(app) == crate::focus::Screen::Manager
         && app.modals.prompt().is_none()

@@ -1,5 +1,7 @@
 # Directory Navigator
 
+[English](README.md) | [Русский](README.ru.md)
+
 A modern terminal file manager built in **Rust with Turbo Vision**, inspired by
 **DOS Navigator**.
 
@@ -44,13 +46,20 @@ and modern filesystem handling.
 
 ## In action
 
+<p align="center">
+  <a href="docs/images/overlapping-windows-and-colors.png">
+    <img src="docs/images/overlapping-windows-and-colors.png" alt="Overlapping Directory Tree, Tetris and Colors windows above the two file panels" width="1000">
+  </a>
+  <br><strong>A classic DN desktop</strong><br>Movable windows, directory browsing and customizable colors.
+</p>
+
 <table>
   <tr>
     <td align="center" width="50%" valign="top">
-      <a href="docs/images/tetris.png">
-        <img src="docs/images/tetris.png" alt="Directory Navigator Tetris with score, next piece and game controls" width="500">
+      <a href="docs/images/tetris-and-pentix-settings.png">
+        <img src="docs/images/tetris-and-pentix-settings.png" alt="Tetris game and setup dialog with ten levels, Classic Tetris or Pentix modes and piece preview" width="500">
       </a>
-      <br><strong>Tetris</strong><br>A classic break, with saved high scores.
+      <br><strong>Tetris and Pentix</strong><br>Ten levels, optional piece preview and separate saved high scores.
     </td>
     <td align="center" width="50%" valign="top">
       <a href="docs/images/options.png">
@@ -150,6 +159,12 @@ highlighted file; reopening a file activates its existing document. Close and qu
 check unsaved changes across the relevant editors. Editors and viewers open maximized,
 can be moved or resized, and support **Tile** and **Cascade** through the Manager
 menu or window list. Window geometry lasts for the session.
+
+Copy and Move use a switchable **Transfer Center**: continue browsing or editing
+while one transfer runs and others wait in its queue. **Manager → Transfers…**
+reopens progress and results. Closing the window keeps work running; errors or
+cancellation pause the queue until you resume it. Existing destinations are never
+overwritten.
 
 The bottom row is a command prompt. Type a command and press **Enter** to run it
 in the active panel's directory; **Esc** clears it. **Ctrl+E / Ctrl+X** recall command

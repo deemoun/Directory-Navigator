@@ -9,6 +9,56 @@ use crate::{
     },
 };
 use std::{io, ops::Index};
+
+/// A per-test clock for the production button-feedback path. It does not advance
+/// filesystem workers or game time, and never changes a process-global clock.
+pub struct InputClock(std::time::Instant);
+impl Default for InputClock {
+    fn default() -> Self {
+        Self(std::time::Instant::now())
+    }
+}
+impl InputClock {
+    pub fn key(&self, app: &mut crate::app::App, key: crossterm::event::KeyEvent) {
+        crate::input::handle_ui_at(app, key, self.0);
+    }
+    pub fn mouse(&self, app: &mut crate::app::App, event: crossterm::event::MouseEvent) {
+        crate::mouse::handle_ui_at(app, event, self.0);
+    }
+    pub fn advance(&mut self, app: &mut crate::app::App, elapsed: std::time::Duration) -> bool {
+        self.0 += elapsed;
+        crate::button_feedback::poll(app, self.0)
+    }
+    pub fn busy(&self, app: &crate::app::App) -> bool {
+        crate::button_feedback::busy(app)
+    }
+}
+
+/// Metadata only: no buffer contents, paths, field values or pasted text.
+pub fn diagnostic_state(app: &crate::app::App) -> String {
+    use std::fmt::Write;
+    let native = app.desktop.native();
+    let mut state = format!(
+        "active={:?} focus={:?} layout_revision={} viewport={:?}\nmodals={:?}\nbutton={}\ncapture={:?} z_order={:?}\n",
+        app.desktop.active(), crate::focus::current(app), app.layout_revision,
+        app.utilities.size, app.modal_infos(), crate::button_feedback::diagnostic(app),
+        native.manipulated_surface(), native.z_order(),
+    );
+    for window in app.desktop.windows() {
+        if let Some(s) = native.surface(crate::windowing::geometry::SurfaceKey::Document(window.id))
+        {
+            let _ = writeln!(
+                state,
+                "surface={:?} bounds={:?} maximized={}",
+                s.id, s.bounds, s.maximized
+            );
+        }
+    }
+    if let Some(s) = native.top_surface() {
+        let _ = writeln!(state, "top={:?} bounds={:?}", s.id, s.bounds);
+    }
+    state
+}
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Cell {
     symbol: String,

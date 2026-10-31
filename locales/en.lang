@@ -765,3 +765,53 @@ Empty demo playlist	Empty demo playlist
 * Already in the draft playlist	* Already in the draft playlist
 Edit the demo order · OK keeps it until this player closes	Edit the demo order · OK keeps it until this player closes
 UI prototype · no playback or file saving	UI prototype · no playback or file saving
+Transfer Center	Transfer Center
+Transfers	Transfers
+Trans~f~ers...	Trans~f~ers...
+Preparing	Preparing
+Calculating totals	Calculating totals
+Copying	Copying
+Verifying	Verifying
+Renaming	Renaming
+Removing sources	Removing sources
+Queued	Queued
+Running	Running
+Cancelling	Cancelling
+Completed	Completed
+Cancelled	Cancelled
+Failed	Failed
+Active	Active
+Queue paused	Queue paused
+estimated	estimated
+Items	Items
+Skipped	Skipped
+Bytes	Bytes
+Elapsed	Elapsed
+Speed	Speed
+Remaining	Remaining
+Source	Source
+Enter: details · F1: Help · Esc: close window	Enter: details · F1: Help · Esc: close window
+No transfers in this session	No transfers in this session
+Cancel selected	Cancel selected
+Resume queue	Resume queue
+Clear finished	Clear finished
+Transfers pending	Transfers pending
+Transfers are still pending. Choose how to finish this session.	Transfers are still pending. Choose how to finish this session.
+Wait and quit	Wait and quit
+Cancel transfers and quit	Cancel transfers and quit
+Return to DN	Return to DN
+Transfer Center Help	Transfer Center Help
+Transfer details Help	Transfer details Help
+Additional detail records omitted	Additional detail records omitted
+Skipped existing destination	Skipped existing destination
+Completed items are retained. Partial destinations may remain.	Completed items are retained. Partial destinations may remain.
+Copy and Move run one at a time. Closing this window keeps transfers running. Cancel stops the selected request; completed items remain. Failure or cancellation pauses the queue. Resume queue starts waiting requests, without retrying failed work. Totals and remaining time are estimates. Existing destinations are never overwritten.	Copy and Move run one at a time. Closing this window keeps transfers running. Cancel stops the selected request; completed items remain. Failure or cancellation pauses the queue. Resume queue starts waiting requests, without retrying failed work. Totals and remaining time are estimates. Existing destinations are never overwritten.
+Cannot queue transfers while quitting	Cannot queue transfers while quitting
+Another file operation is running	Another file operation is running
+Transfer queue is full (64 requests)	Transfer queue is full (64 requests)
+Queued destination changed; transfer was not started	Queued destination changed; transfer was not started
+Queued source resolution changed	Queued source resolution changed
+Queued source list changed	Queued source list changed
+Transfer preparation worker stopped	Transfer preparation worker stopped
+Only Copy and Move belong to the Transfer Center	Only Copy and Move belong to the Transfer Center
+Paused	Paused

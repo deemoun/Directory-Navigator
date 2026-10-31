@@ -257,6 +257,13 @@ impl ModalStack {
             (e.info.owner == ModalOwner::Workspace || e.info.owner == ModalOwner::Document(active))
                 && e.state.is::<MessageState>()
         })?;
+        self.remove_message(self.entries[i].info.id)
+    }
+    pub(crate) fn remove_message(&mut self, id: ModalId) -> Option<crate::dialog::Dialog> {
+        let i = self
+            .entries
+            .iter()
+            .position(|e| e.info.id == id && e.state.is::<MessageState>())?;
         let entry = self.entries.remove(i);
         self.remove_children(entry.info.id);
         entry

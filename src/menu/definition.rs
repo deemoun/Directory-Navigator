@@ -140,6 +140,7 @@ pub const ROOTS: &[Root] = &[
         label: "~M~anager",
         entries: &[
             item("~D~irectory tree", "Ctrl+T", DirectoryTree),
+            item("Trans~f~ers...", "", Transfers),
             item("~Q~uick view", "Ctrl+Q", QuickView),
             item("Terminal ~o~utput", "Ctrl+O", TerminalOutput),
             line(),

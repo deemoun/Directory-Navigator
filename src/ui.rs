@@ -334,6 +334,11 @@ fn draw_content(
         }
     }
     frame.regions().push((regions[2], Target::CommandLine));
+    if let Some(r) = crate::transfers::indicator_bounds(app, regions[2]) {
+        frame
+            .regions()
+            .push((r, Target::Transfer(crate::transfers::Action::Open)));
+    }
     let buttons = Layout::horizontal([Constraint::Percentage(10); 10]).split(regions[3]);
     for (index, rect) in buttons.iter().enumerate() {
         frame

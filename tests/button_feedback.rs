@@ -60,6 +60,71 @@ fn depressed(before: &Buffer, after: &Buffer, r: Rect) {
     }
 }
 #[test]
+fn injected_clock_checks_exact_press_deadline_and_escape_cancellation() -> io::Result<()> {
+    let f = support::Fixture::new("button-clock")?;
+    let mut a = f.app()?;
+    let mut clock = dn::testing::InputClock::default();
+    for cancel in [false, true] {
+        a.prompt_operation(Kind::Mkdir, false);
+        support::draw(&mut a, 80, 25)?;
+        // Focus Cancel without relying on elapsed wall-clock time.
+        input::handle(&mut a, KeyEvent::new(K::Tab, M::NONE));
+        input::handle(&mut a, KeyEvent::new(K::Tab, M::NONE));
+        support::draw(&mut a, 80, 25)?;
+        clock.key(&mut a, KeyEvent::new(K::Enter, M::NONE));
+        assert!(clock.busy(&a));
+        assert!(!clock.advance(&mut a, Duration::from_millis(89)));
+        assert!(a.modals.prompt().is_some());
+        if cancel {
+            clock.key(&mut a, KeyEvent::new(K::Esc, M::NONE));
+            assert!(!clock.busy(&a));
+            assert!(!clock.advance(&mut a, Duration::from_secs(30)));
+            assert!(a.modals.prompt().is_some());
+            input::handle(&mut a, KeyEvent::new(K::Esc, M::NONE));
+        } else {
+            assert!(clock.advance(&mut a, Duration::from_millis(1)));
+            assert!(a.modals.prompt().is_none());
+            assert!(!clock.busy(&a));
+            assert!(!clock.advance(&mut a, Duration::from_secs(30)));
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn injected_clock_mouse_hold_and_early_release_dispatch_only_once() -> io::Result<()> {
+    for held in [false, true] {
+        let f = support::Fixture::new("button-clock-mouse")?;
+        let mut a = f.app()?;
+        let mut clock = dn::testing::InputClock::default();
+        a.prompt_operation(Kind::Mkdir, false);
+        support::draw(&mut a, 80, 25)?;
+        let r = target(&a, Target::CancelPrompt);
+        let event = |kind| MouseEvent {
+            kind,
+            column: r.x + 3,
+            row: r.y,
+            modifiers: M::NONE,
+        };
+        clock.mouse(&mut a, event(E::Down(B::Left)));
+        assert!(clock.busy(&a));
+        if held {
+            assert!(!clock.advance(&mut a, Duration::from_secs(30)));
+            assert!(a.modals.prompt().is_some());
+        }
+        clock.mouse(&mut a, event(E::Up(B::Left)));
+        if !held {
+            assert!(a.modals.prompt().is_some());
+            assert!(!clock.advance(&mut a, Duration::from_millis(89)));
+            assert!(clock.advance(&mut a, Duration::from_millis(1)));
+        }
+        assert!(a.modals.prompt().is_none());
+        assert!(!clock.busy(&a));
+        assert!(!clock.advance(&mut a, Duration::from_secs(30)));
+    }
+    Ok(())
+}
+#[test]
 fn mouse_hold_tracks_leaving_and_returning_and_only_submits_on_release() -> io::Result<()> {
     let f = support::Fixture::new("button-hold")?;
     let mut a = f.app()?;

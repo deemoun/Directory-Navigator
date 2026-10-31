@@ -7,7 +7,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub(super) struct DirectoryGuards(HashMap<PathBuf, Metadata>);
 
 impl DirectoryGuards {

@@ -205,13 +205,18 @@ fn move_refusal_and_skip_never_replace_destinations_or_remove_skipped_sources() 
     copy_dialog::pick(&mut app, owner, t.0.join("out"));
     copy_dialog::action(&mut app, Action::Skip);
     key(&mut app, K::Enter);
+    dn::transfers::action(&mut app, dn::transfers::Action::Resume);
     wait(&mut app, |a| {
-        a.job.is_none() && a.panels.iter().all(|p| !p.loading)
+        !a.transfers.has_work() && a.panels.iter().all(|p| !p.loading)
     });
     let p = app.last_operation.as_ref().unwrap().as_ref().unwrap();
     assert_eq!((p.files, p.skipped), (0, 1));
     let screen = draw(&mut app, 80, 25)?;
-    assert!(screen.contains("Move complete") && screen.contains("Moved items: 0"));
+    assert!(
+        screen.contains("Completed")
+            && screen.contains("Items: 0")
+            && screen.contains("Skipped: 1")
+    );
     assert_eq!(fs::read(t.0.join("out/source.txt"))?, b"winner");
     assert_eq!(fs::read(t.0.join("source.txt"))?, b"fixture bytes");
     Ok(())

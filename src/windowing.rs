@@ -135,6 +135,7 @@ pub fn open(app: &mut App) {
                 | Focus::Viewer
                 | Focus::Plugin
                 | Focus::Tree
+                | Focus::Transfers
                 | Focus::Discovery
                 | Focus::Archive
                 | Focus::FileInfo
@@ -343,6 +344,7 @@ pub fn arrange(app: &mut App, mode: Arrangement) {
                 | Focus::Viewer
                 | Focus::Plugin
                 | Focus::Tree
+                | Focus::Transfers
                 | Focus::Discovery
                 | Focus::Archive
                 | Focus::FileInfo

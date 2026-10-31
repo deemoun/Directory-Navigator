@@ -21,6 +21,7 @@ pub struct Session {
     original: libc::termios,
     output: Vec<u8>,
     screen: Screen,
+    inputs: std::collections::VecDeque<String>,
 }
 impl Session {
     pub fn new(label: &str) -> io::Result<Self> {
@@ -99,6 +100,7 @@ impl Session {
         let mut command = Command::new("/bin/sh");
         command.args(["-c", "\"$1\"; dn_result=$?; printf '\\nDN_STATUS:%s\\n' \"$dn_result\"; IFS= read -r token; printf '\\nDN_INPUT:%s\\n' \"$token\"; exit \"$dn_result\"", "dn-walk", env!("CARGO_BIN_EXE_dn")])
             .current_dir(&root).env("TERM","xterm-256color").env("XDG_CONFIG_HOME",root.join("settings"))
+            .env("DN_TEST_DIAGNOSTICS", root.join("settings/dn/diagnostics.txt"))
             .stdin(Stdio::from(slave.try_clone()?)).stdout(Stdio::from(slave.try_clone()?)).stderr(Stdio::from(slave.try_clone()?));
         // SAFETY: only async-signal-safe calls are made between fork and exec.
         unsafe {
@@ -124,6 +126,7 @@ impl Session {
             original,
             output: vec![],
             screen: Screen::new(80, 25),
+            inputs: Default::default(),
         })
     }
     pub fn text(&self) -> String {
@@ -159,6 +162,7 @@ impl Session {
         stage: &str,
         ready: impl Fn(&Self) -> bool,
     ) -> io::Result<()> {
+        self.remember_input(stage, bytes);
         self.pump()?;
         let previous = self.screen.revision;
         self.master.write_all(bytes)?;
@@ -172,6 +176,7 @@ impl Session {
         stage: &str,
         ready: impl Fn(&Self) -> bool,
     ) -> io::Result<()> {
+        self.remember_input(stage, bytes);
         self.master.write_all(bytes)?;
         self.wait(stage, ready)
     }
@@ -186,11 +191,29 @@ impl Session {
                 return Err(io::Error::other(format!(
                     "{stage}: child={:?}\n{}",
                     self.child.try_wait()?,
-                    self.text()
+                    self.failure_context()
                 )));
             }
             std::thread::sleep(Duration::from_millis(2));
         }
+    }
+    fn remember_input(&mut self, stage: &str, bytes: &[u8]) {
+        if self.inputs.len() == 24 {
+            self.inputs.pop_front();
+        }
+        self.inputs.push_back(format!(
+            "{stage}: {:?} ({} bytes)",
+            &bytes[..bytes.len().min(128)],
+            bytes.len()
+        ));
+    }
+    fn failure_context(&self) -> String {
+        let state = fs::read_to_string(self.root.join("settings/dn/diagnostics.txt"))
+            .unwrap_or_else(|e| format!("Application diagnostics unavailable: {e}"));
+        format!("terminal={}x{} frame={} cursor=({}, {}) visible={} pending_bytes={}\nrecent inputs:\n{}\napplication:\n{}\nscreen:\n{}",
+            self.screen.width, self.screen.height, self.screen.revision,
+            self.screen.x, self.screen.y, self.screen.cursor_visible, self.screen.pending.len(),
+            self.inputs.iter().cloned().collect::<Vec<_>>().join("\n"), state, self.text())
     }
     fn pump(&mut self) -> io::Result<()> {
         let mut bytes = [0; 16384];
@@ -443,6 +466,51 @@ impl Drop for Session {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn failure_report_contains_bounded_inputs_and_live_owned_geometry() -> std::io::Result<()> {
+        let mut s = super::Session::new("diagnostics")?;
+        s.wait("manager ready", |s| {
+            s.command_prompt_active()
+                && s.text().contains("item-000.")
+                && !s.text().contains("Reading directory")
+        })?;
+        s.send(b"\x1b[18~", "mkdir", |s| {
+            s.text().contains("Make directory")
+        })?;
+        s.send(b"\x1b[15;5~", "move dialog", |s| {
+            s.text().contains("Arrows move")
+        })?;
+        s.wait("capture diagnostic published", |s| {
+            std::fs::read_to_string(s.root.join("settings/dn/diagnostics.txt"))
+                .is_ok_and(|text| text.contains("capture=Some") && text.contains("Modal"))
+        })?;
+        for _ in 0..30 {
+            s.remember_input("bounded fixture", b"x");
+        }
+        let report = s.failure_context();
+        for label in [
+            "terminal=80x25",
+            "frame=",
+            "recent inputs:",
+            "active=",
+            "modals=",
+            "button=",
+            "capture=Some",
+            "bounds=",
+            "recent events:",
+            "screen:",
+        ] {
+            assert!(report.contains(label), "Missing {label}: {report}");
+        }
+        assert_eq!(s.inputs.len(), 24);
+        s.send(b"\x1b", "cancel move", |s| {
+            !s.text().contains("Arrows move")
+        })?;
+        s.send(b"\x1b", "cancel mkdir", |s| {
+            !s.text().contains("Make directory")
+        })?;
+        s.finish()
+    }
     use super::{Screen, FRAME_END};
     fn feed(screen: &mut Screen, bytes: &[u8]) {
         screen.pending.extend_from_slice(bytes);

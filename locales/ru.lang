@@ -765,3 +765,53 @@ Empty demo playlist	Список примера пуст
 * Already in the draft playlist	* Уже есть в черновике списка
 Edit the demo order · OK keeps it until this player closes	OK оставит пример списка до закрытия плеера
 UI prototype · no playback or file saving	Макет интерфейса · без звука и записи файлов
+Transfer Center	Центр передач
+Transfers	Передачи
+Trans~f~ers...	П~е~редачи...
+Preparing	Подготовка
+Calculating totals	Подсчёт объёма
+Copying	Копирование
+Verifying	Проверка
+Renaming	Переименование
+Removing sources	Удаление исходников
+Queued	В очереди
+Running	Выполняется
+Cancelling	Отмена
+Completed	Завершено
+Cancelled	Отменено
+Failed	Ошибка
+Active	Активно
+Queue paused	Очередь остановлена
+estimated	оценка
+Items	Объекты
+Skipped	Пропущено
+Bytes	Байты
+Elapsed	Прошло
+Speed	Скорость
+Remaining	Осталось
+Source	Источник
+Enter: details · F1: Help · Esc: close window	Enter: подробности · F1: справка · Esc: закрыть окно
+No transfers in this session	В этом сеансе передач нет
+Cancel selected	Отменить
+Resume queue	Продолжить
+Clear finished	Очистить
+Transfers pending	Незавершённые передачи
+Transfers are still pending. Choose how to finish this session.	Есть незавершённые передачи. Выберите способ выхода.
+Wait and quit	Дождаться и выйти
+Cancel transfers and quit	Отменить и выйти
+Return to DN	Вернуться в DN
+Transfer Center Help	Справка по передачам
+Transfer details Help	Сведения о передаче
+Additional detail records omitted	Других записей пропущено
+Skipped existing destination	Пропущено: назначение уже существует
+Completed items are retained. Partial destinations may remain.	Завершённые объекты сохранены. Могут остаться частично созданные назначения.
+Copy and Move run one at a time. Closing this window keeps transfers running. Cancel stops the selected request; completed items remain. Failure or cancellation pauses the queue. Resume queue starts waiting requests, without retrying failed work. Totals and remaining time are estimates. Existing destinations are never overwritten.	Копирование и перемещение выполняются по очереди. Закрытие окна не останавливает передачу. Отмена останавливает выбранный запрос; готовые объекты сохраняются. Ошибка или отмена останавливает очередь. Продолжение запускает ожидающие запросы без повторения неудачных. Объём и оставшееся время приблизительны. Существующие назначения не перезаписываются.
+Cannot queue transfers while quitting	Нельзя добавлять передачи во время выхода
+Another file operation is running	Выполняется другая файловая операция
+Transfer queue is full (64 requests)	Очередь передач заполнена (64 запроса)
+Queued destination changed; transfer was not started	Назначение изменилось после добавления в очередь; передача не запущена
+Queued source resolution changed	Путь к источнику изменился после добавления в очередь
+Queued source list changed	Список источников изменился после добавления в очередь
+Transfer preparation worker stopped	Подготовка передачи неожиданно остановилась
+Only Copy and Move belong to the Transfer Center	Центр передач поддерживает только копирование и перемещение
+Paused	Пауза

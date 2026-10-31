@@ -792,6 +792,22 @@ pub(crate) fn busy() -> Native {
     control.hide_caption();
     native(control, TextCells::default())
 }
+pub(crate) fn transfer_progress(value: Option<u8>, width: u16, ticks: u64) -> Native {
+    let mut control = ProgressBar::new(
+        TvRect::new(0, 0, i16::try_from(width).unwrap_or(i16::MAX), 1),
+        100,
+    );
+    control.hide_caption();
+    if let Some(value) = value {
+        control.set_value(u64::from(value));
+    } else {
+        control.set_mode(turbo_vision::views::ProgressMode::Marquee);
+        for _ in 0..ticks % (u64::from(width.max(1)) * 2) {
+            control.tick();
+        }
+    }
+    native(control, TextCells::default())
+}
 pub(crate) fn outline(tree: &crate::directory_tree::Tree) -> Native {
     use std::{cell::RefCell, rc::Rc};
     use turbo_vision::views::outline::{Node, OutlineViewer};

@@ -5,6 +5,94 @@ use pty::Session;
 use std::{fs, io};
 
 #[test]
+fn transfer_center_queues_without_blocking_editing_and_restores_terminal() -> io::Result<()> {
+    let mut s = Session::new("transfer-center")?;
+    s.wait("manager ready", |s| {
+        s.command_prompt_active()
+            && s.text().contains("item-000.")
+            && !s.text().contains("Reading directory")
+    })?;
+    s.select_file("item-000.txt")?;
+    s.send(b"\x1b[15~", "copy form", |s| s.text().contains("Copy file"))?;
+    s.send(b"item-001.txt\r", "refused conflict pauses queue", |s| {
+        s.text().contains("Transfer Center")
+            && s.text().contains("Failed")
+            && s.text().contains("Queue paused")
+    })?;
+    assert_eq!(fs::read(s.root.join("item-001.txt"))?, b"fixture\n");
+    for (source, dest) in [
+        ("item-000.txt", "transfer-one.txt"),
+        ("item-002.txt", "transfer-two.txt"),
+    ] {
+        s.send(b"\x1b", "hide center without clearing results", |s| {
+            s.command_prompt_active() && !s.text().contains("Transfer Center")
+        })?;
+        s.select_file(source)?;
+        s.send(b"\x1b[15~", "queue copy form", |s| {
+            s.text().contains("Copy file")
+        })?;
+        s.send(format!("{dest}\r").as_bytes(), "queued request", |s| {
+            s.text().contains("Transfer Center")
+                && s.text().contains("Queue paused")
+                && s.text().contains(dest)
+        })?;
+        assert!(!s.root.join(dest).exists());
+    }
+    s.send(b"\x1b[17;3~", "switch to manager", |s| {
+        s.command_prompt_active()
+    })?;
+    // The last queued request captured item-002; its manager selection remains
+    // intact while the floating center still covers part of the background.
+    s.send(b"\x1b[14~", "editor while transfers wait", |s| {
+        s.text().contains("F2 Save") && s.text().contains("fixture")
+    })?;
+    s.send("draft 界 ".as_bytes(), "independent editor draft", |s| {
+        s.text().contains("draft 界")
+    })?;
+    s.send(b"\x1b[17;4~", "switch back to center", |s| {
+        s.text().contains("Transfer Center") && !s.text().contains("F2 Save")
+    })?;
+    s.send(b"\t\t\r", "resume queued copies", |s| {
+        s.root.join("transfer-one.txt").exists()
+            && s.root.join("transfer-two.txt").exists()
+            && s.text().contains("Completed")
+            && !s.text().contains("Queue paused")
+    })?;
+    s.send(b"\x1bOP", "owned transfer Help", |s| {
+        s.text().contains("Transfer Center Help")
+    })?;
+    s.send(b"\x1b", "return from transfer Help", |s| {
+        s.text().contains("Transfer Center") && !s.text().contains("Transfer Center Help")
+    })?;
+    s.resize(100, 32)?;
+    s.wait("resized center", |s| {
+        s.text().contains("Transfer Center") && s.text().contains("Completed")
+    })?;
+    s.send(b"\x1b[17;3~", "return to retained editor", |s| {
+        s.text().contains("F2 Save") && s.text().contains("draft 界")
+    })?;
+    s.send(b"\x1b", "dirty close guard", |s| {
+        s.text().contains("Discard")
+    })?;
+    s.send(b"d", "discard fixture draft", |s| {
+        !s.text().contains("F2 Save") && !s.text().contains("Discard")
+    })?;
+    if s.text().contains("Transfer Center") {
+        s.send(b"\x1b", "close view", |s| s.command_prompt_active())?;
+    }
+    s.send(b"\x1bmf", "reopen session results from Manager menu", |s| {
+        s.text().contains("Transfer Center") && s.text().contains("Completed")
+    })?;
+    s.send(b"\x1b", "close session results", |s| {
+        s.command_prompt_active()
+    })?;
+    for dest in ["transfer-one.txt", "transfer-two.txt", "item-002.txt"] {
+        assert_eq!(fs::read(s.root.join(dest))?, b"fixture\n");
+    }
+    s.finish()
+}
+
+#[test]
 fn settings_and_unicode_prompt_workflow_restores_terminal_and_preserves_cancelled_drafts(
 ) -> io::Result<()> {
     let mut s = Session::new("controllers")?;
@@ -847,9 +935,19 @@ fn finished_game_buttons_remain_clickable_after_game_over() -> io::Result<()> {
         if s.text().contains("Game over") {
             break;
         }
-        let until = std::time::Instant::now() + std::time::Duration::from_millis(60);
-        s.send_output(b" ", "drop fixture piece", |_| {
-            std::time::Instant::now() >= until
+        fn score(s: &Session) -> Option<u64> {
+            s.text()
+                .split_once("Score:")?
+                .1
+                .trim_start()
+                .split(|c: char| !c.is_ascii_digit())
+                .next()?
+                .parse()
+                .ok()
+        }
+        let previous = score(&s).expect("Visible game score");
+        s.send(b" ", "fixture piece locked or game ended", |s| {
+            s.text().contains("Game over") || score(s).is_some_and(|score| score != previous)
         })?;
     }
     s.wait("game over dialog ready", |s| {

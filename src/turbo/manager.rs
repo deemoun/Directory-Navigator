@@ -338,6 +338,10 @@ pub(crate) fn prepare(
     }
     let (command, cursor) = crate::command_line::presentation(app, prepared.regions[2]);
     plain(&mut s, prepared.regions[2], &command, 0x07);
+    if let Some(r) = crate::transfers::indicator_bounds(app, prepared.regions[2]) {
+        let text = app.transfers.summary(app.config.language);
+        plain(&mut s, r, &crate::formatting::tail(&text, r.width), 0x30);
+    }
     s.cursor = cursor;
     let buttons = Layout::horizontal([Constraint::Percentage(10); 10]).split(prepared.regions[3]);
     for (index, label) in [

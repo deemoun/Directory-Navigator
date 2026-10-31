@@ -131,7 +131,7 @@ pub fn open(app: &mut App, path: PathBuf) -> bool {
         app.open_external_current();
         return true;
     }
-    if app.job.is_some() {
+    if app.blocking_operation() {
         app.error("Wait for the file operation to finish before running an association.");
         return true;
     }

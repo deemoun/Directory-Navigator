@@ -1,6 +1,7 @@
 //! No-replace file operations. Existing destinations are refused or explicitly skipped.
 mod copy_options;
 mod guards;
+pub(crate) mod transfer;
 use crate::filesystem::open_regular;
 pub use copy_options::{CopyOptions, ExistingDestination};
 use guards::DirectoryGuards;
@@ -35,6 +36,12 @@ pub struct Plan {
 
 #[derive(Clone, Debug, Default)]
 pub struct Progress {
+    pub transfer: Option<crate::transfers::TransferId>,
+    pub phase: Phase,
+    pub written: u64,
+    pub total_bytes: Option<u64>,
+    pub details: Vec<Detail>,
+    pub omitted_details: u64,
     pub files: u64,
     pub skipped: u64,
     pub bytes: u64,
@@ -45,11 +52,47 @@ pub enum Event {
     Progress(Progress),
     Done(Result<Progress, OperationFailure>),
 }
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Phase {
+    Preparing,
+    Calculating,
+    #[default]
+    Copying,
+    Verifying,
+    Renaming,
+    RemovingSources,
+}
+impl Phase {
+    pub fn caption(self) -> &'static str {
+        match self {
+            Self::Preparing => "Preparing",
+            Self::Calculating => "Calculating totals",
+            Self::Copying => "Copying",
+            Self::Verifying => "Verifying",
+            Self::Renaming => "Renaming",
+            Self::RemovingSources => "Removing sources",
+        }
+    }
+}
+#[derive(Clone, Debug)]
+pub struct Detail {
+    pub path: PathBuf,
+    pub message: String,
+}
+impl Progress {
+    pub(crate) fn detail(&mut self, path: PathBuf, message: String) {
+        if self.details.len() < 100 {
+            self.details.push(Detail { path, message });
+        } else {
+            self.omitted_details = self.omitted_details.saturating_add(1);
+        }
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct OperationFailure {
     pub kind: io::ErrorKind,
-    pub progress: Progress,
+    pub progress: Box<Progress>,
     pub message: String,
 }
 impl std::fmt::Display for OperationFailure {
@@ -64,6 +107,7 @@ pub enum MoveStrategy {
     Copy,
 }
 pub struct Job {
+    pub transfer: Option<crate::transfers::TransferId>,
     pub(crate) requests: crate::requests::RequestScope,
     token: crate::requests::RequestToken,
     pub events: Receiver<Event>,
@@ -123,6 +167,7 @@ impl Job {
                 let _ = sender.send(Event::Done(result));
             })?;
         Ok(Self {
+            transfer: None,
             requests,
             token,
             events,
@@ -302,6 +347,7 @@ fn mappings(
                     && policy == ExistingDestination::Skip =>
             {
                 progress.skipped = progress.skipped.saturating_add(1);
+                progress.detail(source.path.clone(), "Skipped existing destination".into());
                 continue;
             }
             result => result?,
@@ -390,7 +436,7 @@ pub fn execute_with_options(
     )
     .map_err(|e| OperationFailure {
         kind: e.kind(),
-        progress,
+        progress: Box::new(progress),
         message: e.to_string(),
     })
 }
@@ -417,11 +463,26 @@ fn run_checked(
     plan: &Plan,
     options: CopyOptions,
     cancel: &AtomicBool,
-    mut notify: impl FnMut(&Progress),
+    notify: impl FnMut(&Progress),
     strategy: MoveStrategy,
     space: impl Fn(&Path) -> io::Result<u128>,
 ) -> io::Result<Progress> {
+    run_checked_expected(plan, options, cancel, notify, strategy, space, None)
+}
+fn run_checked_expected(
+    plan: &Plan,
+    options: CopyOptions,
+    cancel: &AtomicBool,
+    mut notify: impl FnMut(&Progress),
+    strategy: MoveStrategy,
+    space: impl Fn(&Path) -> io::Result<u128>,
+    expected: Option<&transfer::Prepared>,
+) -> io::Result<Progress> {
     let mut effective = plan.clone();
+    if let Some(expected) = expected {
+        expected.validate(plan)?;
+        effective.destination = expected.destination.clone();
+    }
     if options.remove_sources && effective.kind == Kind::Copy {
         effective.kind = Kind::Move;
     }
@@ -462,8 +523,12 @@ fn run_checked(
         )?;
         return Ok(progress);
     }
-    let mut guards = DirectoryGuards::default();
-    let sources = sources(plan, &mut guards)?;
+    let mut guards = expected.map_or_else(DirectoryGuards::default, |p| p.guards.clone());
+    let sources = if let Some(p) = expected {
+        p.sources.clone()
+    } else {
+        sources(plan, &mut guards)?
+    };
     let display_roots: std::collections::HashMap<_, _> = sources
         .iter()
         .zip(&plan.sources)
@@ -538,6 +603,7 @@ fn run_checked(
     let mut buffer = vec![0_u8; 128 * 1024];
     for (source, target) in pairs {
         if prefer_rename {
+            progress.phase = Phase::Renaming;
             check(cancel)?;
             let original = &source.metadata;
             progress.path = display_path(&source.path);
@@ -649,6 +715,7 @@ fn run_checked(
                     ));
                 }
             } else if metadata.is_file() {
+                progress.phase = Phase::Copying;
                 let mut input = open_regular(&source)?;
                 if !unchanged_file(&metadata, &input.metadata()?) {
                     return Err(io::Error::other("Source changed before copy"));
@@ -669,6 +736,7 @@ fn run_checked(
                     output.write_all(&buffer[..count])?;
                     remaining -= count as u64;
                     progress.bytes = progress.bytes.saturating_add(count as u64);
+                    progress.written = progress.written.saturating_add(count as u64);
                     notify(&progress);
                 }
                 check(cancel)?;
@@ -679,6 +747,8 @@ fn run_checked(
                 }
                 output.sync_all()?;
                 if options.verify_writes || options.remove_sources {
+                    progress.phase = Phase::Verifying;
+                    notify(&progress);
                     copy_options::verify(&mut input, output, metadata.len(), cancel)?;
                 }
                 check(cancel)?;
@@ -718,6 +788,7 @@ fn run_checked(
     }
     if plan.kind == Kind::Move {
         // Validate the whole copied batch before removing its first source.
+        progress.phase = Phase::RemovingSources;
         // Later unlinks can change ctime on other source hard links, so cleanup
         // below rechecks identity/content metadata without comparing that field.
         for (source, target, original, destination_metadata) in &copied {

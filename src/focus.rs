@@ -3,6 +3,7 @@ use crate::app::App;
 pub use crate::desktop::WindowKind as Screen;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Focus {
+    Transfers,
     Recovery,
     TerminalOutput,
     ConfigImport,
@@ -46,7 +47,7 @@ pub fn current(app: &App) -> Focus {
     if let Some(modal) = app.modal_top() {
         return modal.focus;
     }
-    if app.job.is_some() && screen(app) == Screen::Manager {
+    if app.blocking_operation() && screen(app) == Screen::Manager {
         return Focus::Job;
     }
     match screen(app) {

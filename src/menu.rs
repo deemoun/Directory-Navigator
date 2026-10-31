@@ -8,6 +8,7 @@ pub use navigation::{activate, close, key, open, open_mnemonic, open_root, open_
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Action {
+    Transfers,
     RecoverEditors,
     TerminalOutput,
     ImportDosSettings,
@@ -222,6 +223,7 @@ pub fn execute(app: &mut App, action: Action) {
         Action::OpenExternal => app.open_external_current(),
         Action::BrowseArchive => crate::archive::open_current(app),
         Action::DirectoryTree => crate::directory_tree::open(app),
+        Action::Transfers=>crate::transfers::open(app),
         Action::DirectorySizes => crate::discovery::open_sizes(app),
         Action::QuickView => crate::quick_view::toggle(app),
         Action::Sort(mode) => app.panels[app.active].set_sort(mode),
