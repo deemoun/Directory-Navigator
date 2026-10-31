@@ -1,42 +1,6 @@
+//! Dependency-free: the release gate compiles this file directly with rustc.
 //! All checked-in Actions must require an explicit dispatch, including future workflows.
 use std::{fs, io, path::Path};
-
-#[test]
-fn windows_builds_embed_the_c_runtime_without_changing_other_targets() -> io::Result<()> {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(".cargo/config.toml");
-    let text = fs::read_to_string(path)?;
-    let lf = text.replace("\r\n", "\n");
-    let crlf = lf.replace('\n', "\r\n");
-    let mixed = lf.replacen('\n', "\r\n", 1);
-    for text in [lf, crlf, mixed] {
-        let config: toml::Table = text.parse().expect("Valid Cargo configuration");
-        let targets = config["target"].as_table().expect("Target-specific flags");
-        let flags = targets["x86_64-pc-windows-msvc"]["rustflags"]
-            .as_array()
-            .expect("Windows Rust flags");
-        assert!(flags.windows(2).any(|pair| {
-            pair[0].as_str() == Some("-C") && pair[1].as_str() == Some("target-feature=+crt-static")
-        }));
-        let enables_static_crt = |flags: Option<&toml::Value>| {
-            flags.is_some_and(|flags| flags.to_string().contains("+crt-static"))
-        };
-        assert!(!enables_static_crt(
-            config.get("build").and_then(|build| build.get("rustflags"))
-        ));
-        assert!(!enables_static_crt(
-            config.get("env").and_then(|env| env.get("RUSTFLAGS"))
-        ));
-        for (target, settings) in targets {
-            if !target.ends_with("windows-msvc") {
-                assert!(
-                    !enables_static_crt(settings.get("rustflags")),
-                    "Unexpected static CRT for {target}"
-                );
-            }
-        }
-    }
-    Ok(())
-}
 
 #[test]
 fn every_workflow_is_dispatch_only() -> io::Result<()> {
@@ -317,5 +281,64 @@ fn windows_builds_are_independent_and_package_the_executable() -> io::Result<()>
             "Unexpected Windows workflow dependency/capability: {forbidden}"
         );
     }
+    Ok(())
+}
+
+#[test]
+fn release_gate_compiles_without_cargo_dependencies() -> io::Result<()> {
+    use std::{
+        process::{Command, Stdio},
+        sync::atomic::{AtomicU64, Ordering},
+        thread,
+        time::{Duration, Instant},
+    };
+    struct Fixture(std::path::PathBuf);
+    impl Drop for Fixture {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+    static NEXT: AtomicU64 = AtomicU64::new(0);
+    let directory = std::env::temp_dir().join(format!(
+        "dn-policy-compile-{}-{}",
+        std::process::id(),
+        NEXT.fetch_add(1, Ordering::Relaxed)
+    ));
+    fs::create_dir(&directory)?;
+    let fixture = Fixture(directory);
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let errors = fixture.0.join("stderr.txt");
+    let compiler = std::env::var_os("RUSTC").unwrap_or_else(|| "rustc".into());
+    let executable = if cfg!(windows) {
+        "policy.exe"
+    } else {
+        "policy"
+    };
+    let mut child = Command::new(compiler)
+        .args(["--edition", "2021", "--test"])
+        .arg(root.join("tests/workflow_policy.rs"))
+        .arg("-o")
+        .arg(fixture.0.join(executable))
+        .env("CARGO_MANIFEST_DIR", root)
+        .stdout(Stdio::null())
+        .stderr(fs::File::create(&errors)?)
+        .spawn()?;
+    let deadline = Instant::now() + Duration::from_secs(60);
+    let status = loop {
+        if let Some(status) = child.try_wait()? {
+            break status;
+        }
+        if Instant::now() >= deadline {
+            let _ = child.kill();
+            let _ = child.wait();
+            panic!("Standalone workflow policy compilation timed out");
+        }
+        thread::sleep(Duration::from_millis(10));
+    };
+    assert!(
+        status.success(),
+        "The release gate must compile directly with rustc, without --extern:\n{}",
+        fs::read_to_string(errors)?
+    );
     Ok(())
 }
