@@ -203,6 +203,10 @@ fn apply(app: &mut App, b: Binding, effects: Vec<Effect>) {
                     app.retire_document(w);
                 }
             },
+            Effect::RequestPanelPaths => {
+                let paths = panel_paths(app);
+                dispatch(app, b, Event::PanelPaths(paths));
+            }
             Effect::CopyText(text) => app.editor_clipboard = text,
             Effect::Help { title, text } => app.push_dialog(crate::dialog::Dialog {
                 title,
@@ -456,4 +460,19 @@ pub(crate) fn window_definitions(
         }
     }
     result
+}
+
+/// Capture files/folders at command time; the player filters in its I/O task.
+fn panel_paths(app: &App) -> Vec<PathBuf> {
+    app.panels[app.active].targets()
+}
+pub(crate) fn add_mp3(app: &mut App) {
+    if !cfg!(target_os = "macos") || crate::windowing::blocked(app) {
+        return;
+    }
+    let paths = panel_paths(app);
+    open(app, MP3_PLAYER);
+    if let Some(b) = active(app).filter(|b| b.plugin == MP3_PLAYER) {
+        dispatch(app, b, Event::PanelPaths(paths));
+    }
 }

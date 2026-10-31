@@ -664,33 +664,62 @@ directory changes and after Refresh. Rendering and clock ticks perform no volume
 queries or directory scans. Failed queries display “Volume space unavailable”.
 No drive selector or DOS drive-letter controls are added.
 
-## MP3 Player prototype
+## MP3 Player
 
-Enable **MP3 Player** in **Options → Configuration → Plugins** first; this
-experimental plugin is disabled by default. **Utilities → MP3 Player** then opens
-a DN-style player window. This is a UI prototype:
-no files are opened and no sound is played. Its Track and Track Time counters stay
-at zero. Transport controls and the expanded view's buttons provide native focus
-and pressed feedback; Open, Set up and Volume remain placeholders.
+Enable **MP3 Player** in **Options → Configuration → Plugins** first; it is
+experimental and disabled by default. Audio playback currently requires macOS.
+Linux/Windows retain the window and queue UI with audio controls disabled.
 
-In expanded view, **List** opens a DN-style **Play order** dialog with a native
-scrolling list of numbered demo tracks, unknown durations (`--:--`) and
-descriptions. **Add** opens a nested track chooser; `*` marks tracks already in
-the draft. **Delete** removes the selected row. **OK** keeps the demo order until
-this player window closes; **Cancel/Esc** restores the previously accepted order.
-The chooser's Cancel/Esc returns to the parent draft without changing it.
-Save is deliberately disabled. The list is clearly labelled as example content:
-it does not read MP3 files, scan directories, save playlists or start playback.
-Arrow/page/Home/End keys and the scrollbar navigate; Tab/Shift+Tab select controls.
-Nested F1 Help preserves the draft and focus. Closing/reopening the player resets
-the demo order.
+Mark MP3 files or folders in a file panel and choose **Utilities → Add MP3 to player**.
+Without marks, the command uses the file under the cursor. Files are appended in
+panel order (`.MP3` is accepted). Folders are scanned recursively in name order;
+symbolic links and other extensions are skipped. A progress page offers Cancel,
+which discards the whole batch without changing the queue. Imports also cancel
+when the player closes. Music and background tasks keep running during scanning.
+**Open** in the expanded player and **List → Add** use the same panel selection.
+Adding does not start playback or interrupt the current track. The queue allows
+64 entries, including duplicates. Scanning stops at the queue capacity, 10,000
+directory entries or 64 directory levels, and reports limits/unreadable entries.
+Valid files from a partial scan are added together on completion.
+
+**Play** starts the selected track or resumes a pause. **Pause** suspends it;
+**Stop** resets its position. The outer arrows select the previous/next track
+without wrapping by default; the inner arrows seek by five seconds. Changing tracks while
+playing continues playback; otherwise it selects the track without starting it.
+**Volume** opens a 0–100% dialog, initially 50%, affecting only DN audio. OK applies
+the new value; Cancel discards it. By default, tracks play in order and stop after the last.
+A file/device error stops playback and appears in the expanded window; the queue
+is retained. There are no global media keys or automatic file associations.
+
+**Mode** opens Shuffle and Repeat settings. OK applies them; Cancel discards the
+draft. Repeat Off stops at the end; Repeat One restarts the current track when it
+ends; Repeat All loops the queue. Manual Previous/Next bypass Repeat One and wrap
+only with Repeat All. Shuffle keeps the visible queue unchanged, visits each entry
+once and lets Previous retrace the same order. Repeat All repeats that shuffled
+cycle. Changing the queue or toggling Shuffle rebuilds the cycle starting with the
+current track. Mode settings reset when the player reopens.
+
+Artist/title from ID3 replace filenames in the queue and player when available.
+**Info** shows title, artist, album and the native file path. Tags are read in the
+background without modifying source files. ID3v1 and ID3v2.2/2.3/2.4 are supported,
+including UTF-8 and UTF-16 text. Missing, malformed, unsupported or oversized tags
+fall back to filenames; missing individual fields may fall back to ID3v1.
+
+**List** opens a **Play order** draft with numbered descriptions and unknown durations
+(`--:--`). Delete removes a draft row; OK commits; Cancel/Esc discards changes.
+When stopped, OK also selects the highlighted row for Play. Removing the playing
+track and accepting the draft stops it. Save, Set up and Time remain unavailable.
+Playlists are not saved to disk.
+
+Music continues while other windows or dialogs are active. Closing the player,
+disabling the plugin or quitting DN stops playback. Reopening starts an empty
+queue with the default volume. Nothing is saved between player sessions.
 
 Use Alt+Z, the title zoom button, a title double-click or Alt+0 → Zoom to switch
-between compact and expanded views. Tab/Shift+Tab choose buttons, Enter/Space
-activate them, F1 opens help and Esc closes the player. Ctrl+F5 or title dragging
-moves it. The fixed-size player also participates in Tile/Cascade. Reopening an
-open player activates it; opening it after closing starts compact again.
-**Options → Configuration → Plugins** can hide/enable its menu entry.
+between compact and expanded views. Tab/Shift+Tab choose enabled controls,
+Enter/Space activate them, F1 opens help and Esc closes the current page/player.
+Ctrl+F5 or title dragging moves it. Tile/Cascade retain the fixed window sizes.
+Opening an existing player activates its single window.
 
 ## Tetris / Pentix and high scores
 

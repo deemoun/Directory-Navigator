@@ -23,6 +23,9 @@ chrono = { version = "0.4", default-features = false, features = ["clock"] }
 libc = "0.2"
 
 [target.'cfg(target_os = "macos")'.dependencies]
+rodio = { version = "=0.22.2", default-features = false, features = ["playback", "mp3"] }
+symphonia-core = "=0.5.5"
+symphonia-metadata = "=0.5.5"
 trash = "5.2.9"
 
 [target.'cfg(windows)'.dependencies]

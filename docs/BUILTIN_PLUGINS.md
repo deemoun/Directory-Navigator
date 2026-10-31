@@ -1,6 +1,6 @@
 # Built-in tools
 
-The built-in plugins are Calculator, Tetris/Pentix and the MP3 Player UI prototype.
+The built-in plugins are Calculator, Tetris/Pentix and the MP3 Player.
 They are compiled
 into DN; there is no dynamic loader, binary ABI, installation format, external SDK,
 new dependency or separate plugin configuration format. This is an internal Rust interface which
@@ -140,32 +140,51 @@ PTY verifies toggles, blocked shortcuts, live game retirement, explicit saving,
 resize and terminal restoration. Windows/Linux validation is skipped.
 
 
-## MP3 Player prototype
+## MP3 Player
 
-Utilities → MP3 Player opens a single movable document. Its compact 36×9 and
-expanded 36×16 layouts follow DOS Navigator's CD player, with fixed zero counters,
-a vertical MP3 label and the current configured dialog palette. Transport and
-secondary buttons demonstrate native focus and activation. List opens the
-UI-only play-order dialog described below. There is no playback, file picker,
-metadata reading, timer, audio dependency or saved player preference. Open is a
-placeholder too.
+The opt-in singleton player keeps its DN-style compact 36×9 and expanded 36×18
+windows. Native zoom, movement, arrangement, palette, clipping, owned Help and
+stale-surface guards use the existing shared windowing paths.
 
-Alt+Z, the title zoom control, title double-click and window-list Zoom toggle
-compact/expanded views. The internal optional `ToolPlugin::zoom_action` hook
-returns a local action ID; the common windowing dispatcher delegates to it before
-native maximize/restore. Other windows keep native zoom. Fixed plugin windows
-participate in Tile/Cascade without stretching. Their first geometry comes from
-the declared `LocalWindow`, not a Tetris-specific fallback; later size changes
-retain preferred placement and clamp effective bounds. Closing/reopening the
-player starts compact with Play focused. F1 opens owned prototype help.
+The host handles the typed `RequestPanelPaths` effect by capturing active-panel
+`targets()`, including folders, then delivering `PanelPaths`
+to the same live plugin binding. Utilities → Add MP3 to player captures before
+opening/activating the player. Only MP3 extensions are accepted. List edits a
+bounded 64-entry draft, with stable per-entry identities so duplicates are safe.
+OK applies, Cancel discards; deleting the current entry stops playback. No queue
+or preferences are persisted. Save and unimplemented secondary controls are disabled.
 
-The expanded player's List button opens a 68×20 play-order page, modelled on
-`CDUTIL.PAS`'s `TOrder`, with No./Time/Description columns and native list/scrollbar
-controls. Twelve explicitly labelled demo tracks use unknown durations. Add opens
-an owned track-chooser page; Delete removes a draft row; OK keeps the demo order
-only for that opening, and Cancel discards the draft. Already queued tracks are
-marked with `*`, as in DN. Save is disabled, and duplicate demo entries are allowed
-up to a bounded 64-entry order. Empty-list actions and keyboard traversal skip
-unavailable controls. Standard plugin page layers provide parent focus, movement,
-clipping, owned Help and stale-surface guards. All state lives inside the MP3
-plugin and resets on reopening; counters and transport controls remain inert.
+macOS uses Rodio with only playback/MP3 features. One lazily started worker per
+plugin owns the decoder and output device. A fixed-size shared mailbox coalesces
+requests; UI callbacks never open audio files or seek synchronously. Files use
+`filesystem::open_regular`. Generation checks reject superseded loads and
+snapshots. Stop/close silence the published player immediately, invalidate pending
+loads, and let the worker release the device. The idle worker is reused across
+window openings and exits when its engine is dropped.
+
+`next_wake`/`Tick` poll snapshots while playing or paused, including inactive
+windows, without requesting focus or dialogs. Rendering is immutable. End of track
+advances once; end of queue or an error stops. Playback remains macOS-only;
+other platforms compile without the Rodio dependency and disable audio/import
+controls. Tests use an injected engine so ordinary CI needs no audio hardware.
+
+The import worker uses the existing bounded task pool with a document-owned
+request scope. One pending batch is retained per player. Cancellation discards
+the entire batch; the live owner applies completed results atomically to the
+committed queue or its draft. Traversal checks directory identities, avoids
+symlinks, sorts names and bounds queue capacity, enumerated entries (10,000) and
+nesting (64). Errors/limits are reported without losing readable tracks. Progress
+atomics are copied into UI state during Tick; painting never reads mutable worker
+progress directly.
+
+Read-only ID3 parsing reuses Symphonia 0.5.5. Tags are limited to 1 MiB, individual
+text frames to 16 KiB and displayed fields to 512 characters. Only artist, title
+and album text reaches the metadata parser; artwork is skipped. ID3v1 supplies
+missing fields. File handles use safe regular opens and identity checks.
+
+The Mode page edits a temporary Shuffle/Repeat draft. Playback order uses stable
+entry IDs independently of visible queue order. A shuffled cycle anchors the
+current entry, permutes the rest and supports Previous; Repeat All wraps that
+same cycle. Repeat One applies only at EOF. Queue changes rebuild the cycle;
+repeat-only mode changes preserve it. Modes/import/Info remain macOS-only and
+preferences are session-local.

@@ -128,3 +128,24 @@ pub fn click_at(app: &mut App, bounds: dn::presentation::layout::Rect) {
         },
     );
 }
+
+/// Drive the real plugin polling/layout paths until its owned import page retires.
+pub fn finish_mp3_import(app: &mut App) -> io::Result<()> {
+    let owner = app.desktop.active().id;
+    let deadline = Instant::now() + Duration::from_secs(5);
+    loop {
+        app.poll();
+        let snapshot = dn::layout::prepare(app, dn::presentation::layout::Rect::new(0, 0, 100, 32));
+        if !snapshot
+            .surfaces
+            .iter()
+            .any(|s| s.id.key == dn::windowing::geometry::SurfaceKey::Page(owner, 5))
+        {
+            return Ok(());
+        }
+        if Instant::now() >= deadline {
+            return Err(io::Error::other("MP3 import did not finish"));
+        }
+        std::thread::sleep(Duration::from_millis(1));
+    }
+}

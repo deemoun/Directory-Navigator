@@ -1,24 +1,35 @@
-//! CDUTIL.PAS TOrder: track/time/description list and nested Add track chooser.
-//! UI demonstration only; sample rows never name or read actual files.
-//! Based on Dos Navigator by RIT Research Labs; see THIRD_PARTY_NOTICES.md.
+//! Session-only queue editor. OK commits the draft; Cancel preserves playback.
+//! Layout adapted from DN CDUTIL.PAS; see THIRD_PARTY_NOTICES.md.
 use super::*;
 use crossterm::event::KeyEvent;
 pub(super) const LIST: usize = 12;
-const OK: usize = 200;
-const ADD: usize = 201;
+pub(super) const OK: usize = 200;
+pub(super) const ADD: usize = 201;
 const DELETE: usize = 202;
 const CANCEL: usize = 203;
-const CHOOSE: usize = 210;
-const BACK: usize = 211;
 const FIELD: usize = 220;
 const SAVE: usize = 221;
 const SCROLL: usize = 222;
 const ROW: usize = 1000;
-const TRACKS: usize = 12;
-const MAX_ORDER: usize = 64;
+pub(super) const MAX_ORDER: usize = 64;
 const ROWS: usize = 9;
 pub(super) const ORDER_PAGE: u64 = 1;
-pub(super) const PICKER_PAGE: u64 = 2;
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct Track {
+    pub id: u64,
+    pub path: PathBuf,
+    pub tags: tags::Tags,
+}
+impl Track {
+    pub fn description(&self) -> String {
+        self.tags.description(&self.name())
+    }
+    pub fn name(&self) -> String {
+        crate::filesystem::display_name(
+            &self.path.file_name().unwrap_or_default().to_string_lossy(),
+        )
+    }
+}
 #[derive(Default)]
 struct Selection {
     cursor: usize,
@@ -44,165 +55,106 @@ impl Selection {
         }
     }
 }
+#[derive(Default)]
 pub(super) struct Playlist {
-    pub order: Vec<usize>,
-    draft: Vec<usize>,
+    pub order: Vec<Track>,
+    draft: Vec<Track>,
     selection: Selection,
-    picker: Option<Selection>,
     pub open: bool,
-}
-impl Default for Playlist {
-    fn default() -> Self {
-        Self {
-            order: (0..TRACKS).collect(),
-            draft: Vec::new(),
-            selection: Selection::default(),
-            picker: None,
-            open: false,
-        }
-    }
 }
 impl Playlist {
     pub fn show(&mut self) {
         self.draft = self.order.clone();
         self.selection = Selection::default();
-        self.picker = None;
         self.open = true;
+    }
+    pub fn selected(&self) -> Option<u64> {
+        self.order.get(self.selection.cursor).map(|t| t.id)
+    }
+    pub fn append(&mut self, tracks: impl Iterator<Item = Track>) -> usize {
+        let rows = if self.open {
+            &mut self.draft
+        } else {
+            &mut self.order
+        };
+        let before = rows.len();
+        rows.extend(tracks.take(MAX_ORDER.saturating_sub(before)));
+        rows.len() - before
+    }
+    pub fn available(&self) -> usize {
+        MAX_ORDER.saturating_sub(if self.open {
+            self.draft.len()
+        } else {
+            self.order.len()
+        })
+    }
+    pub fn can_add(&self) -> bool {
+        self.available() > 0
     }
     pub fn action(&mut self, id: usize) {
         if (SCROLL..SCROLL + 4).contains(&id) {
-            let code = [K::Up, K::Down, K::PageUp, K::PageDown][id - SCROLL];
-            if let Some(p) = &mut self.picker {
-                p.focus = 0;
-            } else {
-                self.selection.focus = 0;
-            }
-            self.key(KeyEvent::new(code, crossterm::event::KeyModifiers::NONE));
+            self.selection.focus = 0;
+            self.key(KeyEvent::new(
+                [K::Up, K::Down, K::PageUp, K::PageDown][id - SCROLL],
+                crossterm::event::KeyModifiers::NONE,
+            ));
             return;
         }
-        if self.picker.is_some() {
-            match id {
-                CHOOSE => {
-                    let selected = self.picker.as_ref().unwrap().cursor;
-                    if self.draft.len() < MAX_ORDER {
-                        self.draft.push(selected);
-                        self.selection.cursor = self.draft.len() - 1;
-                        self.selection.fit(self.draft.len());
-                    }
-                    self.picker = None;
-                    self.selection.focus = if self.draft.len() < MAX_ORDER { 2 } else { 1 };
-                }
-                BACK => {
-                    self.picker = None;
-                    self.selection.focus = 2;
-                }
-                FIELD => self.picker.as_mut().unwrap().focus = 0,
-                ROW.. if id < ROW + TRACKS => {
-                    let p = self.picker.as_mut().unwrap();
-                    p.cursor = id - ROW;
-                    p.focus = 0;
-                    p.fit(TRACKS);
-                }
-                _ => {}
+        match id {
+            OK => {
+                self.order = self.draft.clone();
+                self.open = false;
             }
-        } else {
-            match id {
-                OK => {
-                    self.order = self.draft.clone();
-                    self.open = false;
-                }
-                CANCEL => self.open = false,
-                ADD if self.draft.len() < MAX_ORDER => {
-                    self.selection.focus = 2;
-                    self.picker = Some(Selection::default());
-                }
-                DELETE if !self.draft.is_empty() => {
-                    self.draft.remove(self.selection.cursor);
-                    self.selection.fit(self.draft.len());
-                    self.selection.focus = if self.draft.is_empty() { 2 } else { 3 };
-                }
-                FIELD => self.selection.focus = 0,
-                ROW.. if id < ROW + self.draft.len() => {
-                    self.selection.cursor = id - ROW;
-                    self.selection.focus = 0;
-                    self.selection.fit(self.draft.len());
-                }
-                _ => {}
+            CANCEL => self.open = false,
+            DELETE if !self.draft.is_empty() => {
+                self.draft.remove(self.selection.cursor);
+                self.selection.fit(self.draft.len());
+                self.selection.focus = if self.draft.is_empty() { 2 } else { 3 };
             }
+            FIELD => self.selection.focus = 0,
+            ROW.. if id < ROW + self.draft.len() => {
+                self.selection.cursor = id - ROW;
+                self.selection.focus = 0;
+                self.selection.fit(self.draft.len());
+            }
+            _ => {}
         }
     }
     pub fn focus(&mut self, id: usize) {
-        if let Some(p) = &mut self.picker {
-            p.focus = id;
-        } else {
-            self.selection.focus = id;
-        }
+        self.selection.focus = id;
     }
     pub fn key(&mut self, key: KeyEvent) {
-        if let Some(p) = &mut self.picker {
-            p.key(key, TRACKS);
-        } else {
-            self.selection.key(key, self.draft.len());
-        }
+        self.selection.key(key, self.draft.len());
     }
     pub fn wheel(&mut self, down: bool) {
-        let code = if down { K::Down } else { K::Up };
-        if let Some(p) = &mut self.picker {
-            p.focus = 0;
-        } else {
-            self.selection.focus = 0;
-        }
-        self.key(KeyEvent::new(code, crossterm::event::KeyModifiers::NONE));
-    }
-    pub fn page(&self) -> u64 {
-        if self.picker.is_some() {
-            PICKER_PAGE
-        } else {
-            ORDER_PAGE
-        }
+        self.selection.focus = 0;
+        self.key(KeyEvent::new(
+            if down { K::Down } else { K::Up },
+            crossterm::event::KeyModifiers::NONE,
+        ));
     }
     pub fn bounds(ctx: &Context) -> Rect {
         crate::turbo::dialog_spec::centered(ctx.area, 68, 20)
     }
     pub fn windows(&self, ctx: &Context) -> Vec<LocalWindow> {
         let r = Self::bounds(ctx);
-        let mut result = vec![LocalWindow {
+        vec![LocalWindow {
             id: ORDER_PAGE,
             parent: Some(0),
             bounds: r,
             caps: Capabilities::fixed(r.width, r.height),
-        }];
-        if self.picker.is_some() {
-            result.push(LocalWindow {
-                id: PICKER_PAGE,
-                parent: Some(ORDER_PAGE),
-                bounds: r,
-                caps: Capabilities::fixed(r.width, r.height),
-            });
-        }
-        result
+        }]
     }
-    pub fn controls(&self, ctx: &Context, picker: bool) -> DialogSpec<'static> {
+    pub fn controls(&self, ctx: &Context) -> DialogSpec<'static> {
         let r = Self::bounds(ctx);
         let language = ctx.language;
         let style = ctx
             .palette
             .styles_for(crate::palette::theme::Group::Dialogs);
-        let selected = if picker {
-            self.picker.as_ref().unwrap()
-        } else {
-            &self.selection
-        };
-        let title = if picker { "Select track" } else { "Play order" };
-        let mut spec = ctx.dialog(
-            r,
-            selected.focus,
-            language.text(title),
-            if picker { CHOOSE } else { OK },
-            if picker { BACK } else { CANCEL },
-        );
+        let selected = &self.selection;
+        let mut spec = ctx.dialog(r, selected.focus, language.text("Play order"), OK, CANCEL);
         spec.caption(
-            Paragraph::new(language.text("Example tracks · no files loaded")).style(style(0x78)),
+            Paragraph::new(language.text("MP3 queue · current session")).style(style(0x78)),
             Rect::new(r.x + 3, r.y + 1, 62, 1),
         );
         let header = format!(
@@ -219,25 +171,11 @@ impl Playlist {
             crate::turbo::widgets::group_box(""),
             Rect::new(r.x + 2, r.y + 3, 64, 11),
         );
-        let tracks = if picker {
-            (0..TRACKS).collect::<Vec<_>>()
-        } else {
-            self.draft.clone()
-        };
+        let tracks = &self.draft;
         let items = tracks
             .iter()
-            .map(|&id| {
-                let number = if picker && self.draft.contains(&id) {
-                    format!("*{:>2}", id + 1)
-                } else {
-                    format!("{:>3}", id + 1)
-                };
-                format!(
-                    "{number} │ --:-- │ {} {:02}",
-                    language.text("Demo track"),
-                    id + 1
-                )
-            })
+            .enumerate()
+            .map(|(n, track)| format!("{:>3} │ --:-- │ {}", n + 1, track.description()))
             .collect::<Vec<_>>();
         let list = Rect::new(r.x + 3, r.y + 4, 61, ROWS as u16);
         let mut control = Control::new(
@@ -283,38 +221,34 @@ impl Playlist {
         }
         if tracks.is_empty() {
             spec.caption(
-                Paragraph::new(language.text("Empty demo playlist")).style(style(0x30)),
+                Paragraph::new(language.text("Empty playlist")).style(style(0x30)),
                 Rect::new(list.x, list.y, list.width, 1),
             );
         }
         spec.caption(
-            Paragraph::new(language.text(if picker {
-                "* Already in the draft playlist"
-            } else {
-                "Edit the demo order · OK keeps it until this player closes"
-            }))
-            .style(style(0x70)),
+            Paragraph::new(language.text("Add uses the marked MP3 files in the active panel"))
+                .style(style(0x70)),
             Rect::new(r.x + 3, r.y + 14, 62, 1),
         );
         spec.caption(
-            Paragraph::new(language.text("UI prototype · no playback or file saving"))
+            Paragraph::new(language.text("OK applies changes · Cancel discards changes"))
                 .style(style(0x78)),
             Rect::new(r.x + 3, r.y + 15, 62, 1),
         );
-        let buttons = if picker {
-            vec![
-                (1, "OK", CHOOSE, 22, 12, true),
-                (2, "Cancel", BACK, 35, 12, true),
-            ]
-        } else {
-            vec![
-                (1, "OK", OK, 2, 12, true),
-                (2, "Add", ADD, 15, 12, self.draft.len() < MAX_ORDER),
-                (3, "Delete", DELETE, 28, 12, !self.draft.is_empty()),
-                (4, "Save", SAVE, 41, 12, false),
-                (5, "Cancel", CANCEL, 54, 12, true),
-            ]
-        };
+        let buttons = vec![
+            (1, "OK", OK, 2, 12, true),
+            (
+                2,
+                "Add",
+                ADD,
+                15,
+                12,
+                cfg!(target_os = "macos") && self.can_add(),
+            ),
+            (3, "Delete", DELETE, 28, 12, !self.draft.is_empty()),
+            (4, "Save", SAVE, 41, 12, false),
+            (5, "Cancel", CANCEL, 54, 12, true),
+        ];
         for (id, label, action, x, width, enabled) in buttons {
             let mut c = Control::new(
                 id,
@@ -335,58 +269,18 @@ impl Playlist {
         );
         spec
     }
-    pub fn layer(&self, ctx: &Context, id: u64) -> Layer<'static> {
-        let picker = id == PICKER_PAGE;
-        let spec = self.controls(ctx, picker);
+    pub fn layer(&self, ctx: &Context) -> Layer<'static> {
+        let spec = self.controls(ctx);
         let mut frame = NativeFrame::new(ctx.area, ctx.palette);
         frame.render_widget(
-            crate::turbo::widgets::dialog(ctx.language.text(if picker {
-                "Select track"
-            } else {
-                "Play order"
-            })),
+            crate::turbo::widgets::dialog(ctx.language.text("Play order")),
             spec.bounds,
         );
         Layer {
-            id,
-            interactive: id == self.page(),
+            id: ORDER_PAGE,
+            interactive: true,
             scene: frame.finish(),
             controls: Some(spec),
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn demo_order_limit_and_cancelled_picker_never_change_committed_rows() {
-        let mut p = Playlist::default();
-        let original = p.order.clone();
-        p.show();
-        p.action(ADD);
-        p.action(BACK);
-        assert_eq!(p.draft, original);
-        while p.draft.len() < MAX_ORDER {
-            p.action(ADD);
-            p.action(CHOOSE);
-        }
-        p.action(ADD);
-        assert!(p.picker.is_none());
-        assert_eq!(p.draft.len(), MAX_ORDER);
-        p.action(CANCEL);
-        assert_eq!(p.order, original);
-        p.show();
-        assert_eq!(p.draft, original);
-        for _ in 0..TRACKS {
-            p.action(DELETE);
-        }
-        p.action(DELETE);
-        assert!(p.draft.is_empty());
-        assert_eq!(p.selection.offset, 0);
-        p.action(SAVE);
-        assert_eq!(p.order, original);
-        p.action(OK);
-        assert!(p.order.is_empty());
     }
 }

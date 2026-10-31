@@ -118,10 +118,12 @@ pub(crate) enum Event<'a> {
     Activity(bool),
     Focus(usize),
     Tick,
+    PanelPaths(Vec<PathBuf>),
 }
 pub(crate) enum Effect {
     Close,
     CopyText(String),
+    RequestPanelPaths,
     Help { title: &'static str, text: String },
 }
 pub(crate) struct LocalWindow {

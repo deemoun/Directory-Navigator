@@ -815,3 +815,41 @@ Queued source list changed	Queued source list changed
 Transfer preparation worker stopped	Transfer preparation worker stopped
 Only Copy and Move belong to the Transfer Center	Only Copy and Move belong to the Transfer Center
 Paused	Paused
+~A~dd MP3 to player	~A~dd MP3 to player
+MP3 queue · current session	MP3 queue · current session
+Empty playlist	Empty playlist
+Add uses the marked MP3 files in the active panel	Add uses the marked MP3 files in the active panel
+OK applies changes · Cancel discards changes	OK applies changes · Cancel discards changes
+Select MP3 files in the active panel	Select MP3 files in the active panel
+Queue is full (64 tracks)	Queue is full (64 tracks)
+MP3 files added	MP3 files added
+Playback requires macOS	Playback requires macOS
+Stopped	Stopped
+Playing	Playing
+Loading	Loading
+MP3 playback is available on macOS. Enable this plugin in Options > Configuration > Plugins.\nUtilities > Add MP3 to player, Open and List > Add append marked MP3 files from the active panel; without marks they use the file under the cursor. Folders are not scanned.\nPlay starts the selected track or resumes a pause. Pause suspends playback; Stop resets the position. Outer arrows select the previous/next track; inner arrows seek by five seconds. Volume changes player volume only.\nThe queue plays in order and stops after the last track. List edits a draft: OK applies it, Cancel discards it. Deleting the playing track stops playback. The queue is limited to 64 entries.\nMusic continues while working in other windows. Closing the player, disabling the plugin or quitting DN stops playback. No queue or preferences are saved.\nTab / Shift+Tab select controls; Enter / Space press a button. F1 opens Help. Alt+Z switches compact/expanded views; Ctrl+F5 moves the player; Esc closes it.	MP3 playback is available on macOS. Enable this plugin in Options > Configuration > Plugins.\nUtilities > Add MP3 to player, Open and List > Add append marked MP3 files from the active panel; without marks they use the file under the cursor. Folders are not scanned.\nPlay starts the selected track or resumes a pause. Pause suspends playback; Stop resets the position. Outer arrows select the previous/next track; inner arrows seek by five seconds. Volume changes player volume only.\nThe queue plays in order and stops after the last track. List edits a draft: OK applies it, Cancel discards it. Deleting the playing track stops playback. The queue is limited to 64 entries.\nMusic continues while working in other windows. Closing the player, disabling the plugin or quitting DN stops playback. No queue or preferences are saved.\nTab / Shift+Tab select controls; Enter / Space press a button. F1 opens Help. Alt+Z switches compact/expanded views; Ctrl+F5 moves the player; Esc closes it.
+Playback mode	Playback mode
+Shuffle	Shuffle
+Repeat	Repeat
+Repeat off	Repeat off
+Repeat one track	Repeat one track
+Repeat all tracks	Repeat all tracks
+On	On
+Off	Off
+One	One
+Title	Title
+Artist	Artist
+Album	Album
+Unknown	Unknown
+MP3 Track Info	MP3 Track Info
+Adding MP3 files	Adding MP3 files
+Entries checked	Entries checked
+MP3 files found	MP3 files found
+Cancel discards this import	Cancel discards this import
+Select MP3 files or folders in the active panel	Select MP3 files or folders in the active panel
+Import skipped unreadable entries	Import skipped unreadable entries
+Import limit reached	Import limit reached
+No MP3 files found	No MP3 files found
+MP3 import stopped	MP3 import stopped
+MP3 import cancelled	MP3 import cancelled
+MP3 playback is available on macOS. Enable this plugin in Options > Configuration > Plugins.\nUtilities > Add MP3 to player, Open and List > Add use marked files or folders from the active panel; without marks they use the entry under the cursor. Folders are scanned recursively in name order. Symbolic links are skipped. Cancel discards the whole import; the queue holds up to 64 entries.\nPlay starts the selected track or resumes a pause. Pause suspends playback; Stop resets the position. Outer arrows select the previous/next track; inner arrows seek by five seconds. Volume changes player volume only.\nMode controls Shuffle and Repeat: Off, One track or All tracks. Repeat One affects automatic track endings, not manual Next/Previous. Shuffle visits each entry once; Previous retraces that order. Repeat All repeats the same shuffled cycle. Queue edits rebuild the shuffle order. OK applies mode changes; Cancel discards them.\nID3 artist/title replace filenames when available. Info shows title, artist, album and the file path. Missing, unsupported or oversized tags fall back to filenames.\nList edits a draft: OK applies it, Cancel discards it. Deleting the playing track stops playback. Music continues during import and while working in other windows. Closing the player, disabling the plugin or quitting DN stops playback and cancels import. No queue or preferences are saved.\nTab / Shift+Tab select controls; Enter / Space press a button. F1 opens Help. Alt+Z switches compact/expanded views; Ctrl+F5 moves the player; Esc closes the current page.	MP3 playback is available on macOS. Enable this plugin in Options > Configuration > Plugins.\nUtilities > Add MP3 to player, Open and List > Add use marked files or folders from the active panel; without marks they use the entry under the cursor. Folders are scanned recursively in name order. Symbolic links are skipped. Cancel discards the whole import; the queue holds up to 64 entries.\nPlay starts the selected track or resumes a pause. Pause suspends playback; Stop resets the position. Outer arrows select the previous/next track; inner arrows seek by five seconds. Volume changes player volume only.\nMode controls Shuffle and Repeat: Off, One track or All tracks. Repeat One affects automatic track endings, not manual Next/Previous. Shuffle visits each entry once; Previous retraces that order. Repeat All repeats the same shuffled cycle. Queue edits rebuild the shuffle order. OK applies mode changes; Cancel discards them.\nID3 artist/title replace filenames when available. Info shows title, artist, album and the file path. Missing, unsupported or oversized tags fall back to filenames.\nList edits a draft: OK applies it, Cancel discards it. Deleting the playing track stops playback. Music continues during import and while working in other windows. Closing the player, disabling the plugin or quitting DN stops playback and cancels import. No queue or preferences are saved.\nTab / Shift+Tab select controls; Enter / Space press a button. F1 opens Help. Alt+Z switches compact/expanded views; Ctrl+F5 moves the player; Esc closes the current page.

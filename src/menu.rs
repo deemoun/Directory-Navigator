@@ -65,6 +65,7 @@ pub enum Action {
     About,
     Welcome,
     Plugin(crate::plugins::PluginId),
+    AddMp3,
     Settings(SettingsKind),
     Confirmations,
     View(ViewMode),
@@ -158,7 +159,9 @@ pub fn level_items(app: &App, depth: usize) -> Vec<Item> {
                     }
                 }
                 entries.retain(|entry| match entry.action {
-                    Action::Plugin(_) => crate::commands::manager_available(app, entry.action),
+                    Action::Plugin(_) | Action::AddMp3 => {
+                        crate::commands::manager_available(app, entry.action)
+                    }
                     _ => true,
                 });
                 entries
@@ -247,6 +250,7 @@ pub fn execute(app: &mut App, action: Action) {
             title: " Confirmation policy — read-only ",
             message: "[x] Confirm copy/move destinations\n[x] Confirm Trash / permanent deletion\n[x] Refuse existing destinations\n\nThese safeguards are always enabled.\nDeletion mode: Options → File Manager → Setup.\nEsc cancels an operation; completed items remain.\n\nEnter / Esc: close".into(),
         }),
+        Action::AddMp3 => crate::plugins::host::add_mp3(app),
         Action::Plugin(id)=>crate::plugins::host::open(app,id),
         Action::About => app.push_dialog(crate::dialog::Dialog {
             title: crate::dialog::ABOUT_TITLE,

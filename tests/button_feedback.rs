@@ -207,12 +207,16 @@ fn keyboard_default_and_focused_cancel_show_feedback_without_crossing_owners() -
     );
     Ok(())
 }
+#[cfg(target_os = "macos")]
 #[test]
 fn plugin_play_symbol_survives_press_and_rendering_is_immutable() -> io::Result<()> {
     let f = support::Fixture::new("button-plugin")?;
+    std::fs::write(f.0.join("track.mp3"), b"not audio")?;
     let mut a = f.app()?;
+    a.panels[a.active].selected.insert("track.mp3".into());
     a.config.set_plugin_enabled(dn::plugins::MP3_PLAYER, true);
-    dn::menu::execute(&mut a, dn::menu::Action::Plugin(dn::plugins::MP3_PLAYER));
+    dn::menu::execute(&mut a, dn::menu::Action::AddMp3);
+    support::finish_mp3_import(&mut a)?;
     let normal = support::draw(&mut a, 80, 25)?;
     let r = target(
         &a,

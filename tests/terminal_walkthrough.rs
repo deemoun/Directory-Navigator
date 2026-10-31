@@ -434,12 +434,12 @@ fn game_and_editor_arrangements_are_visible_and_game_board_keeps_its_size() -> i
 }
 
 #[test]
-fn mp3_prototype_compact_expanded_help_movement_and_close_restore_terminal() -> io::Result<()> {
+fn mp3_empty_player_compact_expanded_help_movement_and_close_restore_terminal() -> io::Result<()> {
     let mut s = Session::new("mp3-player")?;
     s.wait("manager ready", |s| {
         s.command_prompt_active() && s.text().contains("F5 Copy")
     })?;
-    // The prototype is opt-in; enable it through the actual settings draft.
+    // The player is opt-in; enable it through the actual settings draft.
     s.send(b"\x1bocp", "plugin settings", |s| {
         s.text().contains("Plugins") && s.text().contains("mp3_player")
     })?;
@@ -453,14 +453,14 @@ fn mp3_prototype_compact_expanded_help_movement_and_close_restore_terminal() -> 
             .is_some_and(|r| r.contains("MP3 Player") && r.chars().nth(22) == Some('╔'))
     })?;
     let compact = s.text();
-    assert!(!compact.contains("UI prototype"));
+    assert!(!compact.contains("Empty playlist"));
     s.send(b"\x1bz", "expanded MP3 player", |s| {
         let t = s.text();
-        t.contains("UI prototype") && t.contains("Pause") && t.contains("Volume")
+        t.contains("Empty playlist") && t.contains("Pause") && t.contains("Volume")
     })?;
-    // Buttons only demonstrate navigation; Open must not create a file picker.
-    s.send(b"\t\t\t\t\t\r", "inert Open", |s| {
-        s.text().contains("UI prototype")
+    // Empty transport controls are skipped; the first enabled button is Open.
+    s.send(b"\t\r", "Open imports the current panel selection", |s| {
+        s.text().contains("Select MP3 files")
     })?;
     assert!(!s.text().contains("Open file"));
     s.send(b"\x1bOP", "player help", |s| {
@@ -476,7 +476,7 @@ fn mp3_prototype_compact_expanded_help_movement_and_close_restore_terminal() -> 
         !s.text().contains("Arrows move")
     })?;
     s.send(b"\x1bz", "compact again", |s| {
-        !s.text().contains("UI prototype") && s.text().contains("MP3 Player")
+        !s.text().contains("Volume") && s.text().contains("MP3 Player")
     })?;
     s.send(b"\x1b", "close player", |s| {
         !s.text().contains("MP3 Player") && s.command_prompt_active()
@@ -771,42 +771,49 @@ fn help_has_one_working_expand_restore_control_in_a_real_terminal() -> io::Resul
 }
 
 #[test]
-fn mp3_demo_playlist_track_picker_help_and_cancel_are_ui_only() -> io::Result<()> {
-    let mut s = Session::new("mp3-playlist")?;
-    s.wait("manager ready", |s| {
-        s.command_prompt_active()
-            && s.text().contains("item-000.")
-            && !s.text().contains("Reading directory")
-    })?;
+fn mp3_real_queue_help_cancel_and_volume_restore_terminal() -> io::Result<()> {
+    let mut s = Session::new("mp3-queue")?;
+    fs::write(
+        s.root.join("queue-track.mp3"),
+        b"not played in this UI walkthrough",
+    )?;
+    s.wait("manager ready", |s| s.command_prompt_active())?;
     s.send(b"\x1bocp", "plugins", |s| s.text().contains("mp3_player"))?;
-    s.send(b"\t \r", "enable prototype", |s| {
-        s.command_prompt_active() && !s.text().contains("mp3_player")
+    s.send(b"\t \r", "enable player", |s| s.command_prompt_active())?;
+    s.select_file("queue-track.mp3")?;
+    s.send(b"\x1bua", "import selection", |s| {
+        s.text().contains("MP3 Player") && !s.text().contains("Adding MP3 files")
     })?;
-    s.send(b"\x1bu3", "player", |s| s.text().contains("MP3 Player"))?;
-    s.send(b"\x1bz", "expanded player", |s| {
-        s.text().contains("UI prototype")
+    s.send(b"\x1bz", "expand", |s| s.text().contains("Volume"))?;
+    // From Play, enabled controls are Open, Mode, Volume, List.
+    s.send(b"\t\t\t\t\r", "queue", |s| {
+        s.text().contains("Play order") && s.text().contains("queue-track.mp3")
     })?;
-    // Play is initially focused; ten tabs reach List in expanded row order.
-    s.send(b"\t\t\t\t\t\t\t\t\t\t\r", "demo play order", |s| {
-        s.text().contains("Play order") && s.text().contains("Demo track 01")
-    })?;
-    s.send(b"\t\t\r", "Add track chooser", |s| {
-        s.text().contains("Select track")
-    })?;
-    s.send(b"\x1b[B\r", "append demo track", |s| {
-        s.text().contains("Play order") && !s.text().contains("Select track")
-    })?;
-    s.send(b"\x1bOP", "owned player Help", |s| {
+    s.send(b"\x1bOP", "owned Help", |s| {
         s.text().contains("MP3 Player Help")
     })?;
-    s.send(b"\x1b", "return to draft", |s| {
+    s.send(b"\x1b", "return to queue", |s| {
         s.text().contains("Play order") && !s.text().contains("MP3 Player Help")
     })?;
-    s.send(b"\x1b", "cancel playlist", |s| {
-        s.text().contains("MP3 Player") && !s.text().contains("Play order")
+    s.send(b"\x1b", "cancel queue", |s| {
+        !s.text().contains("Play order")
     })?;
-    s.send(b"\x1b", "close prototype", |s| s.command_prompt_active())?;
-    assert_eq!(fs::read(s.root.join("item-000.txt"))?, b"fixture\n");
+    // List -> Shift+Tab -> Volume.
+    s.send(b"\x1b[Z\r", "volume", |s| s.text().contains("+10%"))?;
+    s.send(b"\t\r", "increase draft", |s| s.text().contains("60%"))?;
+    s.send(b"\x1b", "cancel volume", |s| !s.text().contains("+10%"))?;
+    s.resize(100, 32)?;
+    s.send(b"\x1b[17;3~", "work in manager", |s| {
+        s.command_prompt_active()
+    })?;
+    s.send(b"\x1bu3", "return to singleton", |s| {
+        s.text().contains("Volume") && !s.command_prompt_active()
+    })?;
+    s.send(b"\x1b", "close", |s| s.command_prompt_active())?;
+    assert_eq!(
+        fs::read(s.root.join("queue-track.mp3"))?,
+        b"not played in this UI walkthrough"
+    );
     s.finish()
 }
 
@@ -1044,5 +1051,141 @@ fn welcome_expand_restore_resize_and_start_preserve_terminal() -> io::Result<()>
         !s.text().contains("Arrows move") && s.text().contains("Welcome to Directory Navigator")
     })?;
     s.send(b"\r", "Welcome Start", |s| s.command_prompt_active())?;
+    s.finish()
+}
+
+#[test]
+#[ignore = "requires a working macOS audio output device; plays a quiet synthetic tone"]
+fn mp3_audio_play_pause_seek_background_stop_and_close_restore_terminal() -> io::Result<()> {
+    let mut s = Session::new("mp3-audio")?;
+    fs::write(
+        s.root.join("tone.mp3"),
+        include_bytes!("fixtures/mp3/tone.mp3"),
+    )?;
+    s.wait("manager ready", |s| s.command_prompt_active())?;
+    s.send(b"\x1bocp", "plugins", |s| s.text().contains("mp3_player"))?;
+    s.send(b"\t \r", "enable player", |s| s.command_prompt_active())?;
+    s.select_file("tone.mp3")?;
+    s.send(b"\x1bua", "import tone", |s| {
+        s.text().contains("MP3 Player") && !s.text().contains("Adding MP3 files")
+    })?;
+    s.send(b"\x1bz", "expand", |s| s.text().contains("Volume"))?;
+    s.send(b"\r", "play through default audio output", |s| {
+        s.text().contains("Playing")
+    })?;
+    // Play -> seek forward -> Pause (no next track).
+    s.send(b"\t\t\r", "pause", |s| s.text().contains("Paused"))?;
+    s.send(b"\r", "resume", |s| s.text().contains("Playing"))?;
+    s.send(b"\t\r", "seek +5 seconds", |s| {
+        s.text().contains("Playing") && (5..12).any(|n| s.text().contains(&format!("00:{n:02}")))
+    })?;
+    s.send(b"\x1b[17;3~", "manager while audio plays", |s| {
+        s.command_prompt_active()
+    })?;
+    s.send(b"\x1bu3", "return to playing singleton", |s| {
+        !s.command_prompt_active() && s.text().contains("Playing")
+    })?;
+    // Seek-forward focus -> Pause -> Stop.
+    s.send(b"\t\t\r", "stop", |s| {
+        s.text().contains("Stopped") && s.text().contains("00:00")
+    })?;
+    s.send(b"\x1b", "close player", |s| s.command_prompt_active())?;
+    s.send(b"\x1bu3", "reopen empty", |s| {
+        s.text().contains("MP3 Player") && !s.text().contains("Volume")
+    })?;
+    s.send(b"\x1b", "close empty player", |s| s.command_prompt_active())?;
+    s.finish()
+}
+
+#[test]
+fn mp3_folder_tags_modes_info_and_resize_restore_terminal() -> io::Result<()> {
+    let mut s = Session::new("mp3-folder-modes")?;
+    fs::create_dir_all(s.root.join("music/nested"))?;
+    for (file, title) in [
+        ("music/a.mp3", "First song"),
+        ("music/nested/b.MP3", "Second song"),
+    ] {
+        let mut body = Vec::new();
+        for (id, value) in [
+            (b"TIT2", title),
+            (b"TPE1", "Test artist"),
+            (b"TALB", "Test album"),
+        ] {
+            let text = [vec![3], value.as_bytes().to_vec()].concat();
+            body.extend(id);
+            body.extend((text.len() as u32).to_be_bytes());
+            body.extend([0, 0]);
+            body.extend(text);
+        }
+        let size = body.len();
+        let mut tag = vec![
+            b'I',
+            b'D',
+            b'3',
+            3,
+            0,
+            0,
+            ((size >> 21) & 127) as u8,
+            ((size >> 14) & 127) as u8,
+            ((size >> 7) & 127) as u8,
+            (size & 127) as u8,
+        ];
+        tag.extend(body);
+        fs::write(s.root.join(file), tag)?;
+    }
+    s.wait("manager ready", |s| s.command_prompt_active())?;
+    s.send(b"\x1bocp", "plugins", |s| s.text().contains("mp3_player"))?;
+    s.send(b"\t \r", "enable player", |s| s.command_prompt_active())?;
+    s.select_file("music")?;
+    s.send(b"\x1bua", "import folder", |s| {
+        s.text().contains("MP3 Player") && !s.text().contains("Adding MP3 files")
+    })?;
+    s.send(b"\x1bz", "tagged player", |s| {
+        s.text().contains("Test artist") && s.text().contains("First song")
+    })?;
+    // Play -> Next -> Open -> Mode, with two imported tracks.
+    s.send(b"\t\t\t\r", "mode page", |s| {
+        s.text().contains("Playback mode")
+    })?;
+    s.send(b"\x1bOP", "mode Help", |s| {
+        s.text().contains("MP3 Player Help")
+    })?;
+    s.send(b"\x1b", "return to mode draft", |s| {
+        s.text().contains("Playback mode") && !s.text().contains("MP3 Player Help")
+    })?;
+    s.send(b" \t\t \r", "apply shuffle and repeat one", |s| {
+        !s.text().contains("Playback mode")
+            && s.text().contains("Shuffle On")
+            && s.text().contains("Repeat One")
+    })?;
+    s.send(b"\r", "reopen mode draft", |s| {
+        s.text().contains("Playback mode")
+    })?;
+    s.send(b" \x1b", "discard shuffle change", |s| {
+        !s.text().contains("Playback mode") && s.text().contains("Shuffle On")
+    })?;
+    s.send(b"\t\t\t\r", "track Info", |s| {
+        s.text().contains("MP3 Track Info") && s.text().contains("Test album")
+    })?;
+    s.send(b"\x1b", "close Info", |s| {
+        !s.text().contains("MP3 Track Info")
+    })?;
+    s.send(b"\x1b[Z\r", "tagged queue", |s| {
+        s.text().contains("Play order")
+            && s.text().contains("First song")
+            && s.text().contains("Second song")
+    })?;
+    s.send(b"\x1b", "cancel queue edit", |s| {
+        !s.text().contains("Play order")
+    })?;
+    s.resize(100, 32)?;
+    s.wait("mode retained after resize", |s| {
+        s.text().contains("Shuffle On") && s.text().contains("Repeat One")
+    })?;
+    s.send(b"\x1b[17;3~", "manager", |s| s.command_prompt_active())?;
+    s.send(b"\x1bu3", "return to singleton", |s| {
+        !s.command_prompt_active() && s.text().contains("Repeat One")
+    })?;
+    s.send(b"\x1b", "close player", |s| s.command_prompt_active())?;
     s.finish()
 }

@@ -145,3 +145,44 @@ also reference `EDITOR.PAS`, `FVIEWER.PAS` and the original keyboard help; UTF-8
 transformations and undo transactions use the current Rust editor.
 The implementation uses DN's current Rust workers, controls and file safeguards.
 The original DOS Navigator notice and license reproduced above are retained.
+
+## MP3 audio libraries (macOS)
+
+Rodio 0.22.2: https://github.com/RustAudio/rodio/tree/v0.22.2
+
+Rodio is used under its MIT license:
+
+```text
+Copyright (c) The Rodio Project Contributors
+
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+```
+
+Rodio uses CPAL for audio output (Apache-2.0):
+https://github.com/RustAudio/cpal
+
+MP3 decoding and read-only ID3 metadata use unmodified Symphonia 0.5.5 (MPL-2.0). Its source and license
+are available at https://github.com/pdeljanov/Symphonia/tree/v0.5.5 and
+https://www.mozilla.org/en-US/MPL/2.0/ respectively.
