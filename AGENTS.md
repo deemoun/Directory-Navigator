@@ -103,6 +103,24 @@ native suite for architectural or broad behavior changes. Perform the final
 release rebuild unless the documentation-only or CI-only exemption above applies.
 Report what actually ran and any skipped platform checks.
 
+**Adding or changing tests must not break CI.** Before reporting completion:
+
+- Inspect the current workflow matrix and commands. Run the affected test suite
+  and applicable CI checks locally, including all-target Clippy so test code is
+  checked with warnings treated as errors.
+- Review new tests for macOS ARM64/Intel, Linux and Windows compatibility, even
+  when runtime validation on a platform is out of scope. Avoid platform-specific
+  paths, shell commands, timestamp precision and filesystem assumptions; gate
+  genuinely platform-specific tests explicitly.
+- Keep tests independent and safe under parallel execution. Use private fixtures,
+  bounded waits and observable state transitions rather than timing assumptions.
+  Repeat timing-sensitive regressions and run their containing suite together to
+  catch interference; do not hide failures with retries or longer timeouts.
+- If CI results for the change are available, inspect relevant failures and fix
+  regressions before calling it CI-verified. Local success alone does not prove
+  the platform matrix passes. State unavailable or skipped checks explicitly;
+  do not push or trigger workflows without authorization just to obtain results.
+
 - For UI changes, check English/Russian, default/custom colors, 80×25 and larger
   terminals, resize, clipping, cursor/hit alignment and immutable redraws as relevant.
 - For release/workflow changes, also run

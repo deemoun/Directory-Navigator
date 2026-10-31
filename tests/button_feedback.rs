@@ -177,6 +177,35 @@ fn plugin_play_symbol_survives_press_and_rendering_is_immutable() -> io::Result<
     Ok(())
 }
 #[test]
+fn game_over_space_does_not_capture_escape_as_a_button_cancellation() -> io::Result<()> {
+    use dn::tetris::{self, Screen};
+    for (w, h) in [(80, 25), (100, 32)] {
+        let f = support::Fixture::new("game-over-space-escape")?;
+        let mut a = f.app()?;
+        tetris::open(&mut a);
+        {
+            let g = a.desktop.game_mut().unwrap();
+            g.screen = Screen::GameOver;
+            g.over = true;
+            g.page_focus = 0;
+        }
+        let normal = support::draw(&mut a, w, h)?;
+        input::handle_ui(&mut a, KeyEvent::new(K::Char(' '), M::NONE));
+        assert!(
+            normal == support::draw(&mut a, w, h)?,
+            "Space belongs to the game controller, not the dialog's OK button"
+        );
+        input::handle_ui(&mut a, KeyEvent::new(K::Esc, M::NONE));
+        assert_eq!(a.desktop.game().unwrap().screen, Screen::Play);
+        assert!(a.desktop.game().unwrap().over);
+        finish(&mut a);
+        assert_eq!(a.desktop.game().unwrap().screen, Screen::Play);
+        assert!(a.desktop.game().unwrap().over);
+    }
+    Ok(())
+}
+
+#[test]
 fn tetris_pages_and_custom_colours_use_the_same_press_face() -> io::Result<()> {
     let f = support::Fixture::new("button-tetris")?;
     let mut a = f.app()?;

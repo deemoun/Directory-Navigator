@@ -132,6 +132,15 @@ pub(crate) fn open(app: &mut App, id: PluginId) {
             .open(&ctx);
     }
 }
+/// Feedback and dispatch must agree on which keys use shared controls.
+pub(crate) fn uses_controls(app: &App, key: KeyEvent) -> bool {
+    active(app).is_none_or(|b| {
+        app.desktop.plugins.entries[&b.plugin]
+            .tool
+            .uses_controls(key)
+    })
+}
+
 pub(crate) fn dispatch(app: &mut App, b: Binding, event: Event<'_>) {
     if active(app) != Some(b) {
         return;
@@ -145,8 +154,8 @@ pub(crate) fn dispatch(app: &mut App, b: Binding, event: Event<'_>) {
         return;
     };
     if let Event::Key(key) = event {
-        let tool = &app.desktop.plugins.entries[&b.plugin].tool;
-        if tool.uses_controls(key) {
+        if uses_controls(app, key) {
+            let tool = &app.desktop.plugins.entries[&b.plugin].tool;
             let proposal = tool.controls(&ctx).key(key);
             if let Some(p) = proposal {
                 p.deliver(app, |app, focus, target| {

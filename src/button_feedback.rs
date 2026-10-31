@@ -158,7 +158,9 @@ pub(crate) fn key(app: &mut App, key: KeyEvent) -> bool {
         }
         p.dispatch(app);
     }
-    if !matches!(key.code, KeyCode::Enter | KeyCode::Char(' ')) {
+    if !matches!(key.code, KeyCode::Enter | KeyCode::Char(' '))
+        || !crate::plugins::host::uses_controls(app, key)
+    {
         return false;
     }
     let target = spec(app).and_then(|s| s.key(key)).and_then(|p| p.action);

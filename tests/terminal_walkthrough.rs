@@ -852,12 +852,15 @@ fn finished_game_buttons_remain_clickable_after_game_over() -> io::Result<()> {
             std::time::Instant::now() >= until
         })?;
     }
-    assert!(
-        s.text().contains("Game over"),
-        "Fixture must reach game over\n{}",
-        s.text()
-    );
-    s.send(b"\x1b", "finished board", |s| {
+    s.wait("game over dialog ready", |s| {
+        let text = s.text();
+        text.contains("Game over") && text.contains("Final score:") && text.contains("OK")
+    })?;
+    // Reproduce a final drop key arriving after the Game over page appeared.
+    // Space must not start a pending OK press that would swallow the next Esc.
+    // An ignored Space need not publish a new frame; acknowledge the resulting
+    // Esc transition instead of waiting for an unchanged screen to redraw.
+    s.send(b" \x1b", "finished board", |s| {
         s.text().contains("GAME OVER") && !s.text().contains("Game over")
     })?;
     fn new_position(s: &Session) -> (usize, usize) {
