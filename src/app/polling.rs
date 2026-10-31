@@ -258,6 +258,10 @@ impl App {
             }
             changed |= loading != panel.loading || revision != panel.revision;
             changed |= panel.space.poll(&panel.path, std::time::Instant::now());
+            #[cfg(windows)]
+            {
+                changed |= panel.drives.poll(std::time::Instant::now());
+            }
             if refresh_allowed {
                 panel.refresh_if_due(self.config.show_hidden, std::time::Instant::now());
             }

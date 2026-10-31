@@ -304,6 +304,14 @@ fn draw_content(
         let geometry = &prepared.panels[index];
         frame.regions().push((*area, Target::Panel(index)));
         let panel = &app.panels[index];
+        #[cfg(windows)]
+        for (rect, letter) in crate::windows_drives::strip(
+            *area,
+            panel.drives.mask,
+            crate::windows_drives::current(&panel.path),
+        ) {
+            frame.regions().push((rect, Target::Drive(index, letter)));
+        }
         for entry in panel.offset..panel.entries.len().min(panel.offset + geometry.capacity()) {
             if let Some(rect) = geometry.entry_rect(entry, panel.offset) {
                 frame.regions().push((rect, Target::Entry(index, entry)));

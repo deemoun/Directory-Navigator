@@ -29,6 +29,8 @@ struct Response {
 pub struct Panel {
     pub scope: crate::requests::RequestScope,
     pub space: crate::volume_space::Snapshot,
+    #[cfg(windows)]
+    pub(crate) drives: crate::windows_drives::Snapshot,
     pub path: PathBuf,
     pub entries: Vec<Entry>,
     filtered_out: Vec<Entry>,
@@ -108,6 +110,8 @@ impl Panel {
         let mut panel = Self {
             scope: crate::requests::RequestScope::new(crate::requests::Owner::Panel(index)),
             space: Default::default(),
+            #[cfg(windows)]
+            drives: Default::default(),
             path: path.clone(),
             entries: Vec::new(),
             filtered_out: Vec::new(),

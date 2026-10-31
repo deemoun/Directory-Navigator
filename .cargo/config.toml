@@ -1,0 +1,4 @@
+# Keep Windows downloads portable without a separate Visual C++ Redistributable.
+# Scope this to MSVC so macOS and Linux retain their default runtime linkage.
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]

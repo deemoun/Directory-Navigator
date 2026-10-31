@@ -9,8 +9,16 @@ pub enum Action {
     Close,
     ApplyFilter,
     FilterField,
+    #[cfg(windows)]
+    Drive(u8),
 }
 pub enum Modal {
+    #[cfg(windows)]
+    Drives {
+        panel: usize,
+        letters: Vec<u8>,
+        focus: usize,
+    },
     Bookmarks {
         slot: usize,
         focus: usize,
@@ -21,6 +29,15 @@ pub enum Modal {
         cursor: usize,
         focus: usize,
     },
+}
+impl Modal {
+    pub(crate) fn focus_mut(&mut self) -> &mut usize {
+        match self {
+            Self::Bookmarks { focus, .. } | Self::Filter { focus, .. } => focus,
+            #[cfg(windows)]
+            Self::Drives { focus, .. } => focus,
+        }
+    }
 }
 pub fn open_bookmarks(app: &mut App) {
     if !crate::tool_windows::open(app, crate::tool_windows::Kind::Bookmarks, None) {
@@ -111,6 +128,17 @@ pub fn action(app: &mut App, action: Action) {
         _ => 0,
     };
     match action {
+        #[cfg(windows)]
+        Action::Drive(letter) => {
+            if let Some(Modal::Drives { panel, letters, .. }) = app.navigation_dialog() {
+                if !letters.contains(&letter) {
+                    return;
+                }
+                let panel = *panel;
+                app.set_navigation_dialog(None);
+                crate::windows_drives::navigate(app, panel, letter);
+            }
+        }
         Action::Slot(n) => {
             if n < 9 {
                 if let Some(Modal::Bookmarks { slot, focus, .. }) = app.navigation_dialog_mut() {
@@ -147,6 +175,11 @@ pub fn paste(app: &mut App, text: &str) {
 }
 pub fn key(app: &mut App, key: KeyEvent) {
     if crate::dialog_controls::key(app, key, crate::focus::Focus::Navigation) {
+        return;
+    }
+    #[cfg(windows)]
+    if matches!(app.navigation_dialog(), Some(Modal::Drives { .. })) {
+        crate::windows_drives::key(app, key);
         return;
     }
     match app.navigation_dialog_mut() {

@@ -108,6 +108,10 @@ pub const ROOTS: &[Root] = &[
         id: RootId::Panel,
         label: "~P~anel",
         entries: &[
+            #[cfg(windows)]
+            item("~L~eft drive...", "Alt+F1", Drive(0)),
+            #[cfg(windows)]
+            item("~R~ight drive...", "Alt+F2", Drive(1)),
             item("~Q~uick directories...", "", Bookmarks),
             item("~F~ilename filter...", "Alt+Del", FilenameFilter),
             item("~M~ake list file...", "Alt+L", ExportList),

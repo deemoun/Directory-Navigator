@@ -14,6 +14,10 @@ pub(crate) fn navigation_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
     let profile = app.config.palette;
     let dos = profile.styles_for(crate::palette::theme::Group::Dialogs);
     let modal = app.navigation_dialog()?;
+    #[cfg(windows)]
+    if let Modal::Drives { letters, focus, .. } = modal {
+        return crate::windows_drives::spec(app, area, letters, *focus);
+    }
     let height = if matches!(modal, Modal::Bookmarks { .. }) {
         18
     } else {
@@ -28,6 +32,8 @@ pub(crate) fn navigation_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
     };
     let focus = match modal {
         Modal::Bookmarks { focus, .. } | Modal::Filter { focus, .. } => *focus,
+        #[cfg(windows)]
+        Modal::Drives { .. } => unreachable!("drive picker has its own specification"),
     };
     let default = if matches!(modal, Modal::Bookmarks { .. }) {
         Action::Go
@@ -46,6 +52,8 @@ pub(crate) fn navigation_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
     let w = rect.width - 4;
     let mut buttons = Vec::new();
     match modal {
+        #[cfg(windows)]
+        Modal::Drives { .. } => unreachable!("drive picker has its own specification"),
         Modal::Bookmarks { slot, focus, .. } => {
             let items = (0..9)
                 .map(|i| {

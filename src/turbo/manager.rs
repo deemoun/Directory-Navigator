@@ -85,6 +85,8 @@ fn pane(
         ),
         if active { 0x3f } else { 0x8f },
     );
+    #[cfg(windows)]
+    crate::windows_drives::paint(s, panel, area);
     let inner_width = area.width - 2;
     let preset = if config.layouts[index] == PanelLayout::Brief {
         ColumnPreset::Name

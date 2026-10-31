@@ -458,6 +458,14 @@ fn binding_label<'a, A: Copy + 'a>(
 }
 
 const MANAGER_ALT_KEYS: &[Binding<fn(&mut App)>] = &[
+    #[cfg(windows)]
+    bind(K::F(1), M::ALT, M::empty(), "Alt+F1", None, |app| {
+        crate::windows_drives::open(app, 0);
+    }),
+    #[cfg(windows)]
+    bind(K::F(2), M::ALT, M::empty(), "Alt+F2", None, |app| {
+        crate::windows_drives::open(app, 1);
+    }),
     bind(
         K::Delete,
         M::ALT,

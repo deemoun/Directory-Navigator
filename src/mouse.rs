@@ -50,6 +50,8 @@ pub enum Target {
     MenuSurface,
     Function(u8),
     Panel(usize),
+    #[cfg(windows)]
+    Drive(usize, Option<u8>),
     Scrollbar(usize, crate::panel_layout::ScrollAction),
     Entry(usize, usize),
     CloseDialog,
@@ -588,6 +590,11 @@ fn handle_mouse(app: &mut App, event: MouseEvent) {
         Some(Target::MenuItem(depth, row)) => menu::activate(app, depth, row),
         Some(Target::Function(number)) => menu::execute(app, Action::Key(number)),
         Some(Target::Panel(index)) => app.active = index,
+        #[cfg(windows)]
+        Some(Target::Drive(index, letter)) => match letter {
+            Some(letter) => crate::windows_drives::navigate(app, index, letter),
+            None => crate::windows_drives::open(app, index),
+        },
         Some(Target::Scrollbar(index, action)) => {
             use crate::panel_layout::ScrollAction;
             app.active = index;

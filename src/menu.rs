@@ -20,6 +20,8 @@ pub enum Action {
     ScreensaverSetup,
     ScreenRest,
     Bookmarks,
+    #[cfg(windows)]
+    Drive(usize),
     FilenameFilter,
     Utility(crate::utilities::Kind),
     History(crate::file_tools::history::HistoryKind),
@@ -47,7 +49,10 @@ pub enum Action {
     SelectAll,
     ClearSelection,
     SelectGroup,
-    SelectRelated { extension: bool, selecting: bool },
+    SelectRelated {
+        extension: bool,
+        selecting: bool,
+    },
     UnselectGroup,
     FileInfo,
     Columns,
@@ -204,6 +209,8 @@ pub fn execute(app: &mut App, action: Action) {
         Action::ScreensaverSetup => crate::screensaver::open(app),
         Action::ScreenRest => app.screensaver.start(std::time::Instant::now()),
         Action::Colors => crate::palette::open(app),
+        #[cfg(windows)]
+        Action::Drive(panel) => crate::windows_drives::open(app, panel),
         Action::Bookmarks => crate::navigation_tools::open_bookmarks(app),
         Action::FilenameFilter => crate::navigation_tools::open_filter(app),
         Action::Utility(kind) => crate::utilities::open(app, kind),

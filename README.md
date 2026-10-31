@@ -112,10 +112,16 @@ cargo build --release
 
 On Windows, the executable is `target\release\dn.exe`.
 
+Windows MSVC builds statically link the C runtime through `.cargo/config.toml`.
+For an older binary reporting a missing `VCRUNTIME140.dll`, install Microsoft's
+[Visual C++ v14 Redistributable (x64)](https://aka.ms/vc14/vc_redist.x64.exe)
+in the Windows environment where DN runs, or rebuild DN with the current configuration.
+
 | Platform | Current status |
 | --- | --- |
 | macOS Apple Silicon | Primary development and tested platform |
-| Linux x86_64 / ARM64 | Targeted; runtime validation still pending |
+| Linux ARM64 | User-reported successful launch and operation |
+| Linux x86_64 | Targeted; runtime validation still pending |
 | Windows 10/11 | Best effort; runtime validation still pending |
 
 ## Everyday controls

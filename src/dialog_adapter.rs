@@ -149,12 +149,8 @@ const ADAPTERS: &[Adapter] = &[
         mouse: crate::navigation_tools::mouse,
         spec: crate::ui::navigation_spec,
         set_focus: |app, next| {
-            if let Some(
-                crate::navigation_tools::Modal::Bookmarks { focus, .. }
-                | crate::navigation_tools::Modal::Filter { focus, .. },
-            ) = app.navigation_dialog_mut()
-            {
-                *focus = next;
+            if let Some(modal) = app.navigation_dialog_mut() {
+                *modal.focus_mut() = next;
             }
         },
     },

@@ -75,6 +75,8 @@ pub mod localization;
 pub mod regional;
 
 pub mod volume_space;
+#[cfg(any(windows, test))]
+mod windows_drives;
 
 pub mod windowing;
 

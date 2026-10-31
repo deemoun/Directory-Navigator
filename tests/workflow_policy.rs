@@ -1,5 +1,43 @@
 //! All checked-in Actions must require an explicit dispatch, including future workflows.
 use std::{fs, io, path::Path};
+
+#[test]
+fn windows_builds_embed_the_c_runtime_without_changing_other_targets() -> io::Result<()> {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(".cargo/config.toml");
+    let text = fs::read_to_string(path)?;
+    let lf = text.replace("\r\n", "\n");
+    let crlf = lf.replace('\n', "\r\n");
+    let mixed = lf.replacen('\n', "\r\n", 1);
+    for text in [lf, crlf, mixed] {
+        let config: toml::Table = text.parse().expect("Valid Cargo configuration");
+        let targets = config["target"].as_table().expect("Target-specific flags");
+        let flags = targets["x86_64-pc-windows-msvc"]["rustflags"]
+            .as_array()
+            .expect("Windows Rust flags");
+        assert!(flags.windows(2).any(|pair| {
+            pair[0].as_str() == Some("-C") && pair[1].as_str() == Some("target-feature=+crt-static")
+        }));
+        let enables_static_crt = |flags: Option<&toml::Value>| {
+            flags.is_some_and(|flags| flags.to_string().contains("+crt-static"))
+        };
+        assert!(!enables_static_crt(
+            config.get("build").and_then(|build| build.get("rustflags"))
+        ));
+        assert!(!enables_static_crt(
+            config.get("env").and_then(|env| env.get("RUSTFLAGS"))
+        ));
+        for (target, settings) in targets {
+            if !target.ends_with("windows-msvc") {
+                assert!(
+                    !enables_static_crt(settings.get("rustflags")),
+                    "Unexpected static CRT for {target}"
+                );
+            }
+        }
+    }
+    Ok(())
+}
+
 #[test]
 fn every_workflow_is_dispatch_only() -> io::Result<()> {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join(".github/workflows");

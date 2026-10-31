@@ -662,7 +662,14 @@ shared container; operating-system storage tools can account for purgeable space
 differently. Snapshots refresh in the background about every five seconds, on
 directory changes and after Refresh. Rendering and clock ticks perform no volume
 queries or directory scans. Failed queries display “Volume space unavailable”.
-No drive selector or DOS drive-letter controls are added.
+On Windows only, each panel’s bottom border contains assigned drive letters,
+with the current drive highlighted. Click a letter to open its root, or click
+`*` for the full drive picker. Alt+F1 selects a drive for the left panel and
+Alt+F2 for the right; choose with the arrows/Tab and Enter, or type a letter.
+Escape cancels. Assigned letters refresh about every two seconds; disconnected
+or unready drives report a directory error and leave the previous folder open.
+UNC paths remain supported and do not highlight a drive letter. This strip and
+these shortcuts are absent on macOS and Linux.
 
 ## MP3 Player
 
