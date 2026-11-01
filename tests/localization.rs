@@ -111,10 +111,13 @@ fn catalogs_are_complete_pairs_safe_and_fallback_without_touching_content() {
     );
 }
 fn unique<'a>(labels: impl IntoIterator<Item = &'a str>) {
+    unique_in(Language::Russian, labels);
+}
+fn unique_in<'a>(language: Language, labels: impl IntoIterator<Item = &'a str>) {
     let mut found = BTreeSet::new();
     for label in labels {
-        if let Some(c) = menu::mnemonic(Language::Russian.text(label)) {
-            assert!(found.insert(c), "Duplicate {c}: {label}");
+        if let Some(c) = menu::mnemonic(language.text(label)) {
+            assert!(found.insert(c), "Duplicate {c} in {language:?}: {label}");
         }
     }
 }
@@ -149,15 +152,17 @@ fn windows_panel_mnemonics_are_unique_on_every_host() {
     let items = menu::items(panel);
     let mut labels = items.iter().map(|item| item.label).collect::<Vec<_>>();
     // Include the Windows-only entries even when running on macOS or Linux.
-    for label in ["~L~eft drive...", "~R~ight drive..."] {
+    for label in ["Left dri~v~e...", "Ri~g~ht drive..."] {
         if !labels.contains(&label) {
             labels.push(label);
         }
     }
-    unique(labels);
+    for language in [Language::English, Language::Russian] {
+        unique_in(language, labels.iter().copied());
+    }
     for (label, english, russian) in [
-        ("~L~eft drive...", 'l', 'д'),
-        ("~R~ight drive...", 'r', 'а'),
+        ("Left dri~v~e...", 'v', 'д'),
+        ("Ri~g~ht drive...", 'g', 'а'),
     ] {
         assert!(Language::Russian.matches(label, english));
         assert!(Language::Russian.matches(label, russian));
