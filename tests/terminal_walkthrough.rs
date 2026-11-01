@@ -1138,7 +1138,9 @@ fn mp3_folder_tags_modes_info_and_resize_restore_terminal() -> io::Result<()> {
     s.send(b"\t \r", "enable player", |s| s.command_prompt_active())?;
     s.select_file("music")?;
     s.send(b"\x1bua", "import folder", |s| {
-        s.text().contains("MP3 Player") && !s.text().contains("Adding MP3 files")
+        s.text().contains("MP3 Player")
+            && !s.text().contains("Adding MP3 files")
+            && s.plugin_document_ready()
     })?;
     s.send(b"\x1bz", "tagged player", |s| {
         s.text().contains("Test artist") && s.text().contains("First song")

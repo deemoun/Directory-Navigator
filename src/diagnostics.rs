@@ -111,9 +111,12 @@ mod tests {
                 crossterm::event::KeyModifiers::NONE,
             )));
             assert_eq!(recorder.events.len(), 24);
+            app.panels[0].loading = true;
+            app.panels[1].loading = false;
             recorder.snapshot(&app);
             let text = std::fs::read_to_string(&path)?;
             assert!(text.contains("paste bytes=13") && text.contains("character"));
+            assert!(text.contains("panels_loading=[true, false]"));
             for private in [
                 "PRIVATE_BUFFER",
                 "PRIVATE_PASTE",
@@ -125,7 +128,9 @@ mod tests {
             assert!(Recorder::open(&path).is_err());
             assert_eq!(std::fs::read_to_string(&path)?, text);
             recorder.events.clear();
+            app.panels[0].loading = false;
             recorder.snapshot(&app);
+            assert!(std::fs::read_to_string(&path)?.contains("panels_loading=[false, false]"));
             assert!(std::fs::metadata(&path)?.len() < text.len() as u64);
         }
         Ok(())

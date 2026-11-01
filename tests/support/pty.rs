@@ -13,6 +13,19 @@ use std::{
 };
 use unicode_width::UnicodeWidthChar;
 
+fn document_input_ready(diagnostics: &str, focus: &str) -> bool {
+    diagnostics
+        .lines()
+        .next()
+        .is_some_and(|line| line.starts_with("active=") && line.contains(focus))
+        && diagnostics.lines().any(|line| line == "modals=[]")
+        && diagnostics
+            .lines()
+            .find(|line| line.starts_with("top="))
+            // The manager is the desktop background, with no floating top surface.
+            .is_none_or(|line| line.starts_with("top=SurfaceId { key: Document("))
+}
+
 pub struct Session {
     pub root: PathBuf,
     child: Child,
@@ -141,9 +154,22 @@ impl Session {
     pub fn command_prompt_active(&self) -> bool {
         self.screen.command_prompt_active()
     }
+    pub fn plugin_document_ready(&self) -> bool {
+        fs::read_to_string(self.root.join("settings/dn/diagnostics.txt")).is_ok_and(|state| {
+            document_input_ready(&state, " focus=Plugin ")
+                && state
+                    .lines()
+                    .any(|line| line.starts_with("top=SurfaceId { key: Document("))
+        })
+    }
     pub fn select_file(&mut self, name: &str) -> io::Result<()> {
         // A burst of relative arrows assumes a specific selection throughout
         // asynchronous panel preparation. Select and acknowledge a stable name.
+        // The manager menu and command cursor may precede the initial scans.
+        self.wait("fixture panels ready", |s| {
+            fs::read_to_string(s.root.join("settings/dn/diagnostics.txt"))
+                .is_ok_and(|state| s.screen.file_selection_ready(&state))
+        })?;
         self.send(b"\x1b[18;3~", "fixture quick search", |s| {
             s.text().contains("Find:")
         })?;
@@ -331,6 +357,13 @@ impl Screen {
     }
     fn command_prompt_active(&self) -> bool {
         self.cursor_visible && self.y == self.height - 2
+    }
+    fn file_selection_ready(&self, diagnostics: &str) -> bool {
+        self.command_prompt_active()
+            && document_input_ready(diagnostics, " focus=Manager ")
+            && diagnostics
+                .lines()
+                .any(|line| line == "panels_loading=[false, false]")
     }
     fn resize(&mut self, width: usize, height: usize) {
         self.width = width;
@@ -521,6 +554,47 @@ mod tests {
     fn feed(screen: &mut Screen, bytes: &[u8]) {
         screen.pending.extend_from_slice(bytes);
         screen.decode();
+    }
+    #[test]
+    fn manager_chrome_is_not_file_selection_readiness_while_panels_load() {
+        let mut screen = Screen::new(80, 25);
+        feed(&mut screen, b"\x1b[1;1HFile Utilities\x1b[25;1HF10 Quit");
+        feed(&mut screen, FRAME_END);
+        feed(&mut screen, b"\x1b[24;1H\x1b[?25h");
+        assert!(screen.command_prompt_active());
+        assert!(screen.text().contains("Utilities"));
+        let manager = "active=WindowInfo { id: WindowId(0), kind: Manager } focus=Manager layout_revision=1\nmodals=[]\ntop=SurfaceId { key: Document(WindowId(0)), generation: 0 }\n";
+        for loading in ["[true, true]", "[true, false]", "[false, true]"] {
+            assert!(!screen.file_selection_ready(&format!("{manager}panels_loading={loading}\n")));
+        }
+        let ready = format!("{manager}panels_loading=[false, false]\n");
+        assert!(screen.file_selection_ready(&ready));
+        let background = ready
+            .lines()
+            .filter(|line| !line.starts_with("top="))
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(screen.file_selection_ready(&background));
+        // Missing, partial or non-manager snapshots must never send the key.
+        assert!(!screen.file_selection_ready(manager));
+        assert!(!screen.file_selection_ready(&format!("{manager}panels_loading=[false,")));
+        assert!(!screen.file_selection_ready(&ready.replace("focus=Manager", "focus=Prompt")));
+        assert!(!screen.file_selection_ready(
+            &ready.replace("key: Document(WindowId(0))", "key: Page(WindowId(0), 1)")
+        ));
+        feed(&mut screen, b"\x1b[?25l");
+        assert!(!screen.file_selection_ready(&ready));
+    }
+    #[test]
+    fn plugin_input_waits_for_the_parent_document_after_a_page_closes() {
+        let document = "active=WindowInfo { id: WindowId(1), kind: Plugin } focus=Plugin layout_revision=1\nmodals=[]\ntop=SurfaceId { key: Document(WindowId(1)), generation: 0 }\n";
+        assert!(super::document_input_ready(document, " focus=Plugin "));
+        let page = document.replace("key: Document(WindowId(1))", "key: Page(WindowId(1), 3)");
+        assert!(!super::document_input_ready(&page, " focus=Plugin "));
+        assert!(!super::document_input_ready(
+            &document.replace("modals=[]", "modals=[ModalInfo]"),
+            " focus=Plugin "
+        ));
     }
     #[test]
     fn partial_screen_and_split_frame_terminator_cannot_satisfy_a_new_step() {

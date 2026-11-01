@@ -39,9 +39,10 @@ pub fn diagnostic_state(app: &crate::app::App) -> String {
     use std::fmt::Write;
     let native = app.desktop.native();
     let mut state = format!(
-        "active={:?} focus={:?} layout_revision={} viewport={:?}\nmodals={:?}\nbutton={}\ncapture={:?} z_order={:?}\n",
+        "active={:?} focus={:?} layout_revision={} viewport={:?}\npanels_loading={:?}\nmodals={:?}\nbutton={}\ncapture={:?} z_order={:?}\n",
         app.desktop.active(), crate::focus::current(app), app.layout_revision,
-        app.utilities.size, app.modal_infos(), crate::button_feedback::diagnostic(app),
+        app.utilities.size, app.panels.each_ref().map(|panel| panel.loading),
+        app.modal_infos(), crate::button_feedback::diagnostic(app),
         native.manipulated_surface(), native.z_order(),
     );
     for window in app.desktop.windows() {
