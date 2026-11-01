@@ -5,6 +5,7 @@ use std::{ffi::OsString, path::PathBuf};
 pub struct QuickSearch {
     pub panel: usize,
     pub path: PathBuf,
+    pub location: (u64, usize),
     pub query: String,
     pub no_match: bool,
     original: Option<OsString>,
@@ -15,6 +16,7 @@ impl QuickSearch {
         Self {
             panel,
             path: listing.path.clone(),
+            location: listing.location_key(),
             query: String::new(),
             no_match: false,
             original: listing.entries.get(listing.cursor).map(|e| e.name.clone()),
@@ -91,7 +93,11 @@ pub fn key(app: &mut App, key: KeyEvent) -> bool {
         return false;
     };
     let panel = &mut app.panels[search.panel];
-    if panel.loading || panel.path != search.path || search.panel != app.active {
+    if panel.loading
+        || panel.path != search.path
+        || panel.location_key() != search.location
+        || search.panel != app.active
+    {
         return false;
     }
     match key.code {

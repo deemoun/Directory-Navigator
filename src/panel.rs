@@ -1,4 +1,6 @@
+pub mod archive;
 use crate::filesystem::{self, Entry};
+pub use archive::Location;
 use std::{
     collections::BTreeSet,
     ffi::OsString,
@@ -27,6 +29,7 @@ struct Response {
 }
 
 pub struct Panel {
+    pub location: Location,
     pub scope: crate::requests::RequestScope,
     pub space: crate::volume_space::Snapshot,
     #[cfg(windows)]
@@ -108,6 +111,7 @@ impl Panel {
                 }
             })?;
         let mut panel = Self {
+            location: Location::Filesystem,
             scope: crate::requests::RequestScope::new(crate::requests::Owner::Panel(index)),
             space: Default::default(),
             #[cfg(windows)]
@@ -269,7 +273,8 @@ impl Panel {
 
     /// Passive refresh never disables navigation or paints a loading indicator.
     pub fn refresh_if_due(&mut self, show_hidden: bool, now: Instant) {
-        if !self.loading
+        if !self.is_archive()
+            && !self.loading
             && !self.refreshing
             && now.saturating_duration_since(self.last_refresh) >= Duration::from_secs(2)
         {
@@ -328,31 +333,31 @@ impl Panel {
         self.apply_filter_current();
     }
     pub fn filtered_marks(&self) -> usize {
-        self.filtered_out
-            .iter()
-            .filter(|e| self.selected.contains(&e.name))
-            .count()
+        self.filtered_out.iter().filter(|e| self.marked(e)).count()
     }
     pub fn only_filtered_marks(&self) -> bool {
-        !self.selected.is_empty()
-            && !self
-                .entries
-                .iter()
-                .any(|e| !e.parent && self.selected.contains(&e.name))
+        self.has_marks() && !self.entries.iter().any(|e| !e.parent && self.marked(e))
     }
     pub fn select_visible(&mut self) {
-        self.selected.extend(
-            self.entries
-                .iter()
-                .filter(|e| !e.parent)
-                .map(|e| e.name.clone()),
-        );
+        let names = self
+            .entries
+            .iter()
+            .filter(|e| !e.parent)
+            .map(|e| e.name.clone())
+            .collect::<Vec<_>>();
+        for name in names {
+            self.mark_name(name, true);
+        }
     }
     pub fn invert_visible(&mut self) {
-        for entry in self.entries.iter().filter(|e| !e.parent) {
-            if !self.selected.remove(&entry.name) {
-                self.selected.insert(entry.name.clone());
-            }
+        let names = self
+            .entries
+            .iter()
+            .filter(|e| !e.parent)
+            .map(|e| (e.name.clone(), !self.marked(e)))
+            .collect::<Vec<_>>();
+        for (name, marked) in names {
+            self.mark_name(name, marked);
         }
     }
     pub fn replace_visible_marks(&mut self, marks: &BTreeSet<OsString>) {
@@ -373,6 +378,10 @@ impl Panel {
         if self.loading {
             return;
         }
+        if self.is_archive() {
+            self.archive_enter(show_hidden);
+            return;
+        }
         if let Some(entry) = self.entries.get(self.cursor) {
             if entry.parent {
                 self.parent(show_hidden);
@@ -386,6 +395,10 @@ impl Panel {
         if self.loading {
             return;
         }
+        if self.is_archive() {
+            self.archive_parent(show_hidden);
+            return;
+        }
         if let Some(parent) = self.path.parent() {
             self.request(
                 parent.into(),
@@ -396,6 +409,10 @@ impl Panel {
     }
 
     pub fn refresh(&mut self, show_hidden: bool) {
+        if self.is_archive() {
+            self.refresh_archive();
+            return;
+        }
         if self.loading {
             self.refresh_pending = Some(show_hidden);
         } else {
@@ -409,14 +426,14 @@ impl Panel {
             return;
         }
         if let Some(entry) = self.entries.get(self.cursor).filter(|e| !e.parent) {
-            if !self.selected.remove(&entry.name) {
-                self.selected.insert(entry.name.clone());
-            }
+            let marked = !self.marked(entry);
+            let name = entry.name.clone();
+            self.mark_name(name, marked);
         }
     }
 
     pub fn targets(&self) -> Vec<PathBuf> {
-        if self.loading {
+        if self.is_archive() || self.loading {
             return Vec::new();
         }
         self.entries
@@ -445,6 +462,10 @@ impl Panel {
     }
 
     pub fn go_to(&mut self, path: PathBuf, hidden: bool) {
+        if self.is_archive() {
+            self.leave_archive(hidden);
+            self.loading = false;
+        }
         if !self.loading {
             self.request(path, None, hidden);
         }

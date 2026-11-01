@@ -19,7 +19,6 @@ pub enum Focus {
     Discovery,
     Tree,
     UserMenu,
-    Archive,
     FileInfo,
     Columns,
     Pattern,

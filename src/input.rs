@@ -231,6 +231,19 @@ fn handle_key(app: &mut App, key: KeyEvent) {
         crate::viewer::key(app, key);
         return;
     }
+    if focus == Focus::Manager && key.code == KeyCode::Esc && app.panels[app.active].is_archive() {
+        if !app.command_line.text.is_empty() {
+            if let Some(a) = app.panels[app.active].archive_mut() {
+                a.preview = None;
+            }
+            crate::command_line::key(app, key);
+        } else if app.panels[app.active].loading {
+            app.panels[app.active].leave_archive(app.config.show_hidden);
+        } else if let Some(a) = app.panels[app.active].archive_mut() {
+            a.preview = None;
+        }
+        return;
+    }
     if focus == Focus::Manager && crate::command_line::key(app, key) {
         return;
     }

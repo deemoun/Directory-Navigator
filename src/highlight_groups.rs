@@ -70,8 +70,7 @@ pub fn builtin_color(entry: &crate::filesystem::Entry) -> u8 {
     if entry.directory {
         return 0x8f;
     }
-    let extension = entry
-        .path
+    let extension = std::path::Path::new(&entry.name)
         .extension()
         .map(|s| s.to_string_lossy().to_ascii_lowercase())
         .unwrap_or_default();

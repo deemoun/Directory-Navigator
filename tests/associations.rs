@@ -481,7 +481,7 @@ fn mouse_reload_double_click_and_archive_override() -> io::Result<()> {
             .active_viewer()
             .is_some_and(|v| v.contents.is_some())
     });
-    assert!(app.archive().is_none());
+    assert!(!app.panels[app.active].is_archive());
     assert!(app
         .desktop
         .active_viewer()

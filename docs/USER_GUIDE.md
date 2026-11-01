@@ -176,9 +176,9 @@ an immediate refresh.
 | Esc | Close viewer/dialog or cancel operation |
 
 Independent tools are desktop windows: Directory Tree, Find/results, Directory
-Sizes, archive browsing, file information, Calculator, character table,
+Sizes, file information, Calculator, character table,
 system/memory information, bookmarks, histories and standalone Help. They remain
-open when you switch away. Reopening activates the existing tool; archives and
+open when you switch away. Reopening activates the existing tool;
 file-information windows distinguish file paths. Navigation and View/Edit retain
 the originating tool's selection and results. Quick directories closes after
 Go To successfully navigates its source pane; empty slots or failed navigation
@@ -543,31 +543,49 @@ DOS `!`, `$`, `%1`…`%9` and batch flags are not translated; use the native
 parameter and selection placeholders above instead.
 
 
-Archive browsing is read-only. Enter/double-click a ZIP, TAR, TAR.GZ or TGZ,
-or choose File → Browse archive. Enter opens folders or previews regular members;
-Backspace/Left returns to the parent and Esc closes the archive. F3 opens the
-bounded text/hex viewer, with its existing wrap/search controls; closing that
-viewer returns to the archive. Alt+I shows member metadata, Ctrl+R refreshes,
-Stop cancels background indexing/preview work, and the mouse supports rows,
-double-click, wheel, scrollbar arrows/track, buttons and the title close control.
-The underlying panel paths, cursor, marks, filters and layouts remain intact.
+ZIP, TAR, TAR.GZ and TGZ archives open directly in the active file pane with
+Enter, double-click or File → Browse archive. Each pane navigates independently;
+the header shows the archive and its internal directory. Sorting, filename filters,
+quick search and normal marking controls work inside archives. Enter opens folders
+or previews regular members; F3 opens the bounded read-only text/hex viewer.
+Closing the viewer returns to the same pane. Backspace and `..` go up; at the archive
+root they return to disk and highlight the archive. Ctrl+PgUp returns to disk from
+any depth. The outer cursor, marks, filter and scroll position are restored against
+a refreshed directory listing. Esc cancels indexing or preview work; Ctrl+R rereads
+the archive. F1 explains archive-pane controls.
 
-Members are previewed in memory, never unpacked to disk or added to file history.
-Links/hard links and special entries are listed but never followed or executed.
-Encrypted entries can be listed but cannot be previewed. Corruption, unavailable
-sources and source changes are reported; partial TAR listings are labelled.
-Archive sources must be regular files; file symlinks retain OS-default opening.
+F5 extracts marked items, or the current item when there are no marks, through the
+shared Copy dialog and Transfer Center. Folders include descendants and empty
+subdirectories. Paths are relative to the current archive directory: `a.txt` inside
+`docs` extracts as `a.txt`; selecting `docs` at the root includes `docs/a.txt`.
+The other disk pane supplies the default destination. When both panes show archives,
+enter an explicit absolute disk path or use Tree/history. Copy to Temp Drive works
+through the same extraction path. Accepted jobs continue after leaving the archive.
+Refuse stops on existing top-level destinations; Skip leaves each existing file or
+folder untouched, without merging directories. Preview and Cancel never extract.
 
-Limits: 512 MiB archive source; 10,000 members; 20,000 virtual nodes; 16 MiB tree
-metadata; 64 path levels/4 KiB paths. TAR traversal/decompression is limited to
-256 MiB and each worker read job to ten seconds between I/O checks. ZIP indexing
-uses bounded central-directory validation and a 64 MiB cumulative read budget.
-Preview limits remain 2 MiB/100,000 lines. Small complete ZIP previews check CRC;
-truncated previews do not verify the unseen remainder. ZIP supports Stored and
-Deflate; ZIP64, multi-volume/self-extracting layouts, duplicate ZIP names,
-passwords, extraction, archive modification and nested archive browsing are
-outside this batch. ZIP timestamps are shown as stored; TAR timestamps use UTC.
-The native codecs use `zip`, `tar` and `flate2` with minimal features.
+Archives remain read-only: extract before editing or running commands on members.
+Move, deletion, mkdir, copying into archives, source removal, encrypted members,
+links/special-file extraction, archive creation and nested archive browsing are
+unsupported. Unsupported or unsafe selected trees and incomplete catalogs are
+rejected before extraction. Portable output names exclude Windows device names,
+case-folding collisions and names invalid on Windows. No archive ownership or
+privileged permission bits are restored. Available times and ordinary permissions
+are retained. Files are streamed into private staging on the destination volume;
+checksums and source identity are checked before guarded no-overwrite publication.
+Cancellation removes owned staging; already published items remain if a later
+publication fails. Previewed members stay in memory and do not enter file history.
+
+Limits remain 512 MiB per archive source; 10,000 members; 20,000 virtual nodes;
+16 MiB tree metadata; 64 path levels/4 KiB paths. TAR traversal/decompression is
+limited to 256 MiB. Indexing/preview reads have ten-second work budgets; full
+extraction streams separately with cancellation and a one-hour worker read budget.
+ZIP indexing validates the central directory within a 64 MiB read budget; full
+payload reads are separately bounded by the accepted source size. Preview remains
+limited to 2 MiB/100,000 lines, while extraction can read full members. ZIP supports
+Stored and Deflate; ZIP64, multi-volume/self-extracting layouts and duplicate ZIP
+names are unsupported. ZIP timestamps use local time; TAR timestamps use UTC.
+The native codecs use the existing `zip`, `tar` and `flate2` dependencies.
 
 
 Menu scope: ≡, File, Utilities, Panel, Manager and Options. Directory tree lives
@@ -582,9 +600,8 @@ them. Save/Load desktop continues to persist colors and settings.
 Unsupported commands are not menu placeholders. Disk administration/recovery,
 DOS communications/country/printer setup and built-in printing are outside this
 app's scope. Save all remains outside this pass; desktop movement and zoom use
-the shared window controls described below. Future work is separate: safe archive extraction,
-disk/free-space information and permission editing; later,
-archive creation.
+the shared window controls described below. Future work includes permission editing
+and archive creation.
 Split/combine and line drawing remain low priority. No settings format changes.
 
 **Ctrl+O** in the Classic profile reveals the terminal's real primary screen and

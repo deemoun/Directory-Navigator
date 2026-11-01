@@ -1,4 +1,4 @@
-//! Bounded read-only archive I/O. No unpack/extract APIs or temporary files.
+//! Bounded archive indexing, preview and streaming extraction.
 use crate::{
     filesystem::open_regular,
     task::Cancellation,
@@ -50,6 +50,8 @@ pub struct Member {
     pub kind: Kind,
     pub size: u64,
     pub modified: Option<String>,
+    pub mode: Option<u32>,
+    pub modified_time: Option<std::time::SystemTime>,
     pub children: Vec<usize>,
     pub source: Option<usize>,
     pub raw: Vec<u8>,
@@ -63,12 +65,14 @@ impl Member {
     }
 }
 pub struct Catalog {
+    pub generation: u64,
     pub path: PathBuf,
     pub format: Format,
     pub nodes: Vec<Member>,
     pub skipped: usize,
     pub note: Option<String>,
     identity: Metadata,
+    source_identity: crate::platform_fs::EntryIdentity,
     keys: HashMap<Vec<u8>, usize>,
     metadata_bytes: usize,
 }
@@ -97,17 +101,27 @@ pub fn normalize(raw: &[u8]) -> io::Result<Vec<u8>> {
     Ok(path)
 }
 impl Catalog {
-    fn new(path: PathBuf, format: Format, identity: Metadata) -> Self {
+    fn new(
+        path: PathBuf,
+        format: Format,
+        identity: Metadata,
+        source_identity: crate::platform_fs::EntryIdentity,
+    ) -> Self {
+        static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
         Self {
+            generation: NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
             path,
             format,
             identity,
+            source_identity,
             nodes: vec![Member {
                 path: Vec::new(),
                 parent: 0,
                 kind: Kind::Directory,
                 size: 0,
                 modified: None,
+                mode: None,
+                modified_time: None,
                 children: Vec::new(),
                 source: None,
                 raw: Vec::new(),
@@ -174,6 +188,8 @@ impl Catalog {
                 kind: Kind::Directory,
                 size: 0,
                 modified: None,
+                mode: None,
+                modified_time: None,
                 children: Vec::new(),
                 source: None,
                 raw: Vec::new(),
@@ -333,7 +349,26 @@ fn zip_open(
     metadata: &Metadata,
     cancel: &Cancellation,
 ) -> io::Result<zip::ZipArchive<Guard<File>>> {
-    let mut input = Guard::new(file, cancel, 64 * 1024 * 1024);
+    zip_open_for(file, metadata, cancel, false)
+}
+fn zip_open_for(
+    file: File,
+    metadata: &Metadata,
+    cancel: &Cancellation,
+    extract: bool,
+) -> io::Result<zip::ZipArchive<Guard<File>>> {
+    let mut input = Guard::new(
+        file,
+        cancel,
+        if extract {
+            MAX_SOURCE + 64 * 1024 * 1024
+        } else {
+            64 * 1024 * 1024
+        },
+    );
+    if extract {
+        input.deadline = Instant::now() + Duration::from_secs(3600);
+    }
     let count = zip_guard(&mut input, metadata.len())?;
     let archive = zip::ZipArchive::new(input).map_err(io::Error::other)?;
     if archive.len() != count {
@@ -360,7 +395,11 @@ pub fn list(path: PathBuf, cancel: &Cancellation) -> io::Result<Catalog> {
     let format = Format::detect(&path)
         .ok_or_else(|| io::Error::other("Supported formats: ZIP, TAR, TAR.GZ and TGZ"))?;
     let (file, metadata) = source(&path)?;
-    let mut result = Catalog::new(path, format, metadata);
+    let source_identity = crate::platform_fs::entry_identity(&path)?;
+    if !crate::platform_fs::owns_file(&path, &file) {
+        return Err(io::Error::other("Archive source changed during open"));
+    }
+    let mut result = Catalog::new(path, format, metadata, source_identity);
     if format == Format::Zip {
         let mut archive = zip_open(file, &result.identity, cancel)?;
         for index in 0..archive.len() {
@@ -386,6 +425,8 @@ pub fn list(path: PathBuf, cancel: &Cancellation) -> io::Result<Catalog> {
                 parent: 0,
                 kind,
                 size: entry.size(),
+                mode: entry.unix_mode(),
+                modified_time: entry.last_modified().and_then(zip_time),
                 modified: entry.last_modified().map(|t| {
                     format!(
                         "{:04}-{:02}-{:02} {:02}:{:02}",
@@ -437,6 +478,12 @@ pub fn list(path: PathBuf, cancel: &Cancellation) -> io::Result<Catalog> {
                 parent: 0,
                 kind,
                 size: entry.size(),
+                mode: entry.header().mode().ok(),
+                modified_time: entry
+                    .header()
+                    .mtime()
+                    .ok()
+                    .and_then(|s| std::time::UNIX_EPOCH.checked_add(Duration::from_secs(s))),
                 modified: entry
                     .header()
                     .mtime()
@@ -453,6 +500,7 @@ pub fn list(path: PathBuf, cancel: &Cancellation) -> io::Result<Catalog> {
     }
     cancel.check()?;
     result.finish();
+    result.validate()?;
     Ok(result)
 }
 fn read_preview(
@@ -493,15 +541,7 @@ pub fn preview(catalog: &Catalog, id: usize, cancel: &Cancellation) -> io::Resul
     let index = node
         .source
         .ok_or_else(|| io::Error::other("Member has no data"))?;
-    let (file, metadata) = source(&catalog.path)?;
-    if !crate::platform_fs::same_identity(&catalog.identity, &metadata)
-        || catalog.identity.len() != metadata.len()
-        || catalog.identity.modified().ok() != metadata.modified().ok()
-    {
-        return Err(io::Error::other(
-            "Archive changed since listing; refresh before previewing",
-        ));
-    }
+    let (file, metadata) = catalog.checked_source()?;
     if catalog.format == Format::Zip {
         let mut archive = zip_open(file, &metadata, cancel)?;
         let mut entry = archive.by_index(index).map_err(io::Error::other)?;
@@ -523,6 +563,197 @@ pub fn preview(catalog: &Catalog, id: usize, cancel: &Cancellation) -> io::Resul
         }
         Err(io::Error::other("Archive member disappeared"))
     }
+}
+
+/// Stream full members into an already private, preflighted staging tree.
+/// This deliberately does not use the bounded viewer buffer.
+pub(crate) fn extract_to(
+    catalog: &Catalog,
+    files: &[(usize, PathBuf)],
+    cancel: &Cancellation,
+    mut progress: impl FnMut(usize, u64),
+) -> io::Result<()> {
+    use std::io::Write;
+    fn write(
+        input: &mut impl Read,
+        path: &Path,
+        expected: u64,
+        mode: Option<u32>,
+        modified: Option<std::time::SystemTime>,
+        cancel: &Cancellation,
+        progress: &mut impl FnMut(u64),
+    ) -> io::Result<()> {
+        let mut options = std::fs::OpenOptions::new();
+        options.write(true).create_new(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            options.mode(0o600);
+        }
+        let mut output = options.open(path)?;
+        let mut total = 0u64;
+        let mut buffer = [0; 64 * 1024];
+        loop {
+            cancel.check()?;
+            let n = input.read(&mut buffer)?;
+            if n == 0 {
+                break;
+            }
+            total = total
+                .checked_add(n as u64)
+                .ok_or_else(|| io::Error::other("Member length overflow"))?;
+            if total > expected {
+                return Err(io::Error::other("Member exceeds declared length"));
+            }
+            output.write_all(&buffer[..n])?;
+            progress(n as u64);
+        }
+        if total != expected {
+            return Err(io::Error::new(
+                io::ErrorKind::UnexpectedEof,
+                "Member ended before declared length",
+            ));
+        }
+        #[cfg(unix)]
+        if let Some(mode) = mode {
+            use std::os::unix::fs::PermissionsExt;
+            output.set_permissions(std::fs::Permissions::from_mode(mode & 0o777))?;
+        }
+        #[cfg(not(unix))]
+        let _ = mode;
+        if let Some(time) = modified {
+            output.set_times(std::fs::FileTimes::new().set_modified(time))?;
+        }
+        output.sync_all()
+    }
+    catalog.validate()?;
+    let (file, metadata) = catalog.checked_source()?;
+    let mut found = 0;
+    if catalog.format == Format::Zip {
+        let mut archive = zip_open_for(file, &metadata, cancel, true)?;
+        // The source/index limits remain unchanged. Full extraction allows reading
+        // the accepted source once in addition to the bounded central directory.
+        for (id, path) in files {
+            cancel.check()?;
+            let node = &catalog.nodes[*id];
+            let mut entry = archive
+                .by_index(
+                    node.source
+                        .ok_or_else(|| io::Error::other("Missing member data"))?,
+                )
+                .map_err(io::Error::other)?;
+            if entry.name_raw() != node.raw || entry.size() != node.size {
+                return Err(io::Error::other("Archive member changed"));
+            }
+            let mode = entry.unix_mode();
+            let modified = entry.last_modified().and_then(zip_time);
+            write(
+                &mut entry,
+                path,
+                node.size,
+                mode,
+                modified,
+                cancel,
+                &mut |bytes| progress(*id, bytes),
+            )?;
+            found += 1;
+        }
+    } else {
+        let wanted = files
+            .iter()
+            .map(|(id, path)| (catalog.nodes[*id].source.unwrap(), (*id, path)))
+            .collect::<HashMap<_, _>>();
+        let mut input = Guard::new(file, cancel, MAX_SOURCE);
+        input.deadline = Instant::now() + Duration::from_secs(3600);
+        let decoded: Box<dyn Read> = if catalog.format == Format::TarGz {
+            Box::new(flate2::read::MultiGzDecoder::new(input))
+        } else {
+            Box::new(input)
+        };
+        let mut bounded = Guard::new(decoded, cancel, MAX_STREAM);
+        bounded.deadline = Instant::now() + Duration::from_secs(3600);
+        let mut archive = tar::Archive::new(bounded);
+        for (position, item) in archive.entries()?.enumerate() {
+            cancel.check()?;
+            let mut entry = item?;
+            if let Some((id, path)) = wanted.get(&position) {
+                let node = &catalog.nodes[*id];
+                if entry.path_bytes().as_ref() != node.raw
+                    || entry.size() != node.size
+                    || !entry.header().entry_type().is_file()
+                {
+                    return Err(io::Error::other("Archive member changed"));
+                }
+                let mode = entry.header().mode().ok();
+                let modified = entry
+                    .header()
+                    .mtime()
+                    .ok()
+                    .and_then(|s| std::time::UNIX_EPOCH.checked_add(Duration::from_secs(s)));
+                write(
+                    &mut entry,
+                    path,
+                    node.size,
+                    mode,
+                    modified,
+                    cancel,
+                    &mut |bytes| progress(*id, bytes),
+                )?;
+                found += 1;
+            }
+        }
+        // Consume the trailer so compressed-stream checksum errors cannot be hidden.
+        let mut input = archive.into_inner();
+        let mut buffer = [0; 64 * 1024];
+        loop {
+            cancel.check()?;
+            if input.read(&mut buffer)? == 0 {
+                break;
+            }
+        }
+    }
+    if found != files.len() {
+        return Err(io::Error::other("Archive members disappeared"));
+    }
+    cancel.check()?;
+    catalog.validate()
+}
+impl Catalog {
+    fn checked_source(&self) -> io::Result<(File, Metadata)> {
+        let (file, m) = source(&self.path)?;
+        if crate::platform_fs::entry_identity(&self.path)? != self.source_identity
+            || !crate::platform_fs::owns_file(&self.path, &file)
+            || !crate::platform_fs::same_identity(&self.identity, &m)
+            || self.identity.len() != m.len()
+            || self.identity.modified().ok() != m.modified().ok()
+        {
+            return Err(io::Error::other(
+                "Archive changed since listing; reopen the archive",
+            ));
+        }
+        Ok((file, m))
+    }
+    pub(crate) fn validate(&self) -> io::Result<()> {
+        self.checked_source().map(|_| ())
+    }
+}
+
+fn zip_time(d: zip::DateTime) -> Option<std::time::SystemTime> {
+    let date = chrono::NaiveDate::from_ymd_opt(
+        i32::from(d.year()),
+        u32::from(d.month()),
+        u32::from(d.day()),
+    )?;
+    let time = date.and_hms_opt(
+        u32::from(d.hour()),
+        u32::from(d.minute()),
+        u32::from(d.second()),
+    )?;
+    use chrono::TimeZone;
+    chrono::Local
+        .from_local_datetime(&time)
+        .earliest()
+        .map(std::time::SystemTime::from)
 }
 
 #[cfg(test)]

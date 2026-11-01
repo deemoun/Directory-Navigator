@@ -191,6 +191,9 @@ pub fn open_file(app: &mut App, path: PathBuf, local: bool) {
     }
 }
 pub fn open(app: &mut App, source: Source) {
+    if !crate::archive::require_native(app) {
+        return;
+    }
     app.user_menu.open_epoch = app.desktop.activation_revision();
     let directory = app.panels[app.active].path.clone();
     let fallback = match global() {
@@ -228,6 +231,9 @@ pub fn open(app: &mut App, source: Source) {
     }
 }
 pub fn edit_definition(app: &mut App, local: bool) {
+    if !crate::archive::require_native(app) {
+        return;
+    }
     let path = if local {
         app.panels[app.active].path.join("dn.mnu")
     } else {
@@ -364,6 +370,9 @@ pub fn pending(state: &State) -> bool {
     state.task.is_some()
 }
 fn selected(panel: &crate::panel::Panel) -> io::Result<Vec<PathBuf>> {
+    if panel.is_archive() {
+        return Err(io::Error::other(crate::archive::EXTRACT_FIRST));
+    }
     if panel.only_filtered_marks() {
         return Err(io::Error::other(
             "Marks exist only outside the filename filter",

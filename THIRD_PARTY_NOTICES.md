@@ -197,3 +197,12 @@ https://github.com/RustAudio/cpal
 MP3 decoding and read-only ID3 metadata use unmodified Symphonia 0.5.5 (MPL-2.0). Its source and license
 are available at https://github.com/pdeljanov/Symphonia/tree/v0.5.5 and
 https://www.mozilla.org/en-US/MPL/2.0/ respectively.
+
+## DOS Navigator archive panes
+
+Archive-as-directory navigation and selected F5 extraction follow the behavior in
+DOS Navigator 1.51 `original-dn/ARCVIEW.PAS`, `ARCHIVER.PAS` and its English help,
+Copyright (C) 1991–99 RIT Research Labs. Based on TinyWeb Server by RIT Research Labs.
+The RIT Research Labs license and disclaimer reproduced above apply to adapted
+behavior. Native ZIP/TAR codecs and filesystem safeguards are implemented in Rust;
+DOS external-archiver command execution is not carried over.

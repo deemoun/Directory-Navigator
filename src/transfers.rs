@@ -54,10 +54,22 @@ impl Status {
 struct Origin {
     owner: Owner,
     path: PathBuf,
+    location: (u64, usize),
     selected: BTreeSet<OsString>,
     cursor: Option<OsString>,
 }
+#[derive(Clone)]
+pub enum Request {
+    Filesystem,
+    Archive {
+        selection: crate::archive::Extraction,
+        destination: crate::archive::extract::Destination,
+    },
+}
 pub struct Entry {
+    pub request: Request,
+    pub extracting: bool,
+    archive_summary: Option<String>,
     pub id: TransferId,
     pub source_count: usize,
     pub plan: Plan,
@@ -73,6 +85,9 @@ pub struct Entry {
 }
 impl Entry {
     pub fn source_summary(&self) -> String {
+        if let Some(summary) = &self.archive_summary {
+            return summary.clone();
+        }
         let first = self
             .plan
             .sources
@@ -91,6 +106,7 @@ impl Entry {
     }
     fn retire_payload(&mut self) {
         self.prepared = None;
+        self.request = Request::Filesystem;
         self.origin.selected.clear();
         // Finished history is a summary, not another retained full work plan.
         self.plan.sources.truncate(1);
@@ -242,6 +258,41 @@ pub(crate) fn submit_with_root(
     options: CopyOptions,
     root: Option<crate::temp_drive::Root>,
 ) -> Result<TransferId, String> {
+    submit_request(app, plan, options, root, Request::Filesystem)
+}
+pub(crate) fn submit_extraction(
+    app: &mut App,
+    selection: crate::archive::Extraction,
+    destination: PathBuf,
+    options: CopyOptions,
+    root: Option<crate::temp_drive::Root>,
+) -> Result<TransferId, String> {
+    selection.validate().map_err(|e| e.to_string())?;
+    let receipt =
+        crate::archive::extract::Destination::capture(&destination).map_err(|e| e.to_string())?;
+    let plan = Plan {
+        kind: operations::Kind::Copy,
+        sources: vec![selection.catalog.path.clone()],
+        destination,
+    };
+    submit_request(
+        app,
+        plan,
+        options,
+        root,
+        Request::Archive {
+            selection,
+            destination: receipt,
+        },
+    )
+}
+fn submit_request(
+    app: &mut App,
+    plan: Plan,
+    options: CopyOptions,
+    root: Option<crate::temp_drive::Root>,
+    request: Request,
+) -> Result<TransferId, String> {
     if let Some(root) = &root {
         root.validate().map_err(|e| e.to_string())?;
     }
@@ -274,6 +325,7 @@ pub(crate) fn submit_with_root(
     let origin = Origin {
         owner: panel.scope.owner(),
         path: panel.path.clone(),
+        location: panel.location_key(),
         selected: panel.selected.clone(),
         cursor: panel.entries.get(panel.cursor).map(|e| e.name.clone()),
     };
@@ -283,12 +335,42 @@ pub(crate) fn submit_with_root(
         path: plan.sources.first().cloned().unwrap_or_default(),
         ..Default::default()
     };
+    let archive = matches!(request, Request::Archive { .. });
+    let source_count = match &request {
+        Request::Archive { selection, .. } => selection.members.len(),
+        _ => plan.sources.len(),
+    };
+    let archive_summary = match &request {
+        Request::Archive { selection, .. } => Some(format!(
+            "{} :: {}{}",
+            selection
+                .catalog
+                .path
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy(),
+            selection.catalog.nodes[selection.members[0].index].name(),
+            if source_count > 1 {
+                format!(" (+{})", source_count - 1)
+            } else {
+                String::new()
+            }
+        )),
+        _ => None,
+    };
     app.transfers.entries.push_back(Entry {
+        extracting: archive,
+        archive_summary,
+        request,
         id,
-        source_count: plan.sources.len(),
+        source_count,
         plan,
         options,
-        status: Status::Preparing,
+        status: if archive {
+            Status::Queued
+        } else {
+            Status::Preparing
+        },
         progress,
         error: None,
         origin,
@@ -347,13 +429,25 @@ fn start_next(app: &mut App, now: Instant) {
     // The first request prepares in its dedicated worker. Queued requests must
     // retain their earlier asynchronous identity snapshot before execution.
     let id = e.id;
-    let result = Job::start_transfer(
-        id,
-        e.plan.clone(),
-        e.options,
-        e.prepared.take(),
-        e.root.clone(),
-    );
+    let result = match &e.request {
+        Request::Filesystem => Job::start_transfer(
+            id,
+            e.plan.clone(),
+            e.options,
+            e.prepared.take(),
+            e.root.clone(),
+        ),
+        Request::Archive {
+            selection,
+            destination,
+        } => Job::start_extraction(
+            id,
+            selection.clone(),
+            destination.clone(),
+            e.options,
+            e.root.clone(),
+        ),
+    };
     match result {
         Ok(job) => {
             e.status = Status::Preparing;
@@ -514,18 +608,21 @@ pub(crate) fn poll(app: &mut App, now: Instant) -> bool {
                     .collect::<BTreeSet<_>>();
                 for panel in &mut app.panels {
                     if success
+                        && matches!(e.request, Request::Filesystem)
                         && panel.scope.owner() == e.origin.owner
                         && panel.path == e.origin.path
+                        && panel.location_key() == e.origin.location
                         && panel.selected == e.origin.selected
                         && panel.entries.get(panel.cursor).map(|v| v.name.clone())
                             == e.origin.cursor
                     {
                         panel.selected.retain(|name| !names.contains(name));
                     }
-                    if e.plan.sources.iter().any(|p| {
-                        p.parent() == Some(panel.path.as_path()) || panel.path.starts_with(p)
-                    }) || e.plan.destination == panel.path
-                        || e.plan.destination.parent() == Some(panel.path.as_path())
+                    if !panel.is_archive()
+                        && (e.plan.sources.iter().any(|p| {
+                            p.parent() == Some(panel.path.as_path()) || panel.path.starts_with(p)
+                        }) || e.plan.destination == panel.path
+                            || e.plan.destination.parent() == Some(panel.path.as_path()))
                     {
                         panel.refresh(app.config.show_hidden);
                         panel.space.refresh();
@@ -991,6 +1088,9 @@ mod tests {
         let (plan, options, origin) = (e.plan.clone(), e.options, e.origin.clone());
         for i in 1000..1110 {
             let mut copy = Entry {
+                extracting: false,
+                archive_summary: None,
+                request: Request::Filesystem,
                 id: TransferId(i),
                 source_count: plan.sources.len(),
                 plan: plan.clone(),

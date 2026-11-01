@@ -153,38 +153,13 @@ fn compact_prompt_and_copy_move_buttons_keep_both_arrows_through_tab_and_cancel(
 }
 
 #[test]
-fn translated_archive_and_game_buttons_keep_both_arrows() -> io::Result<()> {
-    use std::{io::Write, time::Duration};
+fn translated_game_buttons_keep_both_arrows() -> io::Result<()> {
     let fixture = support::Fixture::new("translated-button-markers")?;
-    let path = fixture.0.join("fixture.zip");
-    let mut zip = zip::ZipWriter::new(fs::File::create(&path)?);
-    zip.start_file("file.txt", zip::write::SimpleFileOptions::default())?;
-    zip.write_all(b"fixture")?;
-    zip.finish()?;
     for palette in [PaletteProfile::ClassicDn, PaletteProfile::Terminal] {
         for (w, h) in [(80, 25), (132, 40)] {
             let mut app = fixture.app()?;
             app.config.language = Language::Russian;
             app.config.palette = palette;
-            dn::archive::open(&mut app, path.clone());
-            support::wait_until(&mut app, Duration::from_secs(5), |a| {
-                a.archive().is_some_and(|b| !b.loading())
-            });
-            support::draw(&mut app, w, h)?;
-            for _ in 0..10 {
-                if app.archive().unwrap().focus == 4 {
-                    break;
-                }
-                support::key(&mut app, K::Tab);
-            }
-            check_markers(
-                &mut app,
-                w,
-                h,
-                Target::Archive(dn::archive::Action::Refresh),
-                "Обновить",
-            )?;
-            support::key(&mut app, K::Esc);
             dn::tetris::open(&mut app);
             support::draw(&mut app, w, h)?;
             support::key(&mut app, K::Tab);

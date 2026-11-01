@@ -889,3 +889,27 @@ Cannot determine the Temp Drive directory	Cannot determine the Temp Drive direct
 Temp Drive changed; reopen the command	Temp Drive changed; reopen the command
 Unconfirmed deletion source	Unconfirmed deletion source
 Clears every item in Temp Drive, including hidden files and folders. The Temp Drive directory is kept. The confirmation shows whether items go to Trash or are permanently deleted. Cancel leaves everything unchanged.	Clears every item in Temp Drive, including hidden files and folders. The Temp Drive directory is kept. The confirmation shows whether items go to Trash or are permanently deleted. Cancel leaves everything unchanged.
+Extract	Extract
+Extract {} selected archive items to	Extract {} selected archive items to
+Read-only archive · F5 extracts	Read-only archive · F5 extracts
+Partial archive	Partial archive
+ Reading archive…	 Reading archive…
+Archive pane help	Archive pane help
+Archive error	Archive error
+Extract archive members to disk first (F5).	Extract archive members to disk first (F5).
+Choose an explicit absolute filesystem destination.	Choose an explicit absolute filesystem destination.
+Archives are read-only. Choose a filesystem destination.	Archives are read-only. Choose a filesystem destination.
+Only unencrypted regular archive files can be viewed.	Only unencrypted regular archive files can be viewed.
+ZIP / TAR / TAR.GZ / TGZ in the file pane.	ZIP / TAR / TAR.GZ / TGZ in the file pane.
+Enter: folder or read-only preview · F3: preview	Enter: folder or read-only preview · F3: preview
+Insert / Space / Ctrl+click: mark · + / -: group	Insert / Space / Ctrl+click: mark · + / -: group
+F5: extract marked items, or the current item	F5: extract marked items, or the current item
+Folders include descendants and empty directories.	Folders include descendants and empty directories.
+Backspace / ..: parent; at root returns to disk	Backspace / ..: parent; at root returns to disk
+Ctrl+PgUp: exit archive from any folder	Ctrl+PgUp: exit archive from any folder
+Esc: cancel indexing or preview · Ctrl+R: refresh	Esc: cancel indexing or preview · Ctrl+R: refresh
+Both panes can browse archives independently.	Both panes can browse archives independently.
+Choose a disk destination when both show archives.	Choose a disk destination when both show archives.
+Archives are read-only; extract before editing.	Archives are read-only; extract before editing.
+Existing destinations are refused or skipped whole.	Existing destinations are refused or skipped whole.
+ZIP / TAR / TAR.GZ / TGZ in the file pane.\nEnter: folder or read-only preview · F3: preview\nInsert / Space / Ctrl+click: mark · + / -: group\nF5: extract marked items, or the current item\nFolders include descendants and empty directories.\nBackspace / ..: parent; at root returns to disk\nCtrl+PgUp: exit archive from any folder\nEsc: cancel indexing or preview · Ctrl+R: refresh\nBoth panes can browse archives independently.\nChoose a disk destination when both show archives.\nArchives are read-only; extract before editing.\nExisting destinations are refused or skipped whole.	ZIP / TAR / TAR.GZ / TGZ in the file pane.\nEnter: folder or read-only preview · F3: preview\nInsert / Space / Ctrl+click: mark · + / -: group\nF5: extract marked items, or the current item\nFolders include descendants and empty directories.\nBackspace / ..: parent; at root returns to disk\nCtrl+PgUp: exit archive from any folder\nEsc: cancel indexing or preview · Ctrl+R: refresh\nBoth panes can browse archives independently.\nChoose a disk destination when both show archives.\nArchives are read-only; extract before editing.\nExisting destinations are refused or skipped whole.

@@ -56,24 +56,23 @@ impl Wildcard {
 
 pub fn apply(panel: &mut Panel, pattern: &str, selecting: bool) -> usize {
     let matcher = Wildcard::new(pattern);
-    let mut changed = 0;
-    for entry in &panel.entries {
-        if !entry.parent && matcher.matches(&entry.name) {
-            let updated = if selecting {
-                panel.selected.insert(entry.name.clone())
-            } else {
-                panel.selected.remove(&entry.name)
-            };
-            changed += usize::from(updated);
-        }
-    }
-    changed
+    let names = panel
+        .entries
+        .iter()
+        .filter(|e| !e.parent && matcher.matches(&e.name))
+        .map(|e| e.name.clone())
+        .collect::<Vec<_>>();
+    names
+        .into_iter()
+        .filter(|name| panel.mark_name(name.clone(), selecting))
+        .count()
 }
 
 pub struct PatternDialog {
     pub selecting: bool,
     pub panel: usize,
     pub path: PathBuf,
+    pub location: (u64, usize),
     pub field: String,
     pub cursor: usize,
     pub replace_on_type: bool,
@@ -85,6 +84,7 @@ impl PatternDialog {
             selecting,
             panel,
             path,
+            location: (0, 0),
             field: "*".into(),
             cursor: 1,
             replace_on_type: true,
@@ -126,7 +126,7 @@ impl PatternDialog {
 pub fn accept(app: &mut App) {
     if let Some(prompt) = app.modals.take_pattern() {
         let panel = &mut app.panels[prompt.panel];
-        if panel.loading || panel.path != prompt.path {
+        if panel.loading || panel.path != prompt.path || panel.location_key() != prompt.location {
             app.error("Directory changed; reopen group selection.");
             return;
         }
@@ -185,7 +185,7 @@ pub fn related(
         return 0;
     }
     let suffix = |e: &crate::filesystem::Entry| {
-        e.path.extension().map(|s| {
+        std::path::Path::new(&e.name).extension().map(|s| {
             s.to_str()
                 .map(|v| std::ffi::OsString::from(v.to_lowercase()))
                 .unwrap_or_else(|| s.to_owned())
@@ -206,7 +206,7 @@ pub fn related(
     };
     let current_suffix = suffix(current);
     let current_category = category(current);
-    let mut changed = 0;
+    let mut names = Vec::new();
     for e in &panel.entries {
         let matches = if extension {
             !e.directory && !e.symlink && suffix(e) == current_suffix
@@ -214,14 +214,13 @@ pub fn related(
             category(e) == current_category
         };
         if !e.parent && matches {
-            changed += usize::from(if selecting {
-                panel.selected.insert(e.name.clone())
-            } else {
-                panel.selected.remove(&e.name)
-            });
+            names.push(e.name.clone());
         }
     }
-    changed
+    names
+        .into_iter()
+        .filter(|name| panel.mark_name(name.clone(), selecting))
+        .count()
 }
 
 #[cfg(test)]

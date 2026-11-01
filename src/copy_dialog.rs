@@ -17,6 +17,8 @@ impl State {
 #[derive(Default)]
 pub struct Draft {
     pub options: CopyOptions,
+    pub extraction: Option<crate::archive::Extraction>,
+    pub require_destination: bool,
     pub picked: Option<PathBuf>,
     pub(crate) temp_drive: Option<crate::temp_drive::Root>,
 }

@@ -92,6 +92,10 @@ pub fn open_history(app: &mut App, kind: HistoryKind) {
     }));
 }
 pub fn open_compare(app: &mut App) {
+    if app.panels.iter().any(|p| p.is_archive()) {
+        app.error(crate::archive::EXTRACT_FIRST);
+        return;
+    }
     prepare(app);
     if app.panels.iter().any(|p| p.loading) {
         app.error("Wait for both directory listings to finish loading.");
@@ -102,6 +106,9 @@ pub fn open_compare(app: &mut App) {
         .set_file_tools(Some(ToolDialog::Compare { focus: 0 }));
 }
 pub fn open_export(app: &mut App) {
+    if !crate::archive::require_native(app) {
+        return;
+    }
     prepare(app);
     let panel = &app.panels[app.active];
     if panel.loading {

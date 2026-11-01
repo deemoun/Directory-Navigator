@@ -891,3 +891,27 @@ Cannot determine the Temp Drive directory	Не удалось определит
 Temp Drive changed; reopen the command	Temp Drive изменился; вызовите команду заново
 Unconfirmed deletion source	Неподтверждённый источник удаления
 Clears every item in Temp Drive, including hidden files and folders. The Temp Drive directory is kept. The confirmation shows whether items go to Trash or are permanently deleted. Cancel leaves everything unchanged.	Очищает всё содержимое Temp Drive, включая скрытые файлы и папки. Сам каталог сохраняется. В подтверждении указан способ удаления: в корзину или окончательно. Отмена сохраняет все данные.
+Extract	Извлечь
+Extract {} selected archive items to	Извлечь выбранные элементы архива ({}) в
+Read-only archive · F5 extracts	Архив только для чтения · F5 — извлечь
+Partial archive	Неполный архив
+ Reading archive…	 Чтение архива…
+Archive pane help	Справка по панели архива
+Archive error	Ошибка архива
+Extract archive members to disk first (F5).	Сначала извлеките элементы архива на диск (F5).
+Choose an explicit absolute filesystem destination.	Выберите явный абсолютный путь назначения на диске.
+Archives are read-only. Choose a filesystem destination.	Архивы доступны только для чтения. Выберите папку на диске.
+Only unencrypted regular archive files can be viewed.	Просматривать можно только обычные незашифрованные файлы архива.
+ZIP / TAR / TAR.GZ / TGZ in the file pane.	ZIP / TAR / TAR.GZ / TGZ в файловой панели.
+Enter: folder or read-only preview · F3: preview	Enter: папка или просмотр · F3: просмотр
+Insert / Space / Ctrl+click: mark · + / -: group	Insert / Пробел / Ctrl+щелчок: отметить · + / -: группа
+F5: extract marked items, or the current item	F5: извлечь отмеченные элементы или текущий
+Folders include descendants and empty directories.	Папки включают вложенные файлы и пустые каталоги.
+Backspace / ..: parent; at root returns to disk	Backspace / ..: вверх; из корня — на диск
+Ctrl+PgUp: exit archive from any folder	Ctrl+PgUp: выйти из архива из любой папки
+Esc: cancel indexing or preview · Ctrl+R: refresh	Esc: отменить чтение или просмотр · Ctrl+R: обновить
+Both panes can browse archives independently.	Обе панели могут независимо открывать архивы.
+Choose a disk destination when both show archives.	Если обе панели в архивах, выберите папку на диске.
+Archives are read-only; extract before editing.	Архивы только для чтения; перед правкой извлеките файлы.
+Existing destinations are refused or skipped whole.	Существующие файлы и папки отклоняются или пропускаются целиком.
+ZIP / TAR / TAR.GZ / TGZ in the file pane.\nEnter: folder or read-only preview · F3: preview\nInsert / Space / Ctrl+click: mark · + / -: group\nF5: extract marked items, or the current item\nFolders include descendants and empty directories.\nBackspace / ..: parent; at root returns to disk\nCtrl+PgUp: exit archive from any folder\nEsc: cancel indexing or preview · Ctrl+R: refresh\nBoth panes can browse archives independently.\nChoose a disk destination when both show archives.\nArchives are read-only; extract before editing.\nExisting destinations are refused or skipped whole.	ZIP / TAR / TAR.GZ / TGZ в файловой панели.\nEnter: папка или просмотр · F3: просмотр\nInsert / Пробел / Ctrl+щелчок: отметить · + / -: группа\nF5: извлечь отмеченные элементы или текущий\nПапки включают вложенные файлы и пустые каталоги.\nBackspace / ..: вверх; из корня — на диск\nCtrl+PgUp: выйти из архива из любой папки\nEsc: отменить чтение или просмотр · Ctrl+R: обновить\nОбе панели могут независимо открывать архивы.\nЕсли обе панели в архивах, выберите папку на диске.\nАрхивы только для чтения; перед правкой извлеките файлы.\nСуществующие файлы и папки отклоняются или пропускаются целиком.

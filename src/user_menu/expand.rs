@@ -24,17 +24,17 @@ impl Context {
             file: a
                 .entries
                 .get(a.cursor)
-                .filter(|e| !e.parent)
+                .filter(|e| !e.parent && !a.is_archive())
                 .map(|e| e.path.clone().into_os_string()),
             name: a
                 .entries
                 .get(a.cursor)
-                .filter(|e| !e.parent)
+                .filter(|e| !e.parent && !a.is_archive())
                 .map(|e| e.name.clone()),
             other_file: b
                 .entries
                 .get(b.cursor)
-                .filter(|e| !e.parent)
+                .filter(|e| !e.parent && !b.is_archive())
                 .map(|e| e.path.clone().into_os_string()),
             selected: selected(a).map_err(|e| e.to_string()),
             other_selected: selected(b).map_err(|e| e.to_string()),

@@ -37,6 +37,7 @@ pub struct Plan {
 #[derive(Clone, Debug, Default)]
 pub struct Progress {
     pub transfer: Option<crate::transfers::TransferId>,
+    pub member: Option<String>,
     pub phase: Phase,
     pub written: u64,
     pub total_bytes: Option<u64>,
@@ -480,6 +481,23 @@ pub fn run_with_options(
     run_checked(plan, options, cancel, notify, strategy, |path| {
         crate::volume_space::read(path).map(|s| s.available)
     })
+}
+pub(crate) fn publish_extraction(
+    plan: &Plan,
+    options: CopyOptions,
+    cancel: &AtomicBool,
+    notify: impl FnMut(&Progress),
+    prepared: &transfer::Prepared,
+) -> io::Result<Progress> {
+    run_checked_expected(
+        plan,
+        options,
+        cancel,
+        notify,
+        MoveStrategy::PreferRename,
+        |path| crate::volume_space::read(path).map(|s| s.available),
+        Some(prepared),
+    )
 }
 fn run_checked(
     plan: &Plan,

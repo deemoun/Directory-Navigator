@@ -93,7 +93,6 @@ fn viewport_state(app: &App) -> ViewportState {
         copy_history: app.modals.copy_history().map(|h| (h.cursor, h.offset)),
         submenus: app.modals.submenus().to_vec(),
         modal_offsets: vec![
-            app.archive().map_or(0, |m| m.offset),
             app.directory_tree().map_or(0, |m| m.offset),
             app.user_menu.modals.user_menu().map_or(0, |m| m.offset),
             app.discovery().map_or(0, |m| m.offset),
@@ -228,10 +227,6 @@ pub fn prepare_window(
                     .len()
                     .saturating_sub(rows),
             );
-        }
-        if let Some(b) = app.archive_mut() {
-            b.rows = usize::from(area.height.saturating_sub(4).min(30).saturating_sub(9)).max(1);
-            b.keep_visible();
         }
         if let Some(m) = app.user_menu.modals.user_menu_mut() {
             let height = if m.review.is_some() {

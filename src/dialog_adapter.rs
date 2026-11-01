@@ -100,17 +100,6 @@ const ADAPTERS: &[Adapter] = &[
         },
     },
     Adapter {
-        focus: Focus::Archive,
-        key: crate::archive::key,
-        mouse: crate::archive::mouse,
-        spec: crate::ui::archive_spec,
-        set_focus: |app, next| {
-            if let Some(m) = app.archive_mut() {
-                m.focus = next;
-            }
-        },
-    },
-    Adapter {
         focus: Focus::UserMenu,
         key: crate::user_menu::key,
         mouse: crate::user_menu::mouse,

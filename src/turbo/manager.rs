@@ -79,7 +79,7 @@ fn pane(
         &format!(
             " {} ",
             formatting::tail(
-                &display_name(&panel.path.to_string_lossy()),
+                &display_name(&panel.heading()),
                 area.width.saturating_sub(4 + header_reserve)
             )
         ),
@@ -261,7 +261,11 @@ fn pane(
         plain(
             s,
             g.totals,
-            config.language.text(" Reading directory…"),
+            config.language.text(if panel.is_archive() {
+                " Reading archive…"
+            } else {
+                " Reading directory…"
+            }),
             0x8b,
         );
     } else {
@@ -277,6 +281,23 @@ fn pane(
             0x87,
             true,
         );
+    }
+    if let Some(a) = panel.archive() {
+        let text = a
+            .catalog
+            .as_ref()
+            .and_then(|c| c.note.as_deref())
+            .map_or_else(
+                || {
+                    config
+                        .language
+                        .text("Read-only archive · F5 extracts")
+                        .to_owned()
+                },
+                |note| format!("{}: {}", config.language.text("Partial archive"), note),
+            );
+        plain(s, g.space, &formatting::tail(&text, g.space.width), 0x8b);
+        return;
     }
     let text = crate::panel_status::space(panel, config, g.space.width);
     runs(

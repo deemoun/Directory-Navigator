@@ -46,6 +46,10 @@ impl App {
     }
 
     pub fn open_viewer_mode(&mut self, mode: crate::viewer::ViewMode) {
+        if self.panels[self.active].is_archive() {
+            crate::archive::view(self);
+            return;
+        }
         if self.panels[self.active].loading {
             return;
         }
@@ -80,6 +84,22 @@ impl App {
         self.open_current_with(false);
     }
     fn open_current_with(&mut self, browse: bool) {
+        if self.panels[self.active].is_archive() {
+            if !browse {
+                self.error(crate::archive::EXTRACT_FIRST);
+                return;
+            }
+            if self.panels[self.active]
+                .entries
+                .get(self.panels[self.active].cursor)
+                .is_some_and(|e| e.directory)
+            {
+                self.panels[self.active].enter(self.config.show_hidden);
+            } else {
+                crate::archive::view(self);
+            }
+            return;
+        }
         let panel = &self.panels[self.active];
         if panel.loading {
             return;

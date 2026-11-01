@@ -1,319 +1,177 @@
-//! Read-only virtual archive browser, separate from the underlying panels.
+//! Archive-as-directory navigation, adapted from DOS Navigator's ARCVIEW.PAS
+//! (RIT Research Labs). Archive members never become native operation paths.
+pub mod extract;
 pub mod reader;
-use crate::{app::App, task::Task, viewer::Contents};
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
-use reader::{Catalog, Kind};
-use std::{io, path::PathBuf, sync::Arc, time::Instant};
-enum Reply {
-    List(Arc<Catalog>),
-    Preview(PathBuf, Contents),
-}
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Action {
-    Open,
-    Parent,
-    View,
-    Info,
-    Refresh,
-    Stop,
-    Close,
-    Row(usize),
-    Up,
-    Down,
-    PageUp,
-    PageDown,
-}
-pub struct Browser {
-    preview_epoch: u64,
-    pub(crate) requests: crate::requests::RequestScope,
-    pub path: PathBuf,
-    pub catalog: Option<Arc<Catalog>>,
+use crate::{app::App, panel::archive::MemberId};
+use std::{path::PathBuf, sync::Arc};
+#[derive(Clone)]
+pub struct Extraction {
+    pub catalog: Arc<reader::Catalog>,
     pub directory: usize,
-    pub cursor: usize,
-    pub offset: usize,
-    pub rows: usize,
-    pub focus: usize,
-    pub status: String,
-    task: Option<Task<io::Result<Reply>>>,
-    last_click: Option<(usize, Instant)>,
+    pub members: Vec<MemberId>,
 }
-impl Browser {
-    pub fn new(path: PathBuf) -> io::Result<Self> {
-        let source = path.clone();
-        let requests = crate::requests::RequestScope::default();
-        let task = requests.spawn("dn-archive-index", move |cancel| {
-            reader::list(source, &cancel).map(|catalog| Reply::List(Arc::new(catalog)))
-        })?;
-        Ok(Self {
-            preview_epoch: 0,
-            requests,
-            path,
-            catalog: None,
-            directory: 0,
-            cursor: 0,
-            offset: 0,
-            rows: 10,
-            focus: 0,
-            status: "Reading archive… Esc closes · Stop cancels".into(),
-            task: Some(task),
-            last_click: None,
-        })
-    }
-    pub fn loading(&self) -> bool {
-        self.task.is_some()
-    }
-    pub fn children(&self) -> &[usize] {
-        self.catalog
-            .as_ref()
-            .and_then(|c| c.nodes.get(self.directory))
-            .map(|n| n.children.as_slice())
-            .unwrap_or(&[])
-    }
-    pub fn selected(&self) -> Option<usize> {
-        self.cursor
-            .checked_sub(1)
-            .and_then(|i| self.children().get(i).copied())
-    }
-    pub fn keep_visible(&mut self) {
-        self.rows = self.rows.max(1);
-        let last = self.children().len();
-        crate::list_state::ListViewport::fit(
-            &mut self.cursor,
-            &mut self.offset,
-            self.rows,
-            Some(last),
-            Some(last),
-        );
-    }
-    pub fn step(&mut self, delta: isize) {
-        self.cursor = self
-            .cursor
-            .saturating_add_signed(delta)
-            .min(self.children().len());
-        self.keep_visible();
-        self.last_click = None;
-    }
-    fn parent(&mut self) -> bool {
-        if self.directory == 0 {
-            return true;
-        }
-        if let Some(catalog) = &self.catalog {
-            let previous = self.directory;
-            self.directory = catalog.nodes[self.directory].parent;
-            self.cursor = self
-                .children()
-                .iter()
-                .position(|i| *i == previous)
-                .map(|i| i + 1)
-                .unwrap_or(0);
-            self.offset = 0;
-            self.keep_visible();
-        }
+pub const HELP: &str = "ZIP / TAR / TAR.GZ / TGZ in the file pane.\nEnter: folder or read-only preview · F3: preview\nInsert / Space / Ctrl+click: mark · + / -: group\nF5: extract marked items, or the current item\nFolders include descendants and empty directories.\nBackspace / ..: parent; at root returns to disk\nCtrl+PgUp: exit archive from any folder\nEsc: cancel indexing or preview · Ctrl+R: refresh\nBoth panes can browse archives independently.\nChoose a disk destination when both show archives.\nArchives are read-only; extract before editing.\nExisting destinations are refused or skipped whole.";
+pub const EXTRACT_FIRST: &str = "Extract archive members to disk first (F5).";
+pub fn require_native(app: &mut App) -> bool {
+    if app.panels[app.active].is_archive() {
+        app.error(EXTRACT_FIRST);
         false
+    } else {
+        true
     }
 }
 pub fn open(app: &mut App, path: PathBuf) {
     crate::menu::close(app);
     app.modals.set_quick_search(None);
-    if !crate::tool_windows::open(app, crate::tool_windows::Kind::Archive, Some(path.clone())) {
+    if crate::windowing::blocked(app) {
         return;
     }
-    match Browser::new(path) {
-        Ok(b) => app.set_archive(Some(b)),
-        Err(e) => crate::tool_windows::failed(app, e.to_string()),
+    crate::windowing::activate(app, crate::desktop::WindowId::MANAGER);
+    app.quick_view = None;
+    if let Err(e) = app.panels[app.active].open_archive(path) {
+        app.error(e.to_string());
     }
 }
 pub fn open_current(app: &mut App) {
-    let panel = &app.panels[app.active];
-    if panel.loading {
+    if !require_native(app) {
         return;
     }
-    if let Some(entry) = panel
+    let p = &app.panels[app.active];
+    if p.loading {
+        return;
+    }
+    if let Some(e) = p
         .entries
-        .get(panel.cursor)
-        .filter(|e| !e.directory && !e.parent)
+        .get(p.cursor)
+        .filter(|e| !e.directory && !e.parent && !e.symlink)
     {
-        open(app, entry.path.clone());
+        open(app, e.path.clone());
+    }
+}
+pub fn view(app: &mut App) {
+    let epoch = app.desktop.activation_revision();
+    let command = app.command_line.text.clone();
+    let p = &mut app.panels[app.active];
+    if p.loading {
+        return;
+    }
+    let Some(id) = p.entries.get(p.cursor).and_then(|e| p.member(e)) else {
+        return;
+    };
+
+    let a = p.archive_mut().unwrap();
+    let c = a.catalog.as_ref().unwrap().clone();
+    let n = &c.nodes[id.index];
+    if n.kind != reader::Kind::File || n.locked {
+        app.error("Only unencrypted regular archive files can be viewed.");
+        return;
+    }
+    a.preview_epoch = epoch;
+    a.preview_member = Some(id);
+    a.preview_command = command;
+    a.preview_title = PathBuf::from(format!(
+        "{} :: /{}",
+        a.path.display(),
+        String::from_utf8_lossy(&n.path)
+    ));
+    let catalog = c;
+    let task = p.scope.spawn("archive-preview", move |cancel| {
+        reader::preview(&catalog, id.index, &cancel)
+    });
+    match task {
+        Ok(task) => p.archive_mut().unwrap().preview = Some(task),
+        Err(e) => app.error(e.to_string()),
     }
 }
 pub fn poll(app: &mut App) -> bool {
-    // Take the reply here so previews can open the ordinary viewer without paths
-    // being handed to the filesystem or recorded in viewer history.
-    let reply = app
-        .archive_mut()
-        .and_then(|a| crate::task::take_reply(&mut a.task))
-        .map(|reply| reply.unwrap_or_else(|_| Err(io::Error::other("Archive worker stopped"))));
-    let Some(reply) = reply else {
+    let mut changed = false;
+    for index in 0..app.panels.len() {
+        let reply = app.panels[index]
+            .archive_mut()
+            .and_then(|a| crate::task::take_reply(&mut a.index));
+        if let Some(reply) = reply {
+            changed = true;
+            match reply {
+                Ok(Ok(c)) => {
+                    let a = app.panels[index].archive_mut().unwrap();
+                    a.directory = c
+                        .nodes
+                        .iter()
+                        .position(|n| {
+                            n.path == a.restore_directory && n.kind == reader::Kind::Directory
+                        })
+                        .unwrap_or(0);
+                    a.generation = c.generation;
+                    a.catalog = Some(Arc::new(c));
+                    app.panels[index].archive_entries();
+                }
+                other => {
+                    let message = match other {
+                        Ok(Err(e)) => e.to_string(),
+                        _ => "Archive worker stopped".into(),
+                    };
+                    app.panels[index].leave_archive(app.config.show_hidden);
+                    report(app, index, message);
+                }
+            }
+        }
+        let reply = app.panels[index]
+            .archive_mut()
+            .and_then(|a| crate::task::take_reply(&mut a.preview));
+        if let Some(reply) = reply {
+            changed = true;
+            match reply {
+                Ok(Ok(contents)) => {
+                    let a = app.panels[index].archive().unwrap();
+                    // Inactive or superseded requests must never open or focus a document.
+                    if preview_foreground(app, index) {
+                        let viewer = crate::viewer::Viewer::from_archive_contents(
+                            a.preview_title.clone(),
+                            contents,
+                        );
+                        app.show_viewer(viewer);
+                    }
+                }
+                Ok(Err(e)) => {
+                    if preview_foreground(app, index) {
+                        report(app, index, e.to_string());
+                    } else {
+                        app.notice = e.to_string();
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+    changed
+}
+
+fn report(app: &mut App, index: usize, message: String) {
+    if index == app.active
+        && app.desktop.active().id == crate::desktop::WindowId::MANAGER
+        && app.modal_top().is_none()
+    {
+        app.push_owned_dialog(
+            crate::modals::ModalOwner::Document(crate::desktop::WindowId::MANAGER),
+            crate::dialog::Dialog {
+                title: " Archive error ",
+                message,
+            },
+        );
+    } else {
+        app.notice = message;
+    }
+}
+
+fn preview_foreground(app: &App, index: usize) -> bool {
+    let p = &app.panels[index];
+    let Some(a) = p.archive() else {
         return false;
     };
-    let Some(browser) = app.archive_mut() else {
-        return false;
-    };
-    match reply {
-        Ok(Reply::List(catalog)) => {
-            browser.status = format!(
-                "Read-only · {} entries · {} skipped{}",
-                catalog.nodes.len().saturating_sub(1),
-                catalog.skipped,
-                catalog
-                    .note
-                    .as_ref()
-                    .map(|s| format!(" · {s}"))
-                    .unwrap_or_default()
-            );
-            browser.catalog = Some(catalog);
-            browser.directory = 0;
-            browser.cursor = 0;
-            browser.offset = 0;
-        }
-        Ok(Reply::Preview(path, contents)) => {
-            browser.status = "Read-only · Enter browse/view · F3 view · Alt+I info".into();
-            let foreground = browser.preview_epoch == app.desktop.activation_revision()
-                && app.desktop.active().kind
-                    == crate::desktop::WindowKind::Tool(crate::tool_windows::Kind::Archive);
-            let viewer = crate::viewer::Viewer::from_contents(path, contents);
-            let result = if foreground {
-                app.install_document(|desktop| desktop.open_viewer(viewer))
-            } else {
-                app.install_document(|desktop| desktop.open_viewer_background(viewer))
-            };
-            if let Err(error) = result {
-                app.error(error.to_string());
-            }
-        }
-        Err(e) => {
-            browser.status = format!("Archive: {e}");
-            app.error(e.to_string());
-        }
-    }
-    true
-}
-pub fn action(app: &mut App, action: Action) {
-    let datetime = app.config.datetime;
-    if action == Action::Close {
-        app.set_archive(None);
-        return;
-    }
-    let epoch = app.desktop.activation_revision();
-    let Some(browser) = app.archive_mut() else {
-        return;
-    };
-    match action {
-        Action::Stop => {
-            browser.task = None;
-            browser.status = "Stopped · Refresh to reread the archive".into();
-        }
-        Action::Refresh => {
-            let path = browser.path.clone();
-            match Browser::new(path) {
-                Ok(next) => app.set_archive(Some(next)),
-                Err(e) => app.error(e.to_string()),
-            }
-        }
-        Action::Up => browser.step(-1),
-        Action::Down => browser.step(1),
-        Action::PageUp => browser.step(-(browser.rows as isize)),
-        Action::PageDown => browser.step(browser.rows as isize),
-        Action::Parent => {
-            if browser.parent() {
-                app.set_archive(None);
-            }
-        }
-        Action::Row(row) => {
-            if row > browser.children().len() {
-                return;
-            }
-            let now = Instant::now();
-            let double = crate::list_state::ClickTracker::STRICT.matches(
-                browser.last_click.as_ref(),
-                &row,
-                now,
-            );
-            browser.cursor = row;
-            browser.focus = 0;
-            browser.keep_visible();
-            browser.last_click = Some((row, now));
-            if double {
-                self::action(app, Action::Open);
-            }
-        }
-        Action::Open | Action::View | Action::Info => {
-            if browser.loading() {
-                return;
-            }
-            let Some(id) = browser.selected() else {
-                if action == Action::Open && browser.parent() {
-                    app.set_archive(None);
-                }
-                return;
-            };
-            let Some(catalog) = &browser.catalog else {
-                return;
-            };
-            let node = &catalog.nodes[id];
-            if action == Action::Open && node.kind == Kind::Directory {
-                browser.directory = id;
-                browser.cursor = 0;
-                browser.offset = 0;
-                return;
-            }
-            if action == Action::Info || node.kind != Kind::File || node.locked {
-                let dialog=crate::dialog::Dialog{title:" Archive member information ",message:format!("{}\nType: {:?}{}\nSize: {} bytes\nModified: {}\nRead-only. Links and special entries are never followed.\nEncrypted members cannot be previewed.",crate::filesystem::display_name(&String::from_utf8_lossy(&node.path)),node.kind,if node.locked{" (encrypted)"}else{""},node.size,datetime.archive(node.modified.as_deref().unwrap_or("Unavailable")))};
-                app.push_dialog(dialog);
-                return;
-            }
-            let catalog = Arc::clone(catalog);
-            let mut title = browser.path.as_os_str().to_owned();
-            title.push(" :: /");
-            title.push(String::from_utf8_lossy(&node.path).as_ref());
-            let title = PathBuf::from(title);
-            browser.preview_epoch = epoch;
-            match browser.requests.spawn("dn-archive-preview", move |cancel| {
-                reader::preview(&catalog, id, &cancel).map(|c| Reply::Preview(title, c))
-            }) {
-                Ok(task) => {
-                    browser.task = Some(task);
-                    browser.status = "Reading bounded preview… Stop cancels".into();
-                }
-                Err(e) => app.error(e.to_string()),
-            }
-        }
-        _ => {}
-    }
-}
-pub fn key(app: &mut App, key: KeyEvent) {
-    if let Some(m) = app.archive_mut() {
-        m.last_click = None;
-    }
-    if crate::dialog_controls::key(app, key, crate::focus::Focus::Archive) {
-        return;
-    }
-    let Some(browser) = app.archive_mut() else {
-        return;
-    };
-    browser.last_click = None;
-    if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('r') {
-        action(app, Action::Refresh);
-        return;
-    }
-    match key.code{
-  KeyCode::Backspace|KeyCode::Left=>action(app,Action::Parent),
-  KeyCode::Up=>browser.step(-1),KeyCode::Down=>browser.step(1),KeyCode::PageUp=>browser.step(-(browser.rows as isize)),KeyCode::PageDown=>browser.step(browser.rows as isize),KeyCode::Home=>browser.step(isize::MIN),KeyCode::End=>browser.step(isize::MAX),KeyCode::Right=>{if browser.selected().is_some_and(|id|browser.catalog.as_ref().is_some_and(|c|c.nodes[id].kind==Kind::Directory)){action(app,Action::Open);}},
-  KeyCode::F(3)=>action(app,Action::View),KeyCode::Char('i') if key.modifiers==KeyModifiers::ALT=>action(app,Action::Info),KeyCode::F(1)=>app.push_dialog(crate::dialog::Dialog{title:" Archive browser help ",message:"Read-only ZIP / TAR / TAR.GZ / TGZ browser.\nEnter/double-click opens a folder or previews a file.\nBackspace/Left goes up; Esc closes the archive.\nF3 previews; Alt+I shows metadata; Ctrl+R refreshes.\nStop cancels indexing or preview reads.\nLinks/special entries are never followed.\nNo extraction, editing or nested archive execution.\nIn the file manager, Ctrl+Enter uses the OS default app.".into()}),_=>{}
- }
-}
-pub fn mouse(app: &mut App, event: MouseEvent, target: Option<crate::mouse::Target>) {
-    match event.kind {
-        MouseEventKind::Down(MouseButton::Left) => {
-            if let Some(crate::mouse::Target::Archive(a)) = target {
-                action(app, a);
-            }
-        }
-        MouseEventKind::ScrollUp | MouseEventKind::ScrollDown => {
-            if let Some(b) = app.archive_mut() {
-                b.step(crate::list_state::wheel_delta(event.kind));
-            }
-        }
-        _ => {}
-    }
+    index == app.active
+        && a.preview_epoch == app.desktop.activation_revision()
+        && app.desktop.active().id == crate::desktop::WindowId::MANAGER
+        && app.modal_top().is_none()
+        && app.command_line.text == a.preview_command
+        && p.entries.get(p.cursor).and_then(|e| p.member(e)) == a.preview_member
 }

@@ -1,7 +1,6 @@
 use crate::painting::{Block, Frame, Paragraph, Wrap};
 use crate::presentation::layout::{Constraint, Layout, Rect};
 use crate::{app::App, mouse::Target};
-mod archive_view;
 mod clock;
 mod colors_view;
 mod command_history_view;
@@ -28,7 +27,6 @@ mod utilities_view;
 mod viewer_view;
 mod welcome_view;
 mod windows_view;
-pub(crate) use archive_view::archive_spec;
 pub(crate) use command_history_view::command_history_spec;
 pub(crate) use config_import_view::import_spec;
 pub(crate) use copy_dialog_view::copy_spec;

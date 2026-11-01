@@ -28,7 +28,7 @@ frames and close markers. It provides the common centering and standard button-r
 metrics. Content-specific dimensions and native Turbo Vision control palettes stay
 explicit; no restyling or global palette replacement occurs.
 
-Compact prompt, Copy/Move, archive and game button rows reserve the translated
+Compact prompt, Copy/Move and game button rows reserve the translated
 caption width plus both DN focus markers. The same bounds drive native painting
 and mouse targets; compact rows redistribute padding rather than clipping a
 caption or overwriting its first character with the left arrow. Caption widths
@@ -254,3 +254,11 @@ title green, before the shared coordinate transform and clipping. It does not
 change document content, native control state or saved theme slots; a snapshot
 without capture paints normal frame colors again. Resize, owner retirement and
 modal changes reuse the existing capture cancellation rules.
+
+Archive locations use the same file-pane geometry and hit targets as native
+folders. Native pane paths remain real shell working directories; archive member
+identities and marks carry catalog generations. Archive previews are memory-only
+viewer documents, so their titles never enter filesystem identity lookup or history.
+F5 drafts capture member IDs and catalogs; workspace-owned extraction requests
+continue after a pane leaves the archive. The native operation plan only receives
+real private staging paths after complete payload validation.

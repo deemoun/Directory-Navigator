@@ -8,7 +8,6 @@ pub(crate) struct State {
     pub help: Option<Help>,
     directory_tree: Option<crate::directory_tree::Tree>,
     discovery: Option<crate::discovery::Modal>,
-    archive: Option<crate::archive::Browser>,
     file_info: Option<crate::file_info::InfoDialog>,
     navigation_dialog: Option<crate::navigation_tools::Modal>,
     file_tools: Option<crate::file_tools::ToolDialog>,
@@ -48,9 +47,6 @@ impl State {
                 job.bind(owner);
             }
         }
-        if let Some(s) = &mut self.archive {
-            s.requests.bind(owner);
-        }
         if let Some(s) = &mut self.file_info {
             s.requests.bind(owner);
         }
@@ -60,7 +56,6 @@ impl State {
             || self.help.is_some()
             || self.directory_tree.is_some()
             || self.discovery.is_some()
-            || self.archive.is_some()
             || self.file_info.is_some()
             || self.navigation_dialog.is_some()
             || self.file_tools.is_some()
@@ -92,20 +87,6 @@ impl State {
     pub fn set_discovery(&mut self, value: Option<crate::discovery::Modal>) {
         self.started |= value.is_some();
         self.discovery = value;
-        self.bind_requests();
-    }
-    pub fn archive(&self) -> Option<&crate::archive::Browser> {
-        self.archive.as_ref()
-    }
-    pub fn archive_mut(&mut self) -> Option<&mut crate::archive::Browser> {
-        self.archive.as_mut()
-    }
-    pub fn take_archive(&mut self) -> Option<crate::archive::Browser> {
-        self.archive.take()
-    }
-    pub fn set_archive(&mut self, value: Option<crate::archive::Browser>) {
-        self.started |= value.is_some();
-        self.archive = value;
         self.bind_requests();
     }
     pub fn file_info(&self) -> Option<&crate::file_info::InfoDialog> {

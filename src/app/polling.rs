@@ -55,6 +55,7 @@ impl App {
             search.panel != self.active
                 || self.panels[search.panel].loading
                 || self.panels[search.panel].path != search.path
+                || self.panels[search.panel].location_key() != search.location
         }) {
             self.modals.set_quick_search(None);
             changed = true;
@@ -97,7 +98,10 @@ impl App {
             || self.directory_tree().is_some_and(|t| t.loading())
             || crate::user_menu::pending(&self.user_menu)
             || self.associations.busy()
-            || self.archive().is_some_and(|a| a.loading())
+            || self
+                .panels
+                .iter()
+                .any(|p| p.archive().is_some_and(|a| a.preview.is_some()))
             || self.launcher.loading()
             || self.job.is_some()
             || self.transfers.pending_io()

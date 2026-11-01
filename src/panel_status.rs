@@ -59,11 +59,11 @@ pub fn selection(panel: &Panel, config: &Config, width: u16) -> Line {
     let mut folders = 0;
     let mut bytes = 0_u128;
     let mut unknown = false;
-    if !panel.selected.is_empty() {
+    if panel.has_marks() {
         for entry in panel
             .entries
             .iter()
-            .filter(|e| !e.parent && panel.selected.contains(&e.name))
+            .filter(|e| !e.parent && panel.marked(e))
         {
             if entry.directory {
                 folders += 1;

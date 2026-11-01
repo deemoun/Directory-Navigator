@@ -143,6 +143,13 @@ pub fn message_key(app: &mut crate::app::App, code: crossterm::event::KeyCode) {
 
 /// File-manager help is also available from the welcome window.
 pub fn keyboard_help(app: &mut crate::app::App) {
+    if app.panels[app.active].is_archive() {
+        app.push_dialog(Dialog {
+            title: " Archive pane help ",
+            message: crate::archive::HELP.into(),
+        });
+        return;
+    }
     app.push_dialog(Dialog {
         title: " Directory Navigator — Help ",
         message: if app.config.shortcuts.is_mac() {

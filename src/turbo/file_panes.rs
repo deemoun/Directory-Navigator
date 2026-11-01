@@ -49,7 +49,7 @@ pub(crate) fn column(
         .skip(start)
         .take(rect.height as usize)
     {
-        let marked = panel.selected.contains(&entry.name);
+        let marked = panel.marked(entry);
         let marker = if marked && config.show_tags {
             if classic {
                 "√"

@@ -107,7 +107,8 @@ pub(crate) fn copy(app: &mut App) {
     if !available(app, false) {
         return;
     }
-    if app.panels[app.active].targets().is_empty() {
+    if app.panels[app.active].targets().is_empty() && app.panels[app.active].extraction().is_none()
+    {
         app.prompt_operation(Kind::Copy, false);
         return;
     }

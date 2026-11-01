@@ -914,7 +914,10 @@ fn quick_directories_go_navigates_and_closes_in_the_release_ui() -> io::Result<(
     s.wait("manager ready", |s| {
         s.command_prompt_active() && s.text().contains("item-000.")
     })?;
-    s.send(b"\x1b[B\r", "fixture directory opened", |s| {
+    // The inactive pane can paint its filenames before the active scan finishes.
+    // Resolve the fixture by name through the shared model-readiness boundary.
+    s.select_file("inside")?;
+    s.send(b"\r", "fixture directory opened", |s| {
         s.text().contains("child.txt") && s.command_prompt_active()
     })?;
     s.send(b"\x1bpq\r", "bookmarks opened", |s| {
@@ -1463,6 +1466,76 @@ fn temp_drive_real_copy_cancel_clear_and_terminal_restoration() -> io::Result<()
     })?;
     s.send(b"\r", "acknowledge empty Temp Drive", |s| {
         s.command_prompt_active()
+    })?;
+    s.finish()
+}
+
+#[test]
+fn archive_pane_selected_extraction_and_return_restore_terminal() -> io::Result<()> {
+    use std::io::Write;
+    let mut s = Session::new("archive-pane-extraction")?;
+    let path = s.root.join("fixture.zip");
+    let mut archive = zip::ZipWriter::new(fs::File::create(&path)?);
+    for (name, text) in [
+        ("docs/a.txt", b"archive alpha\n".as_slice()),
+        ("docs/b.txt", b"archive beta\n"),
+    ] {
+        archive.start_file(name, zip::write::SimpleFileOptions::default())?;
+        archive.write_all(text)?;
+    }
+    archive.add_directory("empty/", zip::write::SimpleFileOptions::default())?;
+    archive.finish()?;
+    s.wait("initial manager", |s| {
+        s.command_prompt_active() && s.text().contains("item-000.")
+    })?;
+    s.send(b"\x12", "refresh fixture", |s| {
+        s.command_prompt_active() && s.text().contains("fixture.zip")
+    })?;
+    s.select_file("fixture.zip")?;
+    s.send(b"\r", "archive opens in pane", |s| {
+        s.command_prompt_active() && s.text().contains(" :: /") && s.text().contains("docs")
+    })?;
+    s.select_file("docs")?;
+    s.send(b"\r", "internal folder", |s| {
+        s.command_prompt_active() && s.text().contains(" :: /docs") && s.text().contains("a.txt")
+    })?;
+    s.select_file("a.txt")?;
+    s.send(b"\x1b[13~", "member viewer", |s| {
+        s.text().contains("archive alpha")
+    })?;
+    s.send(b"\x1b", "return to archive pane", |s| {
+        s.command_prompt_active() && s.text().contains(" :: /docs")
+    })?;
+    s.select_file("a.txt")?;
+    s.send(b" ", "mark first member", |s| {
+        s.text().contains("selected file")
+    })?;
+    s.send(b" ", "mark second member", |s| {
+        s.text().contains("selected files")
+    })?;
+    s.send(b"\x1b[15~", "selected extraction dialog", |s| {
+        s.text().contains("Extract 2 selected archive")
+    })?;
+    s.send(b"\r", "extraction completes", |s| {
+        s.text().contains("Transfer Center")
+            && s.text().contains("Completed")
+            && s.root.join("a.txt").exists()
+            && s.root.join("b.txt").exists()
+    })?;
+    assert_eq!(fs::read(s.root.join("a.txt"))?, b"archive alpha\n");
+    assert_eq!(fs::read(s.root.join("b.txt"))?, b"archive beta\n");
+    s.send(b"\x1b", "close transfer center", |s| {
+        s.command_prompt_active() && s.text().contains(" :: /docs")
+    })?;
+    s.resize(120, 35)?;
+    s.wait("archive resize", |s| {
+        fs::read_to_string(s.root.join("settings/dn/diagnostics.txt"))
+            .is_ok_and(|d| d.contains("viewport=(120, 35)"))
+    })?;
+    s.send(b"\x1b[5;5~", "exit archive", |s| {
+        s.command_prompt_active()
+            && !s.text().contains(" :: /docs")
+            && s.text().contains("fixture.zip")
     })?;
     s.finish()
 }

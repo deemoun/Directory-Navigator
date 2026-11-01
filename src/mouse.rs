@@ -6,10 +6,7 @@ use crate::{
     menu::{self, Action},
 };
 use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
-use std::{
-    path::PathBuf,
-    time::{Duration, Instant},
-};
+use std::time::{Duration, Instant};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Target {
@@ -28,7 +25,6 @@ pub enum Target {
     SettingsChoice(usize),
     CancelSettingsChoice,
     CommandHistory(crate::command_line::history::Action),
-    Archive(crate::archive::Action),
     UserMenu(crate::user_menu::Action),
     Tree(crate::directory_tree::Action),
     Discovery(crate::discovery::Action),
@@ -84,7 +80,7 @@ pub struct MouseState {
     pub(crate) surfaces: Vec<crate::windowing::geometry::Surface>,
     pub frame: Option<crate::layout::FrameContext>,
     pub regions: Vec<(Rect, Target)>,
-    last_click: Option<(usize, PathBuf, Instant)>,
+    last_click: Option<(usize, crate::panel::archive::EntryIdentity, Instant)>,
     pub scrollbar_drag: Option<(usize, Rect)>,
     pub(crate) dialogs:
         Vec<std::rc::Rc<std::cell::RefCell<crate::turbo::composition::DialogGroup>>>,
@@ -656,7 +652,7 @@ fn handle_mouse(app: &mut App, event: MouseEvent) {
                 return;
             }
             if let Some(entry) = panel.entries.get(row) {
-                let path = entry.path.clone();
+                let path = panel.identity(entry);
                 panel.cursor = row;
                 if event
                     .modifiers

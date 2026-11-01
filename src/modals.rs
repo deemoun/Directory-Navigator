@@ -322,14 +322,6 @@ slot!(
     ConfigImport
 );
 slot!(
-    archive,
-    archive_mut,
-    take_archive,
-    set_archive,
-    crate::archive::Browser,
-    Archive
-);
-slot!(
     directory_tree,
     directory_tree_mut,
     take_directory_tree,
@@ -562,9 +554,6 @@ fn bind_payload(state: &mut dyn Any, owner: crate::requests::Owner) {
         if let Some(job) = &mut s.job {
             job.bind(owner);
         }
-    }
-    if let Some(s) = state.downcast_mut::<crate::archive::Browser>() {
-        s.requests.bind(owner);
     }
     if let Some(s) = state.downcast_mut::<crate::config_import::Preview>() {
         s.requests.bind(owner);

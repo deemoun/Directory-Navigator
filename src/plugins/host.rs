@@ -467,6 +467,9 @@ fn panel_paths(app: &App) -> Vec<PathBuf> {
     app.panels[app.active].targets()
 }
 pub(crate) fn add_mp3(app: &mut App) {
+    if !crate::archive::require_native(app) {
+        return;
+    }
     if !cfg!(target_os = "macos") || crate::windowing::blocked(app) {
         return;
     }

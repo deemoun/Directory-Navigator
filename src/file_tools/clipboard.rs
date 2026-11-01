@@ -45,6 +45,9 @@ pub fn encode<'a>(
     Ok((output, count))
 }
 pub fn copy(app: &mut App, full_paths: bool) {
+    if !crate::archive::require_native(app) {
+        return;
+    }
     let panel = &app.panels[app.active];
     let result = if panel.loading {
         Err(io::Error::other("Directory is still loading."))

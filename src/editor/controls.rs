@@ -96,6 +96,9 @@ pub fn open_smartpad(app: &mut App) {
     }
 }
 pub fn open(app: &mut App, new: bool) {
+    if !crate::archive::require_native(app) {
+        return;
+    }
     if app.blocking_operation()
         || matches!(crate::focus::screen(app), crate::focus::Screen::Plugin(_))
     {

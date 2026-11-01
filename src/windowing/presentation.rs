@@ -81,7 +81,6 @@ impl Policy {
             Kind::Tree
             | Kind::Find
             | Kind::Sizes
-            | Kind::Archive
             | Kind::EditHistory
             | Kind::ViewHistory
             | Kind::DirectoryHistory

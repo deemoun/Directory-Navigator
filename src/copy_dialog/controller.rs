@@ -38,7 +38,7 @@ pub(super) fn reduce(prompt: &mut Prompt, action: Action) -> Effect {
             }
         }
         Action::RemoveSources => {
-            if moving {
+            if moving || copy.extraction.is_some() {
                 return Effect::None;
             }
             copy.options.remove_sources ^= true;

@@ -206,7 +206,7 @@ impl Desktop {
         self.next_id = next;
         let path = match &content {
             Content::Editor(e) => e.path.clone(),
-            Content::Viewer(v) => Some(v.path.clone()),
+            Content::Viewer(v) => v.native_path().map(|path| path.to_path_buf()),
             Content::Tool(t) => t.path.clone(),
             _ => None,
         };

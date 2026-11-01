@@ -149,6 +149,9 @@ fn prepare(app: &mut App) {
     app.modals.set_quick_search(None);
 }
 pub fn open_find(app: &mut App) {
+    if !crate::archive::require_native(app) {
+        return;
+    }
     if crate::tool_windows::reopen(app, crate::tool_windows::Kind::Find) {
         return;
     }
@@ -167,6 +170,9 @@ pub fn open_find(app: &mut App) {
     app.set_discovery(Some(state));
 }
 pub fn open_sizes(app: &mut App) {
+    if !crate::archive::require_native(app) {
+        return;
+    }
     if crate::tool_windows::reopen(app, crate::tool_windows::Kind::Sizes) {
         return;
     }

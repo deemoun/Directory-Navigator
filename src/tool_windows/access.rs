@@ -48,15 +48,6 @@ tool_access!(
     discovery.modals
 );
 tool_access!(
-    archive,
-    archive_mut,
-    take_archive,
-    set_archive,
-    crate::archive::Browser,
-    Archive,
-    modals
-);
-tool_access!(
     file_info,
     file_info_mut,
     take_file_info,

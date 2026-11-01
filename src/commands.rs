@@ -430,6 +430,24 @@ pub(crate) fn viewer_key(key: KeyEvent) -> Option<V> {
 }
 /// Existing availability policy, shared by menu and function-bar presentation.
 pub(crate) fn manager_available(app: &App, action: Action) -> bool {
+    if app.panels[app.active].is_archive()
+        && matches!(
+            action,
+            Action::OpenExternal
+                | Action::BrowseArchive
+                | Action::UserMenu
+                | Action::EditUserMenu(_)
+                | Action::Find
+                | Action::DirectorySizes
+                | Action::CompareDirectories
+                | Action::ExportList
+                | Action::FileInfo
+                | Action::AddMp3
+                | Action::Key(4 | 6 | 7 | 8)
+        )
+    {
+        return false;
+    }
     match action {
         Action::TempDrive | Action::CopyToTempDrive => crate::temp_drive::available(app, false),
         Action::ClearTempDrive => crate::temp_drive::available(app, true),
@@ -605,6 +623,16 @@ const MANAGER_ALT_KEYS: &[Binding<fn(&mut App)>] = &[
 ];
 
 const MANAGER_CONTROL_KEYS: &[Binding<fn(&mut App)>] = &[
+    bind(
+        K::PageUp,
+        M::CONTROL,
+        M::empty(),
+        "Ctrl+PageUp",
+        None,
+        |app| {
+            app.panels[app.active].leave_archive(app.config.show_hidden);
+        },
+    ),
     bind(
         K::Char('+'),
         M::CONTROL.union(M::SHIFT),
@@ -880,7 +908,7 @@ const MANAGER_CONTROL_KEYS: &[Binding<fn(&mut App)>] = &[
         "Ctrl+U",
         None,
         |app| {
-            app.panels[app.active].selected.clear();
+            app.panels[app.active].clear_selection();
         },
     ),
     bind(

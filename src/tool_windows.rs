@@ -15,7 +15,6 @@ pub enum Kind {
     Tree,
     Find,
     Sizes,
-    Archive,
     FileInfo,
     Characters,
     System,
@@ -33,7 +32,6 @@ impl Kind {
             Self::Transfers => Focus::Transfers,
             Self::Tree => Focus::Tree,
             Self::Find | Self::Sizes => Focus::Discovery,
-            Self::Archive => Focus::Archive,
             Self::FileInfo => Focus::FileInfo,
             Self::Characters | Self::System | Self::Memory => Focus::Utility,
             Self::Bookmarks => Focus::Navigation,
@@ -48,7 +46,6 @@ impl Kind {
             Self::Tree => "Directory tree",
             Self::Find => "Find files",
             Self::Sizes => "Directory sizes",
-            Self::Archive => "Archive browser",
             Self::FileInfo => "File information",
             Self::Characters => "ASCII table",
             Self::System => "System information",
@@ -81,9 +78,6 @@ impl ToolWindow {
     }
     pub fn discovery(&self) -> Option<&crate::discovery::Modal> {
         self.state.discovery()
-    }
-    pub fn archive(&self) -> Option<&crate::archive::Browser> {
-        self.state.archive()
     }
     pub fn file_info(&self) -> Option<&crate::file_info::InfoDialog> {
         self.state.file_info()
@@ -350,10 +344,6 @@ pub(crate) fn prepare(app: &mut App, area: Rect) {
             tree.page_rows = usize::from(s.bounds.height.saturating_sub(10)).max(1);
             tree.keep_visible();
         }
-        if let Some(b) = t.state.archive_mut() {
-            b.rows = usize::from(s.bounds.height.saturating_sub(10)).max(1);
-            b.keep_visible();
-        }
         if let Some(d) = t.state.discovery_mut() {
             d.rows = usize::from(s.bounds.height.saturating_sub(12)).max(1);
             d.keep_visible();
@@ -408,7 +398,6 @@ pub(crate) fn poll(app: &mut App) -> bool {
         changed |= match kind {
             Kind::Tree => app.directory_tree_mut().is_some_and(|t| t.poll()),
             Kind::Find | Kind::Sizes => crate::discovery::poll(app),
-            Kind::Archive => crate::archive::poll(app),
             Kind::FileInfo => app.file_info_mut().is_some_and(|i| i.poll()),
             Kind::Bookmarks => crate::navigation_tools::poll(app),
             Kind::System | Kind::Memory => crate::utilities::poll(app),

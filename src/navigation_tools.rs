@@ -66,6 +66,9 @@ pub fn open_filter(app: &mut App) {
     }));
 }
 pub fn assign(app: &mut App, slot: usize) {
+    if !crate::archive::require_native(app) {
+        return;
+    }
     if slot < 9 {
         let panel = app
             .desktop

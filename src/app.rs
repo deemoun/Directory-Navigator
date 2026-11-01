@@ -150,12 +150,18 @@ impl App {
         {
             return;
         }
+        let archive = self.panels[self.active].is_archive();
+        if archive && kind != Kind::Copy {
+            self.error(crate::archive::EXTRACT_FIRST);
+            return;
+        }
+        let extraction = self.panels[self.active].extraction();
         let sources = if kind == Kind::Mkdir {
             Vec::new()
         } else {
             self.panels[self.active].targets()
         };
-        if kind != Kind::Mkdir && sources.is_empty() {
+        if kind != Kind::Mkdir && sources.is_empty() && extraction.is_none() {
             self.error(if self.panels[self.active].only_filtered_marks() {
                 "All marked entries are filtered out. Clear the filter or marks first."
             } else {
@@ -172,9 +178,16 @@ impl App {
         }]
         .path
         .clone();
+        let require_destination = matches!(kind, Kind::Copy | Kind::Move)
+            && !rename_here
+            && self.panels[self.active ^ 1].is_archive();
         self.modals.set_prompt(Some(Prompt {
             kind: PromptKind::Operation(kind),
-            copy: matches!(kind, Kind::Copy | Kind::Move).then(crate::copy_dialog::Draft::default),
+            copy: matches!(kind, Kind::Copy | Kind::Move).then(|| crate::copy_dialog::Draft {
+                extraction,
+                require_destination,
+                ..Default::default()
+            }),
             sources,
             base,
             field: String::new(),
@@ -201,16 +214,20 @@ impl App {
 
     pub fn open_pattern(&mut self, selecting: bool) {
         if !self.blocking_operation() && !self.panels[self.active].loading {
-            self.modals
-                .set_pattern(Some(crate::pattern::PatternDialog::new(
-                    self.active,
-                    self.panels[self.active].path.clone(),
-                    selecting,
-                )));
+            let mut prompt = crate::pattern::PatternDialog::new(
+                self.active,
+                self.panels[self.active].path.clone(),
+                selecting,
+            );
+            prompt.location = self.panels[self.active].location_key();
+            self.modals.set_pattern(Some(prompt));
         }
     }
 
     pub fn open_file_info(&mut self) {
+        if !crate::archive::require_native(self) {
+            return;
+        }
         let panel = &self.panels[self.active];
         if self.blocking_operation() || panel.loading {
             return;
@@ -255,6 +272,15 @@ impl App {
                 return;
             }
         }
+        if prompt
+            .copy
+            .as_ref()
+            .is_some_and(|c| c.require_destination && c.picked.is_none())
+            && (prompt.field.is_empty() || !std::path::Path::new(&prompt.field).is_absolute())
+        {
+            self.error("Choose an explicit absolute filesystem destination.");
+            return;
+        }
         let destination = if let Some(path) = prompt.copy.as_ref().and_then(|c| c.picked.clone()) {
             path
         } else if prompt.field.is_empty() {
@@ -280,6 +306,19 @@ impl App {
                     .copy
                     .as_ref()
                     .map_or_else(Default::default, |c| c.options);
+                if let Some(selection) = prompt.copy.as_ref().and_then(|c| c.extraction.clone()) {
+                    match crate::transfers::submit_extraction(
+                        self,
+                        selection,
+                        destination.clone(),
+                        options,
+                        prompt.copy.and_then(|c| c.temp_drive),
+                    ) {
+                        Ok(_) => self.copy_dialog.record(destination),
+                        Err(e) => self.error(e),
+                    }
+                    return;
+                }
                 let plan = Plan {
                     kind,
                     sources: prompt.sources,

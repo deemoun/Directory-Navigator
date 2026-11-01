@@ -279,7 +279,7 @@ pub fn execute(app: &mut App, action: Action) {
         }),
         Action::Welcome => crate::welcome::open(app),
         Action::SelectAll => app.panels[app.active].select_visible(),
-        Action::ClearSelection => app.panels[app.active].selected.clear(),
+        Action::ClearSelection => app.panels[app.active].clear_selection(),
         Action::InvertSelection => app.panels[app.active].invert_visible(),
         Action::WindowList => crate::windowing::open(app),
         Action::WindowNext=>crate::windowing::cycle(app,false),

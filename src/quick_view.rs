@@ -59,6 +59,17 @@ impl QuickView {
         }
     }
     pub fn poll(&mut self, panel: &crate::panel::Panel, now: Instant) -> bool {
+        if panel.is_archive() {
+            let changed = self.probe.is_some()
+                || self.viewer.is_some()
+                || self.lines != [crate::archive::EXTRACT_FIRST];
+            self.probe = None;
+            self.viewer = None;
+            self.due = None;
+            self.signature = None;
+            self.lines = vec![crate::archive::EXTRACT_FIRST.into()];
+            return changed;
+        }
         let signature = panel.entries.get(panel.cursor).map(|e| Signature {
             path: e.path.clone(),
             size: e.size,

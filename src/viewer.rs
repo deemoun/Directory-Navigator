@@ -142,6 +142,7 @@ pub struct Viewer {
     pub modals: crate::modals::ModalStack,
     pub requested_mode: ViewMode,
     pub path: PathBuf,
+    memory_only: bool,
     pub contents: Option<Contents>,
     pub offset: usize,
     pub horizontal: u16,
@@ -179,6 +180,14 @@ impl Viewer {
         viewer.requested_mode = mode;
         Ok(viewer)
     }
+    pub(crate) fn from_archive_contents(label: PathBuf, contents: Contents) -> Self {
+        let mut viewer = Self::from_contents(label, contents);
+        viewer.memory_only = true;
+        viewer
+    }
+    pub(crate) fn native_path(&self) -> Option<&Path> {
+        (!self.memory_only).then_some(self.path.as_path())
+    }
     pub fn from_contents(path: PathBuf, contents: Contents) -> Self {
         let mut viewer = Self::empty(path, None);
         viewer.requested_mode = if contents.binary {
@@ -192,6 +201,7 @@ impl Viewer {
     fn empty(path: PathBuf, pending: Option<crate::task::Task<Result<Contents, String>>>) -> Self {
         Self {
             path,
+            memory_only: false,
             modals: Default::default(),
             requested_mode: ViewMode::Auto,
             requests: Default::default(),

@@ -236,3 +236,66 @@ impl Job {
         })
     }
 }
+
+impl Job {
+    pub(crate) fn start_extraction(
+        id: crate::transfers::TransferId,
+        selection: crate::archive::Extraction,
+        destination: crate::archive::extract::Destination,
+        options: CopyOptions,
+        root: Option<crate::temp_drive::Root>,
+    ) -> io::Result<Self> {
+        let requests = crate::requests::RequestScope::new(crate::requests::Owner::Workspace);
+        let token = requests.start("file-operation");
+        let (sender, events) = mpsc::sync_channel(8);
+        let cancel = Arc::new(AtomicBool::new(false));
+        let worker_cancel = cancel.clone();
+        thread::Builder::new()
+            .name("dn-extraction".into())
+            .spawn(move || {
+                let mut latest = Progress {
+                    transfer: Some(id),
+                    path: selection.catalog.path.clone(),
+                    phase: Phase::Preparing,
+                    ..Default::default()
+                };
+                let mut last = Instant::now() - Duration::from_secs(1);
+                let result = (|| {
+                    if let Some(root) = &root {
+                        root.validate()?;
+                    }
+                    selection.run(&destination, options, worker_cancel, |p| {
+                        latest = p.clone();
+                        latest.transfer = Some(id);
+                        if last.elapsed() >= Duration::from_millis(80) {
+                            let _ = sender.try_send(Event::Progress(latest.clone()));
+                            last = Instant::now();
+                        }
+                    })
+                })()
+                .map(|mut p| {
+                    p.transfer = Some(id);
+                    p
+                })
+                .map_err(|e: io::Error| OperationFailure {
+                    kind: e.kind(),
+                    progress: Box::new(latest),
+                    message: e.to_string(),
+                });
+                let _ = sender.send(Event::Done(result));
+            })?;
+        Ok(Self {
+            transfer: Some(id),
+            requests,
+            token,
+            events,
+            cancel,
+            progress: Progress {
+                transfer: Some(id),
+                ..Default::default()
+            },
+            kind: Kind::Copy,
+            focus: None,
+        })
+    }
+}

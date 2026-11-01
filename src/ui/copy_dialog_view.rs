@@ -34,7 +34,11 @@ pub(crate) fn copy_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
         Target::SubmitPrompt,
         Target::CancelPrompt,
     );
-    let label = if prompt.sources.len() == 1 {
+    let label = if let Some(selection) = &copy.extraction {
+        language
+            .text("Extract {} selected archive items to")
+            .replace("{}", &selection.members.len().to_string())
+    } else if prompt.sources.len() == 1 {
         let directory = app
             .panels
             .iter()
@@ -170,7 +174,7 @@ pub(crate) fn copy_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
             Some(Action::RemoveSources),
             moving || copy.options.remove_sources,
             5,
-            !moving,
+            !moving && copy.extraction.is_none(),
         ),
     ] {
         let area = Rect::new(rect.x + x, rect.y + y, 25, 1);

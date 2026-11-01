@@ -182,7 +182,6 @@ pub(crate) fn tool_action(app: &mut App, target: Target) {
         Some(Target::CancelColors) => crate::palette::cancel(app),
         Some(Target::Screensaver(i)) => crate::screensaver::command(app, i),
         Some(Target::Tool(a)) => crate::file_tools::action(app, a),
-        Some(Target::Archive(a)) => crate::archive::action(app, a),
         Some(Target::Discovery(a)) => crate::discovery::action(app, a),
         Some(Target::Navigation(a)) => crate::navigation_tools::action(app, a),
         _ => {}

@@ -60,7 +60,9 @@ pub(crate) fn spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
             format!(
                 "#{} {} · {} · {} → {}",
                 e.id,
-                lang.text(if e.plan.kind == operations::Kind::Copy {
+                lang.text(if e.extracting {
+                    "Extract"
+                } else if e.plan.kind == operations::Kind::Copy {
                     "Copy"
                 } else {
                     "Move"
@@ -139,7 +141,12 @@ pub(crate) fn spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
             lang.text("Remaining"),
             eta,
             crate::formatting::tail(
-                &crate::filesystem::display_name(&e.progress.path.to_string_lossy()),
+                &crate::filesystem::display_name(
+                    e.progress
+                        .member
+                        .as_deref()
+                        .unwrap_or(&e.progress.path.to_string_lossy())
+                ),
                 w
             ),
             e.error

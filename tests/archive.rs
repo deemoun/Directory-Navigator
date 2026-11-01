@@ -5,7 +5,6 @@ use dn::{
     archive::{
         self,
         reader::{self, Kind},
-        Action,
     },
     focus::{self, Focus},
     input,
@@ -35,6 +34,9 @@ impl Temp {
     }
     fn app(&self) -> io::Result<App> {
         let mut a = App::new(self.0.clone())?;
+        a.config_store = dn::config::Store::new(Some(self.0.join("config.conf")));
+        a.config.save_on_exit = false;
+        a.config.show_clock = false;
         wait(&mut a, |a| a.panels.iter().all(|p| !p.loading));
         Ok(a)
     }
@@ -56,7 +58,9 @@ fn wait(a: &mut App, done: impl Fn(&App) -> bool) {
     }
 }
 fn finish(a: &mut App) {
-    wait(a, |a| a.archive().is_some_and(|b| !b.loading()));
+    wait(a, |a| {
+        a.panels[a.active].archive().is_some() && !a.panels[a.active].loading
+    });
 }
 fn key(a: &mut App, k: KeyCode) {
     input::handle(a, KeyEvent::new(k, KeyModifiers::NONE));
@@ -119,15 +123,9 @@ fn id(c: &reader::Catalog, path: &[u8]) -> usize {
     c.nodes.iter().position(|n| n.path == path).unwrap()
 }
 fn select(a: &mut App, name: &str) {
-    let b = a.archive_mut().unwrap();
-    let c = b.catalog.as_ref().unwrap();
-    b.cursor = b
-        .children()
-        .iter()
-        .position(|i| c.nodes[*i].name() == name)
-        .unwrap()
-        + 1;
-    b.keep_visible();
+    let p = &mut a.panels[a.active];
+    p.cursor = p.entries.iter().position(|e| e.name == name).unwrap();
+    p.keep_visible_grid(p.viewport_rows, p.viewport_columns);
 }
 fn draw(a: &mut App, w: u16, h: u16) -> io::Result<String> {
     let mut term = Terminal::new(TestBackend::new(w, h))?;
@@ -302,12 +300,13 @@ fn browser_enter_f3_return_parent_and_panel_state_preservation() -> io::Result<(
     let cursor = a.panels[0].cursor;
     key(&mut a, KeyCode::Enter);
     finish(&mut a);
-    assert_eq!(focus::current(&a), Focus::Archive);
+    assert_eq!(focus::current(&a), Focus::Manager);
     select(&mut a, "folder");
     key(&mut a, KeyCode::Enter);
     select(&mut a, "文.txt");
     key(&mut a, KeyCode::F(3));
     wait(&mut a, |a| a.desktop.active_viewer().is_some());
+    assert!(!a.desktop.identity_pending(a.desktop.active().id));
     assert_eq!(
         a.desktop
             .active_viewer()
@@ -326,76 +325,74 @@ fn browser_enter_f3_return_parent_and_panel_state_preservation() -> io::Result<(
     key(&mut a, KeyCode::F(2));
     assert!(a.desktop.active_viewer().unwrap().wrap);
     key(&mut a, KeyCode::Esc);
-    assert_eq!(focus::current(&a), Focus::Archive);
+    assert_eq!(focus::current(&a), Focus::Manager);
     key(&mut a, KeyCode::Backspace);
-    assert_eq!(a.archive().unwrap().directory, 0);
-    key(&mut a, KeyCode::Esc);
-    assert!(a.archive().is_none());
+    assert_eq!(a.panels[a.active].archive().unwrap().directory, 0);
+    key(&mut a, KeyCode::Backspace);
+    wait(&mut a, |a| !a.panels[0].loading);
+    assert!(!a.panels[a.active].is_archive());
     assert_eq!(a.panels[0].selected, marks);
     assert_eq!(a.panels[0].cursor, cursor);
     assert_eq!(a.panels[1].path, t.0);
     Ok(())
 }
 #[test]
-fn mouse_double_click_modals_buttons_and_resizing() -> io::Result<()> {
+fn pane_mouse_navigation_resizes_and_immutable_redraws() -> io::Result<()> {
     let t = Temp::new()?;
-    let p = t.0.join("test.zip");
-    zip(&p, false)?;
+    let path = t.0.join("test.zip");
+    zip(&path, false)?;
     let mut a = t.app()?;
-    archive::open(&mut a, p);
+    archive::open(&mut a, path);
     finish(&mut a);
-    for (w, h) in [(80, 25), (132, 40), (30, 10), (80, 25)] {
-        draw(&mut a, w, h)?;
+    for language in [
+        dn::localization::Language::English,
+        dn::localization::Language::Russian,
+    ] {
+        a.config.language = language;
+        for palette in [
+            dn::palette::PaletteProfile::ClassicDn,
+            dn::palette::PaletteProfile::Custom(dn::palette::theme::DEFAULTS.map(|v| v ^ 1)),
+        ] {
+            a.config.palette = palette;
+            for (w, h) in [(80, 25), (132, 40), (30, 10), (80, 25)] {
+                let first = draw(&mut a, w, h)?;
+                assert_eq!(first, draw(&mut a, w, h)?);
+                assert_eq!(first, draw(&mut a, w, h)?);
+                assert_eq!(focus::current(&a), Focus::Manager);
+            }
+        }
     }
     select(&mut a, "folder");
-    let row = a.archive().unwrap().cursor;
     draw(&mut a, 80, 25)?;
-    click(&mut a, Target::Archive(Action::Row(row)));
-    click(&mut a, Target::Archive(Action::Row(row)));
-    assert_ne!(a.archive().unwrap().directory, 0);
-    select(&mut a, "文.txt");
-    draw(&mut a, 80, 25)?;
-    click(&mut a, Target::Archive(Action::Info));
-    assert_eq!(focus::current(&a), Focus::Message);
-    key(&mut a, KeyCode::Esc);
-    draw(&mut a, 80, 25)?;
-    click(&mut a, Target::Archive(Action::View));
-    wait(&mut a, |a| a.desktop.active_viewer().is_some());
-    key(&mut a, KeyCode::Esc);
-    draw(&mut a, 80, 25)?;
-    click(&mut a, Target::Archive(Action::Close));
-    assert!(a.archive().is_none());
+    let row = a.panels[0].cursor;
+    click(&mut a, Target::Entry(0, row));
+    click(&mut a, Target::Entry(0, row));
+    assert_ne!(a.panels[0].archive().unwrap().directory, 0);
+    assert!(a.panels[0].targets().is_empty());
     Ok(())
 }
 #[test]
-fn close_stop_refresh_and_failed_open_do_not_publish_stale_replies() -> io::Result<()> {
+fn cancelled_index_and_preview_cannot_publish_after_leaving() -> io::Result<()> {
     let t = Temp::new()?;
-    let p = t.0.join("test.zip");
-    zip(&p, true)?;
+    let path = t.0.join("test.zip");
+    zip(&path, true)?;
     let mut a = t.app()?;
-    archive::open(&mut a, p.clone());
-    archive::action(&mut a, Action::Close);
-    for _ in 0..10 {
-        a.poll();
-    }
-    assert!(a.archive().is_none());
-    archive::open(&mut a, p.clone());
-    archive::action(&mut a, Action::Stop);
-    assert!(!a.archive().unwrap().loading());
-    archive::action(&mut a, Action::Refresh);
+    archive::open(&mut a, path.clone());
+    key(&mut a, KeyCode::Esc);
+    wait(&mut a, |a| !a.panels[0].loading);
+    assert!(!a.panels[0].is_archive());
+    archive::open(&mut a, path);
     finish(&mut a);
-    assert!(a.archive().unwrap().catalog.is_some());
     select(&mut a, "root.bin");
-    archive::action(&mut a, Action::View);
-    archive::action(&mut a, Action::Close);
-    for _ in 0..10 {
-        a.poll();
-    }
+    key(&mut a, KeyCode::F(3));
+    a.panels[0].leave_archive(false);
+    wait(&mut a, |a| !a.panels[0].loading);
     assert!(a.desktop.active_viewer().is_none());
     archive::open(&mut a, t.0.join("missing.zip"));
-    finish(&mut a);
+    wait(&mut a, |a| {
+        !a.panels[0].is_archive() && !a.panels[0].loading
+    });
     assert!(!a.dialogs().is_empty());
-    assert_eq!(a.panels[0].path, t.0);
     Ok(())
 }
 #[cfg(unix)]
@@ -425,7 +422,7 @@ fn source_symlinks_special_files_and_permission_errors_are_not_followed() -> io:
     app.launcher
         .request_with(0, p.clone(), |_| Err(io::Error::other("test opener")))?;
     app.open_current();
-    assert!(app.archive().is_none());
+    assert!(!app.panels[app.active].is_archive());
     assert!(!app.dialogs().is_empty());
     app.clear_dialogs();
     app.panels[0].cursor = app.panels[0]
@@ -437,7 +434,7 @@ fn source_symlinks_special_files_and_permission_errors_are_not_followed() -> io:
         &mut app,
         KeyEvent::new(KeyCode::Enter, KeyModifiers::CONTROL),
     );
-    assert!(app.archive().is_none());
+    assert!(!app.panels[app.active].is_archive());
     assert!(!app.dialogs().is_empty());
     Ok(())
 }
@@ -536,5 +533,597 @@ fn duplicate_zip_directory_records_are_rejected_before_ambiguous_preview() -> io
         .unwrap()
         .to_string()
         .contains("Duplicate"));
+    Ok(())
+}
+
+fn clean_zip(path: &Path, large: bool) -> io::Result<()> {
+    let mut w = zip::ZipWriter::new(fs::File::create(path)?);
+    let options = zip::write::SimpleFileOptions::default()
+        .compression_method(zip::CompressionMethod::Deflated)
+        .unix_permissions(0o644);
+    for (name, data) in [
+        ("docs/a.txt", b"alpha".as_slice()),
+        ("docs/b.txt", b"beta"),
+        ("root.txt", b"root"),
+    ] {
+        w.start_file(name, options)?;
+        w.write_all(data)?;
+    }
+    w.add_directory("empty/", options)?;
+    if large {
+        w.start_file("large.bin", options)?;
+        w.write_all(&vec![b'x'; dn::viewer::MAX_BYTES + 100])?;
+    }
+    w.finish()?;
+    Ok(())
+}
+fn extract(a: &mut App, destination: &Path, skip: bool) {
+    a.prompt_operation(dn::operations::Kind::Copy, false);
+    let p = a.modals.prompt_mut().expect("copy draft");
+    assert!(
+        p.sources.is_empty(),
+        "virtual members must never enter native plans"
+    );
+    let draft = p.copy.as_mut().unwrap();
+    assert!(!draft.options.remove_sources);
+    draft.picked = Some(destination.to_path_buf());
+    if skip {
+        draft.options.existing = dn::operations::ExistingDestination::Skip;
+    }
+    a.submit_prompt();
+    wait(a, |a| !a.transfers.has_work());
+    key(a, KeyCode::Esc);
+}
+#[test]
+fn selected_extraction_keeps_relative_hierarchy_and_streams_large_files() -> io::Result<()> {
+    let t = Temp::new()?;
+    let path = t.0.join("clean.zip");
+    clean_zip(&path, true)?;
+    let out = t.0.join("out");
+    fs::create_dir(&out)?;
+    let mut a = t.app()?;
+    archive::open(&mut a, path.clone());
+    finish(&mut a);
+    for name in ["docs", "empty", "large.bin"] {
+        select(&mut a, name);
+        a.panels[0].toggle_selection();
+    }
+    extract(&mut a, &out, false);
+    assert_eq!(
+        a.transfers.entries.back().unwrap().status,
+        dn::transfers::Status::Completed,
+        "{:?}",
+        a.transfers.entries.back().unwrap().error
+    );
+    assert_eq!(fs::read(out.join("docs/a.txt"))?, b"alpha");
+    assert_eq!(fs::read(out.join("docs/b.txt"))?, b"beta");
+    assert!(out.join("empty").is_dir());
+    assert!(!out.join("root.txt").exists());
+    assert_eq!(
+        fs::metadata(out.join("large.bin"))?.len(),
+        (dn::viewer::MAX_BYTES + 100) as u64
+    );
+    assert!(path.is_file());
+    a.panels[0].clear_selection();
+    select(&mut a, "docs");
+    key(&mut a, KeyCode::Enter);
+    select(&mut a, "a.txt");
+    let out2 = t.0.join("out2");
+    fs::create_dir(&out2)?;
+    extract(&mut a, &out2, false);
+    assert_eq!(fs::read(out2.join("a.txt"))?, b"alpha");
+    assert!(!out2.join("docs").exists());
+    assert!(!fs::read_dir(&out)?.any(|e| e
+        .unwrap()
+        .file_name()
+        .to_string_lossy()
+        .starts_with(".dn-")));
+    Ok(())
+}
+#[test]
+fn two_archive_panes_require_native_destination_and_read_only_commands_are_guarded(
+) -> io::Result<()> {
+    let t = Temp::new()?;
+    let path = t.0.join("clean.zip");
+    clean_zip(&path, false)?;
+    let mut a = t.app()?;
+    archive::open(&mut a, path.clone());
+    finish(&mut a);
+    select(&mut a, "root.txt");
+    a.active = 1;
+    archive::open(&mut a, path);
+    finish(&mut a);
+    select(&mut a, "root.txt");
+    a.prompt_operation(dn::operations::Kind::Copy, false);
+    assert!(
+        a.modals
+            .prompt()
+            .unwrap()
+            .copy
+            .as_ref()
+            .unwrap()
+            .require_destination
+    );
+    a.submit_prompt();
+    assert!(!a.transfers.has_work());
+    assert!(!a.dialogs().is_empty());
+    a.clear_dialogs();
+    for kind in [
+        dn::operations::Kind::Move,
+        dn::operations::Kind::Delete,
+        dn::operations::Kind::Mkdir,
+    ] {
+        a.prompt_operation(kind, false);
+        assert!(a.modals.prompt().is_none());
+        assert!(!a.dialogs().is_empty());
+        a.clear_dialogs();
+    }
+    dn::editor::open(&mut a, false);
+    assert!(a.desktop.active_editor().is_none());
+    a.clear_dialogs();
+    let out = t.0.join("out");
+    fs::create_dir(&out)?;
+    extract(&mut a, &out, false);
+    assert_eq!(fs::read(out.join("root.txt"))?, b"root");
+    assert!(a.panels.iter().all(|p| p.is_archive()));
+    Ok(())
+}
+#[test]
+fn extraction_refuses_conflicts_skips_whole_folders_and_cancel_is_draft_only() -> io::Result<()> {
+    let t = Temp::new()?;
+    let path = t.0.join("clean.zip");
+    clean_zip(&path, false)?;
+    let out = t.0.join("out");
+    fs::create_dir_all(out.join("docs"))?;
+    fs::write(out.join("docs/a.txt"), b"keep")?;
+    let mut a = t.app()?;
+    archive::open(&mut a, path);
+    finish(&mut a);
+    select(&mut a, "docs");
+    a.prompt_operation(dn::operations::Kind::Copy, false);
+    key(&mut a, KeyCode::Esc);
+    assert!(!a.transfers.has_work());
+    extract(&mut a, &out, false);
+    assert_eq!(
+        a.transfers.entries.back().unwrap().status,
+        dn::transfers::Status::Failed
+    );
+    assert!(!out.join("docs/b.txt").exists());
+    assert_eq!(fs::read(out.join("docs/a.txt"))?, b"keep");
+    a.transfers.paused = false;
+    extract(&mut a, &out, true);
+    assert_eq!(
+        a.transfers.entries.back().unwrap().status,
+        dn::transfers::Status::Completed
+    );
+    assert!(!out.join("docs/b.txt").exists());
+    assert_eq!(fs::read(out.join("docs/a.txt"))?, b"keep");
+    Ok(())
+}
+#[test]
+fn corrupt_selected_payload_is_not_published() -> io::Result<()> {
+    let t = Temp::new()?;
+    let path = t.0.join("broken.zip");
+    let mut w = zip::ZipWriter::new(fs::File::create(&path)?);
+    w.start_file(
+        "file",
+        zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored),
+    )?;
+    w.write_all(b"CHECKSUM PAYLOAD")?;
+    w.finish()?;
+    let mut bytes = fs::read(&path)?;
+    let pos = bytes
+        .windows(16)
+        .position(|b| b == b"CHECKSUM PAYLOAD")
+        .unwrap();
+    bytes[pos] = b'X';
+    fs::write(&path, bytes)?;
+    let out = t.0.join("out");
+    fs::create_dir(&out)?;
+    let mut a = t.app()?;
+    archive::open(&mut a, path);
+    finish(&mut a);
+    select(&mut a, "file");
+    extract(&mut a, &out, false);
+    assert_eq!(
+        a.transfers.entries.back().unwrap().status,
+        dn::transfers::Status::Failed
+    );
+    assert!(fs::read_dir(&out)?.next().is_none());
+    Ok(())
+}
+#[test]
+fn unsafe_catalog_links_and_portable_name_collisions_never_extract() -> io::Result<()> {
+    let t = Temp::new()?;
+    let out = t.0.join("out");
+    fs::create_dir(&out)?;
+    for (index, names) in [
+        vec!["../escape", "ok"],
+        vec!["CON.txt"],
+        vec!["A", "a"],
+        vec!["dir./file"],
+    ]
+    .iter()
+    .enumerate()
+    {
+        let path = t.0.join(format!("bad{index}.zip"));
+        let mut w = zip::ZipWriter::new(fs::File::create(&path)?);
+        for name in names {
+            w.start_file(*name, zip::write::SimpleFileOptions::default())?;
+            w.write_all(b"never")?;
+        }
+        w.finish()?;
+        let mut a = t.app()?;
+        archive::open(&mut a, path);
+        finish(&mut a);
+        a.panels[0].select_visible();
+        a.prompt_operation(dn::operations::Kind::Copy, false);
+        a.modals.prompt_mut().unwrap().copy.as_mut().unwrap().picked = Some(out.clone());
+        a.submit_prompt();
+        wait(&mut a, |a| !a.transfers.has_work());
+        assert!(a
+            .transfers
+            .entries
+            .back()
+            .is_none_or(|e| e.status == dn::transfers::Status::Failed));
+        assert!(fs::read_dir(&out)?.next().is_none());
+    }
+    Ok(())
+}
+
+#[test]
+fn tar_gzip_extract_selected_tree_and_empty_folders() -> io::Result<()> {
+    let t = Temp::new()?;
+    for (name, gzip) in [
+        ("tree.tar", false),
+        ("tree.tar.gz", true),
+        ("tree.tgz", true),
+    ] {
+        let path = t.0.join(name);
+        tar(&path, gzip)?;
+        let out = t.0.join(format!("out-{name}"));
+        fs::create_dir(&out)?;
+        let mut a = t.app()?;
+        archive::open(&mut a, path);
+        finish(&mut a);
+        select(&mut a, "folder");
+        extract(&mut a, &out, false);
+        assert_eq!(
+            a.transfers.entries.back().unwrap().status,
+            dn::transfers::Status::Completed,
+            "{:?}",
+            a.transfers.entries.back().unwrap().error
+        );
+        assert_eq!(fs::read(out.join("folder/文.txt"))?, b"ARCHIVE PREVIEW\n");
+        assert!(!out.join("link").exists());
+    }
+    Ok(())
+}
+#[test]
+fn archive_marks_are_member_ids_and_mouse_clicks_do_not_alias() -> io::Result<()> {
+    let t = Temp::new()?;
+    let path = t.0.join("clean.zip");
+    clean_zip(&path, false)?;
+    let mut a = t.app()?;
+    archive::open(&mut a, path);
+    finish(&mut a);
+    select(&mut a, "docs");
+    a.panels[0].toggle_selection();
+    assert!(
+        a.panels[0].selected.is_empty(),
+        "native name marks are not archive identities"
+    );
+    let selection = a.panels[0].extraction().unwrap();
+    assert_eq!(selection.members.len(), 1);
+    assert_eq!(
+        selection.members[0].generation,
+        selection.catalog.generation
+    );
+    let docrow = a.panels[0].cursor;
+    select(&mut a, "empty");
+    let emptyrow = a.panels[0].cursor;
+    draw(&mut a, 80, 25)?;
+    click(&mut a, Target::Entry(0, docrow));
+    click(&mut a, Target::Entry(0, emptyrow));
+    assert_eq!(
+        a.panels[0].archive().unwrap().directory,
+        0,
+        "different members cannot double-click"
+    );
+    dn::pattern::apply(&mut a.panels[0], "*", true);
+    assert_eq!(a.panels[0].extraction().unwrap().members.len(), 3);
+    a.panels[0].set_filter("*.txt".into());
+    assert_eq!(a.panels[0].filtered_marks(), 2);
+    assert_eq!(a.panels[0].extraction().unwrap().members.len(), 1);
+    let old = selection.members[0].generation;
+    a.panels[0].refresh(false);
+    finish(&mut a);
+    assert_ne!(a.panels[0].archive().unwrap().generation, old);
+    assert!(!a.panels[0].has_marks());
+    Ok(())
+}
+#[test]
+fn inactive_preview_and_queued_extraction_do_not_retarget_panes() -> io::Result<()> {
+    let t = Temp::new()?;
+    let path = t.0.join("clean.zip");
+    clean_zip(&path, false)?;
+    let mut a = t.app()?;
+    archive::open(&mut a, path);
+    finish(&mut a);
+    select(&mut a, "root.txt");
+    key(&mut a, KeyCode::F(3));
+    a.active = 1;
+    wait(&mut a, |a| {
+        a.panels[0].archive().is_some_and(|p| !p.preview_pending())
+    });
+    assert!(a.desktop.active_viewer().is_none());
+    a.active = 0;
+    a.transfers.paused = true;
+    a.prompt_operation(dn::operations::Kind::Copy, false);
+    let out = t.0.join("out");
+    fs::create_dir(&out)?;
+    a.modals.prompt_mut().unwrap().copy.as_mut().unwrap().picked = Some(out.clone());
+    a.submit_prompt();
+    assert!(a.transfers.has_work());
+    a.panels[0].leave_archive(false);
+    wait(&mut a, |a| !a.panels[0].loading);
+    a.transfers.paused = false;
+    wait(&mut a, |a| !a.transfers.has_work());
+    assert_eq!(fs::read(out.join("root.txt"))?, b"root");
+    assert!(!a.panels[0].is_archive());
+    Ok(())
+}
+#[cfg(unix)]
+#[test]
+fn extraction_rejects_redirected_destinations_and_replaced_archive() -> io::Result<()> {
+    use std::os::unix::fs::symlink;
+    let t = Temp::new()?;
+    let path = t.0.join("clean.zip");
+    clean_zip(&path, false)?;
+    let out = t.0.join("out");
+    fs::create_dir(&out)?;
+    let link = t.0.join("link");
+    symlink(&out, &link)?;
+    let mut a = t.app()?;
+    archive::open(&mut a, path.clone());
+    finish(&mut a);
+    select(&mut a, "root.txt");
+    a.prompt_operation(dn::operations::Kind::Copy, false);
+    a.modals.prompt_mut().unwrap().copy.as_mut().unwrap().picked = Some(link);
+    a.submit_prompt();
+    assert!(!a.transfers.has_work());
+    a.clear_dialogs();
+    assert!(fs::read_dir(&out)?.next().is_none());
+    a.transfers.paused = true;
+    a.prompt_operation(dn::operations::Kind::Copy, false);
+    a.modals.prompt_mut().unwrap().copy.as_mut().unwrap().picked = Some(out.clone());
+    a.submit_prompt();
+    fs::rename(&path, t.0.join("old.zip"))?;
+    clean_zip(&path, false)?;
+    a.transfers.paused = false;
+    wait(&mut a, |a| !a.transfers.has_work());
+    assert_eq!(
+        a.transfers.entries.back().unwrap().status,
+        dn::transfers::Status::Failed
+    );
+    assert!(fs::read_dir(&out)?.next().is_none());
+    Ok(())
+}
+
+#[test]
+fn copy_to_temp_drive_captures_archive_members_and_cancel_does_not_write() -> io::Result<()> {
+    let t = Temp::new()?;
+    let path = t.0.join("clean.zip");
+    clean_zip(&path, false)?;
+    let mut a = t.app()?;
+    archive::open(&mut a, path);
+    finish(&mut a);
+    select(&mut a, "root.txt");
+    dn::menu::execute(&mut a, dn::menu::Action::CopyToTempDrive);
+    let root = t.0.join("temp-drive");
+    assert_eq!(
+        a.modals
+            .prompt()
+            .unwrap()
+            .copy
+            .as_ref()
+            .unwrap()
+            .picked
+            .as_ref(),
+        Some(&root)
+    );
+    key(&mut a, KeyCode::Esc);
+    assert!(fs::read_dir(&root)?.next().is_none());
+    dn::menu::execute(&mut a, dn::menu::Action::CopyToTempDrive);
+    // Changing the pane after the draft was captured cannot retarget its member IDs.
+    select(&mut a, "docs");
+    a.submit_prompt();
+    wait(&mut a, |a| !a.transfers.has_work());
+    assert_eq!(fs::read(root.join("root.txt"))?, b"root");
+    assert!(!root.join("docs").exists());
+    Ok(())
+}
+
+#[test]
+fn selected_link_is_rejected_and_native_sources_can_choose_disk_when_other_pane_is_archive(
+) -> io::Result<()> {
+    let t = Temp::new()?;
+    let path = t.0.join("source.tar");
+    tar(&path, false)?;
+    let mut a = t.app()?;
+    archive::open(&mut a, path);
+    finish(&mut a);
+    select(&mut a, "link");
+    a.prompt_operation(dn::operations::Kind::Copy, false);
+    a.submit_prompt();
+    assert!(!a.transfers.has_work());
+    assert!(!a.dialogs().is_empty());
+    a.clear_dialogs();
+    a.active = 1;
+    fs::write(t.0.join("native.txt"), b"native")?;
+    a.panels[1].refresh(false);
+    wait(&mut a, |a| !a.panels[1].loading);
+    a.panels[1].cursor = a.panels[1]
+        .entries
+        .iter()
+        .position(|e| e.name == "native.txt")
+        .unwrap();
+    dn::menu::execute(&mut a, dn::menu::Action::CopyToTempDrive);
+    assert!(a
+        .modals
+        .prompt()
+        .unwrap()
+        .copy
+        .as_ref()
+        .unwrap()
+        .picked
+        .is_some());
+    a.submit_prompt();
+    wait(&mut a, |a| !a.transfers.has_work());
+    assert_eq!(fs::read(t.0.join("temp-drive/native.txt"))?, b"native");
+    assert!(a.panels[0].is_archive());
+    Ok(())
+}
+
+#[test]
+fn leaving_archive_restores_outer_filter_marks_scroll_and_highlights_archive() -> io::Result<()> {
+    let t = Temp::new()?;
+    for n in 0..80 {
+        fs::write(t.0.join(format!("a-{n:03}.txt")), b"fixture")?;
+    }
+    let path = t.0.join("a.zip");
+    clean_zip(&path, false)?;
+    let mut a = t.app()?;
+    a.panels[0].set_filter("a*".into());
+    a.panels[0]
+        .selected
+        .extend(["a-050.txt".into(), "a.zip".into()]);
+    a.panels[0].cursor = a.panels[0]
+        .entries
+        .iter()
+        .position(|e| e.path == path)
+        .unwrap();
+    draw(&mut a, 80, 25)?;
+    let offset = a.panels[0].offset;
+    key(&mut a, KeyCode::Enter);
+    finish(&mut a);
+    a.panels[0].set_filter("*.txt".into());
+    fs::remove_file(t.0.join("a-050.txt"))?;
+    input::handle(
+        &mut a,
+        KeyEvent::new(KeyCode::PageUp, KeyModifiers::CONTROL),
+    );
+    wait(&mut a, |a| !a.panels[0].loading);
+    assert!(!a.panels[0].is_archive());
+    assert_eq!(a.panels[0].filter, "a*");
+    assert_eq!(a.panels[0].entries[a.panels[0].cursor].path, path);
+    assert_eq!(a.panels[0].selected.len(), 1);
+    assert!(a.panels[0].selected.contains(std::ffi::OsStr::new("a.zip")));
+    assert_eq!(a.panels[0].offset, offset);
+    assert_eq!(a.panels[1].path, t.0);
+    Ok(())
+}
+
+#[test]
+fn explicit_browse_activates_manager_without_closing_other_documents() -> io::Result<()> {
+    let t = Temp::new()?;
+    let path = t.0.join("clean.zip");
+    clean_zip(&path, false)?;
+    let mut a = t.app()?;
+    a.show_viewer(dn::viewer::Viewer::from_contents(
+        t.0.join("memory.txt"),
+        dn::viewer::from_bytes(b"kept".to_vec(), dn::viewer::ViewMode::Text),
+    ));
+    let viewer = a.desktop.active().id;
+    archive::open(&mut a, path);
+    finish(&mut a);
+    assert_eq!(a.desktop.active().id, dn::desktop::WindowId::MANAGER);
+    assert!(a.desktop.viewer(viewer).is_some());
+    assert_eq!(a.panels[1].path, t.0);
+    Ok(())
+}
+
+#[test]
+fn reindex_blocks_old_catalog_navigation_and_inactive_failures_do_not_take_focus() -> io::Result<()>
+{
+    let t = Temp::new()?;
+    let path = t.0.join("clean.zip");
+    clean_zip(&path, false)?;
+    let mut a = t.app()?;
+    archive::open(&mut a, path);
+    finish(&mut a);
+    select(&mut a, "docs");
+    a.panels[0].refresh(false);
+    a.panels[0].enter(false);
+    assert!(a.panels[0].loading);
+    assert_eq!(a.panels[0].archive().unwrap().directory, 0);
+    finish(&mut a);
+    select(&mut a, "docs");
+    a.panels[0].enter(false);
+    let directory = a.panels[0].archive().unwrap().directory;
+    a.panels[0].refresh(false);
+    a.panels[0].parent(false);
+    assert_eq!(a.panels[0].archive().unwrap().directory, directory);
+    finish(&mut a);
+    a.panels[0].leave_archive(false);
+    wait(&mut a, |a| !a.panels[0].loading);
+    archive::open(&mut a, t.0.join("missing.zip"));
+    a.active = 1;
+    wait(&mut a, |a| {
+        !a.panels[0].is_archive() && !a.panels[0].loading
+    });
+    assert_eq!(a.active, 1);
+    assert_eq!(focus::current(&a), Focus::Manager);
+    assert!(a.dialogs().is_empty());
+    assert!(!a.notice.is_empty());
+    Ok(())
+}
+
+#[test]
+fn changing_current_member_retires_the_pending_preview_focus_request() -> io::Result<()> {
+    let t = Temp::new()?;
+    let path = t.0.join("clean.zip");
+    clean_zip(&path, false)?;
+    let mut a = t.app()?;
+    archive::open(&mut a, path);
+    finish(&mut a);
+    select(&mut a, "root.txt");
+    key(&mut a, KeyCode::F(3));
+    select(&mut a, "docs");
+    wait(&mut a, |a| {
+        !a.panels[0].archive().unwrap().preview_pending()
+    });
+    assert_eq!(focus::current(&a), Focus::Manager);
+    assert!(a.desktop.active_viewer().is_none());
+    Ok(())
+}
+
+#[test]
+fn archive_escape_clears_command_drafts_and_preview_never_interrupts_typing() -> io::Result<()> {
+    let t = Temp::new()?;
+    let path = t.0.join("clean.zip");
+    clean_zip(&path, false)?;
+    let mut a = t.app()?;
+    archive::open(&mut a, path);
+    finish(&mut a);
+    select(&mut a, "root.txt");
+    key(&mut a, KeyCode::F(3));
+    dn::command_line::paste(&mut a, "must not run");
+    wait(&mut a, |a| {
+        !a.panels[0].archive().unwrap().preview_pending()
+    });
+    assert!(a.desktop.active_viewer().is_none());
+    assert_eq!(a.command_line.text, "must not run");
+    key(&mut a, KeyCode::Esc);
+    assert!(a.command_line.text.is_empty());
+    assert!(a.command_line.pending.is_none());
+    assert!(a.panels[0].is_archive());
+    key(&mut a, KeyCode::F(3));
+    dn::command_line::paste(&mut a, "another draft");
+    key(&mut a, KeyCode::Esc);
+    assert!(!a.panels[0].archive().unwrap().preview_pending());
+    assert!(a.command_line.text.is_empty());
+    assert!(a.command_line.pending.is_none());
+    assert!(a.desktop.active_viewer().is_none());
     Ok(())
 }
