@@ -144,6 +144,26 @@ fn translated_mnemonics_are_unique_and_keep_english_aliases() {
     assert!(Language::Russian.matches("~F~ile", 'Ф'));
 }
 #[test]
+fn windows_panel_mnemonics_are_unique_on_every_host() {
+    let panel = menu::root_index(menu::RootId::Panel).unwrap();
+    let items = menu::items(panel);
+    let mut labels = items.iter().map(|item| item.label).collect::<Vec<_>>();
+    // Include the Windows-only entries even when running on macOS or Linux.
+    for label in ["~L~eft drive...", "~R~ight drive..."] {
+        if !labels.contains(&label) {
+            labels.push(label);
+        }
+    }
+    unique(labels);
+    for (label, english, russian) in [
+        ("~L~eft drive...", 'l', 'д'),
+        ("~R~ight drive...", 'r', 'а'),
+    ] {
+        assert!(Language::Russian.matches(label, english));
+        assert!(Language::Russian.matches(label, russian));
+    }
+}
+#[test]
 fn formats_cover_orders_leap_dates_midnight_noon_and_offsets() {
     let t = Utc.with_ymd_and_hms(2024, 2, 29, 0, 5, 9).unwrap();
     let mut f = DateTimeFormat::default();
