@@ -60,9 +60,10 @@ def prepare(root, version):
     manifest_path, lock_path = root / "Cargo.toml", root / "Cargo.lock"
     manifest, lock = manifest_path.read_text(), lock_path.read_text()
     package = tomllib.loads(manifest).get("package", {})
-    packages = [p for p in tomllib.loads(lock).get("package", []) if p.get("name") == "dn" and "source" not in p]
-    if package.get("name") != "dn" or len(packages) != 1 or packages[0].get("version") != package.get("version"):
-        raise ValueError("Expected matching dn package versions in Cargo.toml and Cargo.lock")
+    package_name = package.get("name")
+    packages = [p for p in tomllib.loads(lock).get("package", []) if p.get("name") == package_name and "source" not in p]
+    if package_name not in ("dn", "directory-navigator") or len(packages) != 1 or packages[0].get("version") != package.get("version"):
+        raise ValueError("Expected matching Directory Navigator package versions in Cargo.toml and Cargo.lock")
     section = re.search(r"(?ms)^\[package\]\n.*?(?=^\[|\Z)", manifest)
     if section is None:
         raise ValueError("Missing [package] section")
@@ -72,11 +73,11 @@ def prepare(root, version):
     for i, block in enumerate(blocks):
         if block.startswith("[[package]]"):
             item = tomllib.loads(block)["package"][0]
-            if item.get("name") == "dn" and "source" not in item:
+            if item.get("name") == package_name and "source" not in item:
                 blocks[i] = replace_version(block, version)
                 matches += 1
     if matches != 1:
-        raise ValueError("Could not locate the dn lockfile entry")
+        raise ValueError("Could not locate the Directory Navigator lockfile entry")
     manifest_path.write_text(manifest)
     lock_path.write_text("".join(blocks))
 

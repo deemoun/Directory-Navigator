@@ -4,7 +4,9 @@
 
 Source: https://github.com/aovestdipaperino/turbo-vision-4-rust
 
-Pinned revision: `0f2b396a1844c59e31c4714d68ffb6815662918e` (4.1.0).
+Published crate: https://crates.io/crates/turbo-vision/4.1.0
+
+Version: `4.1.0`, registry source revision `a1e2d829e318121116fd22a3254862a211636f13`.
 
 MIT License
 

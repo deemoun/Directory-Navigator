@@ -101,6 +101,38 @@ It starts in your current directory. Use a terminal at least **80 columns × 25 
 The current macOS build is for **Apple Silicon** and is not Developer ID signed or
 notarized, so macOS may block downloaded copies. Test builds need no Rust installation.
 
+### crates.io package preparation
+
+The registry package is named `directory-navigator`; its executable and Rust
+library remain `dn`. The name `dn` is already registered by an unrelated project.
+Version 1.1.5 uses the published Turbo Vision **4.1.0** crate, with
+`default-features = false`. All dependencies use crates.io registry versions.
+
+**Known upstream limitation:** this framework release counts bytes instead of
+characters in some widgets. Clipping Unicode text can panic, and non-ASCII menu
+and status labels can have incorrect widths. The Unicode fixes merged after its
+release are not included in 4.1.0. A future DN patch release can adopt a newer
+framework version containing those fixes. This release deliberately uses the
+published framework without a fork.
+
+Validation against 4.1.0 also finds a Tetris score-layout regression: the rendered
+score table can omit a long score. The native surface-parity test reproduces the
+Unicode-clipping panic above, and the UI frame-baseline comparison also fails.
+These tests remain enabled; a successful packaging dry run does not mean the
+full regression suite passes.
+
+After publication, installation will be:
+
+```sh
+cargo install directory-navigator --version 1.1.5 --locked
+dn --version
+```
+
+Maintain the existing package contents, including `src/`, `locales/`, test
+fixtures, README files, documentation images, `LICENSE` and `THIRD_PARTY_NOTICES.md`.
+Before publication, review `cargo package --list`, run `cargo publish --dry-run`,
+and verify the built executable's version. A dry run does not upload the crate.
+
 ### Build from source
 
 With the stable Rust toolchain installed:

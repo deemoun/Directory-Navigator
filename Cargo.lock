@@ -247,18 +247,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0c87e182de0887fd5361989c677c4e8f5000cd9491d6d563161a8f3a5519fc7f"
 
 [[package]]
-name = "dispatch2"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e0e367e4e7da84520dedcac1901e4da967309406d1e51017ae1abfb97adbd38"
-dependencies = [
- "bitflags 2.13.2",
- "objc2",
-]
-
-[[package]]
-name = "dn"
-version = "1.0.0-beta"
+name = "directory-navigator"
+version = "1.1.5"
 dependencies = [
  "chrono",
  "crossterm",
@@ -275,6 +265,16 @@ dependencies = [
  "unicode-width 0.2.0",
  "windows 0.62.2",
  "zip",
+]
+
+[[package]]
+name = "dispatch2"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1e0e367e4e7da84520dedcac1901e4da967309406d1e51017ae1abfb97adbd38"
+dependencies = [
+ "bitflags 2.13.2",
+ "objc2",
 ]
 
 [[package]]
@@ -1317,7 +1317,8 @@ dependencies = [
 [[package]]
 name = "turbo-vision"
 version = "4.1.0"
-source = "git+https://github.com/aovestdipaperino/turbo-vision-4-rust.git?rev=0f2b396a1844c59e31c4714d68ffb6815662918e#0f2b396a1844c59e31c4714d68ffb6815662918e"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "39fb52a194fc66c3f3b089a5169594f0667832729fd5f0b09da12465922fb6d4"
 dependencies = [
  "chrono",
  "log",

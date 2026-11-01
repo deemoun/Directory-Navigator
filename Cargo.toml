@@ -1,15 +1,27 @@
 [package]
-name = "dn"
-version = "1.0.0-beta"
+name = "directory-navigator"
+version = "1.1.5"
 edition = "2021"
 description = "Native terminal file manager inspired by DOS Navigator 1.51"
 authors = ["Dmitry Yarygin"]
 license = "MIT"
+repository = "https://github.com/deemoun/Directory-Navigator"
 readme = "README.md"
+keywords = ["file-manager", "terminal", "tui", "dos-navigator", "turbo-vision"]
+categories = ["command-line-utilities", "filesystem"]
 exclude = ["original-dn/**", "dist/**", "release/**", "dn", "dn.exe"]
 
+# The registry package name differs from the installed command and Rust library.
+[lib]
+name = "dn"
+path = "src/lib.rs"
+
+[[bin]]
+name = "dn"
+path = "src/main.rs"
+
 [dependencies]
-turbo-vision = { git = "https://github.com/aovestdipaperino/turbo-vision-4-rust.git", rev = "0f2b396a1844c59e31c4714d68ffb6815662918e", default-features = false }
+turbo-vision = { version = "=4.1.0", default-features = false }
 toml = "1"
 crossterm = "0.28"
 unicode-segmentation = "1"

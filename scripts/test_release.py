@@ -44,6 +44,19 @@ class ReleaseTests(unittest.TestCase):
         self.assertEqual(lock, (self.root / "Cargo.lock").read_text())
         self.assertEqual({p.name for p in self.root.iterdir()}, {"Cargo.toml", "Cargo.lock"})
 
+    def test_registry_package_name_keeps_root_and_dependency_versions_separate(self):
+        for name in ["Cargo.toml", "Cargo.lock"]:
+            path = self.root / name
+            path.write_text(path.read_text().replace('name = "dn"', 'name = "directory-navigator"'))
+        release.prepare(self.root, "1.1.4")
+        manifest = (self.root / "Cargo.toml").read_text()
+        lock = (self.root / "Cargo.lock").read_text()
+        self.assertIn('name = "directory-navigator"\nversion = "1.1.4"', manifest)
+        self.assertIn('name = "directory-navigator"\nversion = "1.1.4"', lock)
+        self.assertIn('name = "other"\nversion = "1.0.0-beta"', lock)
+        release.prepare(self.root, "1.1.4")
+        self.assertEqual(lock, (self.root / "Cargo.lock").read_text())
+
     def test_malformed_or_mismatched_metadata_is_not_partially_changed(self):
         for broken in ['not TOML at all', 'version = 4\n', '[[package]]\nname = "dn"\nversion = "0.9.0"\n']:
             (self.root / "Cargo.lock").write_text(broken)
