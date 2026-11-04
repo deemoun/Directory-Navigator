@@ -116,7 +116,7 @@ fn unavailable_actions_are_not_mouse_targets_and_help_keeps_owner() -> io::Resul
     let id = open(&mut a);
     support::modified(&mut a, K::Char('z'), M::ALT);
     support::draw(&mut a, 100, 32)?;
-    for n in [0, 1, 2, 3, 4, 5, 6, 8, 9, 13] {
+    for n in [0, 1, 2, 3, 4, 5, 6, 13] {
         assert!(!a
             .mouse
             .regions
@@ -163,7 +163,7 @@ fn localized_frames_controls_and_palette_are_clipped_and_paint_is_immutable() ->
                         count,
                         if expanded {
                             if cfg!(target_os = "macos") {
-                                4
+                                6
                             } else {
                                 1
                             }
@@ -182,7 +182,7 @@ fn localized_frames_controls_and_palette_are_clipped_and_paint_is_immutable() ->
                         b[(s.bounds.right() - 1, s.bounds.bottom() - 1)].symbol(),
                         "╝"
                     );
-                    assert!(text(&b).contains(language.text("MP3 Player")));
+                    assert!(text(&b).contains(language.text("Music Player")));
                     if expanded {
                         assert!(text(&b).contains(language.text("Set up")));
                     }
@@ -258,6 +258,7 @@ fn plugin_settings_disable_retires_player_and_help_and_reenable_restores_menu() 
     a.open_settings(dn::settings::SettingsKind::Plugins);
     support::draw(&mut a, 100, 32)?;
     support::click(&mut a, Target::Setting(1)); // calculator, MP3 player, Tetris
+    support::draw(&mut a, 100, 32)?;
     support::click(&mut a, Target::AcceptSettings);
     assert!(a.config.plugin_enabled(MP3_PLAYER));
     assert!(!a
@@ -504,6 +505,244 @@ fn folder_tags_modes_info_and_cancel_use_owned_shared_controls() -> io::Result<(
             support::key(&mut a, K::Esc);
             assert!(!a.desktop.contains(id));
         }
+    }
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn enter_overrides_mp3_association_and_imports_only_current_file() -> io::Result<()> {
+    let f = support::Fixture::new("mp3-enter")?;
+    std::fs::write(
+        f.0.join("chosen.MP3"),
+        b"invalid audio, safe to open in test",
+    )?;
+    std::fs::write(f.0.join("marked.mp3"), b"not selected for playback")?;
+    std::fs::write(f.0.join("associations.conf"), b".mp3 = @editor\n")?;
+    let mut a = f.app()?;
+    dn::associations::reload(&mut a);
+    support::wait_until(&mut a, std::time::Duration::from_secs(5), |a| {
+        !a.associations.busy()
+    });
+    a.config.set_plugin_enabled(MP3_PLAYER, true);
+    a.config.mp3.play_on_enter = true;
+    let cursor = a.panels[0]
+        .entries
+        .iter()
+        .position(|e| e.name == "chosen.MP3")
+        .unwrap();
+    a.panels[0].mark_name("marked.mp3".into(), true);
+    a.panels[0].cursor = cursor;
+    support::draw(&mut a, 80, 25)?;
+    support::key(&mut a, K::Enter);
+    assert_eq!(a.desktop.active().kind, WindowKind::Plugin(MP3_PLAYER));
+    assert!(a.desktop.document_ids(WindowKind::Editor).is_empty());
+    support::finish_mp3_import(&mut a)?;
+    support::draw(&mut a, 80, 25)?;
+    support::click(&mut a, Target::Plugin(MP3_PLAYER, ActionId(12)));
+    let b = support::draw(&mut a, 80, 25)?;
+    assert!(text(&b).contains("chosen.MP3"));
+    assert!(!text(&b).contains("marked.mp3"));
+    support::key(&mut a, K::Esc);
+    support::key(&mut a, K::Esc);
+    a.config.mp3.play_on_enter = false;
+    a.open_current();
+    support::wait_until(&mut a, std::time::Duration::from_secs(5), |a| {
+        a.desktop.active().kind == WindowKind::Editor
+    });
+    support::wait(&mut a);
+    assert_eq!(a.desktop.active().kind, WindowKind::Editor);
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn setup_and_time_use_owned_controls_across_languages_sizes_and_palettes() -> io::Result<()> {
+    for language in [
+        dn::localization::Language::English,
+        dn::localization::Language::Russian,
+    ] {
+        for palette in [
+            PaletteProfile::ClassicDn,
+            PaletteProfile::ClassicDn.with_slot(Slot::DialogText, 0x1e),
+        ] {
+            let f = support::Fixture::new("mp3-setup")?;
+            let mut a = f.app()?;
+            a.config.language = language;
+            a.config.palette = palette;
+            open(&mut a);
+            support::draw(&mut a, 80, 25)?;
+            support::modified(&mut a, K::Char('z'), M::ALT);
+            for (w, h) in [(80, 25), (132, 40)] {
+                support::draw(&mut a, w, h)?;
+                support::click(&mut a, Target::Plugin(MP3_PLAYER, ActionId(8)));
+                let before = support::draw(&mut a, w, h)?;
+                assert!(text(&before).contains(language.text("Seek step (seconds)")));
+                assert_eq!(before, support::draw(&mut a, w, h)?);
+                support::click(&mut a, Target::Plugin(MP3_PLAYER, ActionId(603)));
+                support::draw(&mut a, w, h)?;
+                support::click(&mut a, Target::Plugin(MP3_PLAYER, ActionId(605)));
+                support::key(&mut a, K::Esc);
+                assert_eq!(a.config.mp3.seek_seconds, 5);
+                support::draw(&mut a, w, h)?;
+                support::click(&mut a, Target::Plugin(MP3_PLAYER, ActionId(9)));
+                assert!(text(&support::draw(&mut a, w, h)?).contains(language.text("Remaining")));
+                support::key(&mut a, K::Enter);
+                assert!(text(&support::draw(&mut a, w, h)?).contains(language.text("Elapsed")));
+            }
+            support::draw(&mut a, 80, 25)?;
+            support::click(&mut a, Target::Plugin(MP3_PLAYER, ActionId(8)));
+            support::draw(&mut a, 80, 25)?;
+            support::click(&mut a, Target::Plugin(MP3_PLAYER, ActionId(602)));
+            support::draw(&mut a, 80, 25)?;
+            support::click(&mut a, Target::Plugin(MP3_PLAYER, ActionId(605)));
+            support::draw(&mut a, 80, 25)?;
+            support::click(&mut a, Target::Plugin(MP3_PLAYER, ActionId(606)));
+            assert_eq!(
+                (a.config.mp3.seek_seconds, a.config.mp3.default_volume),
+                (10, 60)
+            );
+        }
+    }
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn mixed_music_imports_keep_order_tags_lengths_and_ignore_unavailable_extensions() -> io::Result<()>
+{
+    let f = support::Fixture::new("music-mixed")?;
+    fs::create_dir(f.0.join("album"))?;
+    for (name, bytes) in [
+        (
+            "a.FLAC",
+            include_bytes!("fixtures/music/tone.flac").as_slice(),
+        ),
+        (
+            "b.wav",
+            include_bytes!("fixtures/music/tone.wav").as_slice(),
+        ),
+        (
+            "c.OGG",
+            include_bytes!("fixtures/music/tone.ogg").as_slice(),
+        ),
+        ("d.mp3", include_bytes!("fixtures/mp3/tone.mp3").as_slice()),
+        ("ignored.opus", b"unsupported".as_slice()),
+    ] {
+        fs::write(f.0.join("album").join(name), bytes)?;
+    }
+    let mut a = f.app()?;
+    a.panels[0].selected.insert("album".into());
+    a.config.set_plugin_enabled(MP3_PLAYER, true);
+    menu::execute(&mut a, menu::Action::AddMp3);
+    support::finish_mp3_import(&mut a)?;
+    support::draw(&mut a, 80, 25)?;
+    support::modified(&mut a, K::Char('z'), M::ALT);
+    support::draw(&mut a, 80, 25)?;
+    support::click(&mut a, Target::Plugin(MP3_PLAYER, ActionId(12)));
+    let rows = text(&support::draw(&mut a, 80, 25)?);
+    for title in ["FLAC", "WAV title", "Vorbis title", "d.mp3"] {
+        assert!(rows.contains(title), "{title}: {rows}");
+    }
+    assert_eq!(rows.matches("00:12").count(), 4);
+    assert!(!rows.contains("ignored.opus"));
+    assert_eq!(a.mouse.regions.iter().filter(|(_,t)|matches!(t,Target::Plugin(id,ActionId(row)) if *id==MP3_PLAYER && (1000..1064).contains(row))).count(),4);
+    support::key(&mut a, K::Esc);
+    support::draw(&mut a, 80, 25)?;
+    support::click(&mut a, Target::Plugin(MP3_PLAYER, ActionId(13)));
+    let info = text(&support::draw(&mut a, 80, 25)?);
+    assert!(
+        info.contains("Music Track Info")
+            && info.contains("DN test artist")
+            && info.contains("Format tests")
+    );
+    assert_eq!(
+        fs::read(f.0.join("album/a.FLAC"))?,
+        include_bytes!("fixtures/music/tone.flac")
+    );
+    Ok(())
+}
+
+#[test]
+fn music_menu_new_and_legacy_mnemonics_keep_the_existing_plugin_identity() -> io::Result<()> {
+    for language in [
+        dn::localization::Language::English,
+        dn::localization::Language::Russian,
+    ] {
+        let f = support::Fixture::new("music-menu")?;
+        let mut a = f.app()?;
+        a.config.language = language;
+        a.config.set_plugin_enabled(MP3_PLAYER, true);
+        for ch in if language == dn::localization::Language::Russian {
+            vec!['3', 's', 'з']
+        } else {
+            vec!['3', 's']
+        } {
+            menu::open(&mut a, menu::root_index(menu::RootId::Utilities).unwrap());
+            menu::key(&mut a, K::Char(ch));
+            assert_eq!(
+                a.desktop.active().kind,
+                WindowKind::Plugin(MP3_PLAYER),
+                "{language:?}/{ch}"
+            );
+            support::draw(&mut a, 80, 25)?;
+            support::key(&mut a, K::Esc);
+        }
+    }
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn enter_and_double_click_route_new_extensions_to_music_player() -> io::Result<()> {
+    let f = support::Fixture::new("music-opening")?;
+    for name in ["a.FLAC", "b.WAVE", "c.oga"] {
+        fs::write(f.0.join(name), b"not audio")?;
+    }
+    let mut a = f.app()?;
+    a.config.set_plugin_enabled(MP3_PLAYER, true);
+    a.config.mp3.play_on_enter = true;
+    for name in ["a.FLAC", "b.WAVE", "c.oga"] {
+        a.panels[0].cursor = a.panels[0]
+            .entries
+            .iter()
+            .position(|e| e.name == name)
+            .unwrap();
+        support::draw(&mut a, 80, 25)?;
+        if name == "a.FLAC" {
+            support::key(&mut a, K::Enter);
+        } else {
+            let cursor = a.panels[0].cursor;
+            let rect = a
+                .mouse
+                .regions
+                .iter()
+                .find(|(_, t)| *t == Target::Entry(0, cursor))
+                .unwrap()
+                .0;
+            for _ in 0..2 {
+                pointer(
+                    &mut a,
+                    MouseEventKind::Down(MouseButton::Left),
+                    rect.x,
+                    rect.y,
+                );
+                pointer(
+                    &mut a,
+                    MouseEventKind::Up(MouseButton::Left),
+                    rect.x,
+                    rect.y,
+                );
+            }
+        }
+        assert_eq!(
+            a.desktop.active().kind,
+            WindowKind::Plugin(MP3_PLAYER),
+            "{name}"
+        );
+        support::finish_mp3_import(&mut a)?;
+        support::draw(&mut a, 80, 25)?;
+        support::key(&mut a, K::Esc);
     }
     Ok(())
 }

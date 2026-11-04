@@ -450,7 +450,7 @@ fn mp3_empty_player_compact_expanded_help_movement_and_close_restore_terminal() 
         s.text()
             .lines()
             .nth(8)
-            .is_some_and(|r| r.contains("MP3 Player") && r.chars().nth(22) == Some('╔'))
+            .is_some_and(|r| r.contains("Music Player") && r.chars().nth(22) == Some('╔'))
     })?;
     let compact = s.text();
     assert!(!compact.contains("Empty playlist"));
@@ -460,14 +460,14 @@ fn mp3_empty_player_compact_expanded_help_movement_and_close_restore_terminal() 
     })?;
     // Empty transport controls are skipped; the first enabled button is Open.
     s.send(b"\t\r", "Open imports the current panel selection", |s| {
-        s.text().contains("Select MP3 files")
+        s.text().contains("Select music files")
     })?;
     assert!(!s.text().contains("Open file"));
     s.send(b"\x1bOP", "player help", |s| {
-        s.text().contains("MP3 Player Help")
+        s.text().contains("Music Player Help")
     })?;
     s.send(b"\x1b", "close player help", |s| {
-        !s.text().contains("MP3 Player Help")
+        !s.text().contains("Music Player Help")
     })?;
     s.send(b"\x1b[15;5~", "move player", |s| {
         s.text().contains("Arrows move")
@@ -476,10 +476,10 @@ fn mp3_empty_player_compact_expanded_help_movement_and_close_restore_terminal() 
         !s.text().contains("Arrows move")
     })?;
     s.send(b"\x1bz", "compact again", |s| {
-        !s.text().contains("Volume") && s.text().contains("MP3 Player")
+        !s.text().contains("Volume") && s.text().contains("Music Player")
     })?;
     s.send(b"\x1b", "close player", |s| {
-        !s.text().contains("MP3 Player") && s.command_prompt_active()
+        !s.text().contains("Music Player") && s.command_prompt_active()
     })?;
     s.finish()
 }
@@ -782,18 +782,18 @@ fn mp3_real_queue_help_cancel_and_volume_restore_terminal() -> io::Result<()> {
     s.send(b"\t \r", "enable player", |s| s.command_prompt_active())?;
     s.select_file("queue-track.mp3")?;
     s.send(b"\x1bua", "import selection", |s| {
-        s.text().contains("MP3 Player") && !s.text().contains("Adding MP3 files")
+        s.text().contains("Music Player") && !s.text().contains("Adding music files")
     })?;
     s.send(b"\x1bz", "expand", |s| s.text().contains("Volume"))?;
-    // From Play, enabled controls are Open, Mode, Volume, List.
-    s.send(b"\t\t\t\t\r", "queue", |s| {
+    // From Play: Open, Set up, Time, Mode, Volume, List.
+    s.send(b"\t\t\t\t\t\t\r", "queue", |s| {
         s.text().contains("Play order") && s.text().contains("queue-track.mp3")
     })?;
     s.send(b"\x1bOP", "owned Help", |s| {
-        s.text().contains("MP3 Player Help")
+        s.text().contains("Music Player Help")
     })?;
     s.send(b"\x1b", "return to queue", |s| {
-        s.text().contains("Play order") && !s.text().contains("MP3 Player Help")
+        s.text().contains("Play order") && !s.text().contains("Music Player Help")
     })?;
     s.send(b"\x1b", "cancel queue", |s| {
         !s.text().contains("Play order")
@@ -1060,21 +1060,18 @@ fn welcome_expand_restore_resize_and_start_preserve_terminal() -> io::Result<()>
 #[test]
 #[ignore = "requires a working macOS audio output device; plays a quiet synthetic tone"]
 fn mp3_audio_play_pause_seek_background_stop_and_close_restore_terminal() -> io::Result<()> {
-    let mut s = Session::new("mp3-audio")?;
+    let mut s = Session::with_preferences(
+        "mp3-audio",
+        "[plugins]\nenabled=['mp3_player']\n[plugins.mp3_player]\nplay_on_enter=true\n",
+    )?;
     fs::write(
         s.root.join("tone.mp3"),
         include_bytes!("fixtures/mp3/tone.mp3"),
     )?;
     s.wait("manager ready", |s| s.command_prompt_active())?;
-    s.send(b"\x1bocp", "plugins", |s| s.text().contains("mp3_player"))?;
-    s.send(b"\t \r", "enable player", |s| s.command_prompt_active())?;
     s.select_file("tone.mp3")?;
-    s.send(b"\x1bua", "import tone", |s| {
-        s.text().contains("MP3 Player") && !s.text().contains("Adding MP3 files")
-    })?;
-    s.send(b"\x1bz", "expand", |s| s.text().contains("Volume"))?;
-    s.send(b"\r", "play through default audio output", |s| {
-        s.text().contains("Playing")
+    s.send(b"\r", "Enter plays through default audio output", |s| {
+        s.text().contains("Playing") && s.text().contains("Elapsed")
     })?;
     // Play -> seek forward -> Pause (no next track).
     s.send(b"\t\t\r", "pause", |s| s.text().contains("Paused"))?;
@@ -1094,7 +1091,7 @@ fn mp3_audio_play_pause_seek_background_stop_and_close_restore_terminal() -> io:
     })?;
     s.send(b"\x1b", "close player", |s| s.command_prompt_active())?;
     s.send(b"\x1bu3", "reopen empty", |s| {
-        s.text().contains("MP3 Player") && !s.text().contains("Volume")
+        s.text().contains("Music Player") && !s.text().contains("Volume")
     })?;
     s.send(b"\x1b", "close empty player", |s| s.command_prompt_active())?;
     s.finish()
@@ -1141,22 +1138,22 @@ fn mp3_folder_tags_modes_info_and_resize_restore_terminal() -> io::Result<()> {
     s.send(b"\t \r", "enable player", |s| s.command_prompt_active())?;
     s.select_file("music")?;
     s.send(b"\x1bua", "import folder", |s| {
-        s.text().contains("MP3 Player")
-            && !s.text().contains("Adding MP3 files")
+        s.text().contains("Music Player")
+            && !s.text().contains("Adding music files")
             && s.plugin_document_ready()
     })?;
     s.send(b"\x1bz", "tagged player", |s| {
         s.text().contains("Test artist") && s.text().contains("First song")
     })?;
-    // Play -> Next -> Open -> Mode, with two imported tracks.
-    s.send(b"\t\t\t\r", "mode page", |s| {
+    // Play -> Next -> Open -> Set up -> Time -> Mode.
+    s.send(b"\t\t\t\t\t\r", "mode page", |s| {
         s.text().contains("Playback mode")
     })?;
     s.send(b"\x1bOP", "mode Help", |s| {
-        s.text().contains("MP3 Player Help")
+        s.text().contains("Music Player Help")
     })?;
     s.send(b"\x1b", "return to mode draft", |s| {
-        s.text().contains("Playback mode") && !s.text().contains("MP3 Player Help")
+        s.text().contains("Playback mode") && !s.text().contains("Music Player Help")
     })?;
     s.send(b" \t\t \r", "apply shuffle and repeat one", |s| {
         !s.text().contains("Playback mode")
@@ -1170,10 +1167,10 @@ fn mp3_folder_tags_modes_info_and_resize_restore_terminal() -> io::Result<()> {
         !s.text().contains("Playback mode") && s.text().contains("Shuffle On")
     })?;
     s.send(b"\t\t\t\r", "track Info", |s| {
-        s.text().contains("MP3 Track Info") && s.text().contains("Test album")
+        s.text().contains("Music Track Info") && s.text().contains("Test album")
     })?;
     s.send(b"\x1b", "close Info", |s| {
-        !s.text().contains("MP3 Track Info")
+        !s.text().contains("Music Track Info")
     })?;
     s.send(b"\x1b[Z\r", "tagged queue", |s| {
         s.text().contains("Play order")
@@ -1536,6 +1533,146 @@ fn archive_pane_selected_extraction_and_return_restore_terminal() -> io::Result<
         s.command_prompt_active()
             && !s.text().contains(" :: /docs")
             && s.text().contains("fixture.zip")
+    })?;
+    s.finish()
+}
+
+#[test]
+fn mp3_setup_time_and_track_lengths_in_real_terminal() -> io::Result<()> {
+    let mut s =
+        Session::with_preferences("mp3-enhancements", "[plugins]\nenabled=['mp3_player']\n")?;
+    fs::write(
+        s.root.join("duration.mp3"),
+        include_bytes!("fixtures/mp3/tone.mp3"),
+    )?;
+    s.wait("manager ready", |s| s.command_prompt_active())?;
+    s.select_file("duration.mp3")?;
+    s.send(b"\x1bua", "import duration", |s| {
+        s.text().contains("Music Player")
+            && !s.text().contains("Adding music files")
+            && s.plugin_document_ready()
+    })?;
+    s.send(b"\x1bz", "expand", |s| s.text().contains("Set up"))?;
+    s.send(b"\t\t\r", "setup", |s| {
+        s.text().contains("Seek step (seconds)")
+    })?;
+    s.send(b"\t\t\t \t\t\r", "volume draft", |s| {
+        s.text().contains("60%")
+    })?;
+    s.send(b"\t\r", "apply setup", |s| {
+        !s.text().contains("Seek step (seconds)") && s.text().contains("60%")
+    })?;
+    s.send(b"\t\r", "remaining timing", |s| {
+        s.text().contains("Remaining")
+    })?;
+    s.send(b"\r", "elapsed timing", |s| s.text().contains("Elapsed"))?;
+    s.send(b"\t\t\t\r", "playlist length", |s| {
+        s.text().contains("Play order") && s.text().contains("duration.mp3")
+    })?;
+    assert!(!s.text().contains("--:--"), "{}", s.text());
+    for (width, height) in [(132, 40), (80, 25)] {
+        s.resize(width, height)?;
+        s.wait("playlist resize acknowledged", |s| {
+            s.text().contains("Play order")
+                && fs::read_to_string(s.root.join("settings/dn/diagnostics.txt"))
+                    .is_ok_and(|d| d.contains(&format!("viewport=({width}, {height})")))
+        })?;
+    }
+    s.send(b"\x1b", "cancel playlist", |s| {
+        !s.text().contains("Play order")
+    })?;
+    s.send(b"\x1b", "close player", |s| s.command_prompt_active())?;
+    s.finish()
+}
+
+fn music_fixture_queue(s: &mut Session) -> io::Result<()> {
+    fs::create_dir(s.root.join("mixed"))?;
+    for (name, bytes) in [
+        (
+            "a.flac",
+            include_bytes!("fixtures/music/tone.flac").as_slice(),
+        ),
+        (
+            "b.wav",
+            include_bytes!("fixtures/music/tone.wav").as_slice(),
+        ),
+        (
+            "c.ogg",
+            include_bytes!("fixtures/music/tone.ogg").as_slice(),
+        ),
+        ("d.mp3", include_bytes!("fixtures/mp3/tone.mp3").as_slice()),
+    ] {
+        fs::write(s.root.join("mixed").join(name), bytes)?;
+    }
+    s.wait("manager ready", |s| s.command_prompt_active())?;
+    s.select_file("mixed")?;
+    s.send(b"\x1bua", "import mixed music", |s| {
+        s.text().contains("Music Player")
+            && !s.text().contains("Adding music files")
+            && s.plugin_document_ready()
+    })?;
+    s.send(b"\x1bz", "expand music player", |s| {
+        s.text().contains("FLAC") && s.text().contains("Volume")
+    })
+}
+#[test]
+fn music_mixed_queue_metadata_and_new_menu_mnemonic_restore_terminal() -> io::Result<()> {
+    let mut s = Session::with_preferences("music-mixed", "[plugins]\nenabled=['mp3_player']\n")?;
+    music_fixture_queue(&mut s)?;
+    s.send(b"\t\t\t\t\t\t\t\r", "mixed queue", |s| {
+        s.text().contains("Play order") && s.text().contains("Vorbis title")
+    })?;
+    let text = s.text();
+    assert!(text.contains("FLAC") && text.contains("WAV title") && text.contains("d.mp3"));
+    assert_eq!(text.matches("00:12").count(), 4);
+    s.send(b"\x1b", "close queue", |s| {
+        !s.text().contains("Play order") && s.text().contains("Volume")
+    })?;
+    s.send(b"\x1b", "close player", |s| s.command_prompt_active())?;
+    s.send(b"\x1bus", "new Music Player mnemonic", |s| {
+        s.text().contains("Music Player") && !s.command_prompt_active()
+    })?;
+    s.send(b"\x1b", "close empty player", |s| s.command_prompt_active())?;
+    s.finish()
+}
+#[test]
+#[ignore = "requires a working macOS audio output device; plays quiet synthetic tones"]
+fn music_mixed_audio_play_seek_next_and_channel_changes_restore_terminal() -> io::Result<()> {
+    let mut s =
+        Session::with_preferences("music-mixed-audio", "[plugins]\nenabled=['mp3_player']\n")?;
+    music_fixture_queue(&mut s)?;
+    s.send(b"\r", "play FLAC", |s| {
+        s.text().contains("Playing") && s.text().contains("FLAC")
+    })?;
+    // All formats use the same output/transport. Next must replace the decoder
+    // across stereo 24-bit/48k FLAC, mono 16-bit/44.1k WAV, stereo Vorbis and MP3.
+    for title in ["WAV title", "Vorbis title", "d.mp3"] {
+        let text = s.text();
+        let (row, col) = text
+            .lines()
+            .enumerate()
+            .find_map(|(row, line)| {
+                line.find("►►")
+                    .map(|byte| (row, line[..byte].chars().count()))
+            })
+            .unwrap();
+        let mouse = format!(
+            "\x1b[<0;{};{}M\x1b[<0;{};{}m",
+            col + 1,
+            row + 1,
+            col + 1,
+            row + 1
+        );
+        s.send(mouse.as_bytes(), "next music format", |s| {
+            s.text().contains("Playing") && s.text().contains(title)
+        })?;
+        s.send(b"\x1b[Z\r", "seek current format", |s| {
+            s.text().contains("Playing")
+                && (5..=8).any(|n| s.text().contains(&format!("00:{n:02}")))
+        })?;
+    }
+    s.send(b"\x1b", "close playing music", |s| {
+        s.command_prompt_active()
     })?;
     s.finish()
 }

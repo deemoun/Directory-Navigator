@@ -114,7 +114,8 @@ fn plugins_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
     let settings = app.modals.settings()?;
     let language = app.config.language;
     let palette = app.config.palette;
-    let count = settings.plugins.len();
+    let order = settings.plugin_rows();
+    let count = order.len();
     let form = settings.kind.definition();
     let rect = centered(
         area,
@@ -122,10 +123,11 @@ fn plugins_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
         ((count + usize::from(form.height)).min(usize::from(area.height.saturating_sub(2)))) as u16,
     );
     let rows = usize::from(rect.height.saturating_sub(9)).max(1);
-    let offset = settings
-        .cursor
-        .min(count.saturating_sub(1))
-        .saturating_sub(rows - 1);
+    let cursor = order
+        .iter()
+        .position(|id| *id == settings.cursor)
+        .unwrap_or(count.saturating_sub(1));
+    let offset = cursor.saturating_sub(rows - 1);
     let mut spec = DialogSpec::new(
         rect,
         scope(app, crate::focus::Focus::Settings)?,
@@ -139,23 +141,42 @@ fn plugins_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
             .style(palette.for_group(crate::palette::theme::Group::Dialogs, theme::HEADING)),
         Rect::new(rect.x + 3, rect.y + 2, rect.width - 6, 1),
     );
-    for (index, (id, title)) in settings.plugins.iter().enumerate() {
-        let visible = (offset..offset + rows).contains(&index);
+    for (position, &index) in order.iter().enumerate() {
+        let option = index == settings.plugins.len();
+        let visible = (offset..offset + rows).contains(&position);
         let row = Rect::new(
-            rect.x + 3,
-            rect.y + 4 + if visible { (index - offset) as u16 } else { 0 },
-            rect.width - 7,
+            rect.x + 3 + if option { 2 } else { 0 },
+            rect.y
+                + 4
+                + if visible {
+                    (position - offset) as u16
+                } else {
+                    0
+                },
+            rect.width - 7 - if option { 2 } else { 0 },
             1,
         );
         let mut c = Control::new(
             index,
             row,
             ControlKind::Checkbox {
-                caption: format!("{} ({})", language.text(title), id.0),
-                checked: settings.draft.plugin_enabled(*id),
+                caption: if option {
+                    language
+                        .text("Play music files in internal player")
+                        .to_owned()
+                } else {
+                    let (id, title) = settings.plugins[index];
+                    format!("{} ({})", language.text(title), id.0)
+                },
+                checked: if option {
+                    settings.draft.mp3.play_on_enter
+                } else {
+                    settings.draft.plugin_enabled(settings.plugins[index].0)
+                },
             },
             Target::Setting(index),
         );
+        c.enabled = !option || settings.mp3_open_enabled();
         if !visible {
             c.paint = false;
             c.hits.clear();
@@ -164,7 +185,7 @@ fn plugins_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
     }
     if count > rows {
         spec.native(
-            crate::turbo::widgets::scrollbar(settings.cursor.min(count - 1), count - 1, rows),
+            crate::turbo::widgets::scrollbar(cursor, count - 1, rows),
             Rect::new(rect.right() - 3, rect.y + 4, 1, rows as u16),
         );
     }

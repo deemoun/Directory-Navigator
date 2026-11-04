@@ -84,11 +84,12 @@ cannot simply be copied and put under another distribution licence
 
 ## DOS Navigator CD-player-derived interface
 
-The MP3 Player UI prototype in `src/plugins/mp3_player.rs` adapts the
+The Music Player interface in `src/plugins/mp3_player.rs` adapts the
 three-row counter glyph and compact/expanded arrangement from DOS Navigator
-1.51 `CDPLAYER.PAS`. The demo play-order dialog and nested track chooser in
+1.51 `CDPLAYER.PAS`. The play-order dialog in
 `src/plugins/mp3_player/playlist.rs` follow `CDUTIL.PAS` (`TOrder`, track/time/
-description rows and Add/Delete controls). No CD or audio implementation is included.
+description rows and Add/Delete controls). Modern Rust audio playback and duration
+probing do not use the original DOS CD drivers.
 
 Based on Dos Navigator by RIT Research Labs.
 

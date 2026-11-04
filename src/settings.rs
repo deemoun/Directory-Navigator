@@ -52,12 +52,25 @@ impl Settings {
         if self.kind == SettingsKind::Highlight {
             self.draft.highlight_groups.0.len() * 3 + 2
         } else if self.kind == SettingsKind::Plugins {
-            self.plugins.len()
+            self.plugin_rows().len()
         } else if !self.choice_fields().is_empty() {
             self.choice_fields().len()
         } else {
             self.rows().len()
         }
+    }
+    pub(crate) fn plugin_rows(&self) -> Vec<usize> {
+        let mut rows = Vec::new();
+        for (index, (id, _)) in self.plugins.iter().enumerate() {
+            rows.push(index);
+            if *id == crate::plugins::MP3_PLAYER {
+                rows.push(self.plugins.len());
+            }
+        }
+        rows
+    }
+    pub(crate) fn mp3_open_enabled(&self) -> bool {
+        cfg!(target_os = "macos") && self.draft.plugin_enabled(crate::plugins::MP3_PLAYER)
     }
     pub fn keyboard_choice(&mut self, reverse: bool) {
         if self.kind == SettingsKind::Keyboard {
@@ -99,6 +112,10 @@ impl Settings {
         }
 
         if self.kind == SettingsKind::Plugins {
+            if index == self.plugins.len() && self.mp3_open_enabled() {
+                self.cursor = index;
+                self.draft.mp3.play_on_enter = !self.draft.mp3.play_on_enter;
+            }
             if let Some((id, _)) = self.plugins.get(index) {
                 self.cursor = index;
                 self.draft

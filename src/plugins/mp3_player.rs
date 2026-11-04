@@ -1,4 +1,4 @@
-//! Session MP3 player, adapted from DN 1.51 CDPLAYER.PAS's counter and layout.
+//! Session music player, adapted from DN 1.51 CDPLAYER.PAS's counter and layout.
 //! Copyright (C) 1991-99 RIT Research Labs.
 //! Based on Dos Navigator by RIT Research Labs; see THIRD_PARTY_NOTICES.md.
 use super::*;
@@ -11,15 +11,24 @@ use crate::{
 use crossterm::event::{KeyCode as K, MouseButton, MouseEventKind};
 
 mod audio;
+mod formats;
+#[cfg(target_os = "macos")]
+mod metadata;
+pub(super) fn supports_path(path: &std::path::Path) -> bool {
+    formats::Format::from_path(path).is_some()
+}
+#[cfg(any(target_os = "macos", test))]
+mod duration;
 mod import;
 mod modes;
 mod playlist;
+mod setup;
 mod tags;
 const PLAY: usize = 2;
 const ZOOM: usize = 100;
 const CLOSE: usize = 101;
 const HELP: usize = 102;
-const HELP_TEXT: &str = "MP3 playback is available on macOS. Enable this plugin in Options > Configuration > Plugins.\nUtilities > Add MP3 to player, Open and List > Add use marked files or folders from the active panel; without marks they use the entry under the cursor. Folders are scanned recursively in name order. Symbolic links are skipped. Cancel discards the whole import; the queue holds up to 64 entries.\nPlay starts the selected track or resumes a pause. Pause suspends playback; Stop resets the position. Outer arrows select the previous/next track; inner arrows seek by five seconds. Volume changes player volume only.\nMode controls Shuffle and Repeat: Off, One track or All tracks. Repeat One affects automatic track endings, not manual Next/Previous. Shuffle visits each entry once; Previous retraces that order. Repeat All repeats the same shuffled cycle. Queue edits rebuild the shuffle order. OK applies mode changes; Cancel discards them.\nID3 artist/title replace filenames when available. Info shows title, artist, album and the file path. Missing, unsupported or oversized tags fall back to filenames.\nList edits a draft: OK applies it, Cancel discards it. Deleting the playing track stops playback. Music continues during import and while working in other windows. Closing the player, disabling the plugin or quitting DN stops playback and cancels import. No queue or preferences are saved.\nTab / Shift+Tab select controls; Enter / Space press a button. F1 opens Help. Alt+Z switches compact/expanded views; Ctrl+F5 moves the player; Esc closes the current page.";
+const HELP_TEXT: &str = "MP3, FLAC, WAV and Ogg Vorbis playback is available on macOS. Enable this plugin in Options > Configuration > Plugins.\nUtilities > Add music to player, Open and List > Add use marked files or folders from the active panel; without marks they use the entry under the cursor. Folders are scanned recursively in name order. Symbolic links are skipped. Cancel discards the whole import; the queue holds up to 64 entries.\nPlay starts the selected track or resumes a pause. Pause suspends playback; Stop resets the position. Outer arrows select the previous/next track; inner arrows use the saved seek step. Set up edits the seek step and default volume. Time switches elapsed/remaining track time. Volume changes player volume only.\nMode controls Shuffle and Repeat: Off, One track or All tracks. Repeat One affects automatic track endings, not manual Next/Previous. Shuffle visits each entry once; Previous retraces that order. Repeat All repeats the same shuffled cycle. Queue edits rebuild the shuffle order. OK applies mode changes; Cancel discards them.\nEnable Play music files in internal player in Plugins settings to add and play the current supported music file with Enter; Ctrl+Enter still uses the OS default. Playlist Time shows track durations when available. ID3, Vorbis comments and RIFF artist/title replace filenames when available. Info shows title, artist, album and the file path. Missing, unsupported or oversized tags fall back to filenames.\nList edits a draft: OK applies it, Cancel discards it. Deleting the playing track stops playback. Music continues during import and while working in other windows. Closing the player, disabling the plugin or quitting DN stops playback and cancels import. The queue is session-only. The internal-opening option, seek step and default volume use normal DN settings saving.\nTab / Shift+Tab select controls; Enter / Space press a button. F1 opens Help. Alt+Z switches compact/expanded views; Ctrl+F5 moves the player; Esc closes the current page.";
 const VOLUME_PAGE: u64 = 3;
 const VOLUME_DOWN: usize = 300;
 const VOLUME_UP: usize = 301;
@@ -46,6 +55,10 @@ enum Transport {
 pub(crate) struct Mp3Player {
     playlist: playlist::Playlist,
     expanded: bool,
+    preferences: crate::config::Mp3Preferences,
+    remaining: bool,
+    setup_draft: Option<crate::config::Mp3Preferences>,
+    setup_focus: usize,
     focus: usize,
     current: Option<u64>,
     next_track: u64,
@@ -68,6 +81,10 @@ impl Default for Mp3Player {
         Self {
             playlist: playlist::Playlist::default(),
             expanded: false,
+            preferences: Default::default(),
+            remaining: false,
+            setup_draft: None,
+            setup_focus: 0,
             focus: PLAY,
             current: None,
             next_track: 0,
@@ -107,6 +124,12 @@ impl Mp3Player {
             .iter()
             .position(|t| Some(t.id) == self.current)
     }
+    fn track_duration(&self) -> Option<Duration> {
+        self.snapshot.duration.or_else(|| {
+            self.track_index()
+                .and_then(|i| self.playlist.order[i].duration)
+        })
+    }
     fn enabled(&self, id: usize) -> bool {
         if !cfg!(target_os = "macos") {
             return id == playlist::LIST;
@@ -121,7 +144,7 @@ impl Mp3Player {
             5 => self.transport == Transport::Playing,
             6 => self.transport != Transport::Stopped,
             7 => self.playlist.can_add(),
-            10..=12 => true,
+            8..=12 => true,
             13 => self.track_index().is_some(),
             _ => false,
         }
@@ -167,10 +190,14 @@ impl Mp3Player {
         if snapshot.generation == self.request.generation {
             if let Some(error) = &snapshot.error {
                 self.notice = error.clone();
+                self.expanded = true;
                 self.stop();
                 return;
             }
             let finished = snapshot.finished;
+            if let (Some(id), Some(duration)) = (self.current, snapshot.duration) {
+                self.playlist.update_duration(id, duration);
+            }
             self.snapshot = snapshot;
             if finished && self.transport == Transport::Playing {
                 if let Some(next) = self.playback.neighbor(self.current, true, true) {
@@ -197,7 +224,7 @@ impl Mp3Player {
                 self.notice = ctx
                     .language
                     .text(if self.playlist.can_add() {
-                        "Select MP3 files or folders in the active panel"
+                        "Select music files or folders in the active panel"
                     } else {
                         "Queue is full (64 tracks)"
                     })
@@ -211,17 +238,46 @@ impl Mp3Player {
                 import::scan(paths, capacity, &cancel, &worker)
             }) {
                 Ok(task) => {
+                    self.notice.clear();
                     self.import = Some(import::Pending {
                         task: Some(task),
                         progress,
                         wake: ctx.now,
                         draft: self.playlist.open,
+                        play: None,
                         visited: 0,
                         found: 0,
                     })
                 }
                 Err(error) => self.notice = error.to_string(),
             }
+        }
+    }
+    fn play_file(&mut self, path: PathBuf, ctx: &Context) {
+        if !cfg!(target_os = "macos") {
+            return;
+        }
+        self.expanded = true;
+        if self.import.is_some()
+            || self.playlist.open
+            || self.setup_draft.is_some()
+            || self.volume_draft.is_some()
+            || self.mode_draft.is_some()
+        {
+            self.notice = ctx
+                .language
+                .text("Finish the current player operation first")
+                .into();
+            return;
+        }
+        if let Some(track) = self.playlist.order.iter().find(|t| t.path == path) {
+            self.current = Some(track.id);
+            self.start(ctx.now);
+            return;
+        }
+        self.add_files(vec![path.clone()], ctx);
+        if let Some(pending) = &mut self.import {
+            pending.play = Some(path);
         }
     }
     fn poll_import(&mut self, ctx: &Context) {
@@ -252,20 +308,27 @@ impl Mp3Player {
                         self.current = self.playlist.order.first().map(|t| t.id);
                     }
                     self.sync_order();
+                    if let Some(path) = pending.play {
+                        if let Some(track) = self.playlist.order.iter().find(|t| t.path == path) {
+                            self.current = Some(track.id);
+                            self.start(ctx.now);
+                        }
+                    }
                     self.notice = if errors > 0 {
                         format!(
                             "{}: {errors}",
-                            ctx.language.text("Import skipped unreadable entries")
+                            ctx.language
+                                .text("Import skipped unreadable or unsupported entries")
                         )
                     } else if limited {
                         ctx.language.text("Import limit reached").into()
                     } else if count == 0 {
-                        ctx.language.text("No MP3 files found").into()
+                        ctx.language.text("No supported music files found").into()
                     } else {
                         String::new()
                     };
                 }
-                Err(_) => self.notice = ctx.language.text("MP3 import stopped").into(),
+                Err(_) => self.notice = ctx.language.text("Music import stopped").into(),
             }
         }
         if let Some(pending) = &mut self.import {
@@ -345,7 +408,7 @@ impl Mp3Player {
         let mut spec = ctx.dialog(
             r,
             0,
-            ctx.language.text("Adding MP3 files"),
+            ctx.language.text("Adding music files"),
             IMPORT_CANCEL,
             IMPORT_CANCEL,
         );
@@ -363,13 +426,19 @@ impl Mp3Player {
             ),
             (
                 3,
-                format!("{}: {found}", ctx.language.text("MP3 files found")),
+                format!("{}: {found}", ctx.language.text("Music files found")),
             ),
             (5, ctx.language.text("Cancel discards this import").into()),
         ] {
             spec.caption(
                 Paragraph::new(text).style(style(0x70)),
                 Rect::new(r.x + 3, r.y + y, 46, 1),
+            );
+        }
+        if !self.notice.is_empty() {
+            spec.caption(
+                Paragraph::new(self.notice.clone()).style(style(0x70)),
+                Rect::new(r.x + 3, r.y + 4, 46, 1),
             );
         }
         spec.control(Control::new(
@@ -404,30 +473,45 @@ impl Mp3Player {
             crate::filesystem::display_name(&track.path.to_string_lossy())
         );
         vec![Effect::Help {
-            title: " MP3 Track Info ",
+            title: " Music Track Info ",
             text,
         }]
     }
     fn action(&mut self, id: usize, ctx: &Context) -> Vec<Effect> {
         if id == HELP {
             return vec![Effect::Help {
-                title: " MP3 Player Help ",
+                title: " Music Player Help ",
                 text: ctx.language.text(HELP_TEXT).into(),
             }];
         }
         if self.import.is_some() {
             if id == IMPORT_CANCEL {
                 self.import = None;
-                self.notice = ctx.language.text("MP3 import cancelled").into();
+                self.notice = ctx.language.text("Music import cancelled").into();
             }
             return Vec::new();
         }
+        if self.setup_draft.is_some() {
+            return self.setup_action(id);
+        }
         if let Some(mode) = &mut self.mode_draft {
             match id {
-                MODE_SHUFFLE => mode.shuffle = !mode.shuffle,
-                MODE_OFF => mode.repeat = modes::Repeat::Off,
-                MODE_ONE => mode.repeat = modes::Repeat::One,
-                MODE_ALL => mode.repeat = modes::Repeat::All,
+                MODE_SHUFFLE => {
+                    mode.shuffle = !mode.shuffle;
+                    self.mode_focus = 0;
+                }
+                MODE_OFF => {
+                    mode.repeat = modes::Repeat::Off;
+                    self.mode_focus = 1;
+                }
+                MODE_ONE => {
+                    mode.repeat = modes::Repeat::One;
+                    self.mode_focus = 2;
+                }
+                MODE_ALL => {
+                    mode.repeat = modes::Repeat::All;
+                    self.mode_focus = 3;
+                }
                 MODE_OK => {
                     self.playback.apply(
                         *mode,
@@ -518,11 +602,15 @@ impl Mp3Player {
                             .filter(|(serial, _)| self.snapshot.seek_serial != Some(*serial))
                             .map_or(self.snapshot.position, |(_, position)| position);
                         let position = if id == 1 {
-                            base.saturating_sub(Duration::from_secs(5))
+                            base.saturating_sub(Duration::from_secs(u64::from(
+                                self.preferences.seek_seconds,
+                            )))
                         } else {
-                            base.saturating_add(Duration::from_secs(5))
+                            base.saturating_add(Duration::from_secs(u64::from(
+                                self.preferences.seek_seconds,
+                            )))
                         };
-                        let position = self.snapshot.duration.map_or(position, |d| position.min(d));
+                        let position = self.track_duration().map_or(position, |d| position.min(d));
                         let serial = self.request.seek.map_or(0, |(n, _)| n + 1);
                         self.request.seek = Some((serial, position));
                         self.submit();
@@ -544,6 +632,11 @@ impl Mp3Player {
                     }
                     6 => self.stop(),
                     7 => return vec![Effect::RequestPanelPaths],
+                    8 => {
+                        self.setup_draft = Some(self.preferences);
+                        self.setup_focus = 0;
+                    }
+                    9 => self.remaining = !self.remaining,
                     10 => {
                         self.mode_draft = Some(self.playback.mode);
                         self.mode_focus = 0;
@@ -598,7 +691,7 @@ impl Mp3Player {
 }
 impl ToolPlugin for Mp3Player {
     fn definition(&self) -> Definition {
-        Definition::builtin(MP3_PLAYER, "MP3 Player", Presentation::Document)
+        Definition::builtin(MP3_PLAYER, "Music Player", Presentation::Document)
     }
     fn as_any(&self) -> &dyn Any {
         self
@@ -614,18 +707,23 @@ impl ToolPlugin for Mp3Player {
         });
         self.playback = modes::Order::default();
         self.mode_draft = None;
+        self.setup_draft = None;
         self.stop();
         self.playlist = playlist::Playlist::default();
         self.current = None;
         self.expanded = false;
         self.focus = PLAY;
         self.notice.clear();
-        self.request.volume = 50;
+        self.preferences = ctx.mp3;
+        self.request.volume = ctx.mp3.default_volume;
+        self.remaining = false;
+        self.setup_draft = None;
         self.volume_draft = None;
     }
     fn close(&mut self) {
         self.import = None;
         self.mode_draft = None;
+        self.setup_draft = None;
         self.stop();
         self.playlist = playlist::Playlist::default();
         self.current = None;
@@ -643,6 +741,10 @@ impl ToolPlugin for Mp3Player {
     }
     fn event(&mut self, event: Event<'_>, ctx: &Context) -> Vec<Effect> {
         match event {
+            Event::PlayMp3(path) => {
+                self.play_file(path, ctx);
+                Vec::new()
+            }
             Event::PanelPaths(paths) => {
                 self.add_files(paths, ctx);
                 Vec::new()
@@ -656,6 +758,10 @@ impl ToolPlugin for Mp3Player {
             }
             Event::Action(ActionId(id)) => self.action(id, ctx),
             Event::Focus(_) if self.import.is_some() => Vec::new(),
+            Event::Focus(id) if self.setup_draft.is_some() => {
+                self.setup_focus = id;
+                Vec::new()
+            }
             Event::Focus(id) if self.mode_draft.is_some() => {
                 self.mode_focus = id;
                 Vec::new()
@@ -718,6 +824,8 @@ impl ToolPlugin for Mp3Player {
             });
         }
         for (id, spec) in [
+            self.setup_draft
+                .map(|_| (setup::PAGE, self.setup_controls(ctx))),
             self.mode_draft
                 .map(|_| (MODE_PAGE, self.mode_controls(ctx))),
             self.import
@@ -744,6 +852,8 @@ impl ToolPlugin for Mp3Player {
     fn controls(&self, ctx: &Context) -> DialogSpec<'_> {
         if self.import.is_some() {
             self.import_controls(ctx)
+        } else if self.setup_draft.is_some() {
+            self.setup_controls(ctx)
         } else if self.mode_draft.is_some() {
             self.mode_controls(ctx)
         } else if self.volume_draft.is_some() {
@@ -757,13 +867,14 @@ impl ToolPlugin for Mp3Player {
     fn view(&self, ctx: &Context) -> View<'_> {
         let mut frame = NativeFrame::new(ctx.area, ctx.palette);
         frame.render_widget(
-            crate::turbo::widgets::dialog(ctx.language.text("MP3 Player")),
+            crate::turbo::widgets::dialog(ctx.language.text("Music Player")),
             self.bounds(ctx),
         );
         let mut layers = vec![Layer {
             id: 0,
             interactive: !self.playlist.open
                 && self.volume_draft.is_none()
+                && self.setup_draft.is_none()
                 && self.mode_draft.is_none()
                 && self.import.is_none(),
             scene: frame.finish(),
@@ -789,6 +900,8 @@ impl ToolPlugin for Mp3Player {
             });
         }
         for (id, spec) in [
+            self.setup_draft
+                .map(|_| (setup::PAGE, self.setup_controls(ctx))),
             self.mode_draft
                 .map(|_| (MODE_PAGE, self.mode_controls(ctx))),
             self.import
@@ -802,8 +915,10 @@ impl ToolPlugin for Mp3Player {
             frame.render_widget(
                 crate::turbo::widgets::dialog(ctx.language.text(if id == MODE_PAGE {
                     "Playback mode"
+                } else if id == setup::PAGE {
+                    "Music player setup"
                 } else {
-                    "Adding MP3 files"
+                    "Adding music files"
                 })),
                 spec.bounds,
             );
@@ -824,12 +939,23 @@ impl Mp3Player {
         let style = ctx
             .palette
             .styles_for(crate::palette::theme::Group::Dialogs);
-        let mut spec = ctx.dialog(r, self.focus, language.text("MP3 Player"), PLAY, CLOSE);
+        let mut spec = ctx.dialog(r, self.focus, language.text("Music Player"), PLAY, CLOSE);
         spec.native(
             crate::turbo::widgets::group_box(""),
             Rect::new(r.x + 1, r.y + 1, 34, 5),
         );
-        for (label, x, w) in [("Track", r.x + 4, 8), ("Track Time", r.x + 17, 12)] {
+        for (label, x, w) in [
+            ("Track", r.x + 4, 8),
+            (
+                if self.remaining {
+                    "Remaining"
+                } else {
+                    "Elapsed"
+                },
+                r.x + 17,
+                12,
+            ),
+        ] {
             spec.caption(
                 Paragraph::new(language.text(label)).style(style(0x70)),
                 Rect::new(x, r.y + 1, w, 1),
@@ -848,7 +974,13 @@ impl Mp3Player {
             ["▄▄▄", "█▄█", "▄▄█"],
         ];
         let track = self.track_index().map_or(0, |i| i + 1);
-        let seconds = self.snapshot.position.as_secs().min(5999);
+        let time = if self.remaining {
+            self.track_duration()
+                .map(|d| d.saturating_sub(self.snapshot.position))
+        } else {
+            Some(self.snapshot.position)
+        };
+        let seconds = time.unwrap_or_default().as_secs().min(5999);
         let digits = [
             track / 10,
             track % 10,
@@ -863,18 +995,29 @@ impl Mp3Player {
         {
             for (row, text) in DIGITS[digit].into_iter().enumerate() {
                 spec.caption(
-                    Paragraph::new(text).style(style(0x70)),
+                    Paragraph::new(if x >= r.x + 12 && time.is_none() {
+                        "   "
+                    } else {
+                        text
+                    })
+                    .style(style(0x70)),
                     Rect::new(x, r.y + 2 + row as u16, 3, 1),
                 );
             }
         }
-        for y in [r.y + 3, r.y + 4] {
+        if time.is_none() {
+            spec.caption(
+                Paragraph::new("--:--").style(style(0x70)),
+                Rect::new(r.x + 17, r.y + 3, 5, 1),
+            );
+        }
+        for y in [r.y + 3, r.y + 4].into_iter().filter(|_| time.is_some()) {
             spec.caption(
                 Paragraph::new("▪").style(style(0x70)),
                 Rect::new(r.x + 20, y, 1, 1),
             );
         }
-        for (row, text) in ["M", "P", "3"].into_iter().enumerate() {
+        for (row, text) in ["M", "U", "S"].into_iter().enumerate() {
             spec.caption(
                 Paragraph::new(text).style(style(0x70)),
                 Rect::new(r.x + 32, r.y + 2 + row as u16, 1, 1),
@@ -920,8 +1063,7 @@ impl Mp3Player {
                         Transport::Paused => "Paused",
                     }),
                     format_time(self.snapshot.position),
-                    self.snapshot
-                        .duration
+                    self.track_duration()
                         .map_or_else(|| "--:--".into(), format_time),
                     self.request.volume
                 ))
@@ -1022,6 +1164,7 @@ mod tests {
             active: true,
             now: Instant::now(),
             storage: None,
+            mp3: Default::default(),
         }
     }
     fn player() -> (Mp3Player, Rc<RefCell<FakeState>>) {
@@ -1039,6 +1182,7 @@ mod tests {
                     id: id as u64,
                     path: path.into(),
                     tags: tags::Tags::default(),
+                    duration: None,
                 }),
         );
         p.current = Some(0);
@@ -1179,6 +1323,7 @@ mod tests {
                 id,
                 path: "same.mp3".into(),
                 tags: tags::Tags::default(),
+                duration: None,
             })),
             64
         );
@@ -1190,6 +1335,7 @@ mod tests {
             id,
             path: "same.mp3".into(),
             tags: tags::Tags::default(),
+            duration: None,
         }));
         p.action(200);
         assert_eq!(p.order.len(), 2);
@@ -1240,7 +1386,7 @@ mod tests {
             ready.send(cancel).unwrap();
             gate.recv_timeout(Duration::from_secs(5)).unwrap();
             import::Result {
-                tracks: vec![("late.mp3".into(), tags::Tags::default())],
+                tracks: vec![("late.mp3".into(), tags::Tags::default(), None)],
                 ..Default::default()
             }
         })
@@ -1251,6 +1397,7 @@ mod tests {
             progress: Default::default(),
             wake: ctx.now,
             draft: false,
+            play: None,
             visited: 0,
             found: 0,
         });
@@ -1286,6 +1433,7 @@ mod tests {
                     artist: "Artist".into(),
                     album: "Album".into(),
                 },
+                None,
             )],
             ..Default::default()
         })
@@ -1295,6 +1443,7 @@ mod tests {
             progress: Default::default(),
             wake: ctx.now,
             draft: false,
+            play: None,
             visited: 0,
             found: 0,
         });
@@ -1309,5 +1458,113 @@ mod tests {
         assert_eq!(p.transport, Transport::Playing);
         assert_eq!(p.current, Some(0));
         assert_eq!(p.snapshot.position, Duration::from_secs(2));
+    }
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn setup_is_a_draft_time_toggles_and_duration_updates_live_and_draft_rows() {
+        let (mut p, fake) = player();
+        let ctx = context();
+        p.expanded = true;
+        assert!(p.enabled(8) && p.enabled(9));
+        p.action(8, &ctx);
+        p.setup_action(603);
+        p.setup_action(605);
+        p.setup_action(607);
+        assert_eq!(p.preferences.seek_seconds, 5);
+        assert_eq!(p.request.volume, 50);
+        p.action(8, &ctx);
+        p.setup_action(603);
+        p.setup_action(605);
+        assert!(matches!(
+            p.setup_action(606).as_slice(),
+            [Effect::Mp3Setup {
+                seek_seconds: 30,
+                default_volume: 60
+            }]
+        ));
+        assert_eq!(p.request.volume, 60);
+        p.action(9, &ctx);
+        assert!(p.remaining);
+        p.start(ctx.now);
+        p.playlist.show();
+        fake.borrow_mut().snapshot = audio::Snapshot {
+            generation: p.request.generation,
+            ready: true,
+            duration: Some(Duration::from_secs(60001)),
+            position: Duration::from_secs(2),
+            ..Default::default()
+        };
+        p.poll_audio(ctx.now);
+        assert_eq!(
+            p.playlist.order[0].duration,
+            Some(Duration::from_secs(60001))
+        );
+        let spec = p.playlist.controls(&ctx);
+        assert!(spec.controls.iter().any(|c| matches!(&c.kind,ControlKind::List{items,..} if items.iter().any(|s| s.contains("1000:01")))));
+        p.playlist.action(playlist::OK);
+        assert_eq!(
+            p.playlist.order[0].duration,
+            Some(Duration::from_secs(60001))
+        );
+        p.action(3, &ctx);
+        assert_eq!(
+            fake.borrow().request.seek.unwrap().1,
+            Duration::from_secs(32)
+        );
+        p.close();
+        let mut ctx = context();
+        ctx.mp3.seek_seconds = 10;
+        ctx.mp3.default_volume = 70;
+        p.open(&ctx);
+        assert!(!p.remaining && p.setup_draft.is_none());
+        assert_eq!((p.preferences.seek_seconds, p.request.volume), (10, 70));
+    }
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn enter_reuses_entries_when_full_and_busy_or_failed_import_never_stops_audio() {
+        let (mut p, fake) = player();
+        let ctx = context();
+        p.playlist.append((2..64).map(|id| playlist::Track {
+            id,
+            path: format!("{id}.mp3").into(),
+            tags: Default::default(),
+            duration: None,
+        }));
+        p.play_file("two.mp3".into(), &ctx);
+        assert_eq!(p.current, Some(1));
+        assert_eq!(p.playlist.order.len(), 64);
+        assert_eq!(p.transport, Transport::Playing);
+        let generation = p.request.generation;
+        p.play_file("new.mp3".into(), &ctx);
+        assert_eq!(p.request.generation, generation);
+        assert!(p.notice.contains("Queue is full"));
+        assert_eq!(fake.borrow().request.path, Some("two.mp3".into()));
+        p.playlist.show();
+        p.play_file("one.mp3".into(), &ctx);
+        assert_eq!(p.request.generation, generation);
+        assert!(p.notice.contains("Finish"));
+    }
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn seek_and_remaining_use_imported_duration_when_decoder_has_no_total() {
+        let (mut p, fake) = player();
+        let ctx = context();
+        p.expanded = true;
+        p.playlist.order[0].duration = Some(Duration::from_secs(8));
+        p.start(ctx.now);
+        fake.borrow_mut().snapshot = audio::Snapshot {
+            generation: p.request.generation,
+            ready: true,
+            position: Duration::from_secs(2),
+            ..Default::default()
+        };
+        p.poll_audio(ctx.now);
+        assert_eq!(p.track_duration(), Some(Duration::from_secs(8)));
+        p.action(3, &ctx);
+        p.action(3, &ctx);
+        assert_eq!(
+            fake.borrow().request.seek.unwrap().1,
+            Duration::from_secs(8)
+        );
     }
 }

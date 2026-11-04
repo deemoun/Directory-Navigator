@@ -42,7 +42,7 @@ and modern filesystem handling.
 - Choose English or Russian, with independent date order and 12/24-hour time.
 - Recall commands through a searchable session history; copy filenames or paths to the internal clipboard.
 - Use the calculator, character table and configurable user menus—or play Tetris or Pentix with separate, persistent high scores.
-- Play local **MP3** files on macOS in a DN-style player with a session queue, recursive folder import, ID3 tags, shuffle/repeat, pause, seek and volume. Disabled by default; enable it in Options → Configuration → Plugins, then use Utilities → Add MP3 to player. Linux/Windows show the player UI without audio. Based on Dos Navigator by RIT Research Labs.
+- Play local **MP3, FLAC, WAV and Ogg Vorbis** files on macOS in a DN-style player with a session queue, recursive folder import, track tags and durations, shuffle/repeat, pause, seek and volume. Disabled by default; enable it in Options → Configuration → Plugins, then use Utilities → Add music to player. Linux/Windows show the player UI without audio. Based on Dos Navigator by RIT Research Labs.
 
 ## In action
 

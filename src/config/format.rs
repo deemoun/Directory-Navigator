@@ -27,6 +27,21 @@ fn records(config: &Config) -> Vec<(&'static str, String, Value)> {
             fields.push(($group, $key.to_owned(), Value::from($value)));
         };
     }
+    add!(
+        "plugins.mp3_player",
+        "play_on_enter",
+        config.mp3.play_on_enter
+    );
+    add!(
+        "plugins.mp3_player",
+        "seek_seconds",
+        i64::from(config.mp3.seek_seconds)
+    );
+    add!(
+        "plugins.mp3_player",
+        "default_volume",
+        i64::from(config.mp3.default_volume)
+    );
     add!("application", "shortcuts", config.shortcuts.key());
     add!("interface", "palette", config.palette.key());
     add!("regional", "language", config.language.key());
@@ -91,6 +106,7 @@ fn checked(group: &str, key: &str, value: &Value, default: &Value) -> io::Result
         )));
     }
     let allowed: Option<&[&str]> = match (group, key) {
+        ("plugins.mp3_player", "seek_seconds") => Some(&["1", "5", "10", "30"]),
         ("application", "shortcuts") => Some(&["auto", "classic_dn", "mac"]),
         ("interface", "palette") => Some(&["classic", "terminal"]),
         ("regional", "language") => Some(&["en", "ru"]),
@@ -105,6 +121,11 @@ fn checked(group: &str, key: &str, value: &Value, default: &Value) -> io::Result
         }
         _ => None,
     };
+    if (group, key) == ("plugins.mp3_player", "default_volume")
+        && !text.parse::<u8>().is_ok_and(|v| v <= 100)
+    {
+        return Err(invalid("Invalid MP3 default volume"));
+    }
     if text.contains(['\n', '\r'])
         || allowed.is_some_and(|values| !values.contains(&text.as_str()))
         || (group, key) == ("editor", "tab_size")
@@ -138,6 +159,13 @@ fn assign(config: &mut Config, group: &str, key: &str, text: &str) -> io::Result
     }
     let index = usize::from(group == "panels.right");
     match (group, key) {
+        ("plugins.mp3_player", "play_on_enter") => config.mp3.play_on_enter = text == "true",
+        ("plugins.mp3_player", "seek_seconds") => {
+            config.mp3.seek_seconds = text.parse().map_err(|_| invalid("Invalid MP3 seek step"))?
+        }
+        ("plugins.mp3_player", "default_volume") => {
+            config.mp3.default_volume = text.parse().map_err(|_| invalid("Invalid MP3 volume"))?
+        }
         ("application", "shortcuts") => config.shortcuts = crate::shortcuts::Profile::parse(text),
         ("interface", "palette") => config.palette = crate::palette::PaletteProfile::parse(text),
         ("regional", "language") => config.language = crate::localization::Language::parse(text),

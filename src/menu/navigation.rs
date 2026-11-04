@@ -125,10 +125,9 @@ pub fn key(app: &mut App, code: KeyCode) {
             }
         }
         KeyCode::Char(c) => {
-            if let Some(index) = entries
-                .iter()
-                .position(|item| item.selectable() && app.config.language.matches(item.label, c))
-            {
+            if let Some(index) = entries.iter().position(|item| {
+                item.selectable() && super::definition::matches(item, app.config.language, c)
+            }) {
                 activate(app, depth, index);
             }
         }

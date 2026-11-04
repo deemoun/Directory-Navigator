@@ -78,7 +78,7 @@ fn settings_draft_cancel_commit_disable_live_game_and_reenable_keep_scores() -> 
         .unwrap();
     a.desktop.activate(dn::desktop::WindowId::MANAGER);
     a.open_settings(SettingsKind::Plugins);
-    assert_eq!(a.modals.settings().unwrap().control_count(), 3);
+    assert_eq!(a.modals.settings().unwrap().control_count(), 4);
     key(&mut a, K::Tab);
     key(&mut a, K::Tab);
     key(&mut a, K::Char(' '));
@@ -163,7 +163,7 @@ fn plugins_dialog_localized_native_controls_mouse_keyboard_and_immutable_render(
             key(&mut a, K::BackTab);
             assert_eq!(a.modals.settings().unwrap().cursor, 0);
             key(&mut a, K::BackTab);
-            assert_eq!(a.modals.settings().unwrap().cursor, 4);
+            assert_eq!(a.modals.settings().unwrap().cursor, 5);
             let snap = dn::layout::prepare_window(
                 &mut a,
                 dn::testing::layout::Rect::new(7, 3, 80, 25),
@@ -295,11 +295,13 @@ fn default_off_player_is_hidden_until_explicitly_enabled_in_plugin_settings() ->
     a.open_settings(SettingsKind::Plugins);
     draw(&mut a, 80, 25)?;
     click(&mut a, Target::Setting(1));
+    draw(&mut a, 80, 25)?;
     click(&mut a, Target::CancelSettings);
     assert!(!a.config.plugin_enabled(MP3_PLAYER));
     a.open_settings(SettingsKind::Plugins);
     draw(&mut a, 80, 25)?;
     click(&mut a, Target::Setting(1));
+    draw(&mut a, 80, 25)?;
     click(&mut a, Target::AcceptSettings);
     assert!(a.config.plugin_enabled(MP3_PLAYER));
     menu::open(&mut a, menu::root_index(menu::RootId::Utilities).unwrap());
@@ -311,5 +313,94 @@ fn default_off_player_is_hidden_until_explicitly_enabled_in_plugin_settings() ->
         a.desktop.active().kind,
         dn::desktop::WindowKind::Plugin(MP3_PLAYER)
     );
+    Ok(())
+}
+
+#[test]
+fn mp3_saved_preferences_defaults_validation_and_unknown_values() -> io::Result<()> {
+    let (t, _) = fixture()?;
+    let path = t.0.join("mp3.conf");
+    let old = Config::parse(b"config_version=2\n[plugins]\nenabled=['mp3_player']\n")?;
+    assert!(!old.mp3.play_on_enter);
+    assert_eq!((old.mp3.seek_seconds, old.mp3.default_volume), (5, 50));
+    fs::write(
+        &path,
+        "config_version=2\n[plugins.mp3_player]\nunknown='preserve'\n",
+    )?;
+    let mut config = Config::read(&path)?;
+    config.save_on_exit = false;
+    config.mp3.play_on_enter = true;
+    config.mp3.seek_seconds = 30;
+    config.mp3.default_volume = 70;
+    config.save(&path)?;
+    assert_eq!(Config::read(&path)?, config);
+    assert!(fs::read_to_string(&path)?.contains("preserve"));
+    for field in [
+        "play_on_enter=1",
+        "seek_seconds=0",
+        "seek_seconds=6",
+        "seek_seconds='5'",
+        "default_volume=-1",
+        "default_volume=101",
+        "default_volume=true",
+    ] {
+        assert!(
+            Config::parse(format!("config_version=2\n[plugins.mp3_player]\n{field}\n").as_bytes())
+                .is_err(),
+            "{field}"
+        );
+    }
+    let before = fs::read(&path)?;
+    config.mp3.default_volume = 101;
+    assert!(config.save(&path).is_err());
+    assert_eq!(fs::read(&path)?, before);
+    Ok(())
+}
+
+#[test]
+fn internal_mp3_option_follows_plugin_draft_and_preserves_cancel() -> io::Result<()> {
+    use dn::plugins::MP3_PLAYER;
+    let (_t, mut a) = fixture()?;
+    a.open_settings(SettingsKind::Plugins);
+    draw(&mut a, 80, 25)?;
+    assert!(!a
+        .mouse
+        .regions
+        .iter()
+        .any(|(_, t)| *t == Target::Setting(3)));
+    click(&mut a, Target::Setting(1));
+    draw(&mut a, 80, 25)?;
+    assert_eq!(
+        a.mouse
+            .regions
+            .iter()
+            .any(|(_, t)| *t == Target::Setting(3)),
+        cfg!(target_os = "macos")
+    );
+    #[cfg(target_os = "macos")]
+    {
+        click(&mut a, Target::Setting(3));
+        assert!(a.modals.settings().unwrap().draft.mp3.play_on_enter);
+        click(&mut a, Target::Setting(1));
+        draw(&mut a, 80, 25)?;
+        assert!(!a
+            .mouse
+            .regions
+            .iter()
+            .any(|(_, t)| *t == Target::Setting(3)));
+        assert!(a.modals.settings().unwrap().draft.mp3.play_on_enter);
+    }
+    click(&mut a, Target::CancelSettings);
+    assert!(!a.config.mp3.play_on_enter && !a.config.plugin_enabled(MP3_PLAYER));
+    #[cfg(target_os = "macos")]
+    {
+        a.open_settings(SettingsKind::Plugins);
+        draw(&mut a, 80, 25)?;
+        click(&mut a, Target::Setting(1));
+        draw(&mut a, 80, 25)?;
+        click(&mut a, Target::Setting(3));
+        click(&mut a, Target::AcceptSettings);
+        assert!(a.config.mp3.play_on_enter && a.config.plugin_enabled(MP3_PLAYER));
+    }
     Ok(())
 }

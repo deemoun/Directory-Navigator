@@ -217,6 +217,10 @@ fn plugin_play_symbol_survives_press_and_rendering_is_immutable() -> io::Result<
     a.config.set_plugin_enabled(dn::plugins::MP3_PLAYER, true);
     dn::menu::execute(&mut a, dn::menu::Action::AddMp3);
     support::finish_mp3_import(&mut a)?;
+    // Keep geometry fixed while the intentionally invalid audio reports its error.
+    // The expanded player exposes that error without moving the Play button.
+    support::draw(&mut a, 80, 25)?;
+    support::modified(&mut a, K::Char('z'), M::ALT);
     let normal = support::draw(&mut a, 80, 25)?;
     let r = target(
         &a,

@@ -87,6 +87,7 @@ pub(crate) struct Context {
     pub active: bool,
     pub now: Instant,
     pub storage: Option<PathBuf>,
+    pub mp3: crate::config::Mp3Preferences,
 }
 impl Context {
     pub fn target(&self, id: usize) -> Target {
@@ -119,12 +120,20 @@ pub(crate) enum Event<'a> {
     Focus(usize),
     Tick,
     PanelPaths(Vec<PathBuf>),
+    PlayMp3(PathBuf),
 }
 pub(crate) enum Effect {
     Close,
     CopyText(String),
     RequestPanelPaths,
-    Help { title: &'static str, text: String },
+    Mp3Setup {
+        seek_seconds: u8,
+        default_volume: u8,
+    },
+    Help {
+        title: &'static str,
+        text: String,
+    },
 }
 pub(crate) struct LocalWindow {
     pub id: u64,

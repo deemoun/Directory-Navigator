@@ -87,8 +87,8 @@ pub const ROOTS: &[Root] = &[
             ),
             line(),
             item("~C~alculator", "Ctrl+K", Plugin(crate::plugins::CALCULATOR)),
-            item("MP~3~ Player", "", Plugin(crate::plugins::MP3_PLAYER)),
-            item("~A~dd MP3 to player", "", AddMp3),
+            item("Mu~s~ic Player", "", Plugin(crate::plugins::MP3_PLAYER)),
+            item("~A~dd music to player", "", AddMp3),
             item(
                 "ASCII Ta~b~le",
                 "Ctrl+B",
@@ -527,3 +527,13 @@ pub const VIEWER_BAR: &[BarItem<V>] = &[
         width: C::Min(1),
     },
 ];
+
+/// Keep the original MP3-player menu key as an alias after its visible rename.
+pub(crate) fn matches(
+    item: &Item,
+    language: crate::localization::Language,
+    character: char,
+) -> bool {
+    language.matches(item.label, character)
+        || (item.action == Action::Plugin(crate::plugins::MP3_PLAYER) && character == '3')
+}

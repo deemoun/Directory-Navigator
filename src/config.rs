@@ -10,8 +10,31 @@ use std::{
 use store::read_bytes;
 pub use store::Store;
 
+/// Saved MP3 defaults; the queue and current volume remain session state.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Mp3Preferences {
+    pub play_on_enter: bool,
+    pub seek_seconds: u8,
+    pub default_volume: u8,
+}
+impl Default for Mp3Preferences {
+    fn default() -> Self {
+        Self {
+            play_on_enter: false,
+            seek_seconds: 5,
+            default_volume: 50,
+        }
+    }
+}
+impl Mp3Preferences {
+    pub fn valid(self) -> bool {
+        [1, 5, 10, 30].contains(&self.seek_seconds) && self.default_volume <= 100
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Config {
+    pub mp3: Mp3Preferences,
     pub disabled_plugins: std::collections::BTreeSet<String>,
     pub enabled_plugins: std::collections::BTreeSet<String>,
     pub shortcuts: crate::shortcuts::Profile,
@@ -41,6 +64,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
+            mp3: Mp3Preferences::default(),
             disabled_plugins: Default::default(),
             enabled_plugins: Default::default(),
             shortcuts: Default::default(),

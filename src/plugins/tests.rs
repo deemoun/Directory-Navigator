@@ -334,7 +334,8 @@ fn plugins_settings_lists_registered_tools_not_a_builtin_whitelist() -> io::Resu
     a.desktop.activate(WindowId::MANAGER);
     a.open_settings(crate::settings::SettingsKind::Plugins);
     let settings = a.modals.settings().unwrap();
-    assert_eq!(settings.control_count(), 4);
+    assert_eq!(settings.plugins.len(), 4);
+    assert_eq!(settings.control_count(), 5); // Registered tools plus the MP3 opening preference.
     let index = settings
         .plugins
         .iter()

@@ -191,7 +191,7 @@ Ctrl+Tab / Ctrl+Shift+Tab also work when the terminal reports their modifiers.
 Ordinary Tab still navigates controls. Alt+0 opens the window list. The manager
 remains first; closing a window returns to the most recently used live window.
 
-Tools, Tetris and MP3 Player expose the main DN menu. Editors/viewers keep their
+Tools, Tetris and Music Player expose the main DN menu. Editors/viewers keep their
 own menus. Main-menu file/panel actions target the manager's current pane. F6 and
 Shift+F6 keep their Move/Rename meanings in that pane. Settings, confirmations,
 Copy/Move forms, destination pickers and Tetris pages still block switching.
@@ -733,15 +733,34 @@ notes open as ordinary editor documents. There is no separate notes file,
 automatic startup restore or new configuration preference. Blocking dialogs,
 file pickers, confirmations and exit review retain focus and prevent invocation.
 
-## MP3 Player
+## Music Player
 
-Enable **MP3 Player** in **Options → Configuration → Plugins** first; it is
+Enable **Music Player** in **Options → Configuration → Plugins** first; it is
 experimental and disabled by default. Audio playback currently requires macOS.
 Linux/Windows retain the window and queue UI with audio controls disabled.
 
-Mark MP3 files or folders in a file panel and choose **Utilities → Add MP3 to player**.
+Supported files: **MP3**, native **FLAC**, **WAV/WAVE** (PCM or floating-point),
+and **Ogg Vorbis** (`.ogg` / `.oga`). Headers identify the actual media format;
+extensions determine which files Enter and folder imports consider. Opus,
+AAC/M4A, Ogg FLAC, and chained/multiplexed Ogg streams are outside this support.
+No FFmpeg or external codec installation is needed. Utilities → Music Player
+uses the new menu mnemonic S; the old Alt+U, 3 sequence remains an alias.
+The saved plugin ID and settings section stay `mp3_player`, so existing enable,
+opening, volume and seek preferences continue to work.
+
+
+On macOS, enable **Play music files in internal player** directly below the plugin
+checkbox to use Enter/double-click for internal playback. It is off by default
+and unavailable while the plugin is disabled. It overrides custom associations for supported music files;
+Ctrl+Enter still opens the OS default app. Only the current regular supported music file is
+used, regardless of marks. The player retains its queue, reuses an entry with the
+same native path, and starts it immediately. New files are imported first without
+interrupting current audio. A busy import/full queue reports a message. Archive
+members and symbolic links keep their existing opening behavior.
+
+Mark music files or folders in a file panel and choose **Utilities → Add music to player**.
 Without marks, the command uses the file under the cursor. Files are appended in
-panel order (`.MP3` is accepted). Folders are scanned recursively in name order;
+panel order; extension matching is case-insensitive. Folders are scanned recursively in name order;
 symbolic links and other extensions are skipped. A progress page offers Cancel,
 which discards the whole batch without changing the queue. Imports also cancel
 when the player closes. Music and background tasks keep running during scanning.
@@ -753,12 +772,12 @@ Valid files from a partial scan are added together on completion.
 
 **Play** starts the selected track or resumes a pause. **Pause** suspends it;
 **Stop** resets its position. The outer arrows select the previous/next track
-without wrapping by default; the inner arrows seek by five seconds. Changing tracks while
+without wrapping by default; the inner arrows use the saved seek step (initially five seconds). Changing tracks while
 playing continues playback; otherwise it selects the track without starting it.
 **Volume** opens a 0–100% dialog, initially 50%, affecting only DN audio. OK applies
 the new value; Cancel discards it. By default, tracks play in order and stop after the last.
 A file/device error stops playback and appears in the expanded window; the queue
-is retained. There are no global media keys or automatic file associations.
+is retained. There are no global media keys.
 
 **Mode** opens Shuffle and Repeat settings. OK applies them; Cancel discards the
 draft. Repeat Off stops at the end; Repeat One restarts the current track when it
@@ -768,21 +787,33 @@ once and lets Previous retrace the same order. Repeat All repeats that shuffled
 cycle. Changing the queue or toggling Shuffle rebuilds the cycle starting with the
 current track. Mode settings reset when the player reopens.
 
-Artist/title from ID3 replace filenames in the queue and player when available.
+Artist/title from ID3, Vorbis comments (FLAC/Ogg), or RIFF INFO/ID3 (WAV) replace filenames in the queue and player when available.
 **Info** shows title, artist, album and the native file path. Tags are read in the
 background without modifying source files. ID3v1 and ID3v2.2/2.3/2.4 are supported,
 including UTF-8 and UTF-16 text. Missing, malformed, unsupported or oversized tags
 fall back to filenames; missing individual fields may fall back to ID3v1.
 
-**List** opens a **Play order** draft with numbered descriptions and unknown durations
-(`--:--`). Delete removes a draft row; OK commits; Cancel/Esc discards changes.
+**Set up** edits the seek step (1/5/10/30 seconds) and default volume (0–100%).
+OK applies both, including the current volume; Cancel/Esc discards edits. The
+**Volume** dialog changes only the current session volume. **Time** toggles elapsed
+and remaining track time; unknown remaining time shows `--:--`.
+
+FLAC duration comes from STREAMINFO sample counts, WAV from frame counts, and
+Ogg from the final granule position after validating page boundaries and CRCs.
+Text metadata is bounded; artwork is skipped and source files are never modified.
+
+**List** opens a **Play order** draft with numbered descriptions and track durations.
+Duration is read in the background from format metadata without an audio device;
+unsupported/truncated streams show `--:--`. Long durations retain all minute digits. Delete removes a draft row; OK commits; Cancel/Esc discards changes.
 When stopped, OK also selects the highlighted row for Play. Removing the playing
-track and accepting the draft stops it. Save, Set up and Time remain unavailable.
+track and accepting the draft stops it. Save remains unavailable.
 Playlists are not saved to disk.
 
 Music continues while other windows or dialogs are active. Closing the player,
 disabling the plugin or quitting DN stops playback. Reopening starts an empty
-queue with the default volume. Nothing is saved between player sessions.
+queue with the saved default volume and elapsed timing. The internal-opening
+checkbox, seek step and default volume follow normal DN configuration saving
+(including Save desktop and save-on-exit); playlist and playback modes are not saved.
 
 Use Alt+Z, the title zoom button, a title double-click or Alt+0 → Zoom to switch
 between compact and expanded views. Tab/Shift+Tab choose enabled controls,

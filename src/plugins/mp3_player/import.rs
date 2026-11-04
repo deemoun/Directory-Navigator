@@ -12,7 +12,7 @@ pub(super) struct Progress {
 }
 #[derive(Default)]
 pub(super) struct Result {
-    pub tracks: Vec<(PathBuf, Tags)>,
+    pub tracks: Vec<(PathBuf, Tags, Option<std::time::Duration>)>,
     pub errors: usize,
     pub limited: bool,
 }
@@ -21,19 +21,24 @@ pub(super) struct Pending {
     pub progress: Arc<Progress>,
     pub wake: Instant,
     pub draft: bool,
+    pub play: Option<PathBuf>,
     pub visited: usize,
     pub found: usize,
 }
 impl Pending {
     pub fn tracks(result: Result, next_id: &mut u64) -> impl Iterator<Item = Track> + '_ {
-        result.tracks.into_iter().map(move |(path, tags)| {
-            *next_id = next_id.wrapping_add(1);
-            Track {
-                id: *next_id,
-                path,
-                tags,
-            }
-        })
+        result
+            .tracks
+            .into_iter()
+            .map(move |(path, tags, duration)| {
+                *next_id = next_id.wrapping_add(1);
+                Track {
+                    id: *next_id,
+                    path,
+                    tags,
+                    duration,
+                }
+            })
     }
 }
 #[cfg(target_os = "macos")]
@@ -78,10 +83,7 @@ pub(super) fn scan(
                 return;
             }
             if metadata.is_file() {
-                if !path
-                    .extension()
-                    .is_some_and(|e| e.eq_ignore_ascii_case("mp3"))
-                {
+                if !super::supports_path(path) {
                     return;
                 }
                 let read = (|| -> std::io::Result<_> {
@@ -90,13 +92,20 @@ pub(super) fn scan(
                         return Err(std::io::Error::other("File changed while importing"));
                     }
                     self.cancel.check()?;
-                    let tags = super::tags::read(&mut file)?;
+                    let info = super::metadata::read(&mut file, self.cancel)?;
                     self.cancel.check()?;
-                    Ok(tags)
+                    let after = file.metadata()?;
+                    if !crate::platform_fs::owns(path, &after)
+                        || metadata.len() != after.len()
+                        || metadata.modified()? != after.modified()?
+                    {
+                        return Err(std::io::Error::other("File changed while importing"));
+                    }
+                    Ok((info.tags, info.duration))
                 })();
                 match read {
-                    Ok(tags) => {
-                        self.result.tracks.push((path.into(), tags));
+                    Ok((tags, duration)) => {
+                        self.result.tracks.push((path.into(), tags, duration));
                         self.progress.found.fetch_add(1, Ordering::Relaxed);
                     }
                     Err(_) => self.result.errors += 1,
@@ -225,7 +234,7 @@ mod tests {
             result
                 .tracks
                 .iter()
-                .map(|(p, _)| p.strip_prefix(&f.0).unwrap().to_path_buf())
+                .map(|(p, _, _)| p.strip_prefix(&f.0).unwrap().to_path_buf())
                 .collect::<Vec<_>>(),
             vec![PathBuf::from("album/a.MP3"), PathBuf::from("z.mp3")]
         );
@@ -278,6 +287,32 @@ mod tests {
         );
         assert!(result.limited);
         assert!(result.tracks.is_empty());
+        Ok(())
+    }
+    #[test]
+    fn duration_probe_handles_real_audio_oversized_tags_and_truncation_without_writes(
+    ) -> io::Result<()> {
+        let f = Fixture::new()?;
+        let tone = include_bytes!("../../../tests/fixtures/mp3/tone.mp3");
+        let path = f.0.join("duration.mp3");
+        let mut tagged = b"ID3\x04\0\0\0\x40\0\x01".to_vec(); // Above the 1 MiB tag limit.
+        tagged.resize(11 + 1024 * 1024, 0);
+        tagged.extend(tone);
+        for data in [tone.to_vec(), tagged] {
+            fs::write(&path, &data)?;
+            let result = scan(
+                vec![path.clone()],
+                64,
+                &Default::default(),
+                &Default::default(),
+            );
+            assert_eq!(result.errors, 0);
+            assert!(result.tracks[0].2.is_some_and(|d| d.as_secs() >= 11));
+            assert_eq!(fs::read(&path)?, data);
+        }
+        fs::write(&path, &tone[..tone.len() - 1])?;
+        let result = scan(vec![path], 64, &Default::default(), &Default::default());
+        assert!(result.tracks[0].2.is_none());
         Ok(())
     }
 }

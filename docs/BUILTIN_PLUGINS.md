@@ -1,6 +1,6 @@
 # Built-in tools
 
-The built-in plugins are Calculator, Tetris/Pentix and the MP3 Player.
+The built-in plugins are Calculator, Tetris/Pentix and the Music Player.
 They are compiled
 into DN; there is no dynamic loader, binary ABI, installation format, external SDK,
 new dependency or separate plugin configuration format. This is an internal Rust interface which
@@ -10,7 +10,7 @@ may evolve with the application.
 
 Options → Configuration → Plugins lists every registered built-in tool, including
 disabled tools. Checkboxes edit a draft: OK applies it, Cancel discards it.
-Calculator and Tetris are enabled by default; the experimental MP3 Player is
+Calculator and Tetris are enabled by default; the experimental Music Player is
 disabled by default. Compiled-in defaults live in `plugins::enabled_by_default`.
 Explicit user choices override those defaults and survive saving/restarting. Disabling closes the current presentation and
 hides its menu entry and blocks shortcut launches. Enabling restores the menu
@@ -52,10 +52,11 @@ Enter/Esc and button Space through the plugin's actual shared native controls.
 A plugin can retain specialized key behavior, as Tetris does for Space.
 
 Callbacks receive a small `Context`: presentation owner, viewport, language,
-palette, activity, injected time and the existing configuration storage path.
+palette, activity, injected time, typed MP3 defaults and the existing configuration storage path.
 They never receive `App` or own the terminal/event loop. Effects are limited to
-closing their own presentation, copying text to DN's internal clipboard and
-opening owned Help. Interactive Copy/Help effects require the foreground binding;
+closing their own presentation, copying text to DN's internal clipboard,
+opening owned Help, requesting captured panel paths, and submitting validated
+MP3 setup defaults to the host. Interactive Copy/Help effects require the foreground binding;
 background activity cannot change another tool's focus or clipboard. Filesystem policy and score validation remain in the existing
 score store; no generic filesystem or background-job API is introduced.
 
@@ -79,7 +80,7 @@ result, base and history across closes; opening resets focus and its history pag
 Tetris releases its current game on close, while the score store and pending
 unsaved records remain in the module for later reopening/retry. The existing
 `tetris.conf` path, format, DOS import, merging and write safeguards are unchanged.
-Calculator, Tetris and MP3 Player are singleton documents in the window list.
+Calculator, Tetris and Music Player are singleton documents in the window list.
 Calculator now uses Document presentation while retaining its shared native
 form, session history and controls. Main menus and window switching remain
 available; owned decision pages keep their blocking behavior.
@@ -140,7 +141,7 @@ PTY verifies toggles, blocked shortcuts, live game retirement, explicit saving,
 resize and terminal restoration. Windows/Linux validation is skipped.
 
 
-## MP3 Player
+## Music Player
 
 The opt-in singleton player keeps its DN-style compact 36×9 and expanded 36×18
 windows. Native zoom, movement, arrangement, palette, clipping, owned Help and
@@ -148,13 +149,38 @@ stale-surface guards use the existing shared windowing paths.
 
 The host handles the typed `RequestPanelPaths` effect by capturing active-panel
 `targets()`, including folders, then delivering `PanelPaths`
-to the same live plugin binding. Utilities → Add MP3 to player captures before
-opening/activating the player. Only MP3 extensions are accepted. List edits a
+to the same live plugin binding. Utilities → Add music to player captures before
+opening/activating the player. MP3, FLAC, WAV/WAVE and Ogg Vorbis extensions use one shared registry. List edits a
 bounded 64-entry draft, with stable per-entry identities so duplicates are safe.
 OK applies, Cancel discards; deleting the current entry stops playback. No queue
-or preferences are persisted. Save and unimplemented secondary controls are disabled.
+is persisted. Save remains disabled; Set up and Time use owned controls.
 
-macOS uses Rodio with only playback/MP3 features. One lazily started worker per
+On macOS, the optional `plugins.mp3_player.play_on_enter` preference routes regular
+supported music files through a typed `PlayMp3(PathBuf)` event before custom associations.
+Explicit OS opening bypasses that route. The player reuses a matching native path
+or imports the captured single file and starts it after successful completion;
+marks and the current queue remain independent. The host validates `Mp3Setup`
+effects and updates only saved seek/default-volume fields. Plugins never write
+configuration themselves; normal DN saving policy applies. Missing fields default
+to external opening, a five-second seek step and 50% volume.
+
+The public-facing name is Music Player; internal plugin IDs, typed events and
+`plugins.mp3_player` keys retain their legacy names for configuration compatibility.
+The shared menu definition supplies mnemonic S and preserves the legacy 3 alias.
+FLAC STREAMINFO, WAV format/data chunks and Ogg Vorbis headers/comments supply
+bounded tags and duration. Ogg pages are checked for CRC, sequence, continuation
+and end granules; unsupported codecs or chained streams fail clearly. No media
+samples or artwork are decoded during import.
+
+Each track carries optional duration. MP3 import uses trusted Xing/Info/VBRI metadata
+through the existing decoder, supplied only bounded initial MPEG frames, or a
+cancellable frame-header scan for CBR/VBR streams without trustworthy metadata.
+No audio device is opened and full sample decoding is unnecessary. Playback
+snapshots reconcile committed and draft durations by entry ID. Drawing reads
+these values without changing state. Time switches elapsed/remaining track time;
+Set up applies seek/default-volume drafts, while Volume remains session-only.
+
+macOS uses Rodio with playback and MP3/FLAC/PCM-WAV/Vorbis features. One lazily started worker per
 plugin owns the decoder and output device. A fixed-size shared mailbox coalesces
 requests; UI callbacks never open audio files or seek synchronously. Files use
 `filesystem::open_regular`. Generation checks reject superseded loads and

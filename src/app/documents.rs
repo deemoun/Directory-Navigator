@@ -111,6 +111,11 @@ impl App {
             }
             if browse && !entry.directory && !entry.symlink {
                 let path = entry.path.clone();
+                if entry.file_type.is_some_and(|kind| kind.is_file())
+                    && crate::plugins::host::play_mp3(self, path.clone())
+                {
+                    return;
+                }
                 if crate::associations::open(self, path) {
                     return;
                 }

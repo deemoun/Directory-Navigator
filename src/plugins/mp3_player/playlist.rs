@@ -19,6 +19,7 @@ pub(super) struct Track {
     pub id: u64,
     pub path: PathBuf,
     pub tags: tags::Tags,
+    pub duration: Option<Duration>,
 }
 impl Track {
     pub fn description(&self) -> String {
@@ -80,6 +81,16 @@ impl Playlist {
         let before = rows.len();
         rows.extend(tracks.take(MAX_ORDER.saturating_sub(before)));
         rows.len() - before
+    }
+    pub fn update_duration(&mut self, id: u64, duration: Duration) {
+        for t in self
+            .order
+            .iter_mut()
+            .chain(self.draft.iter_mut())
+            .filter(|t| t.id == id)
+        {
+            t.duration = Some(duration);
+        }
     }
     pub fn available(&self) -> usize {
         MAX_ORDER.saturating_sub(if self.open {
@@ -154,11 +165,19 @@ impl Playlist {
         let selected = &self.selection;
         let mut spec = ctx.dialog(r, selected.focus, language.text("Play order"), OK, CANCEL);
         spec.caption(
-            Paragraph::new(language.text("MP3 queue · current session")).style(style(0x78)),
+            Paragraph::new(language.text("Music queue · current session")).style(style(0x78)),
             Rect::new(r.x + 3, r.y + 1, 62, 1),
         );
+        let time_width = self
+            .draft
+            .iter()
+            .filter_map(|t| t.duration)
+            .map(|d| format_time(d).len())
+            .max()
+            .unwrap_or(5)
+            .max(5);
         let header = format!(
-            "{:>3} │ {:^5} │ {}",
+            "{:>3} │ {:^time_width$} │ {}",
             language.text("No."),
             language.text("Time"),
             language.text("Description")
@@ -175,7 +194,14 @@ impl Playlist {
         let items = tracks
             .iter()
             .enumerate()
-            .map(|(n, track)| format!("{:>3} │ --:-- │ {}", n + 1, track.description()))
+            .map(|(n, track)| {
+                format!(
+                    "{:>3} │ {:>time_width$} │ {}",
+                    n + 1,
+                    track.duration.map_or_else(|| "--:--".into(), format_time),
+                    track.description()
+                )
+            })
             .collect::<Vec<_>>();
         let list = Rect::new(r.x + 3, r.y + 4, 61, ROWS as u16);
         let mut control = Control::new(
