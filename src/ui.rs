@@ -733,9 +733,18 @@ fn draw_workspace(
                 20,
             ),
         ];
+        // The last slot must fit the translated Close caption. Borrow unused
+        // padding from preceding slots instead of clipping Russian at 80 cols.
+        let close_width = (crate::presentation::text::Span::raw(format!(
+            "Esc {}",
+            app.config.language.text("Close")
+        ))
+        .width()
+        .min(usize::from(width))) as u16;
+        let available = width.saturating_sub(close_width);
         let mut x = 0;
         for (key, label, target, w) in entries {
-            let w = w.min(width.saturating_sub(x));
+            let w = w.min(available.saturating_sub(x));
             let r = Rect::new(x, y, w, 1);
             frame.render_widget(
                 crate::turbo::widgets::function_status(key, app.config.language.text(label), true),

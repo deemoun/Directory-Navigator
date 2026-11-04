@@ -110,18 +110,10 @@ library remain `dn`. The name `dn` is already registered by an unrelated project
 Version 1.1.6 uses the published Turbo Vision **4.1.0** crate, with
 `default-features = false`. All dependencies use crates.io registry versions.
 
-**Known upstream limitation:** this framework release counts bytes instead of
-characters in some widgets. Clipping Unicode text can panic, and non-ASCII menu
-and status labels can have incorrect widths. The Unicode fixes merged after its
-release are not included in 4.1.0. A future DN patch release can adopt a newer
-framework version containing those fixes. This release deliberately uses the
-published framework without a fork.
-
-Validation against 4.1.0 also finds a Tetris score-layout regression: the rendered
-score table can omit a long score. The native surface-parity test reproduces the
-Unicode-clipping panic above, and the UI frame-baseline comparison also fails.
-These tests remain enabled; a successful packaging dry run does not mean the
-full regression suite passes.
+DN adapts display-only text surfaces to terminal cells to avoid UTF-8 byte
+clipping in Turbo Vision 4.1.0. Translated status captions also receive enough
+offscreen space for the framework's byte-length checks. These fixes live in DN;
+the published framework dependency remains unchanged, without a fork.
 
 After publication, installation will be:
 

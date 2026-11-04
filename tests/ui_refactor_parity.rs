@@ -2,6 +2,9 @@
 //! floating desktop; nested choices center over their parent. Surface targets
 //! are checked by floating_windows rather than mixed into legacy control hashes.
 //! Viewer backgrounds include Go to; editor Help includes the block commands.
+//! Plugin preferences and editor frames include the approved music-opening and
+//! Markdown-preview controls. Russian tool footers preserve every shortcut and
+//! the full Close caption, including at 80 columns.
 mod support;
 use dn::{
     editor::{self, EditorAction as A},
@@ -115,6 +118,46 @@ fn shared_logic_preserves_native_frames() -> io::Result<()> {
                         }
                         let snapshot = layout::prepare(&mut a, Rect::new(0, 0, w, h));
                         let result = ui::render(&a, &snapshot);
+                        // Verify the reason for intentional snapshot changes independently
+                        // of hashes: new controls stay reachable and translations fit.
+                        if matches!(case, 13..=15) {
+                            let buffer = Buffer::rendered(ui::render(&a, &snapshot));
+                            let footer = buffer
+                                .content
+                                .chunks(usize::from(w))
+                                .last()
+                                .unwrap()
+                                .iter()
+                                .map(|c| c.symbol())
+                                .collect::<String>();
+                            assert!(
+                                footer
+                                    .contains(&format!("Alt+F6 {}", language.text("Next window"))),
+                                "{footer}"
+                            );
+                            assert!(
+                                footer.contains(&format!("Esc {}", language.text("Close"))),
+                                "{footer}"
+                            );
+                        }
+                        if case == 4 {
+                            let buffer = Buffer::rendered(ui::render(&a, &snapshot));
+                            let text = buffer
+                                .content
+                                .iter()
+                                .map(|c| c.symbol())
+                                .collect::<String>();
+                            assert!(
+                                text.contains(language.text("Play music files in internal player")),
+                                "{text}"
+                            );
+                        }
+                        if case == 8 {
+                            assert!(result
+                                .hit_regions()
+                                .iter()
+                                .any(|(_, t)| *t == dn::mouse::Target::Editor(A::MarkdownPreview)));
+                        }
                         let normalize = |result: dn::ui::RenderedFrame| {
                             let cursor = result.cursor();
                             let hits = result

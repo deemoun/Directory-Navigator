@@ -1,4 +1,5 @@
 //! Turbo Vision terminal host. Scenes paint directly through native documents.
+mod cell_text;
 pub(crate) mod characters;
 mod codec;
 mod color_grid;

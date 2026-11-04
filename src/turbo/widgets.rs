@@ -755,7 +755,15 @@ pub(crate) fn status(label: &str) -> Native {
     );
     let mut result = native(control, text);
     result.appearance = Appearance::Status(true);
-    result.overscan = 32;
+    // StatusLine 4.1.0 tests UTF-8 byte length before drawing an item.
+    // Keep its native shortcut painting, but provide enough offscreen cells
+    // for encoded graphemes and its delimiters; crop to the declared hit area.
+    result.overscan = label
+        .len()
+        .saturating_sub(label.chars().count())
+        .saturating_add(8)
+        .max(32)
+        .min(u16::MAX as usize) as u16;
     result.inset = 1;
     result.status_text = Some(label);
     result
@@ -981,10 +989,8 @@ pub(crate) fn text_view(lines: &[String], horizontal: usize, attribute: u8) -> N
     let content = lines
         .iter()
         .map(|line| text.text(&pan(line, horizontal)))
-        .collect::<Vec<_>>()
-        .join("\n");
-    let mut control = turbo_vision::views::text_viewer::TextViewer::new(TvRect::new(0, 0, 1, 1));
-    control.set_text(&content);
+        .collect();
+    let control = super::cell_text::CellText::new(content);
     let mut result = native(control, text);
     result.appearance = Appearance::Preview(attribute);
     result
@@ -1061,6 +1067,29 @@ pub(crate) fn color_key(value: u8, code: crossterm::event::KeyCode) -> Option<u8
 mod tests {
     use super::*;
     use crossterm::event::KeyCode as K;
+    #[test]
+    fn translated_status_items_are_not_dropped_by_native_byte_width_checks() {
+        for profile in [PaletteProfile::ClassicDn, PaletteProfile::Terminal] {
+            let mut scene = super::super::scene::Scene {
+                width: 40,
+                height: 2,
+                profile,
+                cells: BTreeMap::new(),
+                regions: Vec::new(),
+                cursor: None,
+            };
+            paint_into(
+                &mut scene,
+                function_status("Alt+F6 ", "Следующее окно", true),
+                Rect::new(0, 0, 25, 1),
+            );
+            let text = (0..25)
+                .map(|x| scene.cells.get(&(x, 0)).map_or(" ", |c| c.text.as_str()))
+                .collect::<String>();
+            assert!(text.contains("Alt+F6 Следующее окно"), "{text}");
+            assert!(scene.cells.keys().all(|(x, y)| *x < 25 && *y == 0));
+        }
+    }
     #[test]
     fn native_drawing_preserves_graphemes_literal_tokens_and_input_cursor() {
         let mut frame = NativeFrame::new(Rect::new(0, 0, 40, 12), PaletteProfile::ClassicDn);
