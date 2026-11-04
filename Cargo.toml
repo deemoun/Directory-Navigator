@@ -1,6 +1,6 @@
 [package]
 name = "directory-navigator"
-version = "1.1.5"
+version = "1.1.6"
 edition = "2021"
 description = "Native terminal file manager inspired by DOS Navigator 1.51"
 authors = ["Dmitry Yarygin"]

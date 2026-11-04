@@ -107,7 +107,7 @@ notarized, so macOS may block downloaded copies. Test builds need no Rust instal
 
 The registry package is named `directory-navigator`; its executable and Rust
 library remain `dn`. The name `dn` is already registered by an unrelated project.
-Version 1.1.5 uses the published Turbo Vision **4.1.0** crate, with
+Version 1.1.6 uses the published Turbo Vision **4.1.0** crate, with
 `default-features = false`. All dependencies use crates.io registry versions.
 
 **Known upstream limitation:** this framework release counts bytes instead of
@@ -126,7 +126,7 @@ full regression suite passes.
 After publication, installation will be:
 
 ```sh
-cargo install directory-navigator --version 1.1.5 --locked
+cargo install directory-navigator --version 1.1.6 --locked
 dn --version
 ```
 
