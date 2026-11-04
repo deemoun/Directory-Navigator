@@ -53,6 +53,7 @@ pub const ROOTS: &[Root] = &[
             item("~V~iew", "", Submenu(MenuId::View)),
             item("~E~dit", "F4", Key(4)),
             item("~B~rowse archive...", "Enter", BrowseArchive),
+            item("Create arc~h~ive...", "", CreateArchive),
             item("~O~pen with default app", "Ctrl+Enter", OpenExternal),
             item("~F~ind...", "Ctrl+F7", Find),
             item("~C~opy...", "F5", Key(5)),

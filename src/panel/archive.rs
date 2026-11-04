@@ -34,6 +34,7 @@ pub struct Archive {
     pub catalog: Option<Arc<Catalog>>,
     pub directory: usize,
     pub generation: u64,
+    pub(crate) password: Option<crate::archive::Password>,
     pub(crate) restore_directory: Vec<u8>,
     pub(crate) index: Option<Task<io::Result<Catalog>>>,
     pub(crate) preview: Option<Task<io::Result<crate::viewer::Contents>>>,
@@ -162,6 +163,7 @@ impl Panel {
             catalog: a.catalog.as_ref().unwrap().clone(),
             directory: a.directory,
             members: ids,
+            password: a.password.clone(),
         })
     }
     pub fn open_archive(&mut self, path: PathBuf) -> io::Result<()> {
@@ -193,6 +195,7 @@ impl Panel {
             directory: 0,
             generation,
             restore_directory: Vec::new(),
+            password: None,
             index: Some(index),
             preview: None,
             preview_title: PathBuf::new(),
@@ -229,6 +232,7 @@ impl Panel {
             a.index = Some(task);
             a.preview = None;
             a.restore_directory = directory;
+            a.password = None;
             self.loading = true;
             self.revision = self.revision.wrapping_add(1);
         }

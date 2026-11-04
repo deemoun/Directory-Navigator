@@ -61,6 +61,7 @@ struct Origin {
 #[derive(Clone)]
 pub enum Request {
     Filesystem,
+    Create(crate::archive::create::Creation),
     Archive {
         selection: crate::archive::Extraction,
         destination: crate::archive::extract::Destination,
@@ -69,6 +70,7 @@ pub enum Request {
 pub struct Entry {
     pub request: Request,
     pub extracting: bool,
+    pub packing: bool,
     archive_summary: Option<String>,
     pub id: TransferId,
     pub source_count: usize,
@@ -260,6 +262,23 @@ pub(crate) fn submit_with_root(
 ) -> Result<TransferId, String> {
     submit_request(app, plan, options, root, Request::Filesystem)
 }
+pub(crate) fn submit_creation(
+    app: &mut App,
+    creation: crate::archive::create::Creation,
+) -> Result<TransferId, String> {
+    let plan = Plan {
+        kind: operations::Kind::Copy,
+        sources: creation.sources.clone(),
+        destination: creation.destination.clone(),
+    };
+    submit_request(
+        app,
+        plan,
+        CopyOptions::default(),
+        None,
+        Request::Create(creation),
+    )
+}
 pub(crate) fn submit_extraction(
     app: &mut App,
     selection: crate::archive::Extraction,
@@ -336,6 +355,7 @@ fn submit_request(
         ..Default::default()
     };
     let archive = matches!(request, Request::Archive { .. });
+    let packing = matches!(request, Request::Create(_));
     let source_count = match &request {
         Request::Archive { selection, .. } => selection.members.len(),
         _ => plan.sources.len(),
@@ -360,13 +380,14 @@ fn submit_request(
     };
     app.transfers.entries.push_back(Entry {
         extracting: archive,
+        packing,
         archive_summary,
         request,
         id,
         source_count,
         plan,
         options,
-        status: if archive {
+        status: if archive || packing {
             Status::Queued
         } else {
             Status::Preparing
@@ -430,6 +451,7 @@ fn start_next(app: &mut App, now: Instant) {
     // retain their earlier asynchronous identity snapshot before execution.
     let id = e.id;
     let result = match &e.request {
+        Request::Create(creation) => Job::start_creation(id, creation.clone()),
         Request::Filesystem => Job::start_transfer(
             id,
             e.plan.clone(),
@@ -1089,6 +1111,7 @@ mod tests {
         for i in 1000..1110 {
             let mut copy = Entry {
                 extracting: false,
+                packing: false,
                 archive_summary: None,
                 request: Request::Filesystem,
                 id: TransferId(i),

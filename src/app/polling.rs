@@ -95,6 +95,7 @@ impl App {
                 crate::focus::Focus::Manager | crate::focus::Focus::QuickSearch
             ) && self.quick_view.as_ref().is_some_and(|q| q.pending()))
             || self.modals.config_import().is_some_and(|p| p.loading())
+            || self.modals.archive_dialog().is_some_and(|d| d.loading())
             || self.directory_tree().is_some_and(|t| t.loading())
             || crate::user_menu::pending(&self.user_menu)
             || self.associations.busy()

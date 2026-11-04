@@ -307,6 +307,16 @@ impl App {
                     .as_ref()
                     .map_or_else(Default::default, |c| c.options);
                 if let Some(selection) = prompt.copy.as_ref().and_then(|c| c.extraction.clone()) {
+                    if selection.password.is_none() && selection.needs_password() {
+                        crate::archive::dialogs::password_for_extraction(
+                            self,
+                            selection,
+                            destination,
+                            options,
+                            prompt.copy.and_then(|c| c.temp_drive),
+                        );
+                        return;
+                    }
                     match crate::transfers::submit_extraction(
                         self,
                         selection,

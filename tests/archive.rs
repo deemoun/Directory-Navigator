@@ -658,6 +658,8 @@ fn two_archive_panes_require_native_destination_and_read_only_commands_are_guard
         assert!(!a.dialogs().is_empty());
         a.clear_dialogs();
     }
+    dn::menu::execute(&mut a, dn::menu::Action::CreateArchive);
+    assert!(a.modals.archive_dialog().is_none());
     dn::editor::open(&mut a, false);
     assert!(a.desktop.active_editor().is_none());
     a.clear_dialogs();
@@ -1125,5 +1127,341 @@ fn archive_escape_clears_command_drafts_and_preview_never_interrupts_typing() ->
     assert!(a.command_line.text.is_empty());
     assert!(a.command_line.pending.is_none());
     assert!(a.desktop.active_viewer().is_none());
+    Ok(())
+}
+
+fn protected_zip(path: &Path) -> io::Result<()> {
+    let mut writer = zip::ZipWriter::new(fs::File::create(path)?);
+    let options = zip::write::SimpleFileOptions::default()
+        .compression_method(zip::CompressionMethod::Deflated)
+        .with_aes_encryption(zip::AesMode::Aes256, "secret 界");
+    writer.start_file("private.txt", options)?;
+    writer.write_all(b"AUTHENTICATED PRIVATE PREVIEW\n")?;
+    writer.start_file("second.txt", options)?;
+    writer.write_all(b"second member\n")?;
+    writer.finish()?;
+    Ok(())
+}
+#[test]
+fn archive_creation_dialog_masks_passwords_validates_confirmation_and_queues_real_zip(
+) -> io::Result<()> {
+    use archive::dialogs::{self, Action};
+    let t = Temp::new()?;
+    fs::write(t.0.join("source.txt"), b"original contents")?;
+    let mut a = t.app()?;
+    select(&mut a, "source.txt");
+    dialogs::create(&mut a);
+    assert_eq!(focus::current(&a), Focus::ArchiveDialog);
+    key(&mut a, KeyCode::Tab);
+    input::paste(&mut a, "secret 界");
+    key(&mut a, KeyCode::Tab);
+    input::paste(&mut a, "different");
+    key(&mut a, KeyCode::Enter);
+    assert!(draw(&mut a, 80, 25)?.contains("Passwords do not match"));
+    key(&mut a, KeyCode::Home);
+    for _ in 0..9 {
+        key(&mut a, KeyCode::Delete);
+    }
+    input::paste(&mut a, "secret 界");
+    for lang in [
+        dn::localization::Language::English,
+        dn::localization::Language::Russian,
+    ] {
+        a.config.language = lang;
+        for palette in [
+            dn::palette::PaletteProfile::ClassicDn,
+            dn::palette::PaletteProfile::Custom([0x3f; dn::palette::theme::COUNT]),
+        ] {
+            a.config.palette = palette;
+            for (w, h) in [(80, 25), (132, 40), (50, 15), (80, 25)] {
+                let before = draw(&mut a, w, h)?;
+                assert!(!before.contains("secret") && !before.contains("different"));
+                let hits = a.mouse.regions.clone();
+                for _ in 0..3 {
+                    assert_eq!(before, draw(&mut a, w, h)?);
+                    assert_eq!(hits, a.mouse.regions);
+                }
+            }
+        }
+    }
+    a.config.language = dn::localization::Language::English;
+    draw(&mut a, 80, 25)?;
+    click(&mut a, Target::Archive(Action::Confirm));
+    wait(&mut a, |a| !a.transfers.has_work());
+    assert!(a.modals.archive_dialog().is_none());
+    assert!(a.transfers.entries.back().unwrap().packing);
+    assert_eq!(
+        a.transfers.entries.back().unwrap().status,
+        dn::transfers::Status::Completed,
+        "{:?}",
+        a.transfers.entries.back().unwrap().error
+    );
+    let catalog = reader::list(t.0.join("source.txt.zip"), &Cancellation::default())?;
+    assert!(catalog.nodes[1].locked);
+    assert_eq!(fs::read(t.0.join("source.txt"))?, b"original contents");
+    assert!(a.copy_dialog.history.is_empty());
+    Ok(())
+}
+#[test]
+fn encrypted_preview_retries_cancels_caches_per_pane_and_refresh_forgets() -> io::Result<()> {
+    use archive::dialogs::{self, Action};
+    let t = Temp::new()?;
+    protected_zip(&t.0.join("protected.zip"))?;
+    let mut a = t.app()?;
+    archive::open(&mut a, t.0.join("protected.zip"));
+    finish(&mut a);
+    select(&mut a, "private.txt");
+    key(&mut a, KeyCode::F(3));
+    assert_eq!(focus::current(&a), Focus::ArchiveDialog);
+    input::paste(&mut a, "wrong");
+    key(&mut a, KeyCode::Enter);
+    wait(&mut a, |a| {
+        a.modals.archive_dialog().is_some_and(|d| !d.loading())
+    });
+    assert!(draw(&mut a, 80, 25)?.contains("Incorrect archive password"));
+    assert!(a.desktop.active_viewer().is_none());
+    input::paste(&mut a, "secret 界");
+    key(&mut a, KeyCode::Enter);
+    wait(&mut a, |a| a.desktop.active_viewer().is_some());
+    assert!(draw(&mut a, 80, 25)?.contains("AUTHENTICATED PRIVATE PREVIEW"));
+    key(&mut a, KeyCode::Esc);
+    select(&mut a, "second.txt");
+    key(&mut a, KeyCode::F(3));
+    assert!(a.modals.archive_dialog().is_none());
+    wait(&mut a, |a| a.desktop.active_viewer().is_some());
+    key(&mut a, KeyCode::Esc);
+    a.active = 1;
+    archive::open(&mut a, t.0.join("protected.zip"));
+    finish(&mut a);
+    select(&mut a, "private.txt");
+    key(&mut a, KeyCode::F(3));
+    assert_eq!(focus::current(&a), Focus::ArchiveDialog);
+    dialogs::action(&mut a, Action::Cancel);
+    assert!(a.panels[1].is_archive());
+    assert!(a.desktop.active_viewer().is_none());
+    a.active = 0;
+    input::handle(
+        &mut a,
+        KeyEvent::new(KeyCode::Char('r'), KeyModifiers::CONTROL),
+    );
+    finish(&mut a);
+    select(&mut a, "private.txt");
+    key(&mut a, KeyCode::F(3));
+    assert_eq!(focus::current(&a), Focus::ArchiveDialog);
+    key(&mut a, KeyCode::Esc);
+    assert!(a.panels[0].is_archive());
+    Ok(())
+}
+#[test]
+fn encrypted_multiselect_extraction_survives_leaving_pane_and_retires_credentials() -> io::Result<()>
+{
+    let t = Temp::new()?;
+    protected_zip(&t.0.join("protected.zip"))?;
+    fs::create_dir(t.0.join("out"))?;
+    let mut a = t.app()?;
+    archive::open(&mut a, t.0.join("protected.zip"));
+    finish(&mut a);
+    for name in ["private.txt", "second.txt"] {
+        select(&mut a, name);
+        a.panels[0].toggle_selection();
+    }
+    a.prompt_operation(dn::operations::Kind::Copy, false);
+    a.modals.prompt_mut().unwrap().copy.as_mut().unwrap().picked = Some(t.0.join("out"));
+    a.submit_prompt();
+    assert_eq!(focus::current(&a), Focus::ArchiveDialog);
+    a.transfers.paused = true;
+    input::paste(&mut a, "secret 界");
+    key(&mut a, KeyCode::Enter);
+    wait(&mut a, |a| a.modals.archive_dialog().is_none());
+    assert!(a.transfers.has_work());
+    a.panels[0].leave_archive(false);
+    a.transfers.paused = false;
+    wait(&mut a, |a| !a.transfers.has_work());
+    assert_eq!(
+        a.transfers.entries.back().unwrap().status,
+        dn::transfers::Status::Completed
+    );
+    assert!(matches!(
+        a.transfers.entries.back().unwrap().request,
+        dn::transfers::Request::Filesystem
+    ));
+    assert_eq!(
+        fs::read(t.0.join("out/private.txt"))?,
+        b"AUTHENTICATED PRIVATE PREVIEW\n"
+    );
+    assert_eq!(fs::read(t.0.join("out/second.txt"))?, b"second member\n");
+    assert_eq!(a.copy_dialog.history, [t.0.join("out")]);
+    Ok(())
+}
+#[test]
+fn cancelled_or_stale_password_reply_never_opens_a_viewer_or_queues_work() -> io::Result<()> {
+    let t = Temp::new()?;
+    protected_zip(&t.0.join("protected.zip"))?;
+    let mut a = t.app()?;
+    archive::open(&mut a, t.0.join("protected.zip"));
+    finish(&mut a);
+    select(&mut a, "private.txt");
+    key(&mut a, KeyCode::F(3));
+    input::paste(&mut a, "secret 界");
+    key(&mut a, KeyCode::Enter);
+    key(&mut a, KeyCode::Esc);
+    for _ in 0..4 {
+        a.poll();
+    }
+    assert!(a.desktop.active_viewer().is_none());
+    key(&mut a, KeyCode::F(3));
+    input::paste(&mut a, "secret 界");
+    key(&mut a, KeyCode::Enter);
+    a.panels[0].leave_archive(false);
+    wait(&mut a, |a| a.modals.archive_dialog().is_none());
+    assert!(a.desktop.active_viewer().is_none());
+    assert!(!a.transfers.has_work());
+    Ok(())
+}
+
+#[test]
+fn legacy_zipcrypto_fixture_authenticates_without_an_external_archiver() -> io::Result<()> {
+    let t = Temp::new()?;
+    let path = t.0.join("legacy.zip");
+    // Original synthetic fixture generated independently with Info-ZIP.
+    // Keep bytes in source so no generated ZIP needs to be tracked.
+    const LEGACY_ZIP: &[u8] = &[
+        0x50, 0x4b, 0x03, 0x04, 0x0a, 0x00, 0x09, 0x00, 0x00, 0x00, 0xc7, 0x80, 0x64, 0x5d, 0x9a,
+        0x5d, 0x51, 0x9c, 0x38, 0x00, 0x00, 0x00, 0x2c, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x1c, 0x00,
+        0x6c, 0x65, 0x67, 0x61, 0x63, 0x79, 0x2e, 0x74, 0x78, 0x74, 0x55, 0x54, 0x09, 0x00, 0x03,
+        0xe6, 0x49, 0xeb, 0x6a, 0xe6, 0x49, 0xeb, 0x6a, 0x75, 0x78, 0x0b, 0x00, 0x01, 0x04, 0xf5,
+        0x01, 0x00, 0x00, 0x04, 0x14, 0x00, 0x00, 0x00, 0xff, 0x3a, 0x84, 0x80, 0xb5, 0xdd, 0xce,
+        0x49, 0x50, 0x1f, 0x08, 0x13, 0xf4, 0x0a, 0x62, 0x04, 0x52, 0x81, 0x09, 0xfc, 0x23, 0x4f,
+        0x4f, 0xba, 0x38, 0x45, 0xcb, 0x80, 0xc6, 0xd2, 0xe5, 0x69, 0x3f, 0x90, 0xaf, 0x98, 0xf0,
+        0x2a, 0xe3, 0x08, 0xc8, 0x71, 0x59, 0xf0, 0xe8, 0x33, 0x2e, 0xe5, 0x0c, 0x7f, 0x53, 0x66,
+        0xc9, 0x1d, 0x71, 0x4b, 0x50, 0x4b, 0x07, 0x08, 0x9a, 0x5d, 0x51, 0x9c, 0x38, 0x00, 0x00,
+        0x00, 0x2c, 0x00, 0x00, 0x00, 0x50, 0x4b, 0x01, 0x02, 0x1e, 0x03, 0x0a, 0x00, 0x09, 0x00,
+        0x00, 0x00, 0xc7, 0x80, 0x64, 0x5d, 0x9a, 0x5d, 0x51, 0x9c, 0x38, 0x00, 0x00, 0x00, 0x2c,
+        0x00, 0x00, 0x00, 0x0a, 0x00, 0x18, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
+        0xa4, 0x81, 0x00, 0x00, 0x00, 0x00, 0x6c, 0x65, 0x67, 0x61, 0x63, 0x79, 0x2e, 0x74, 0x78,
+        0x74, 0x55, 0x54, 0x05, 0x00, 0x03, 0xe6, 0x49, 0xeb, 0x6a, 0x75, 0x78, 0x0b, 0x00, 0x01,
+        0x04, 0xf5, 0x01, 0x00, 0x00, 0x04, 0x14, 0x00, 0x00, 0x00, 0x50, 0x4b, 0x05, 0x06, 0x00,
+        0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x50, 0x00, 0x00, 0x00, 0x8c, 0x00, 0x00, 0x00,
+        0x00, 0x00,
+    ];
+    fs::write(&path, LEGACY_ZIP)?;
+    let c = reader::list(path, &Cancellation::default())?;
+    let id = id(&c, b"legacy.txt");
+    assert!(c.nodes[id].locked);
+    assert!(reader::preview_with_password(
+        &c,
+        id,
+        Some(&archive::Password::new("wrong")),
+        &Cancellation::default()
+    )
+    .is_err());
+    reader::preview_with_password(
+        &c,
+        id,
+        Some(&archive::Password::new("fixture-password")),
+        &Cancellation::default(),
+    )?;
+    Ok(())
+}
+#[test]
+fn encrypted_preview_authenticates_beyond_preview_limit_and_keeps_bounded_contents(
+) -> io::Result<()> {
+    use std::io::{Read, Seek, SeekFrom};
+    let t = Temp::new()?;
+    let path = t.0.join("large-encrypted.zip");
+    let mut writer = zip::ZipWriter::new(fs::File::create(&path)?);
+    writer.start_file(
+        "large.txt",
+        zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Stored)
+            .with_aes_encryption(zip::AesMode::Aes256, "secret"),
+    )?;
+    writer.write_all(&vec![b'x'; dn::viewer::MAX_BYTES + 100])?;
+    writer.finish()?;
+    let c = reader::list(path.clone(), &Cancellation::default())?;
+    reader::preview_with_password(
+        &c,
+        1,
+        Some(&archive::Password::new("secret")),
+        &Cancellation::default(),
+    )?;
+    let mut zip = zip::ZipArchive::new(fs::File::open(&path)?)?;
+    let raw = zip.by_index_raw(0)?;
+    let at = raw.data_start().unwrap() + raw.compressed_size() - 1;
+    drop(raw);
+    drop(zip);
+    let mut file = fs::OpenOptions::new().read(true).write(true).open(&path)?;
+    file.seek(SeekFrom::Start(at))?;
+    let mut b = [0];
+    file.read_exact(&mut b)?;
+    b[0] ^= 1;
+    file.seek(SeekFrom::Start(at))?;
+    file.write_all(&b)?;
+    drop(file);
+    let c = reader::list(path, &Cancellation::default())?;
+    assert!(reader::preview_with_password(
+        &c,
+        1,
+        Some(&archive::Password::new("secret")),
+        &Cancellation::default()
+    )
+    .is_err());
+    Ok(())
+}
+
+#[test]
+fn encrypted_temp_drive_extraction_password_cancel_keeps_destination_empty() -> io::Result<()> {
+    let t = Temp::new()?;
+    protected_zip(&t.0.join("protected.zip"))?;
+    let mut a = t.app()?;
+    archive::open(&mut a, t.0.join("protected.zip"));
+    finish(&mut a);
+    select(&mut a, "private.txt");
+    dn::menu::execute(&mut a, dn::menu::Action::CopyToTempDrive);
+    a.submit_prompt();
+    assert_eq!(focus::current(&a), Focus::ArchiveDialog);
+    key(&mut a, KeyCode::Esc);
+    let root = t.0.join("temp-drive");
+    assert!(fs::read_dir(&root)?.next().is_none());
+    assert!(!a.transfers.has_work());
+    dn::menu::execute(&mut a, dn::menu::Action::CopyToTempDrive);
+    a.submit_prompt();
+    input::paste(&mut a, "secret 界");
+    key(&mut a, KeyCode::Enter);
+    wait(&mut a, |a| {
+        a.modals.archive_dialog().is_none() && !a.transfers.has_work()
+    });
+    assert_eq!(
+        a.transfers.entries.back().unwrap().status,
+        dn::transfers::Status::Completed
+    );
+    assert_eq!(
+        fs::read(root.join("private.txt"))?,
+        b"AUTHENTICATED PRIVATE PREVIEW\n"
+    );
+    assert!(!root.join("second.txt").exists());
+    Ok(())
+}
+
+#[test]
+fn creation_from_desktop_menu_activates_manager_and_preserves_other_documents() -> io::Result<()> {
+    let t = Temp::new()?;
+    fs::write(t.0.join("source.txt"), b"keep")?;
+    let mut a = t.app()?;
+    select(&mut a, "source.txt");
+    a.show_viewer(dn::viewer::Viewer::from_contents(
+        t.0.join("memory.txt"),
+        dn::viewer::from_bytes(b"open document".to_vec(), dn::viewer::ViewMode::Text),
+    ));
+    let viewer = a.desktop.active().id;
+    dn::menu::execute(&mut a, dn::menu::Action::CreateArchive);
+    assert_eq!(a.desktop.active().id, dn::desktop::WindowId::MANAGER);
+    assert_eq!(focus::current(&a), Focus::ArchiveDialog);
+    assert!(a.desktop.viewer(viewer).is_some());
+    key(&mut a, KeyCode::Esc);
+    assert!(a.modals.archive_dialog().is_none());
+    assert!(a.desktop.viewer(viewer).is_some());
+    assert_eq!(fs::read(t.0.join("source.txt"))?, b"keep");
+    assert!(!t.0.join("source.txt.zip").exists());
     Ok(())
 }

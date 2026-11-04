@@ -314,6 +314,14 @@ macro_rules! copy_slot {
     };
 }
 slot!(
+    archive_dialog,
+    archive_dialog_mut,
+    take_archive_dialog,
+    set_archive_dialog,
+    crate::archive::dialogs::Dialog,
+    ArchiveDialog
+);
+slot!(
     config_import,
     config_import_mut,
     take_config_import,
@@ -549,6 +557,9 @@ slot!(
 );
 
 fn bind_payload(state: &mut dyn Any, owner: crate::requests::Owner) {
+    if let Some(s) = state.downcast_mut::<crate::archive::dialogs::Dialog>() {
+        s.requests.bind(owner);
+    }
     if let Some(s) = state.downcast_mut::<crate::discovery::Modal>() {
         s.requests.bind(owner);
         if let Some(job) = &mut s.job {

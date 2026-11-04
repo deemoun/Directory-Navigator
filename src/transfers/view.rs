@@ -60,7 +60,9 @@ pub(crate) fn spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
             format!(
                 "#{} {} · {} · {} → {}",
                 e.id,
-                lang.text(if e.extracting {
+                lang.text(if e.packing {
+                    "Pack"
+                } else if e.extracting {
                     "Extract"
                 } else if e.plan.kind == operations::Kind::Copy {
                     "Copy"

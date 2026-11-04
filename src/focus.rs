@@ -3,6 +3,7 @@ use crate::app::App;
 pub use crate::desktop::WindowKind as Screen;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Focus {
+    ArchiveDialog,
     Transfers,
     Recovery,
     TerminalOutput,

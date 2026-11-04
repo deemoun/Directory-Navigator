@@ -301,6 +301,7 @@ fn paste_text(app: &mut App, text: &str) {
         Focus::Plugin => crate::plugins::host::paste(app, text),
         Focus::Manager => crate::command_line::paste(app, text),
         Focus::Navigation => crate::navigation_tools::paste(app, text),
+        Focus::ArchiveDialog => crate::archive::dialogs::paste(app, text),
         Focus::Utility => {}
         Focus::FileTools => app.file_tools.paste(text),
         Focus::CommandHistory => crate::command_line::history::paste(app, text),

@@ -920,3 +920,50 @@ Music player setup	Настройка плеера
 Seek step (seconds)	Шаг перемотки (секунды)
 Default volume	Громкость по умолчанию
 Finish the current player operation first	Сначала завершите текущую операцию плеера
+Create arc~h~ive...	Создать арх~и~в...
+Create archive	Создать архив
+Archive password	Пароль архива
+Archive creation help	Создание архивов — справка
+Archive path (.zip)	Путь архива (.zip)
+Password (optional)	Пароль (необязательно)
+Confirm password	Повторите пароль
+Password	Пароль
+Create	Создать
+Pack	Упаковать
+Checking password…	Проверка пароля…
+ZIP · Originals kept · Blank password: no encryption	ZIP · Исходники сохраняются · Без пароля: без шифрования
+Remembered only while this archive pane is open	Пароль хранится лишь пока открыта эта панель архива
+Input is too long or contains control characters	Слишком длинный ввод или управляющие символы
+Select files or folders to create an archive	Выберите файлы или папки для создания архива
+Enter a .zip archive path	Введите путь к архиву .zip
+Passwords do not match	Пароли не совпадают
+Enter the archive password	Введите пароль архива
+Password worker stopped	Обработчик пароля остановлен
+Incorrect archive password	Неверный пароль архива
+Archive password required	Требуется пароль архива
+Only regular archive files can be viewed.	Просматривать можно только обычные файлы архива.
+Only regular members can be previewed; links are never followed	Просмотр доступен только для обычных файлов; ссылки не открываются
+Selected tree contains links or special members	Выбранное дерево содержит ссылки или специальные элементы
+Packing links and special files is not supported	Упаковка ссылок и специальных файлов не поддерживается
+Archive source changed; create the archive again	Источник изменился; создайте архив заново
+Select files and choose a .zip archive path	Выберите файлы и укажите путь архива .zip
+Archive destination already exists	Архив назначения уже существует
+Archive destination must not contain parent components	Путь архива не должен содержать переходов к родителю
+Choose absolute archive sources	Укажите абсолютные пути источников
+Place the archive outside the selected folders	Разместите архив вне выбранных папок
+Archive source parents must not be links	Родительские папки источников не должны быть ссылками
+Archive source parent changed	Родительская папка источника изменилась
+Archive names must be Unicode	Имена в архиве должны быть в Unicode
+Archive exceeds 10,000 entries	В архиве больше 10 000 элементов
+Conflicting archive member names	Конфликт имён элементов архива
+Archive metadata limit reached	Превышен предел метаданных архива
+Archive input exceeds the 256 MiB extraction limit	Источники превышают предел распаковки 256 МиБ
+Insufficient space for archive creation	Недостаточно места для создания архива
+Archive source changed during open	Источник архива изменился при открытии
+Archive source grew during packing	Источник увеличился во время упаковки
+Archive source shrank during packing	Источник уменьшился во время упаковки
+Created archive exceeds the 512 MiB browser limit	Созданный архив превышает предел просмотра 512 МиБ
+Encrypted preview exceeds the 256 MiB authentication limit	Зашифрованный просмотр превышает предел проверки 256 МиБ
+Encrypted selection exceeds the 256 MiB authentication limit	Зашифрованное выделение превышает предел проверки 256 МиБ
+Truncated encrypted member	Зашифрованный элемент обрезан
+Create a new ZIP from marked files and folders, or the current item. Paths and empty folders are preserved; originals are kept. Existing archives are never overwritten or updated. Links and special files are not packed.\nBlank password creates an ordinary ZIP. A password creates AES-256 encrypted file contents; filenames remain visible. Confirm the password before creating. Passwords are never saved to settings or history.\nCreation runs in Transfer Center and can be cancelled. The final archive appears only after success. DN currently accepts up to 10,000 entries and 256 MiB of input.\nEncrypted ZIP preview and extraction ask for a password. A successful password is remembered only while this archive pane is open; refresh forgets it. Cancel leaves files unchanged. Other ZIP applications must support AES encryption.	Создание ZIP из отмеченных файлов и папок или текущего элемента. Структура и пустые папки сохраняются, исходники остаются на месте. Существующие архивы не заменяются. Ссылки и специальные файлы не упаковываются.\nПустой пароль создаёт обычный ZIP. С паролем содержимое файлов шифруется AES-256, имена остаются видимыми. Повторите пароль перед созданием. Пароли не сохраняются в настройках или истории.\nСоздание выполняется в Центре передач с возможностью отмены. Готовый архив появляется только после успеха. Пределы: 10 000 элементов и 256 МиБ исходных данных.\nПросмотр и распаковка зашифрованных ZIP запрашивают пароль. Успешный пароль хранится лишь пока открыта панель архива; обновление его забывает. Отмена не меняет файлы. Другие программы для ZIP должны поддерживать AES.

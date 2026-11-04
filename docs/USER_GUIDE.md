@@ -564,9 +564,36 @@ through the same extraction path. Accepted jobs continue after leaving the archi
 Refuse stops on existing top-level destinations; Skip leaves each existing file or
 folder untouched, without merging directories. Preview and Cancel never extract.
 
+**File → Create archive…** packs marked disk files and folders, or the current
+item, into a new ZIP. The compact dialog asks for the archive path and an optional
+password with confirmation. The default path is in the other disk pane, or the
+active disk pane when the other pane shows an archive. Compression is normal
+Deflate. Folder names, hidden descendants and empty directories are preserved;
+originals remain untouched. Links and special files are rejected. ZIP names must
+be portable Unicode, with no conflicting case-folded names. The destination must
+be outside selected folders and must not already exist. Creation runs through
+Transfer Center, continues while navigating, and supports cancellation. Only a
+complete ZIP is published; cancelled or failed staging is cleaned up. Limits are
+10,000 entries, 256 MiB of source file data and the existing browser metadata limits.
+Updating archives, removing originals, split volumes and TAR creation are unavailable.
+
+A blank password creates an ordinary ZIP; a nonempty password encrypts file
+contents with AES-256. Filenames remain visible. AES ZIP requires a compatible
+application (for example 7-Zip); support varies in operating-system archive tools.
+DN can list encrypted ZIPs without a password. Preview and F5 extraction ask for
+one when needed; a wrong password allows retry and Cancel leaves files unchanged.
+Credentials are remembered only for that archive pane until close or refresh;
+accepted extraction jobs retain their own in-memory credentials until finished.
+Nothing stores passwords in configuration, destination history or diagnostics.
+Encrypted contents are authenticated before preview text or extracted files are
+published. Password checking is cancellable and limited to 256 MiB per selection.
+The viewer still retains only its bounded preview, even when authentication reads
+an entire encrypted member. Both AES ZIP and legacy ZipCrypto reads are supported;
+new archives always use AES. No external archiver is required on any platform.
+
 Archives remain read-only: extract before editing or running commands on members.
-Move, deletion, mkdir, copying into archives, source removal, encrypted members,
-links/special-file extraction, archive creation and nested archive browsing are
+Move, deletion, mkdir, copying into archives, source removal,
+links/special-file extraction and nested archive browsing are
 unsupported. Unsupported or unsafe selected trees and incomplete catalogs are
 rejected before extraction. Portable output names exclude Windows device names,
 case-folding collisions and names invalid on Windows. No archive ownership or
@@ -601,7 +628,7 @@ Unsupported commands are not menu placeholders. Disk administration/recovery,
 DOS communications/country/printer setup and built-in printing are outside this
 app's scope. Save all remains outside this pass; desktop movement and zoom use
 the shared window controls described below. Future work includes permission editing
-and archive creation.
+and additional archive formats.
 Split/combine and line drawing remain low priority. No settings format changes.
 
 **Ctrl+O** in the Classic profile reveals the terminal's real primary screen and

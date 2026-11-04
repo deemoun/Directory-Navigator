@@ -209,3 +209,9 @@ Copyright (C) 1991–99 RIT Research Labs. Based on TinyWeb Server by RIT Resear
 The RIT Research Labs license and disclaimer reproduced above apply to adapted
 behavior. Native ZIP/TAR codecs and filesystem safeguards are implemented in Rust;
 DOS external-archiver command execution is not carried over.
+
+ZIP creation and its password-confirmation workflow are adapted from the behavior
+of DOS Navigator 1.51 `ARCHIVER.PAS` (`MakeArchive`), RIT Research Labs. The modern
+implementation uses built-in ZIP/AES codecs and the shared Transfer Center rather
+than external DOS packers. AES support and ephemeral credential clearing use the
+`zip` crate encryption feature and `zeroize`, under their respective crate licenses.

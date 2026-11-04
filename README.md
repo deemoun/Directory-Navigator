@@ -35,6 +35,7 @@ and modern filesystem handling.
 - Preview text or hex, edit UTF-8 files, and search or replace text.
 - Keep multiple editors and viewers open, and switch between them with **Alt+0**.
 - Browse ZIP, TAR and TAR.GZ/TGZ directly in either file pane; extract selected files and folders with F5.
+- Create ZIP archives from selected files and folders, optionally with an AES-256 password; preview and extract encrypted ZIPs in DN.
 - Type shell commands directly into the bottom command prompt.
 - Customize the layout, clock and screensaver; edit component colors in a DN-style foreground/background selector with Color, B/W and Mono presets. Settings save on exit.
 - Configure file extensions to use DN's viewer/editor or your preferred commands.

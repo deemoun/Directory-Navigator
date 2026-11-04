@@ -435,6 +435,7 @@ pub(crate) fn manager_available(app: &App, action: Action) -> bool {
             action,
             Action::OpenExternal
                 | Action::BrowseArchive
+                | Action::CreateArchive
                 | Action::UserMenu
                 | Action::EditUserMenu(_)
                 | Action::Find
@@ -449,6 +450,11 @@ pub(crate) fn manager_available(app: &App, action: Action) -> bool {
         return false;
     }
     match action {
+        Action::CreateArchive => {
+            !app.panels[app.active].loading
+                && !app.panels[app.active].targets().is_empty()
+                && !app.blocking_operation()
+        }
         Action::TempDrive | Action::CopyToTempDrive => crate::temp_drive::available(app, false),
         Action::ClearTempDrive => crate::temp_drive::available(app, true),
         Action::SmartPad => !crate::windowing::blocked(app) && !app.blocking_operation(),

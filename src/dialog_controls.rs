@@ -151,6 +151,7 @@ fn set_focus(app: &mut App, scope: Focus, next: usize) {
 
 pub(crate) fn tool_action(app: &mut App, target: Target) {
     match Some(target) {
+        Some(Target::Archive(a)) => crate::archive::dialogs::action(app, a),
         Some(Target::Transfer(a)) => crate::transfers::action(app, a),
         Some(Target::Recovery(a)) => crate::editor::recovery::action(app, a),
         Some(Target::CloseDialog) => {

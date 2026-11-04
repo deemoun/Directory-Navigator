@@ -10,6 +10,7 @@ use std::time::{Duration, Instant};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Target {
+    Archive(crate::archive::dialogs::Action),
     Transfer(crate::transfers::Action),
     Recovery(crate::editor::recovery::Action),
     Surface(

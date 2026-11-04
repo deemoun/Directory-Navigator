@@ -528,14 +528,22 @@ fn read_preview(
     Ok(viewer::from_bytes(bytes, ViewMode::Auto))
 }
 pub fn preview(catalog: &Catalog, id: usize, cancel: &Cancellation) -> io::Result<Contents> {
+    preview_with_password(catalog, id, None, cancel)
+}
+pub fn preview_with_password(
+    catalog: &Catalog,
+    id: usize,
+    password: Option<&super::Password>,
+    cancel: &Cancellation,
+) -> io::Result<Contents> {
     cancel.check()?;
     let node = catalog
         .nodes
         .get(id)
         .ok_or_else(|| io::Error::other("Missing archive member"))?;
-    if node.kind != Kind::File || node.locked {
+    if node.kind != Kind::File {
         return Err(io::Error::other(
-            "Only unencrypted regular members can be previewed; links are never followed",
+            "Only regular members can be previewed; links are never followed",
         ));
     }
     let index = node
@@ -544,11 +552,43 @@ pub fn preview(catalog: &Catalog, id: usize, cancel: &Cancellation) -> io::Resul
     let (file, metadata) = catalog.checked_source()?;
     if catalog.format == Format::Zip {
         let mut archive = zip_open(file, &metadata, cancel)?;
-        let mut entry = archive.by_index(index).map_err(io::Error::other)?;
+        let mut entry = zip_entry(&mut archive, index, password)?;
         if entry.name_raw() != node.raw {
             return Err(io::Error::other("Archive member changed"));
         }
-        read_preview(&mut entry, cancel, node.size)
+        let contents = if node.locked {
+            // Authentication covers the entire encrypted member, including the
+            // part beyond the viewer limit, before any text is exposed.
+            if node.size > MAX_STREAM {
+                return Err(io::Error::other(
+                    "Encrypted preview exceeds the 256 MiB authentication limit",
+                ));
+            }
+            let mut bytes = Vec::new();
+            let mut total = 0u64;
+            let mut buffer = [0; 64 * 1024];
+            loop {
+                cancel.check()?;
+                let n = entry.read(&mut buffer)?;
+                if n == 0 {
+                    break;
+                }
+                total += n as u64;
+                if total > node.size {
+                    return Err(io::Error::other("Member exceeds declared length"));
+                }
+                let keep = n.min((viewer::MAX_BYTES + 1).saturating_sub(bytes.len()));
+                bytes.extend_from_slice(&buffer[..keep]);
+            }
+            if total != node.size {
+                return Err(io::Error::other("Truncated encrypted member"));
+            }
+            viewer::from_bytes(bytes, ViewMode::Auto)
+        } else {
+            read_preview(&mut entry, cancel, node.size)?
+        };
+        catalog.validate()?;
+        Ok(contents)
     } else {
         let mut archive = tar::Archive::new(tar_input(file, catalog.format, cancel));
         for (position, item) in archive.entries()?.enumerate() {
@@ -570,6 +610,7 @@ pub fn preview(catalog: &Catalog, id: usize, cancel: &Cancellation) -> io::Resul
 pub(crate) fn extract_to(
     catalog: &Catalog,
     files: &[(usize, PathBuf)],
+    password: Option<&super::Password>,
     cancel: &Cancellation,
     mut progress: impl FnMut(usize, u64),
 ) -> io::Result<()> {
@@ -636,12 +677,12 @@ pub(crate) fn extract_to(
         for (id, path) in files {
             cancel.check()?;
             let node = &catalog.nodes[*id];
-            let mut entry = archive
-                .by_index(
-                    node.source
-                        .ok_or_else(|| io::Error::other("Missing member data"))?,
-                )
-                .map_err(io::Error::other)?;
+            let mut entry = zip_entry(
+                &mut archive,
+                node.source
+                    .ok_or_else(|| io::Error::other("Missing member data"))?,
+                password,
+            )?;
             if entry.name_raw() != node.raw || entry.size() != node.size {
                 return Err(io::Error::other("Archive member changed"));
             }
@@ -754,6 +795,76 @@ fn zip_time(d: zip::DateTime) -> Option<std::time::SystemTime> {
         .from_local_datetime(&time)
         .earliest()
         .map(std::time::SystemTime::from)
+}
+
+fn zip_entry<'a>(
+    archive: &'a mut zip::ZipArchive<Guard<File>>,
+    index: usize,
+    password: Option<&super::Password>,
+) -> io::Result<zip::read::ZipFile<'a, Guard<File>>> {
+    let result = match password {
+        Some(password) => archive.by_index_decrypt(index, password.bytes()),
+        None => archive.by_index(index),
+    };
+    result.map_err(|e| match e {
+        zip::result::ZipError::InvalidPassword => io::Error::new(
+            io::ErrorKind::PermissionDenied,
+            "Incorrect archive password",
+        ),
+        e => io::Error::other(e),
+    })
+}
+/// Authenticate selected encrypted members in cancellable bounded reads. The
+/// UI remembers credentials only after successful authentication, never on entry.
+pub(crate) fn check_password(
+    catalog: &Catalog,
+    ids: &[usize],
+    password: &super::Password,
+    cancel: &Cancellation,
+) -> io::Result<()> {
+    let (file, metadata) = catalog.checked_source()?;
+    let mut archive = zip_open_for(file, &metadata, cancel, true)?;
+    let mut total = 0u64;
+    let mut buffer = [0; 64 * 1024];
+    for id in ids {
+        cancel.check()?;
+        let node = &catalog.nodes[*id];
+        if !node.locked || node.kind != Kind::File {
+            continue;
+        }
+        total = total
+            .checked_add(node.size)
+            .filter(|n| *n <= MAX_STREAM)
+            .ok_or_else(|| {
+                io::Error::other("Encrypted selection exceeds the 256 MiB authentication limit")
+            })?;
+        let mut entry = zip_entry(
+            &mut archive,
+            node.source
+                .ok_or_else(|| io::Error::other("Missing member data"))?,
+            Some(password),
+        )?;
+        if entry.name_raw() != node.raw || entry.size() != node.size {
+            return Err(io::Error::other("Archive member changed"));
+        }
+        let mut read = 0u64;
+        loop {
+            cancel.check()?;
+            let n = entry.read(&mut buffer)?;
+            if n == 0 {
+                break;
+            }
+            read += n as u64;
+            if read > node.size {
+                return Err(io::Error::other("Member exceeds declared length"));
+            }
+        }
+        if read != node.size {
+            return Err(io::Error::other("Truncated encrypted member"));
+        }
+    }
+    cancel.check()?;
+    catalog.validate()
 }
 
 #[cfg(test)]

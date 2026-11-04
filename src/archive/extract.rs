@@ -119,7 +119,7 @@ impl Drop for Stage {
         }
     }
 }
-fn component(raw: &[u8]) -> io::Result<OsString> {
+pub(super) fn component(raw: &[u8]) -> io::Result<OsString> {
     // Reject Windows aliases on every host, keeping archive output portable and
     // preventing name collisions on case-insensitive filesystems.
     let text = std::str::from_utf8(raw)
@@ -153,7 +153,15 @@ fn component(raw: &[u8]) -> io::Result<OsString> {
     Ok(text.into())
 }
 impl Extraction {
-    fn selected(&self) -> io::Result<Vec<(usize, PathBuf)>> {
+    pub fn needs_password(&self) -> bool {
+        self.selected().is_ok_and(|nodes| {
+            nodes.iter().any(|(id, _)| {
+                self.catalog.nodes[*id].locked && self.catalog.nodes[*id].kind == Kind::File
+            })
+        })
+    }
+
+    pub(super) fn selected(&self) -> io::Result<Vec<(usize, PathBuf)>> {
         if self.catalog.note.is_some() || self.catalog.skipped > 0 {
             return Err(io::Error::other(
                 "Cannot extract from an incomplete or unsafe archive catalog",
@@ -188,9 +196,9 @@ impl Extraction {
             let mut stack = vec![id.index];
             while let Some(index) = stack.pop() {
                 let n = &self.catalog.nodes[index];
-                if !matches!(n.kind, Kind::File | Kind::Directory) || n.locked {
+                if !matches!(n.kind, Kind::File | Kind::Directory) {
                     return Err(io::Error::other(
-                        "Selected tree contains encrypted files, links or special members",
+                        "Selected tree contains links or special members",
                     ));
                 }
                 let mut path = PathBuf::new();
@@ -223,6 +231,12 @@ impl Extraction {
             return Err(io::Error::other("Archive members are read-only"));
         }
         self.validate()?;
+        if self.password.is_none() && self.needs_password() {
+            return Err(io::Error::new(
+                io::ErrorKind::PermissionDenied,
+                "Archive password required",
+            ));
+        }
         destination.validate()?;
         let token = Cancellation::from_flag(cancel.clone());
         token.check()?;
@@ -318,12 +332,18 @@ impl Extraction {
             total_bytes: Some(required),
             ..Default::default()
         };
-        reader::extract_to(&self.catalog, &files, &token, |id, bytes| {
-            progress.member =
-                Some(String::from_utf8_lossy(&self.catalog.nodes[id].path).into_owned());
-            progress.written += bytes;
-            notify(&progress)
-        })?;
+        reader::extract_to(
+            &self.catalog,
+            &files,
+            self.password.as_ref(),
+            &token,
+            |id, bytes| {
+                progress.member =
+                    Some(String::from_utf8_lossy(&self.catalog.nodes[id].path).into_owned());
+                progress.written += bytes;
+                notify(&progress)
+            },
+        )?;
         for (id, relative) in selected.iter().rev() {
             let n = &self.catalog.nodes[*id];
             if n.kind == Kind::Directory {
@@ -420,6 +440,7 @@ mod tests {
             }],
             catalog,
             directory: 0,
+            password: None,
         };
         let destination = Destination::capture(&f.0.join("out"))?;
         Ok((f, selection, destination))
@@ -471,6 +492,7 @@ mod tests {
                 .collect(),
             catalog,
             directory: 0,
+            password: None,
         };
         let cancel = Arc::new(AtomicBool::new(false));
         let result = selection.run(&destination, CopyOptions::default(), cancel.clone(), |p| {

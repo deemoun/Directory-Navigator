@@ -918,3 +918,50 @@ Music player setup	Music player setup
 Seek step (seconds)	Seek step (seconds)
 Default volume	Default volume
 Finish the current player operation first	Finish the current player operation first
+Create arc~h~ive...	Create arc~h~ive...
+Create archive	Create archive
+Archive password	Archive password
+Archive creation help	Archive creation help
+Archive path (.zip)	Archive path (.zip)
+Password (optional)	Password (optional)
+Confirm password	Confirm password
+Password	Password
+Create	Create
+Pack	Pack
+Checking password…	Checking password…
+ZIP · Originals kept · Blank password: no encryption	ZIP · Originals kept · Blank password: no encryption
+Remembered only while this archive pane is open	Remembered only while this archive pane is open
+Input is too long or contains control characters	Input is too long or contains control characters
+Select files or folders to create an archive	Select files or folders to create an archive
+Enter a .zip archive path	Enter a .zip archive path
+Passwords do not match	Passwords do not match
+Enter the archive password	Enter the archive password
+Password worker stopped	Password worker stopped
+Incorrect archive password	Incorrect archive password
+Archive password required	Archive password required
+Only regular archive files can be viewed.	Only regular archive files can be viewed.
+Only regular members can be previewed; links are never followed	Only regular members can be previewed; links are never followed
+Selected tree contains links or special members	Selected tree contains links or special members
+Packing links and special files is not supported	Packing links and special files is not supported
+Archive source changed; create the archive again	Archive source changed; create the archive again
+Select files and choose a .zip archive path	Select files and choose a .zip archive path
+Archive destination already exists	Archive destination already exists
+Archive destination must not contain parent components	Archive destination must not contain parent components
+Choose absolute archive sources	Choose absolute archive sources
+Place the archive outside the selected folders	Place the archive outside the selected folders
+Archive source parents must not be links	Archive source parents must not be links
+Archive source parent changed	Archive source parent changed
+Archive names must be Unicode	Archive names must be Unicode
+Archive exceeds 10,000 entries	Archive exceeds 10,000 entries
+Conflicting archive member names	Conflicting archive member names
+Archive metadata limit reached	Archive metadata limit reached
+Archive input exceeds the 256 MiB extraction limit	Archive input exceeds the 256 MiB extraction limit
+Insufficient space for archive creation	Insufficient space for archive creation
+Archive source changed during open	Archive source changed during open
+Archive source grew during packing	Archive source grew during packing
+Archive source shrank during packing	Archive source shrank during packing
+Created archive exceeds the 512 MiB browser limit	Created archive exceeds the 512 MiB browser limit
+Encrypted preview exceeds the 256 MiB authentication limit	Encrypted preview exceeds the 256 MiB authentication limit
+Encrypted selection exceeds the 256 MiB authentication limit	Encrypted selection exceeds the 256 MiB authentication limit
+Truncated encrypted member	Truncated encrypted member
+Create a new ZIP from marked files and folders, or the current item. Paths and empty folders are preserved; originals are kept. Existing archives are never overwritten or updated. Links and special files are not packed.\nBlank password creates an ordinary ZIP. A password creates AES-256 encrypted file contents; filenames remain visible. Confirm the password before creating. Passwords are never saved to settings or history.\nCreation runs in Transfer Center and can be cancelled. The final archive appears only after success. DN currently accepts up to 10,000 entries and 256 MiB of input.\nEncrypted ZIP preview and extraction ask for a password. A successful password is remembered only while this archive pane is open; refresh forgets it. Cancel leaves files unchanged. Other ZIP applications must support AES encryption.	Create a new ZIP from marked files and folders, or the current item. Paths and empty folders are preserved; originals are kept. Existing archives are never overwritten or updated. Links and special files are not packed.\nBlank password creates an ordinary ZIP. A password creates AES-256 encrypted file contents; filenames remain visible. Confirm the password before creating. Passwords are never saved to settings or history.\nCreation runs in Transfer Center and can be cancelled. The final archive appears only after success. DN currently accepts up to 10,000 entries and 256 MiB of input.\nEncrypted ZIP preview and extraction ask for a password. A successful password is remembered only while this archive pane is open; refresh forgets it. Cancel leaves files unchanged. Other ZIP applications must support AES encryption.

@@ -49,6 +49,17 @@ pub(crate) fn paint(frame: &mut impl Frame, app: &App, area: Rect, focus: Focus)
 
 const ADAPTERS: &[Adapter] = &[
     Adapter {
+        focus: Focus::ArchiveDialog,
+        key: crate::archive::dialogs::key,
+        mouse: crate::archive::dialogs::mouse,
+        spec: crate::archive::dialogs::spec,
+        set_focus: |app, next| {
+            if let Some(d) = app.modals.archive_dialog_mut() {
+                d.focus = next;
+            }
+        },
+    },
+    Adapter {
         focus: Focus::Transfers,
         key: crate::transfers::key,
         mouse: crate::transfers::mouse,

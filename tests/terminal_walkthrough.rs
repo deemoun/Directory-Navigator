@@ -1676,3 +1676,105 @@ fn music_mixed_audio_play_seek_next_and_channel_changes_restore_terminal() -> io
     })?;
     s.finish()
 }
+
+#[test]
+fn archive_creation_and_password_preview_extraction_restore_terminal() -> io::Result<()> {
+    let mut s = Session::new("archive-passwords")?;
+    s.wait("initial manager", |s| {
+        s.command_prompt_active() && s.text().contains("item-000.")
+    })?;
+    s.select_file("item-000.txt")?;
+    s.send(b"\x1bfh", "plain ZIP creation form", |s| {
+        s.text().contains("Create archive") && s.text().contains("Confirm password")
+    })?;
+    s.send(b"\r", "plain archive completes", |s| {
+        s.text().contains("Transfer Center")
+            && s.text().matches("· Completed ·").count() == 1
+            && s.root.join("item-000.txt.zip").exists()
+    })?;
+    let catalog = dn::archive::reader::list(
+        s.root.join("item-000.txt.zip"),
+        &dn::task::Cancellation::default(),
+    )?;
+    assert!(!catalog.nodes[1].locked);
+    s.send(b"\x1b", "return after plain packing", |s| {
+        s.command_prompt_active()
+    })?;
+    s.select_file("item-001.txt")?;
+    s.send(b"\x1bfh", "encrypted ZIP creation form", |s| {
+        s.text().contains("Create archive") && s.text().contains("Confirm password")
+    })?;
+    s.send(
+        b"\tfixture-password\tfixture-password",
+        "masked creation password",
+        |s| s.text().contains("****************") && !s.text().contains("fixture-password"),
+    )?;
+    s.send(b"\r", "encrypted archive completes", |s| {
+        s.text().contains("Transfer Center")
+            && s.text().matches("· Completed ·").count() == 2
+            && s.root.join("item-001.txt.zip").exists()
+    })?;
+    s.send(b"\x1b", "return after encrypted packing", |s| {
+        s.command_prompt_active()
+    })?;
+    // Packing refreshes both panes asynchronously. Explicitly finish a fresh
+    // listing before opening a filename search for the newly published output.
+    s.send(b"\x12", "refresh packed output", |s| {
+        s.command_prompt_active()
+            && fs::read_to_string(s.root.join("settings/dn/diagnostics.txt")).is_ok_and(|d| {
+                d.lines()
+                    .any(|line| line == "panels_loading=[false, false]")
+            })
+    })?;
+    s.select_file("item-001.txt.zip")?;
+    s.send(b"\r", "encrypted archive pane", |s| {
+        s.command_prompt_active() && s.text().contains(" :: /") && s.text().contains("item-001.txt")
+    })?;
+    s.select_file("item-001.txt")?;
+    s.send(b"\x1b[13~", "preview password prompt", |s| {
+        s.text().contains("Archive password")
+    })?;
+    s.send(b"wrong\r", "wrong password remains retryable", |s| {
+        s.text().contains("Incorrect archive password")
+    })?;
+    s.resize(100, 32)?;
+    s.wait("password prompt after resize", |s| {
+        s.text().contains("Archive password") && s.text().contains("Incorrect archive password")
+    })?;
+    s.send(b"fixture-password\r", "authenticated preview", |s| {
+        s.text().contains("fixture") && s.text().contains("F2 Wrap")
+    })?;
+    s.send(b"\x1b", "return from encrypted preview", |s| {
+        s.command_prompt_active() && s.text().contains(" :: /")
+    })?;
+    s.send(b"\x12", "refresh forgets archive password", |s| {
+        s.command_prompt_active()
+            && s.text().contains("item-001.txt")
+            && !s.text().contains("Reading directory")
+    })?;
+    s.select_file("item-001.txt")?;
+    s.send(b"\x1b[15~", "encrypted extraction copy form", |s| {
+        s.text().contains("Extract 1 selected archive")
+    })?;
+    s.send(b"unpacked.txt\r", "extraction password prompt", |s| {
+        s.text().contains("Archive password")
+    })?;
+    s.send(
+        b"fixture-password\r",
+        "encrypted extraction completes",
+        |s| {
+            s.text().contains("Transfer Center")
+                && s.text().matches("· Completed ·").count() == 3
+                && s.root.join("unpacked.txt").exists()
+        },
+    )?;
+    assert_eq!(fs::read(s.root.join("unpacked.txt"))?, b"fixture\n");
+    assert_eq!(fs::read(s.root.join("item-001.txt"))?, b"fixture\n");
+    s.send(b"\x1b", "return after extraction", |s| {
+        s.command_prompt_active()
+    })?;
+    s.send(b"\x1b[5;5~", "leave encrypted archive", |s| {
+        s.command_prompt_active() && !s.text().contains(" :: /")
+    })?;
+    s.finish()
+}

@@ -238,6 +238,59 @@ impl Job {
 }
 
 impl Job {
+    pub(crate) fn start_creation(
+        id: crate::transfers::TransferId,
+        creation: crate::archive::create::Creation,
+    ) -> io::Result<Self> {
+        let requests = crate::requests::RequestScope::new(crate::requests::Owner::Workspace);
+        let token = requests.start("file-operation");
+        let (sender, events) = mpsc::sync_channel(8);
+        let cancel = Arc::new(AtomicBool::new(false));
+        let worker_cancel = cancel.clone();
+        thread::Builder::new()
+            .name("dn-archive-create".into())
+            .spawn(move || {
+                let mut latest = Progress {
+                    transfer: Some(id),
+                    path: creation.destination.clone(),
+                    phase: Phase::Preparing,
+                    ..Default::default()
+                };
+                let mut last = Instant::now() - Duration::from_secs(1);
+                let result = creation
+                    .run(&crate::task::Cancellation::from_flag(worker_cancel), |p| {
+                        latest = p.clone();
+                        latest.transfer = Some(id);
+                        if last.elapsed() >= Duration::from_millis(80) {
+                            let _ = sender.try_send(Event::Progress(latest.clone()));
+                            last = Instant::now();
+                        }
+                    })
+                    .map(|mut p| {
+                        p.transfer = Some(id);
+                        p
+                    })
+                    .map_err(|e: io::Error| OperationFailure {
+                        kind: e.kind(),
+                        progress: Box::new(latest),
+                        message: e.to_string(),
+                    });
+                let _ = sender.send(Event::Done(result));
+            })?;
+        Ok(Self {
+            transfer: Some(id),
+            requests,
+            token,
+            events,
+            cancel,
+            progress: Progress {
+                transfer: Some(id),
+                ..Default::default()
+            },
+            kind: Kind::Copy,
+            focus: None,
+        })
+    }
     pub(crate) fn start_extraction(
         id: crate::transfers::TransferId,
         selection: crate::archive::Extraction,

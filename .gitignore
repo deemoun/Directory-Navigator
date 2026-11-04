@@ -11,6 +11,19 @@
 *.dSYM/
 *.pdb
 
+# Generated test archives and output (test inputs belong in source fixtures)
+*.[zZ][iI][pP]
+*.tar
+*.tar.gz
+*.tgz
+*.log
+*.tmp
+*.profraw
+*.profdata
+/test-artifacts/
+/test-results/
+/coverage/
+
 # Operating-system and editor files
 .DS_Store
 Thumbs.db

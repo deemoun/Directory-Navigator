@@ -1,14 +1,19 @@
 //! Archive-as-directory navigation, adapted from DOS Navigator's ARCVIEW.PAS
 //! (RIT Research Labs). Archive members never become native operation paths.
+pub mod create;
+pub mod dialogs;
 pub mod extract;
+mod password;
 pub mod reader;
 use crate::{app::App, panel::archive::MemberId};
+pub use password::Password;
 use std::{path::PathBuf, sync::Arc};
 #[derive(Clone)]
 pub struct Extraction {
     pub catalog: Arc<reader::Catalog>,
     pub directory: usize,
     pub members: Vec<MemberId>,
+    pub password: Option<Password>,
 }
 pub const HELP: &str = "ZIP / TAR / TAR.GZ / TGZ in the file pane.\nEnter: folder or read-only preview · F3: preview\nInsert / Space / Ctrl+click: mark · + / -: group\nF5: extract marked items, or the current item\nFolders include descendants and empty directories.\nBackspace / ..: parent; at root returns to disk\nCtrl+PgUp: exit archive from any folder\nEsc: cancel indexing or preview · Ctrl+R: refresh\nBoth panes can browse archives independently.\nChoose a disk destination when both show archives.\nArchives are read-only; extract before editing.\nExisting destinations are refused or skipped whole.";
 pub const EXTRACT_FIRST: &str = "Extract archive members to disk first (F5).";
@@ -62,10 +67,15 @@ pub fn view(app: &mut App) {
     let a = p.archive_mut().unwrap();
     let c = a.catalog.as_ref().unwrap().clone();
     let n = &c.nodes[id.index];
-    if n.kind != reader::Kind::File || n.locked {
-        app.error("Only unencrypted regular archive files can be viewed.");
+    if n.kind != reader::Kind::File {
+        app.error("Only regular archive files can be viewed.");
         return;
     }
+    if n.locked && a.password.is_none() {
+        dialogs::password_for_preview(app, id);
+        return;
+    }
+    let password = a.password.clone();
     a.preview_epoch = epoch;
     a.preview_member = Some(id);
     a.preview_command = command;
@@ -76,7 +86,7 @@ pub fn view(app: &mut App) {
     ));
     let catalog = c;
     let task = p.scope.spawn("archive-preview", move |cancel| {
-        reader::preview(&catalog, id.index, &cancel)
+        reader::preview_with_password(&catalog, id.index, password.as_ref(), &cancel)
     });
     match task {
         Ok(task) => p.archive_mut().unwrap().preview = Some(task),
@@ -84,7 +94,7 @@ pub fn view(app: &mut App) {
     }
 }
 pub fn poll(app: &mut App) -> bool {
-    let mut changed = false;
+    let mut changed = dialogs::poll(app);
     for index in 0..app.panels.len() {
         let reply = app.panels[index]
             .archive_mut()
