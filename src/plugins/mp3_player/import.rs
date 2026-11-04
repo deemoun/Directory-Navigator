@@ -20,7 +20,6 @@ pub(super) struct Pending {
     pub task: Option<crate::task::Task<Result>>,
     pub progress: Arc<Progress>,
     pub wake: Instant,
-    pub draft: bool,
     pub play: Option<PathBuf>,
     pub visited: usize,
     pub found: usize,

@@ -143,17 +143,23 @@ resize and terminal restoration. Windows/Linux validation is skipped.
 
 ## Music Player
 
-The opt-in singleton player keeps its DN-style compact 36×9 and expanded 36×18
+The opt-in singleton player keeps its DN-style compact 36×9 and expanded 66×18
 windows. Native zoom, movement, arrangement, palette, clipping, owned Help and
 stale-surface guards use the existing shared windowing paths.
 
-The host handles the typed `RequestPanelPaths` effect by capturing active-panel
-`targets()`, including folders, then delivering `PanelPaths`
-to the same live plugin binding. Utilities → Add music to player captures before
-opening/activating the player. MP3, FLAC, WAV/WAVE and Ogg Vorbis extensions use one shared registry. List edits a
-bounded 64-entry draft, with stable per-entry identities so duplicates are safe.
-OK applies, Cancel discards; deleting the current entry stops playback. No queue
-is persisted. Save remains disabled; Set up and Time use owned controls.
+The host captures panel paths for Utilities → Add music to player. The typed
+`RequestMusicFile { play }` effect opens an owned DN file picker using the active
+panel's real filesystem directory. Its result remains inside the live player;
+Open adds and plays, while Playlist → Add appends only. Picker keyboard/mouse
+input is owner-bound, translated for its moved native page, and its scene is
+prepared before immutable painting. `PlayMp3(PathBuf)` remains the typed Enter
+request. MP3, FLAC, WAV/WAVE and Ogg Vorbis use the shared format registry.
+Playlist is a live session queue: Enter plays, removal commits immediately,
+Close keeps changes. No queue paths, credentials, or picker location are persisted.
+Settings retains its draft/OK/Cancel behavior. Inline volume and Shuffle apply
+immediately; Repeat uses an owned Off/One/All page with apply/cancel. The expanded
+presentation derives separate metadata, one timer and display-only position/volume
+meters from existing state. Compact controls retain their previous layout. The queue has no unavailable Save button.
 
 On macOS, the optional `plugins.mp3_player.play_on_enter` preference routes regular
 supported music files through a typed `PlayMp3(PathBuf)` event before custom associations.
@@ -176,9 +182,9 @@ Each track carries optional duration. MP3 import uses trusted Xing/Info/VBRI met
 through the existing decoder, supplied only bounded initial MPEG frames, or a
 cancellable frame-header scan for CBR/VBR streams without trustworthy metadata.
 No audio device is opened and full sample decoding is unnecessary. Playback
-snapshots reconcile committed and draft durations by entry ID. Drawing reads
+snapshots reconcile live queue durations by entry ID. Drawing reads
 these values without changing state. Time switches elapsed/remaining track time;
-Set up applies seek/default-volume drafts, while Volume remains session-only.
+Settings applies seek/default-volume drafts; inline volume remains session-only.
 
 macOS uses Rodio with playback and MP3/FLAC/PCM-WAV/Vorbis features. One lazily started worker per
 plugin owns the decoder and output device. A fixed-size shared mailbox coalesces

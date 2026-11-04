@@ -39,6 +39,9 @@ pub struct VisualRow {
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Action {
+    Help,
+    ToggleMarkdown,
+    BackToEditor,
     GoTo,
     Wrap,
     Find,
@@ -82,7 +85,7 @@ impl Viewer {
                 range: (10 + 3 * (value % 16))..(12 + 3 * (value % 16)),
             });
         } else {
-            if value == 0 || value > contents.lines.len() {
+            if value == 0 || value > self.source_line_count() {
                 return Err("Line is outside the loaded preview.".into());
             }
             self.current = None;
@@ -93,7 +96,7 @@ impl Viewer {
         Ok(())
     }
     pub fn go_to_line(&mut self, line: usize) {
-        self.reveal_line = Some(line.saturating_sub(1));
+        self.reveal_line = Some(self.display_line_for_source(line.saturating_sub(1)));
         self.layout_width = 0;
     }
 
@@ -110,8 +113,11 @@ impl Viewer {
         self.rows.clear();
         self.layout_width = width;
         if let Some(contents) = &self.contents {
-            for (line, text) in contents.lines.iter().enumerate() {
-                if !self.wrap || contents.binary {
+            'logical: for (line, text) in contents.lines.iter().enumerate() {
+                if self.markdown.rendered && self.rows.len() > crate::markdown::MAX_ROWS {
+                    break;
+                }
+                if !self.wrap || contents.binary || self.fixed_row(line) {
                     self.rows.push(VisualRow {
                         line,
                         range: 0..text.len(),
@@ -127,6 +133,9 @@ impl Viewer {
                             line,
                             range: start..byte,
                         });
+                        if self.markdown.rendered && self.rows.len() > crate::markdown::MAX_ROWS {
+                            break 'logical;
+                        }
                         start = byte;
                         cells = 0;
                     }
@@ -137,6 +146,11 @@ impl Viewer {
                     range: start..text.len(),
                 });
             }
+        }
+        if self.markdown.rendered && self.rows.len() > crate::markdown::MAX_ROWS {
+            self.toggle_markdown();
+            self.notice = crate::markdown::LIMIT_NOTICE.into();
+            return;
         }
         self.offset = self.row_for(anchor.0, anchor.1);
         self.mapped_wrap = self.wrap;
@@ -158,7 +172,7 @@ impl Viewer {
         let Some(row) = self.rows.get(self.offset) else {
             return (self.offset, 0);
         };
-        if self.mapped_wrap {
+        if self.mapped_wrap && !self.fixed_row(row.line) {
             return (row.line, row.range.start);
         }
         let Some(text) = self.contents.as_ref().and_then(|c| c.lines.get(row.line)) else {
@@ -174,7 +188,7 @@ impl Viewer {
         }
         (row.line, text.len())
     }
-    fn row_for(&self, line: usize, byte: usize) -> usize {
+    pub(super) fn row_for(&self, line: usize, byte: usize) -> usize {
         self.rows
             .iter()
             .position(|r| {
@@ -280,7 +294,7 @@ impl Viewer {
         self.last_search = memory.clone();
         if let Some(found) = found {
             self.offset = self.row_for(found.line, found.range.start);
-            if !self.wrap {
+            if !self.wrap || self.fixed_row(found.line) {
                 let text = &contents.lines[found.line];
                 let start = Span::raw(&text[..found.range.start]).width();
                 let length = Span::raw(&text[found.range.clone()]).width();
@@ -306,6 +320,25 @@ impl Viewer {
     }
 }
 pub fn action(app: &mut App, action: Action) {
+    if action == Action::Help {
+        app.push_dialog(crate::dialog::Dialog {title:" Viewer Help ",message:app.config.language.text("F6 toggles Markdown/source for .md and .markdown files. Search uses displayed text; Go to uses source line numbers. F5 returns from an editor preview. Links and images do not open automatically.").into()});
+        return;
+    }
+
+    if action == Action::BackToEditor {
+        let back = app
+            .desktop
+            .active_viewer()
+            .and_then(|v| v.preview_editor)
+            .filter(|id| app.desktop.editor(*id).is_some());
+        if let Some(back) = back {
+            crate::windowing::activate(app, back);
+        } else {
+            let id = app.desktop.target();
+            app.retire_document(id);
+        }
+        return;
+    }
     if action == Action::Close {
         {
             let id = app.desktop.target();
@@ -332,6 +365,9 @@ pub fn action(app: &mut App, action: Action) {
         return;
     }
     match action {
+        Action::Help => {}
+        Action::ToggleMarkdown => viewer.toggle_markdown(),
+        Action::BackToEditor => {}
         Action::GoTo => {
             if viewer.contents.is_some() {
                 viewer.modals.set_viewer_goto(Some(GoToDialog {
@@ -449,7 +485,9 @@ pub fn key(app: &mut App, key: KeyEvent) {
     }
 
     if let Some(command) = crate::commands::viewer_key(key) {
-        action(app, command);
+        if crate::commands::viewer_available(viewer, command) {
+            action(app, command);
+        }
         return;
     }
     let command = match key.code {
@@ -477,11 +515,11 @@ pub fn key(app: &mut App, key: KeyEvent) {
             viewer.step(isize::MAX);
             None
         }
-        KeyCode::Left if !viewer.wrap => {
+        KeyCode::Left if viewer.horizontal_allowed() => {
             viewer.horizontal = viewer.horizontal.saturating_sub(4);
             None
         }
-        KeyCode::Right if !viewer.wrap => {
+        KeyCode::Right if viewer.horizontal_allowed() => {
             viewer.horizontal = viewer.horizontal.saturating_add(4).min(16384);
             None
         }

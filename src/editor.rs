@@ -254,7 +254,23 @@ impl Editor {
         }
         if let Some(buffer) = &self.buffer {
             self.highlight.refresh(buffer);
+            self.highlight.schedule_markdown(buffer, &self.requests);
         }
+    }
+    pub(crate) fn poll_markdown(&mut self) -> bool {
+        if let Some(buffer) = &self.buffer {
+            self.highlight.schedule_markdown(buffer, &self.requests);
+            let changed = self.highlight.poll_markdown(buffer);
+            if let Some(notice) = self.highlight.md_notice.take() {
+                self.notice = notice;
+            }
+            changed
+        } else {
+            false
+        }
+    }
+    pub(crate) fn markdown_pending(&self) -> bool {
+        self.highlight.markdown_pending()
     }
     pub fn keep_visible(&mut self) {
         if let Some(buffer) = &self.buffer {

@@ -791,23 +791,23 @@ panel order; extension matching is case-insensitive. Folders are scanned recursi
 symbolic links and other extensions are skipped. A progress page offers Cancel,
 which discards the whole batch without changing the queue. Imports also cancel
 when the player closes. Music and background tasks keep running during scanning.
-**Open** in the expanded player and **List → Add** use the same panel selection.
-Adding does not start playback or interrupt the current track. The queue allows
+**Open…** uses DN’s file picker to add and immediately play one supported file,
+reusing an existing queue entry. **Playlist… → Add…** uses the same picker but
+only appends; it does not interrupt playback. Cancelling either picker leaves
+the queue and playback intact. Panel imports do not start playback. The queue allows
 64 entries, including duplicates. Scanning stops at the queue capacity, 10,000
 directory entries or 64 directory levels, and reports limits/unreadable entries.
 Valid files from a partial scan are added together on completion.
 
-**Play** starts the selected track or resumes a pause. **Pause** suspends it;
+**Play/Pause** starts, pauses or resumes the current track;
 **Stop** resets its position. The outer arrows select the previous/next track
 without wrapping by default; the inner arrows use the saved seek step (initially five seconds). Changing tracks while
 playing continues playback; otherwise it selects the track without starting it.
-**Volume** opens a 0–100% dialog, initially 50%, affecting only DN audio. OK applies
-the new value; Cancel discards it. By default, tracks play in order and stop after the last.
+Inline **− / +** changes session volume immediately in 10-point steps within 0–100%; the adjacent meter and percentage show its value. By default, tracks play in order and stop after the last.
 A file/device error stops playback and appears in the expanded window; the queue
 is retained. There are no global media keys.
 
-**Mode** opens Shuffle and Repeat settings. OK applies them; Cancel discards the
-draft. Repeat Off stops at the end; Repeat One restarts the current track when it
+The **Shuffle** checkbox toggles immediately. **Repeat** opens an owned Off/One/All selector; Enter or a row click applies, while Esc cancels. Repeat Off stops at the end; Repeat One restarts the current track when it
 ends; Repeat All loops the queue. Manual Previous/Next bypass Repeat One and wrap
 only with Repeat All. Shuffle keeps the visible queue unchanged, visits each entry
 once and lets Previous retrace the same order. Repeat All repeats that shuffled
@@ -820,27 +820,36 @@ background without modifying source files. ID3v1 and ID3v2.2/2.3/2.4 are support
 including UTF-8 and UTF-16 text. Missing, malformed, unsupported or oversized tags
 fall back to filenames; missing individual fields may fall back to ID3v1.
 
-**Set up** edits the seek step (1/5/10/30 seconds) and default volume (0–100%).
+**Settings…** edits the seek step (1/5/10/30 seconds) and default volume (0–100%).
 OK applies both, including the current volume; Cancel/Esc discards edits. The
-**Volume** dialog changes only the current session volume. **Time** toggles elapsed
-and remaining track time; unknown remaining time shows `--:--`.
+inline volume controls change only session volume. The focusable elapsed/remaining control toggles elapsed
+and remaining track time; remaining has a minus sign and unknown duration shows `--:--`.
 
 FLAC duration comes from STREAMINFO sample counts, WAV from frame counts, and
 Ogg from the final granule position after validating page boundaries and CRCs.
 Text metadata is bounded; artwork is skipped and source files are never modified.
 
-**List** opens a **Play order** draft with numbered descriptions and track durations.
-Duration is read in the background from format metadata without an audio device;
-unsupported/truncated streams show `--:--`. Long durations retain all minute digits. Delete removes a draft row; OK commits; Cancel/Esc discards changes.
-When stopped, OK also selects the highlighted row for Play. Removing the playing
-track and accepting the draft stops it. Save remains unavailable.
-Playlists are not saved to disk.
+**Playlist…** opens the live queue with numbered descriptions and track durations.
+Enter or Play starts the highlighted track. Add… opens the file picker without
+interrupting playback. Remove applies immediately; removing the playing track
+stops it. Close/Esc keeps changes and returns to the player. Duration is read in
+the background without an audio device; unknown values show `--:--`, and long
+durations retain all minute digits. There is no disabled Save button and playlists
+are not saved to disk.
 
 Music continues while other windows or dialogs are active. Closing the player,
 disabling the plugin or quitting DN stops playback. Reopening starts an empty
 queue with the saved default volume and elapsed timing. The internal-opening
 checkbox, seek step and default volume follow normal DN configuration saving
 (including Save desktop and save-on-exit); playlist and playback modes are not saved.
+
+The expanded **66×18** layout shows artist and title separately, followed by
+track/queue count, status and a single elapsed/remaining timer. Long metadata
+truncates at whole graphemes; Info keeps full details. A display-only cyan bar
+shows elapsed position regardless of timing mode, clamps to duration, and stays
+empty when duration is unknown. The volume meter is also display-only. Transport
+controls share one row; Open/Playlist and Info/Settings sit in the footer. Errors
+and loading notices have a dedicated row. The compact **36×9** counter is unchanged.
 
 Use Alt+Z, the title zoom button, a title double-click or Alt+0 → Zoom to switch
 between compact and expanded views. Tab/Shift+Tab choose enabled controls,
@@ -1243,3 +1252,37 @@ are retained. Root or source replacement after confirmation is rejected.
 Inside Temp Drive all ordinary panel operations apply. F8 acts on real stored
 files, and F6 can move them elsewhere. Parent navigation leaves the directory
 normally. A file or link substituted for the Temp Drive root is rejected.
+
+## Markdown viewing and editing
+
+F3 opens UTF-8 `.md` and `.markdown` files (case-insensitively) as formatted
+Markdown. F6 switches between Markdown and source; explicit **As Text** starts
+with source, and **As Hex** keeps the ordinary hex viewer. Enter associations
+and the Quick View pane keep their existing behavior. Archive members, including
+password-protected ZIP members, use the same rendering after authentication.
+
+Formatting includes headings, emphasis, strikethrough, quotes, lists, task lists,
+rules, inline/fenced code and aligned tables. Prose wraps by default; wide code
+and tables retain their layout and use Left/Right horizontal scrolling. F2 toggles
+wrapping. F7 searches displayed text, Shift+F7/Ctrl+F7 continue forward/backward,
+and Go to uses original source line numbers. Mode switches and resizing preserve
+the source anchor. Links show their labels and URLs; images show captions and
+paths. HTML is literal text. Nothing loads resources, follows links or runs HTML.
+
+F4 edits the original Markdown source with syntax highlighting, including fenced
+code in the editor's existing supported languages. Disabling syntax colors keeps
+source text unchanged. **F5** (the `Prevw` button) or **Misc → Markdown preview**
+opens a read-only snapshot of the current buffer, including unsaved or untitled
+text. F5 returns to its editor; reopening refreshes and reuses that editor's
+preview. Esc closes the preview and returns to its live source editor. If the
+source editor has closed, normal viewer-close behavior applies. Multiple editors
+have independent previews. Cursor, selection, undo, dirty/recovery state, BOM and
+line endings remain intact. Previewing creates no temporary file or view-history
+path. In the Mac profile, Ctrl+O then 5 previews/returns; Ctrl+O then m toggles
+Markdown/source in a viewer. F1 explains the new controls.
+
+Existing input limits remain 2 MiB and 100,000 source lines. Rendering is limited
+to 8 MiB, 100,000 output rows, 64 nested containers and 200,000 style spans.
+Malformed Markdown is displayed tolerantly; exceeded limits or renderer failures
+show source with a notice. Parsing is cancellable and document-owned; stale
+replies cannot replace newer edits or activate an inactive window.

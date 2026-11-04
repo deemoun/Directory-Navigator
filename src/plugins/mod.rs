@@ -121,11 +121,18 @@ pub(crate) enum Event<'a> {
     Tick,
     PanelPaths(Vec<PathBuf>),
     PlayMp3(PathBuf),
+    MusicPicker {
+        base: PathBuf,
+        hidden: bool,
+        play: bool,
+    },
 }
 pub(crate) enum Effect {
     Close,
     CopyText(String),
-    RequestPanelPaths,
+    RequestMusicFile {
+        play: bool,
+    },
     Mp3Setup {
         seek_seconds: u8,
         default_volume: u8,
@@ -168,6 +175,10 @@ pub(crate) trait ToolPlugin: Any {
     }
     /// Optional presentation toggle in place of native maximize/restore.
     fn zoom_action(&self) -> Option<ActionId> {
+        None
+    }
+    fn prepare(&mut self, _ctx: &Context) {}
+    fn native_input_page(&self) -> Option<u64> {
         None
     }
     fn controls(&self, ctx: &Context) -> DialogSpec<'_>;

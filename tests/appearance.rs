@@ -295,7 +295,13 @@ fn function_bars_profiles_mouse_and_disabled_editor_actions() -> io::Result<()> 
         .regions
         .iter()
         .any(|(rect, _)| rect.contains((25, 24).into())));
-    for column in [24, 32, 56, 64] {
+    assert!(app
+        .mouse
+        .regions
+        .iter()
+        .any(|(rect, target)| rect.contains((35, 24).into())
+            && *target == dn::mouse::Target::Editor(dn::editor::EditorAction::MarkdownPreview)));
+    for column in [24, 56, 64] {
         let label: String = (column + 2..column + 8)
             .map(|x| terminal.backend().buffer()[(x, 24)].symbol())
             .collect();

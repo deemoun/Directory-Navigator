@@ -58,6 +58,7 @@ pub mod task;
 
 pub mod discovery;
 pub mod launcher;
+pub mod markdown;
 pub mod platform_fs;
 pub mod publication;
 pub mod quick_view;

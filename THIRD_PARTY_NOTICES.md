@@ -215,3 +215,7 @@ of DOS Navigator 1.51 `ARCHIVER.PAS` (`MakeArchive`), RIT Research Labs. The mod
 implementation uses built-in ZIP/AES codecs and the shared Transfer Center rather
 than external DOS packers. AES support and ephemeral credential clearing use the
 `zip` crate encryption feature and `zeroize`, under their respective crate licenses.
+
+Markdown parsing uses `pulldown-cmark` (MIT), with its table, task-list and
+strikethrough extensions. DN supplies terminal rendering, source mapping and
+editor preview behavior. No browser engine or HTML execution is used.

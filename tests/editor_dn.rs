@@ -234,9 +234,17 @@ fn original_keys_menu_precedence_and_deferred_function_keys() -> io::Result<()> 
         .modals
         .editor_modal()
         .is_none());
-    for code in [KeyCode::F(4), KeyCode::F(5), KeyCode::F(8), KeyCode::F(9)] {
+    for code in [KeyCode::F(4), KeyCode::F(8), KeyCode::F(9)] {
         key(&mut app, code);
     }
+    let editor = app.desktop.active().id;
+    key(&mut app, KeyCode::F(5));
+    assert_eq!(
+        app.desktop.active_viewer().unwrap().preview_editor,
+        Some(editor)
+    );
+    key(&mut app, KeyCode::Esc);
+    assert_eq!(app.desktop.active().id, editor);
     assert_eq!(buffer(&app).text, "one two");
     assert!(app
         .desktop

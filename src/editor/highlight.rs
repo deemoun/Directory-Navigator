@@ -1,4 +1,5 @@
 //! Small lexical highlighter. No language server or code execution.
+mod markdown;
 use super::buffer::Buffer;
 use std::{
     hash::{Hash, Hasher},
@@ -7,6 +8,7 @@ use std::{
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Language {
     Plain,
+    Markdown,
     Rust,
     Pascal,
     C,
@@ -25,6 +27,7 @@ impl Language {
             .to_ascii_lowercase()
             .as_str()
         {
+            "md" | "markdown" => Self::Markdown,
             "rs" => Self::Rust,
             "pas" | "pp" => Self::Pascal,
             "c" | "h" | "cpp" | "hpp" | "cc" => Self::C,
@@ -39,6 +42,7 @@ impl Language {
     pub fn label(self) -> &'static str {
         match self {
             Self::Plain => "Text",
+            Self::Markdown => "Markdown",
             Self::Rust => "Rust",
             Self::Pascal => "Pascal",
             Self::C => "C/C++",
@@ -72,15 +76,30 @@ struct Highlighted {
 pub struct Cache {
     pub language: Language,
     lines: Vec<Highlighted>,
+    md_requested: Option<u64>,
+    pub(crate) md_notice: Option<String>,
+    md_pending: Option<(
+        u64,
+        crate::task::Task<std::io::Result<crate::markdown::Document>>,
+    )>,
 }
 impl Cache {
     pub fn new(language: Language) -> Self {
         Self {
             language,
             lines: Vec::new(),
+            md_requested: None,
+            md_notice: None,
+            md_pending: None,
         }
     }
     pub fn refresh(&mut self, buffer: &Buffer) {
+        if self.language == Language::Markdown {
+            if self.md_requested != Some(buffer.revision()) {
+                self.lines.clear();
+            }
+            return;
+        }
         let start = buffer
             .changed_line
             .min(self.lines.len())
@@ -121,7 +140,7 @@ impl Cache {
                 line.tokens
                     .get(line.tokens.partition_point(|t| t.end <= column))
             })
-            .is_none_or(|t| t.code)
+            .map_or(self.language != Language::Markdown, |t| t.code)
     }
     pub fn color(&self, row: usize, column: usize) -> u8 {
         self.lines
@@ -150,7 +169,7 @@ fn keyword(word: &str, language: Language) -> bool {
         Language::Python => "and as assert async await break class continue def del elif else except False finally for from global if import in is lambda None nonlocal not or pass raise return True try while with yield",
         Language::Json | Language::Toml | Language::Yaml => "true false null yes no on off",
         Language::Shell => "case do done elif else esac fi for function if in select then until while export local readonly return",
-        Language::Plain => "",
+        Language::Plain | Language::Markdown => "",
     };
     if language == Language::Pascal {
         words

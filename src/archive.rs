@@ -54,6 +54,9 @@ pub fn open_current(app: &mut App) {
     }
 }
 pub fn view(app: &mut App) {
+    view_mode(app, crate::viewer::ViewMode::Auto);
+}
+pub fn view_mode(app: &mut App, mode: crate::viewer::ViewMode) {
     let epoch = app.desktop.activation_revision();
     let command = app.command_line.text.clone();
     let p = &mut app.panels[app.active];
@@ -71,6 +74,7 @@ pub fn view(app: &mut App) {
         app.error("Only regular archive files can be viewed.");
         return;
     }
+    a.preview_mode = mode;
     if n.locked && a.password.is_none() {
         dialogs::password_for_preview(app, id);
         return;
@@ -86,7 +90,7 @@ pub fn view(app: &mut App) {
     ));
     let catalog = c;
     let task = p.scope.spawn("archive-preview", move |cancel| {
-        reader::preview_with_password(&catalog, id.index, password.as_ref(), &cancel)
+        reader::preview_with_mode(&catalog, id.index, password.as_ref(), mode, &cancel)
     });
     match task {
         Ok(task) => p.archive_mut().unwrap().preview = Some(task),
@@ -135,10 +139,22 @@ pub fn poll(app: &mut App) -> bool {
                     let a = app.panels[index].archive().unwrap();
                     // Inactive or superseded requests must never open or focus a document.
                     if preview_foreground(app, index) {
-                        let viewer = crate::viewer::Viewer::from_archive_contents(
+                        let mut viewer = crate::viewer::Viewer::from_archive_contents(
                             a.preview_title.clone(),
                             contents,
+                            a.preview_member
+                                .and_then(|id| {
+                                    a.catalog.as_ref().map(|c| {
+                                        crate::markdown::is_path(std::path::Path::new(
+                                            String::from_utf8_lossy(&c.nodes[id.index].path)
+                                                .as_ref(),
+                                        ))
+                                    })
+                                })
+                                .unwrap_or(false),
                         );
+                        viewer.requested_mode = a.preview_mode;
+                        viewer.markdown.requested = a.preview_mode == crate::viewer::ViewMode::Auto;
                         app.show_viewer(viewer);
                     }
                 }

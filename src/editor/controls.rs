@@ -2,6 +2,7 @@ use super::*;
 use crate::{app::App, dialog, menu};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EditorAction {
+    MarkdownPreview,
     WindowMove,
     WindowZoom,
     Open,
@@ -593,6 +594,10 @@ fn submit_prompt(app: &mut App) -> Result<(), String> {
     Ok(())
 }
 pub fn action(app: &mut App, command: EditorAction) {
+    if command == EditorAction::MarkdownPreview {
+        crate::viewer::markdown::preview_editor(app);
+        return;
+    }
     if matches!(command, EditorAction::WindowMove | EditorAction::WindowZoom) {
         crate::windowing::move_active(app, command == EditorAction::WindowZoom);
         return;
@@ -625,17 +630,16 @@ pub fn action(app: &mut App, command: EditorAction) {
         return;
     }
     if command == A::Help {
+        let language = app.config.language;
+        let base = language.text(if app.config.shortcuts.is_mac() {
+            crate::shortcuts::EDITOR_HELP
+        } else {
+            crate::commands::help::CLASSIC_EDITOR
+        });
+        let message=format!("{base}\n{}",language.text("F5 previews the current unsaved buffer as Markdown. F5 or Esc returns from preview; F6 toggles formatted Markdown/source. Links and image paths are displayed only; HTML is literal."));
         app.push_dialog(crate::dialog::Dialog {
             title: " Editor Help ",
-            message: app
-                .config
-                .language
-                .text(if app.config.shortcuts.is_mac() {
-                    crate::shortcuts::EDITOR_HELP
-                } else {
-                    crate::commands::help::CLASSIC_EDITOR
-                })
-                .into(),
+            message,
         });
         return;
     }
@@ -735,6 +739,7 @@ fn apply(app: &mut App, command: EditorAction) -> Result<(), String> {
         return search_controls::decision(editor, command);
     }
     match command {
+        A::MarkdownPreview => {}
         A::PromptField => {
             if let Some(Modal::Prompt { focus, .. }) = editor.modals.editor_modal_mut() {
                 *focus = 0;

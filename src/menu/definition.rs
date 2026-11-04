@@ -403,6 +403,7 @@ pub const EDITOR_ROOTS: &[EditorRoot] = &[
         enabled: true,
         entries: &[
             editor_item("~D~uplicate line", "F6", A::Duplicate),
+            editor_item("Markdown ~p~review", "F5", A::MarkdownPreview),
             editor_item("Matching ~b~racket", "Ctrl+]", A::MatchBracket),
             editor_line(),
             editor_item("Si~z~e/Move", "Ctrl+F5", A::WindowMove),
@@ -426,6 +427,7 @@ pub const EDITOR_ROOTS: &[EditorRoot] = &[
 
 /// Status-bar entries are display order, captions and mouse actions. Shortcut
 /// labels describe existing bindings; moving an entry never rebinds its key.
+#[derive(Clone, Copy)]
 pub struct BarItem<A> {
     pub key: &'static str,
     pub label: &'static str,
@@ -460,8 +462,8 @@ pub const EDITOR_BAR: &[BarItem<A>] = &[
     },
     BarItem {
         key: "F5",
-        label: "",
-        action: None,
+        label: "Prevw",
+        action: Some(A::MarkdownPreview),
         width: C::Fill(1),
     },
     BarItem {
@@ -498,6 +500,18 @@ pub const EDITOR_BAR: &[BarItem<A>] = &[
 use crate::viewer::Action as V;
 pub const VIEWER_BAR: &[BarItem<V>] = &[
     BarItem {
+        key: "F5",
+        label: "Editor",
+        action: Some(V::BackToEditor),
+        width: C::Length(10),
+    },
+    BarItem {
+        key: "F6",
+        label: "Markdown",
+        action: Some(V::ToggleMarkdown),
+        width: C::Length(13),
+    },
+    BarItem {
         key: "F2",
         label: "Wrap",
         action: Some(V::Wrap),
@@ -528,6 +542,30 @@ pub const VIEWER_BAR: &[BarItem<V>] = &[
         width: C::Min(1),
     },
 ];
+
+pub fn viewer_bar(viewer: &crate::viewer::Viewer) -> Vec<BarItem<V>> {
+    let extra = viewer.markdown_available() || viewer.preview_editor.is_some();
+    VIEWER_BAR
+        .iter()
+        .filter(|e| match e.action {
+            Some(V::ToggleMarkdown) => viewer.markdown_available(),
+            Some(V::BackToEditor) => viewer.preview_editor.is_some(),
+            _ => true,
+        })
+        .map(|e| {
+            let mut e = *e;
+            if extra {
+                e.width = match e.action {
+                    Some(V::Wrap | V::Find) => C::Length(10),
+                    Some(V::Next) => C::Length(12),
+                    Some(V::Reverse) => C::Length(13),
+                    _ => e.width,
+                };
+            }
+            e
+        })
+        .collect()
+}
 
 /// Keep the original MP3-player menu key as an alias after its visible rename.
 pub(crate) fn matches(

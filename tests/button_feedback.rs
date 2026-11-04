@@ -209,7 +209,7 @@ fn keyboard_default_and_focused_cancel_show_feedback_without_crossing_owners() -
 }
 #[cfg(target_os = "macos")]
 #[test]
-fn plugin_play_symbol_survives_press_and_rendering_is_immutable() -> io::Result<()> {
+fn plugin_play_caption_survives_press_and_rendering_is_immutable() -> io::Result<()> {
     let f = support::Fixture::new("button-plugin")?;
     std::fs::write(f.0.join("track.mp3"), b"not audio")?;
     let mut a = f.app()?;
@@ -233,7 +233,10 @@ fn plugin_play_symbol_survives_press_and_rendering_is_immutable() -> io::Result<
     assert_eq!(first, second);
     assert_ne!(normal, first);
     assert!(
-        (r.x + 3..r.right() - 1).any(|x| first[(x, r.y)].symbol() == "►"),
+        (r.x..r.right())
+            .map(|x| first[(x, r.y)].symbol())
+            .collect::<String>()
+            .contains("Play"),
         "Play caption retained"
     );
     finish(&mut a);

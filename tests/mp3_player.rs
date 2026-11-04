@@ -61,7 +61,7 @@ fn registered_singleton_has_declared_centered_geometry_and_resets_on_reopen() ->
     assert_eq!(surface(&mut a, id, 100, 32).bounds.height, 18);
     let expanded = surface(&mut a, id, 100, 32).bounds;
     let small = surface(&mut a, id, 80, 25).bounds;
-    assert_eq!((small.width, small.height), (36, 18));
+    assert_eq!((small.width, small.height), (66, 18));
     assert!(small.bottom() <= 24 && small.right() <= 80);
     assert_eq!(surface(&mut a, id, 100, 32).bounds, expanded);
     support::key(&mut a, K::Esc);
@@ -116,7 +116,7 @@ fn unavailable_actions_are_not_mouse_targets_and_help_keeps_owner() -> io::Resul
     let id = open(&mut a);
     support::modified(&mut a, K::Char('z'), M::ALT);
     support::draw(&mut a, 100, 32)?;
-    for n in [0, 1, 2, 3, 4, 5, 6, 13] {
+    for n in [0, 1, 2, 3, 4, 6, 13] {
         assert!(!a
             .mouse
             .regions
@@ -158,12 +158,12 @@ fn localized_frames_controls_and_palette_are_clipped_and_paint_is_immutable() ->
                         .hit_regions()
                         .iter()
                         .all(|(r, _)| r.right() <= w && r.bottom() <= h));
-                    let count=frame.hit_regions().iter().filter(|(_,t)|matches!(t,Target::Plugin(p,ActionId(n)) if *p==MP3_PLAYER && *n<14)).count();
+                    let count=frame.hit_regions().iter().filter(|(_,t)|matches!(t,Target::Plugin(p,ActionId(n)) if *p==MP3_PLAYER && *n<15)).count();
                     assert_eq!(
                         count,
                         if expanded {
                             if cfg!(target_os = "macos") {
-                                6
+                                8
                             } else {
                                 1
                             }
@@ -184,7 +184,7 @@ fn localized_frames_controls_and_palette_are_clipped_and_paint_is_immutable() ->
                     );
                     assert!(text(&b).contains(language.text("Music Player")));
                     if expanded {
-                        assert!(text(&b).contains(language.text("Set up")));
+                        assert!(text(&b).contains(language.text("Settings…")));
                     }
                     support::draw(&mut a, w, h)?;
                     support::modified(&mut a, K::Char('z'), M::ALT);
@@ -299,7 +299,7 @@ fn page(a: &mut App, owner: WindowId, n: u64) -> bool {
 }
 #[cfg(target_os = "macos")]
 #[test]
-fn panel_import_draft_cancel_commit_and_reopen_use_real_paths_without_reading() -> io::Result<()> {
+fn panel_import_live_removal_and_reopen_preserve_original_files() -> io::Result<()> {
     let f = support::Fixture::new("mp3-import")?;
     for name in ["one.mp3", "界.MP3", "ignore.txt"] {
         fs::write(f.0.join(name), b"not decoded until Play")?;
@@ -327,16 +327,26 @@ fn panel_import_draft_cancel_commit_and_reopen_use_real_paths_without_reading() 
     action(&mut a, 202)?;
     action(&mut a, 203)?;
     action(&mut a, 12)?;
-    assert!(support::text(&mut a, 100, 32)?.contains("one.mp3"));
-    action(&mut a, 201)?;
-    action(&mut a, 200)?;
-    action(&mut a, 12)?;
-    support::draw(&mut a, 100, 32)?;
-    assert!(a
+    let b = support::draw(&mut a, 100, 32)?;
+    let row = a
         .mouse
         .regions
         .iter()
-        .any(|(_, t)| *t == Target::Plugin(MP3_PLAYER, ActionId(1003))));
+        .find(|(_, t)| *t == Target::Plugin(MP3_PLAYER, ActionId(1000)))
+        .unwrap()
+        .0;
+    let description = (row.x..row.right())
+        .map(|x| b[(x, row.y)].symbol())
+        .collect::<String>();
+    assert!(
+        !description.contains("one.mp3") && description.contains("界"),
+        "{description}"
+    );
+    assert!(!a
+        .mouse
+        .regions
+        .iter()
+        .any(|(_, t)| *t == Target::Plugin(MP3_PLAYER, ActionId(1001))));
     action(&mut a, 203)?;
     support::key(&mut a, K::Esc);
     assert!(!a.desktop.contains(id));
@@ -382,10 +392,9 @@ fn empty_playlist_and_volume_pages_keep_focus_bounds_and_immutable_frames() -> i
             action(&mut a, 203)?;
             if cfg!(target_os = "macos") {
                 action(&mut a, 11)?;
-                assert!(page(&mut a, id, 3));
-                action(&mut a, 301)?;
-                action(&mut a, 303)?;
                 assert!(!page(&mut a, id, 3));
+                assert!(support::text(&mut a, 100, 32)?.contains("60%"));
+                action(&mut a, 5)?;
                 assert!(support::text(&mut a, 100, 32)?.contains("50%"));
             }
             support::key(&mut a, K::Esc);
@@ -463,7 +472,8 @@ fn folder_tags_modes_info_and_cancel_use_owned_shared_controls() -> io::Result<(
                 .regions
                 .iter()
                 .any(|(_, t)| *t == Target::Plugin(MP3_PLAYER, ActionId(2))));
-            action(&mut a, 7)?;
+            menu::execute(&mut a, menu::Action::AddMp3);
+            support::finish_mp3_import(&mut a)?;
             assert!(support::text(&mut a, 100, 32)?.contains("Artist name"));
             action(&mut a, 13)?;
             assert!(a.modal_top().is_some());
@@ -472,7 +482,10 @@ fn folder_tags_modes_info_and_cancel_use_owned_shared_controls() -> io::Result<(
             support::key(&mut a, K::Esc);
             assert_eq!(a.desktop.active().id, id);
             action(&mut a, 10)?;
-            assert!(page(&mut a, id, 4));
+            action(&mut a, 14)?;
+            assert!(page(&mut a, id, 8));
+            action(&mut a, 811)?;
+            assert!(!page(&mut a, id, 8));
             for (w, h) in [(80, 25), (132, 40)] {
                 let snapshot = layout::prepare(&mut a, Rect::new(0, 0, w, h));
                 let first = dn::testing::Buffer::rendered(dn::ui::render(&a, &snapshot));
@@ -482,21 +495,7 @@ fn folder_tags_modes_info_and_cancel_use_owned_shared_controls() -> io::Result<(
                         dn::testing::Buffer::rendered(dn::ui::render(&a, &snapshot))
                     );
                 }
-                support::draw(&mut a, w, h)?;
-                assert!(!a
-                    .mouse
-                    .regions
-                    .iter()
-                    .any(|(_, t)| *t == Target::Plugin(MP3_PLAYER, ActionId(2))));
             }
-            action(&mut a, 400)?;
-            action(&mut a, 403)?;
-            action(&mut a, 405)?;
-            action(&mut a, 10)?;
-            action(&mut a, 400)?;
-            action(&mut a, 402)?;
-            action(&mut a, 404)?;
-            assert!(!page(&mut a, id, 4));
             let text = support::text(&mut a, 100, 32)?;
             assert!(text.contains(language.text("Shuffle")) && text.contains(language.text("One")));
             action(&mut a, 12)?;
@@ -743,6 +742,187 @@ fn enter_and_double_click_route_new_extensions_to_music_player() -> io::Result<(
         support::finish_mp3_import(&mut a)?;
         support::draw(&mut a, 80, 25)?;
         support::key(&mut a, K::Esc);
+    }
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn music_file_picker_cancel_add_and_live_queue_keep_panel_context() -> io::Result<()> {
+    let f = support::Fixture::new("music-picker")?;
+    fs::write(
+        f.0.join("choice.MP3"),
+        include_bytes!("fixtures/mp3/tone.mp3"),
+    )?;
+    fs::write(f.0.join("ignore.txt"), b"unsupported")?;
+    let mut a = f.app()?;
+    let before = a
+        .panels
+        .iter()
+        .map(|p| (p.path.clone(), p.cursor, p.selected.clone()))
+        .collect::<Vec<_>>();
+    let owner = show_playlist(&mut a)?;
+    action(&mut a, 201)?;
+    assert!(page(&mut a, owner, 7));
+    input::paste(&mut a, "choice.MP3");
+    support::key(&mut a, K::Esc);
+    assert!(!page(&mut a, owner, 7));
+    assert!(support::text(&mut a, 100, 32)?.contains("Empty playlist"));
+    action(&mut a, 201)?;
+    input::paste(&mut a, "choice.MP3");
+    support::key(&mut a, K::Enter);
+    support::finish_mp3_import(&mut a)?;
+    assert!(!page(&mut a, owner, 7));
+    let rows = support::text(&mut a, 100, 32)?;
+    assert!(
+        rows.contains("choice.MP3") && rows.contains("00:12"),
+        "{rows}"
+    );
+    support::key(&mut a, K::Esc);
+    action(&mut a, 7)?;
+    assert!(page(&mut a, owner, 7));
+    // Preparing and repeatedly painting a moved picker remains immutable.
+    for (w, h) in [(80, 25), (132, 40), (50, 15), (80, 25)] {
+        let snapshot = layout::prepare(&mut a, Rect::new(0, 0, w, h));
+        let first = dn::testing::Buffer::rendered(dn::ui::render(&a, &snapshot));
+        for _ in 0..3 {
+            assert_eq!(
+                first,
+                dn::testing::Buffer::rendered(dn::ui::render(&a, &snapshot))
+            );
+        }
+    }
+    // Move the owned picker, then exercise its native Cancel button with mouse
+    // coordinates translated back from the floating page.
+    support::draw(&mut a, 100, 32)?;
+    let original = layout::prepare(&mut a, Rect::new(0, 0, 100, 32))
+        .surfaces
+        .into_iter()
+        .find(|s| s.id.key == SurfaceKey::Page(owner, 7))
+        .unwrap()
+        .bounds;
+    pointer(
+        &mut a,
+        MouseEventKind::Down(MouseButton::Left),
+        original.x + 10,
+        original.y,
+    );
+    pointer(
+        &mut a,
+        MouseEventKind::Drag(MouseButton::Left),
+        original.x + 12,
+        original.y + 1,
+    );
+    pointer(
+        &mut a,
+        MouseEventKind::Up(MouseButton::Left),
+        original.x + 12,
+        original.y + 1,
+    );
+    let b = support::draw(&mut a, 100, 32)?;
+    let moved = layout::prepare(&mut a, Rect::new(0, 0, 100, 32))
+        .surfaces
+        .into_iter()
+        .find(|s| s.id.key == SurfaceKey::Page(owner, 7))
+        .unwrap()
+        .bounds;
+    assert_ne!(moved, original);
+    let (x, y) = (moved.y..moved.bottom())
+        .find_map(|y| {
+            let cells = (moved.x..moved.right())
+                .map(|x| b[(x, y)].symbol())
+                .collect::<Vec<_>>();
+            cells
+                .windows(6)
+                .position(|w| w == ["C", "a", "n", "c", "e", "l"])
+                .map(|i| (moved.x + i as u16 + 1, y))
+        })
+        .expect("native picker Cancel");
+    pointer(&mut a, MouseEventKind::Down(MouseButton::Left), x, y);
+    pointer(&mut a, MouseEventKind::Up(MouseButton::Left), x, y);
+    assert!(!page(&mut a, owner, 7));
+    assert_eq!(
+        a.panels
+            .iter()
+            .map(|p| (p.path.clone(), p.cursor, p.selected.clone()))
+            .collect::<Vec<_>>(),
+        before
+    );
+    assert_eq!(a.desktop.active().id, owner);
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn repeat_selector_is_owned_cancellable_and_keyboard_mouse_accessible() -> io::Result<()> {
+    for language in [
+        dn::localization::Language::English,
+        dn::localization::Language::Russian,
+    ] {
+        for palette in [
+            PaletteProfile::ClassicDn,
+            PaletteProfile::ClassicDn.with_slot(Slot::DialogList, 0x2e),
+        ] {
+            let f = support::Fixture::new("music-repeat-design")?;
+            let mut a = f.app()?;
+            a.config.language = language;
+            a.config.palette = palette;
+            let owner = open(&mut a);
+            support::draw(&mut a, 80, 25)?;
+            support::modified(&mut a, K::Char('z'), M::ALT);
+            action(&mut a, 14)?;
+            assert!(page(&mut a, owner, 8));
+            for (w, h) in [(80, 25), (132, 40), (50, 15), (80, 25)] {
+                let snapshot = layout::prepare(&mut a, Rect::new(0, 0, w, h));
+                let first = dn::testing::Buffer::rendered(dn::ui::render(&a, &snapshot));
+                assert!(first.content.iter().any(|c| !c.symbol().is_empty()));
+                for _ in 0..3 {
+                    assert_eq!(
+                        first,
+                        dn::testing::Buffer::rendered(dn::ui::render(&a, &snapshot))
+                    );
+                }
+                if w >= 80 && h >= 25 {
+                    assert!(snapshot
+                        .surfaces
+                        .iter()
+                        .all(|s| s.bounds.right() <= w && s.bounds.bottom() <= h));
+                }
+            }
+            support::draw(&mut a, 80, 25)?;
+            support::key(&mut a, K::Down);
+            support::key(&mut a, K::Enter);
+            assert!(!page(&mut a, owner, 8));
+            let b = support::draw(&mut a, 80, 25)?;
+            let r = surface(&mut a, owner, 80, 25).bounds;
+            let modes = (r.x..r.right())
+                .map(|x| b[(x, r.y + 11)].symbol())
+                .collect::<String>();
+            assert!(modes.contains(language.text("One")), "{modes}");
+            action(&mut a, 14)?;
+            support::key(&mut a, K::Down);
+            support::key(&mut a, K::Esc);
+            assert!(!page(&mut a, owner, 8));
+            let b = support::draw(&mut a, 80, 25)?;
+            let r = surface(&mut a, owner, 80, 25).bounds;
+            let modes = (r.x..r.right())
+                .map(|x| b[(x, r.y + 11)].symbol())
+                .collect::<String>();
+            assert!(modes.contains(language.text("One")), "{modes}");
+            action(&mut a, 14)?;
+            action(&mut a, 812)?;
+            assert!(!page(&mut a, owner, 8));
+            // Enter on Shuffle toggles the checkbox, rather than default Play.
+            action(&mut a, 10)?;
+            support::draw(&mut a, 80, 25)?;
+            support::key(&mut a, K::Enter);
+            let b = support::draw(&mut a, 80, 25)?;
+            let r = surface(&mut a, owner, 80, 25).bounds;
+            let modes = (r.x..r.right())
+                .map(|x| b[(x, r.y + 11)].symbol())
+                .collect::<String>();
+            assert!(!modes.contains('X'), "{modes}");
+        }
     }
     Ok(())
 }

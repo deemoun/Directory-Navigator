@@ -178,7 +178,10 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
             entry.key.strip_prefix('F').unwrap_or(entry.key).to_owned()
         };
         let name = entry.label;
-        let command = entry.action;
+        let command = entry.action.filter(|action| {
+            *action != crate::editor::EditorAction::MarkdownPreview
+                || (editor.buffer.is_some() && !editor.busy())
+        });
         frame.render_widget(
             crate::turbo::widgets::function_status(
                 &key,

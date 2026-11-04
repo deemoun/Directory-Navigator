@@ -33,6 +33,7 @@ and modern filesystem handling.
 - Create directories and send files to Trash with confirmation.
 - Find files, compare directories, calculate folder sizes and use bookmarks.
 - Preview text or hex, edit UTF-8 files, and search or replace text.
+- Read formatted Markdown with F3, edit highlighted source with F4, and preview unsaved text with F5.
 - Keep multiple editors and viewers open, and switch between them with **Alt+0**.
 - Browse ZIP, TAR and TAR.GZ/TGZ directly in either file pane; extract selected files and folders with F5.
 - Create ZIP archives from selected files and folders, optionally with an AES-256 password; preview and extract encrypted ZIPs in DN.

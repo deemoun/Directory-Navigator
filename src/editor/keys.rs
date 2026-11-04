@@ -84,7 +84,7 @@ pub fn key(app: &mut App, key: KeyEvent) {
         return;
     }
     if editor.modals.editor_menu().is_some() {
-        let accelerator = matches!(key.code, KeyCode::F(1 | 2 | 3 | 6 | 7)) || ctrl;
+        let accelerator = matches!(key.code, KeyCode::F(1 | 2 | 3 | 5 | 6 | 7)) || ctrl;
         if accelerator {
             editor.modals.set_editor_menu(None);
         } else {

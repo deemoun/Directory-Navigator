@@ -55,18 +55,20 @@ pub(super) fn draw_viewer(frame: &mut impl Frame, app: &App, area: Rect) {
     }
     if let Some(contents) = &viewer.contents {
         draw_text(frame, viewer, regions[1], profile, app.config.language);
-        let line = viewer.anchor().0 + 1;
+        let line = viewer.source_line() + 1;
         frame.render_widget(
             Paragraph::new(format!(
                 " {} │ {line}/{} lines{} · {}",
-                if contents.binary {
+                if viewer.markdown.rendered {
+                    "Markdown"
+                } else if contents.binary {
                     "Hex"
                 } else if viewer.wrap {
                     "Text Wrap"
                 } else {
                     "Text"
                 },
-                contents.lines.len(),
+                viewer.source_line_count(),
                 if contents.truncated {
                     " [bounded preview]"
                 } else {
@@ -84,8 +86,38 @@ pub(super) fn draw_viewer(frame: &mut impl Frame, app: &App, area: Rect) {
         );
     }
     frame.render_widget(Block::default().style(profile.bar(true)), regions[3]);
-    let entries = crate::menu::definition::VIEWER_BAR;
-    let cells = Layout::horizontal(entries.iter().map(|entry| entry.width)).split(regions[3]);
+    let entries = crate::menu::definition::viewer_bar(viewer);
+    let caption = |entry: &crate::menu::definition::BarItem<Action>| {
+        app.config.language.text(
+            if entry.action == Some(Action::ToggleMarkdown) && viewer.markdown.rendered {
+                "Source"
+            } else {
+                entry.label
+            },
+        )
+    };
+    let extra = viewer.markdown_available() || viewer.preview_editor.is_some();
+    let cells = Layout::horizontal(entries.iter().map(|entry| {
+        if extra && entry.action != Some(Action::GoTo) {
+            Constraint::Length(
+                (Line::from(
+                    crate::shortcuts::label(
+                        app.config.shortcuts,
+                        crate::focus::Screen::Viewer,
+                        entry.key,
+                    )
+                    .as_ref(),
+                )
+                .width()
+                    + Line::from(caption(entry)).width()
+                    + 2)
+                .min(u16::MAX as usize) as u16,
+            )
+        } else {
+            entry.width
+        }
+    }))
+    .split(regions[3]);
     for (i, entry) in entries.iter().enumerate() {
         let enabled = entry
             .action
@@ -99,11 +131,7 @@ pub(super) fn draw_viewer(frame: &mut impl Frame, app: &App, area: Rect) {
             )
         );
         frame.render_widget(
-            crate::turbo::widgets::function_status(
-                &key,
-                app.config.language.text(entry.label),
-                enabled,
-            ),
+            crate::turbo::widgets::function_status(&key, caption(entry), enabled),
             cells[i],
         );
         if enabled {
@@ -259,12 +287,58 @@ pub(super) fn draw_text(
         } else {
             viewer.horizontal as usize
         };
-        frame.render_widget(
-            crate::turbo::widgets::text_view(&lines, horizontal, 0x1f)
-                .themed(crate::palette::theme::Group::Viewer),
-            area,
-        );
+        if viewer.markdown.rendered {
+            use crate::presentation::text::Span;
+            use unicode_segmentation::UnicodeSegmentation;
+            let doc = viewer.markdown.document.as_ref().unwrap();
+            for (y, row) in visual.iter().enumerate() {
+                let logical = &doc.rows[row.line];
+                let pan = if !viewer.wrap || logical.fixed {
+                    viewer.horizontal as usize
+                } else {
+                    0
+                };
+                let mut cells = 0usize;
+                let mut spans = Vec::new();
+                for (byte, g) in logical.text[row.range.clone()].grapheme_indices(true) {
+                    let width = g.width();
+                    if cells >= pan + area.width as usize {
+                        break;
+                    }
+                    if cells + width > pan {
+                        let at = byte + row.range.start;
+                        let role = logical
+                            .runs
+                            .get(logical.runs.partition_point(|r| r.range.end <= at))
+                            .filter(|r| r.range.contains(&at))
+                            .map_or(crate::markdown::Role::Text, |r| r.role);
+                        let text = if cells < pan {
+                            " ".repeat(cells + width - pan)
+                        } else {
+                            g.to_string()
+                        };
+                        spans.push(Span::styled(text, dos(role.color())));
+                    }
+                    cells += width;
+                }
+                frame.render_widget(
+                    Paragraph::new(Line::from(spans)).style(dos(0x1f)),
+                    Rect::new(area.x, area.y + y as u16, area.width, 1),
+                );
+            }
+        } else {
+            frame.render_widget(
+                crate::turbo::widgets::text_view(&lines, horizontal, 0x1f)
+                    .themed(crate::palette::theme::Group::Viewer),
+                area,
+            );
+        }
         for (y, row) in visual.iter().enumerate() {
+            let horizontal = if !viewer.wrap || viewer.fixed_row(row.line) {
+                viewer.horizontal as usize
+            } else {
+                0
+            };
             if let Some(found) = viewer.current.as_ref().filter(|m| {
                 m.line == row.line && m.range.start < row.range.end && m.range.end > row.range.start
             }) {

@@ -507,6 +507,7 @@ fn read_preview(
     input: &mut impl Read,
     cancel: &Cancellation,
     expected: u64,
+    mode: ViewMode,
 ) -> io::Result<Contents> {
     let mut bytes = Vec::new();
     let mut input = input.take(viewer::MAX_BYTES as u64 + 1);
@@ -525,7 +526,7 @@ fn read_preview(
             "Archive member ended before its declared length",
         ));
     }
-    Ok(viewer::from_bytes(bytes, ViewMode::Auto))
+    Ok(viewer::from_bytes(bytes, mode))
 }
 pub fn preview(catalog: &Catalog, id: usize, cancel: &Cancellation) -> io::Result<Contents> {
     preview_with_password(catalog, id, None, cancel)
@@ -534,6 +535,15 @@ pub fn preview_with_password(
     catalog: &Catalog,
     id: usize,
     password: Option<&super::Password>,
+    cancel: &Cancellation,
+) -> io::Result<Contents> {
+    preview_with_mode(catalog, id, password, ViewMode::Auto, cancel)
+}
+pub fn preview_with_mode(
+    catalog: &Catalog,
+    id: usize,
+    password: Option<&super::Password>,
+    mode: ViewMode,
     cancel: &Cancellation,
 ) -> io::Result<Contents> {
     cancel.check()?;
@@ -583,9 +593,9 @@ pub fn preview_with_password(
             if total != node.size {
                 return Err(io::Error::other("Truncated encrypted member"));
             }
-            viewer::from_bytes(bytes, ViewMode::Auto)
+            viewer::from_bytes(bytes, mode)
         } else {
-            read_preview(&mut entry, cancel, node.size)?
+            read_preview(&mut entry, cancel, node.size, mode)?
         };
         catalog.validate()?;
         Ok(contents)
@@ -598,7 +608,7 @@ pub fn preview_with_password(
                 if entry.path_bytes().as_ref() != node.raw {
                     return Err(io::Error::other("Archive member changed"));
                 }
-                return read_preview(&mut entry, cancel, node.size);
+                return read_preview(&mut entry, cancel, node.size, mode);
             }
         }
         Err(io::Error::other("Archive member disappeared"))

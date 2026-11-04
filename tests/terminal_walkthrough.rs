@@ -433,6 +433,38 @@ fn game_and_editor_arrangements_are_visible_and_game_board_keeps_its_size() -> i
     s.finish()
 }
 
+fn music_click(
+    s: &mut Session,
+    label: &str,
+    purpose: &str,
+    ready: impl Fn(&Session) -> bool,
+) -> io::Result<()> {
+    music_click_row(s, label, None, purpose, ready)
+}
+fn music_click_row(
+    s: &mut Session,
+    label: &str,
+    row_label: Option<&str>,
+    purpose: &str,
+    ready: impl Fn(&Session) -> bool,
+) -> io::Result<()> {
+    let screen = s.text();
+    let (y, line, at) = screen
+        .lines()
+        .enumerate()
+        .filter(|(_, line)| row_label.is_none_or(|needle| line.contains(needle)))
+        .find_map(|(y, line)| line.find(label).map(|at| (y, line, at)))
+        .ok_or_else(|| io::Error::other(format!("Missing music control {label}:\n{screen}")))?;
+    let x = unicode_width::UnicodeWidthStr::width(&line[..at]);
+    let click = format!("\x1b[<0;{};{}M\x1b[<0;{};{}m", x + 2, y + 1, x + 2, y + 1);
+    s.send(click.as_bytes(), purpose, ready)
+}
+fn music_repeat(s: &Session, value: &str) -> bool {
+    s.text()
+        .lines()
+        .any(|line| line.contains("Repeat:") && line.contains(value))
+}
+
 #[test]
 fn mp3_empty_player_compact_expanded_help_movement_and_close_restore_terminal() -> io::Result<()> {
     let mut s = Session::new("mp3-player")?;
@@ -456,13 +488,14 @@ fn mp3_empty_player_compact_expanded_help_movement_and_close_restore_terminal() 
     assert!(!compact.contains("Empty playlist"));
     s.send(b"\x1bz", "expanded MP3 player", |s| {
         let t = s.text();
-        t.contains("Empty playlist") && t.contains("Pause") && t.contains("Volume")
+        t.contains("Empty playlist") && t.contains("Open…") && t.contains("Volume")
     })?;
-    // Empty transport controls are skipped; the first enabled button is Open.
-    s.send(b"\t\r", "Open imports the current panel selection", |s| {
-        s.text().contains("Select music files")
+    music_click(&mut s, "Open…", "Open shows DN file picker", |s| {
+        s.text().contains("Open file")
     })?;
-    assert!(!s.text().contains("Open file"));
+    music_click(&mut s, "Cancel", "cancel Open by mouse", |s| {
+        !s.text().contains("Open file") && s.text().contains("Music Player")
+    })?;
     s.send(b"\x1bOP", "player help", |s| {
         s.text().contains("Music Player Help")
     })?;
@@ -785,23 +818,33 @@ fn mp3_real_queue_help_cancel_and_volume_restore_terminal() -> io::Result<()> {
         s.text().contains("Music Player") && !s.text().contains("Adding music files")
     })?;
     s.send(b"\x1bz", "expand", |s| s.text().contains("Volume"))?;
-    // From Play: Open, Set up, Time, Mode, Volume, List.
-    s.send(b"\t\t\t\t\t\t\r", "queue", |s| {
-        s.text().contains("Play order") && s.text().contains("queue-track.mp3")
+    music_click(&mut s, "Playlist…", "live queue", |s| {
+        s.text().contains("Music queue · current session") && s.text().contains("queue-track.mp3")
     })?;
     s.send(b"\x1bOP", "owned Help", |s| {
         s.text().contains("Music Player Help")
     })?;
     s.send(b"\x1b", "return to queue", |s| {
-        s.text().contains("Play order") && !s.text().contains("Music Player Help")
+        s.text().contains("Music queue · current session")
+            && !s.text().contains("Music Player Help")
     })?;
-    s.send(b"\x1b", "cancel queue", |s| {
-        !s.text().contains("Play order")
+    s.send(b"\x1b", "close queue", |s| {
+        !s.text().contains("Music queue · current session")
     })?;
-    // List -> Shift+Tab -> Volume.
-    s.send(b"\x1b[Z\r", "volume", |s| s.text().contains("+10%"))?;
-    s.send(b"\t\r", "increase draft", |s| s.text().contains("60%"))?;
-    s.send(b"\x1b", "cancel volume", |s| !s.text().contains("+10%"))?;
+    music_click_row(
+        &mut s,
+        "+",
+        Some("Volume"),
+        "immediate volume increase",
+        |s| s.text().contains("60%"),
+    )?;
+    music_click_row(
+        &mut s,
+        "−",
+        Some("Volume"),
+        "immediate volume decrease",
+        |s| s.text().contains("50%"),
+    )?;
     s.resize(100, 32)?;
     s.send(b"\x1b[17;3~", "work in manager", |s| {
         s.command_prompt_active()
@@ -1074,9 +1117,9 @@ fn mp3_audio_play_pause_seek_background_stop_and_close_restore_terminal() -> io:
         s.text().contains("Playing") && s.text().contains("Elapsed")
     })?;
     // Play -> seek forward -> Pause (no next track).
-    s.send(b"\t\t\r", "pause", |s| s.text().contains("Paused"))?;
+    music_click(&mut s, "Pause", "pause", |s| s.text().contains("Paused"))?;
     s.send(b"\r", "resume", |s| s.text().contains("Playing"))?;
-    s.send(b"\t\r", "seek +5 seconds", |s| {
+    music_click(&mut s, "+5s", "seek +5 seconds", |s| {
         s.text().contains("Playing") && (5..12).any(|n| s.text().contains(&format!("00:{n:02}")))
     })?;
     s.send(b"\x1b[17;3~", "manager while audio plays", |s| {
@@ -1086,7 +1129,7 @@ fn mp3_audio_play_pause_seek_background_stop_and_close_restore_terminal() -> io:
         !s.command_prompt_active() && s.text().contains("Playing")
     })?;
     // Seek-forward focus -> Pause -> Stop.
-    s.send(b"\t\t\r", "stop", |s| {
+    music_click(&mut s, "Stop", "stop", |s| {
         s.text().contains("Stopped") && s.text().contains("00:00")
     })?;
     s.send(b"\x1b", "close player", |s| s.command_prompt_active())?;
@@ -1145,48 +1188,53 @@ fn mp3_folder_tags_modes_info_and_resize_restore_terminal() -> io::Result<()> {
     s.send(b"\x1bz", "tagged player", |s| {
         s.text().contains("Test artist") && s.text().contains("First song")
     })?;
-    // Play -> Next -> Open -> Set up -> Time -> Mode.
-    s.send(b"\t\t\t\t\t\r", "mode page", |s| {
-        s.text().contains("Playback mode")
+    music_click(&mut s, "Shuffle", "shuffle immediately", |s| {
+        s.text()
+            .lines()
+            .any(|line| line.contains("Shuffle") && line.contains('X'))
     })?;
-    s.send(b"\x1bOP", "mode Help", |s| {
+    music_click(&mut s, "Off", "repeat popup", |s| {
+        s.text().contains("Cancel") && !s.plugin_document_ready()
+    })?;
+    s.send(b"\x1b[B\r", "choose repeat one", |s| {
+        s.plugin_document_ready() && music_repeat(s, "One")
+    })?;
+    music_click(&mut s, "One", "repeat popup again", |s| {
+        !s.plugin_document_ready() && s.text().contains("Cancel")
+    })?;
+    s.send(b"\x1b[C\x1b", "cancel repeat selection", |s| {
+        s.plugin_document_ready() && music_repeat(s, "One")
+    })?;
+    s.send(b"\x1bOP", "player Help", |s| {
         s.text().contains("Music Player Help")
     })?;
-    s.send(b"\x1b", "return to mode draft", |s| {
-        s.text().contains("Playback mode") && !s.text().contains("Music Player Help")
+    s.send(b"\x1b", "return from Help", |s| {
+        music_repeat(s, "One") && !s.text().contains("Music Player Help")
     })?;
-    s.send(b" \t\t \r", "apply shuffle and repeat one", |s| {
-        !s.text().contains("Playback mode")
-            && s.text().contains("Shuffle On")
-            && s.text().contains("Repeat One")
-    })?;
-    s.send(b"\r", "reopen mode draft", |s| {
-        s.text().contains("Playback mode")
-    })?;
-    s.send(b" \x1b", "discard shuffle change", |s| {
-        !s.text().contains("Playback mode") && s.text().contains("Shuffle On")
-    })?;
-    s.send(b"\t\t\t\r", "track Info", |s| {
+    music_click(&mut s, "Info…", "track Info", |s| {
         s.text().contains("Music Track Info") && s.text().contains("Test album")
     })?;
     s.send(b"\x1b", "close Info", |s| {
         !s.text().contains("Music Track Info")
     })?;
-    s.send(b"\x1b[Z\r", "tagged queue", |s| {
-        s.text().contains("Play order")
+    music_click(&mut s, "Playlist…", "tagged queue", |s| {
+        s.text().contains("Music queue · current session")
             && s.text().contains("First song")
             && s.text().contains("Second song")
     })?;
-    s.send(b"\x1b", "cancel queue edit", |s| {
-        !s.text().contains("Play order")
+    s.send(b"\x1b", "close queue", |s| {
+        !s.text().contains("Music queue · current session")
     })?;
     s.resize(100, 32)?;
     s.wait("mode retained after resize", |s| {
-        s.text().contains("Shuffle On") && s.text().contains("Repeat One")
+        s.text()
+            .lines()
+            .any(|line| line.contains("Shuffle") && line.contains('X'))
+            && music_repeat(s, "One")
     })?;
     s.send(b"\x1b[17;3~", "manager", |s| s.command_prompt_active())?;
     s.send(b"\x1bu3", "return to singleton", |s| {
-        !s.command_prompt_active() && s.text().contains("Repeat One")
+        !s.command_prompt_active() && music_repeat(s, "One")
     })?;
     s.send(b"\x1b", "close player", |s| s.command_prompt_active())?;
     s.finish()
@@ -1552,8 +1600,8 @@ fn mp3_setup_time_and_track_lengths_in_real_terminal() -> io::Result<()> {
             && !s.text().contains("Adding music files")
             && s.plugin_document_ready()
     })?;
-    s.send(b"\x1bz", "expand", |s| s.text().contains("Set up"))?;
-    s.send(b"\t\t\r", "setup", |s| {
+    s.send(b"\x1bz", "expand", |s| s.text().contains("Settings…"))?;
+    music_click(&mut s, "Settings…", "setup", |s| {
         s.text().contains("Seek step (seconds)")
     })?;
     s.send(b"\t\t\t \t\t\r", "volume draft", |s| {
@@ -1562,24 +1610,24 @@ fn mp3_setup_time_and_track_lengths_in_real_terminal() -> io::Result<()> {
     s.send(b"\t\r", "apply setup", |s| {
         !s.text().contains("Seek step (seconds)") && s.text().contains("60%")
     })?;
-    s.send(b"\t\r", "remaining timing", |s| {
+    music_click(&mut s, "Elapsed", "remaining timing", |s| {
         s.text().contains("Remaining")
     })?;
     s.send(b"\r", "elapsed timing", |s| s.text().contains("Elapsed"))?;
-    s.send(b"\t\t\t\r", "playlist length", |s| {
-        s.text().contains("Play order") && s.text().contains("duration.mp3")
+    music_click(&mut s, "Playlist…", "playlist length", |s| {
+        s.text().contains("Music queue · current session") && s.text().contains("duration.mp3")
     })?;
     assert!(!s.text().contains("--:--"), "{}", s.text());
     for (width, height) in [(132, 40), (80, 25)] {
         s.resize(width, height)?;
         s.wait("playlist resize acknowledged", |s| {
-            s.text().contains("Play order")
+            s.text().contains("Music queue · current session")
                 && fs::read_to_string(s.root.join("settings/dn/diagnostics.txt"))
                     .is_ok_and(|d| d.contains(&format!("viewport=({width}, {height})")))
         })?;
     }
     s.send(b"\x1b", "cancel playlist", |s| {
-        !s.text().contains("Play order")
+        !s.text().contains("Music queue · current session")
     })?;
     s.send(b"\x1b", "close player", |s| s.command_prompt_active())?;
     s.finish()
@@ -1619,14 +1667,14 @@ fn music_fixture_queue(s: &mut Session) -> io::Result<()> {
 fn music_mixed_queue_metadata_and_new_menu_mnemonic_restore_terminal() -> io::Result<()> {
     let mut s = Session::with_preferences("music-mixed", "[plugins]\nenabled=['mp3_player']\n")?;
     music_fixture_queue(&mut s)?;
-    s.send(b"\t\t\t\t\t\t\t\r", "mixed queue", |s| {
-        s.text().contains("Play order") && s.text().contains("Vorbis title")
+    music_click(&mut s, "Playlist…", "mixed queue", |s| {
+        s.text().contains("Music queue · current session") && s.text().contains("Vorbis title")
     })?;
     let text = s.text();
     assert!(text.contains("FLAC") && text.contains("WAV title") && text.contains("d.mp3"));
     assert_eq!(text.matches("00:12").count(), 4);
     s.send(b"\x1b", "close queue", |s| {
-        !s.text().contains("Play order") && s.text().contains("Volume")
+        !s.text().contains("Music queue · current session") && s.text().contains("Volume")
     })?;
     s.send(b"\x1b", "close player", |s| s.command_prompt_active())?;
     s.send(b"\x1bus", "new Music Player mnemonic", |s| {
@@ -1776,5 +1824,75 @@ fn archive_creation_and_password_preview_extraction_restore_terminal() -> io::Re
     s.send(b"\x1b[5;5~", "leave encrypted archive", |s| {
         s.command_prompt_active() && !s.text().contains(" :: /")
     })?;
+    s.finish()
+}
+
+#[test]
+fn markdown_viewer_and_unsaved_editor_preview_restore_terminal() -> io::Result<()> {
+    let mut s = Session::new("markdown-preview")?;
+    let path = s.root.join("a.md");
+    fs::write(&path,"# Markdown heading\n\n**formatted** paragraph\n\n| Name | Value |\n|---|---|\n| DN | 42 |\n\n```rust\nfn main() {}\n```\n")?;
+    s.wait("manager ready", |s| {
+        s.command_prompt_active() && s.text().contains("item-000.")
+    })?;
+    s.send(b"\x12", "refresh Markdown fixture", |s| {
+        s.command_prompt_active() && s.text().contains("a.md")
+    })?;
+    s.select_file("a.md")?;
+    s.send(b"\x1b[13~", "formatted Markdown viewer", |s| {
+        s.text().contains("Markdown heading")
+            && s.text().contains("F6 Source")
+            && !s.text().contains("**formatted**")
+    })?;
+    s.send(b"\x1b[17~", "Markdown source mode", |s| {
+        s.text().contains("**formatted**") && s.text().contains("F6 Markdown")
+    })?;
+    s.send(b"\x1b[17~", "return to formatted view", |s| {
+        s.text().contains("F6 Source") && !s.text().contains("**formatted**")
+    })?;
+    s.resize(120, 35)?;
+    s.wait("Markdown resize", |s| {
+        s.text().contains("Markdown heading") && s.text().contains("F6 Source")
+    })?;
+    s.send(b"\x1b", "close Markdown viewer", |s| {
+        s.command_prompt_active()
+    })?;
+    s.send(b"\x1b[14~", "Markdown source editor", |s| {
+        s.text().contains("# Markdown heading") && s.text().contains("F2 Save")
+    })?;
+    s.send(
+        b"\x1b[200~UNSAVED \x1b[201~",
+        "unsaved Markdown edit",
+        |s| s.text().contains("UNSAVED # Markdown"),
+    )?;
+    s.send(b"\x1b[15~", "unsaved-buffer Markdown preview", |s| {
+        s.text().contains("UNSAVED # Markdown")
+            && s.text().contains("F5 Editor")
+            && s.text().contains("F6 Source")
+    })?;
+    assert!(!fs::read_to_string(&path)?.contains("UNSAVED"));
+    s.send(b"\x1b[15~", "return to unsaved editor", |s| {
+        s.text().contains("F2 Save") && s.text().contains("UNSAVED # Markdown")
+    })?;
+    s.send(b"\x1a", "undo remains available after preview", |s| {
+        s.text().contains("F2 Save") && !s.text().contains("UNSAVED")
+    })?;
+    s.send(b"\x1b[15~", "preview refresh after undo", |s| {
+        s.text().contains("F5 Editor")
+            && s.text().contains("F6 Source")
+            && !s.text().contains("UNSAVED")
+    })?;
+    s.send(b"\x1b", "Esc returns to the source editor", |s| {
+        s.text().contains("F2 Save")
+    })?;
+    s.send(b"\x1b", "close edited source", |s| {
+        s.command_prompt_active() || s.text().contains("Save changes")
+    })?;
+    if !s.command_prompt_active() {
+        s.send(b"d", "discard temporary edit", |s| {
+            s.command_prompt_active()
+        })?;
+    }
+    assert!(!fs::read_to_string(&path)?.contains("UNSAVED"));
     s.finish()
 }

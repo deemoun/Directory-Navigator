@@ -17,11 +17,18 @@ impl App {
         if id == WindowId::MANAGER || !self.desktop.contains(id) {
             return false;
         }
+        let return_editor = (self.desktop.active().id == id)
+            .then(|| self.desktop.viewer(id).and_then(|v| v.preview_editor))
+            .flatten();
         self.desktop.close(id);
         if self.desktop.contains(id) {
             return false;
         }
         self.sync_modals();
+        if let Some(editor) = return_editor.filter(|editor| self.desktop.editor(*editor).is_some())
+        {
+            crate::windowing::activate(self, editor);
+        }
         true
     }
 }

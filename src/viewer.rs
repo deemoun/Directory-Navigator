@@ -1,3 +1,4 @@
+pub(crate) mod markdown;
 mod navigation;
 mod search_controller;
 use crate::filesystem::open_regular;
@@ -20,7 +21,9 @@ pub enum ViewMode {
     Hex,
 }
 
+#[derive(Clone)]
 pub struct Contents {
+    pub source: Option<std::sync::Arc<str>>,
     pub loaded_bytes: usize,
     pub lines: Vec<String>,
     pub binary: bool,
@@ -75,6 +78,8 @@ pub fn from_bytes(mut bytes: Vec<u8>, mode: ViewMode) -> Contents {
         ViewMode::Text => false,
         ViewMode::Hex => true,
     };
+    let source =
+        (!binary).then(|| std::sync::Arc::<str>::from(String::from_utf8_lossy(&bytes).as_ref()));
     let mut lines = Vec::new();
     if binary {
         for (index, chunk) in bytes.chunks(16).take(MAX_LINES + 1).enumerate() {
@@ -126,6 +131,7 @@ pub fn from_bytes(mut bytes: Vec<u8>, mode: ViewMode) -> Contents {
         lines.push(String::new());
     }
     Contents {
+        source,
         loaded_bytes: if binary {
             bytes.len().min(MAX_LINES * 16)
         } else {
@@ -141,6 +147,8 @@ pub struct Viewer {
     pub(crate) requests: crate::requests::RequestScope,
     pub modals: crate::modals::ModalStack,
     pub requested_mode: ViewMode,
+    pub markdown: markdown::State,
+    pub preview_editor: Option<crate::desktop::WindowId>,
     pub path: PathBuf,
     memory_only: bool,
     pub contents: Option<Contents>,
@@ -178,11 +186,19 @@ impl Viewer {
         let mut viewer = Self::empty(path, Some(pending));
         viewer.requests = requests;
         viewer.requested_mode = mode;
+        viewer.markdown.hint = resolve_link && crate::markdown::is_path(&viewer.path);
+        viewer.markdown.requested = mode == ViewMode::Auto;
         Ok(viewer)
     }
-    pub(crate) fn from_archive_contents(label: PathBuf, contents: Contents) -> Self {
+    pub(crate) fn from_archive_contents(
+        label: PathBuf,
+        contents: Contents,
+        markdown_hint: bool,
+    ) -> Self {
         let mut viewer = Self::from_contents(label, contents);
         viewer.memory_only = true;
+        viewer.markdown.hint = markdown_hint;
+        viewer.markdown.requested = true;
         viewer
     }
     pub(crate) fn native_path(&self) -> Option<&Path> {
@@ -204,6 +220,8 @@ impl Viewer {
             memory_only: false,
             modals: Default::default(),
             requested_mode: ViewMode::Auto,
+            markdown: Default::default(),
+            preview_editor: None,
             requests: Default::default(),
             contents: None,
             offset: 0,
@@ -221,6 +239,9 @@ impl Viewer {
     }
 
     pub fn poll(&mut self) -> Option<Result<(), String>> {
+        if self.pending.is_none() {
+            return self.poll_markdown();
+        }
         Some(match crate::task::take_reply(&mut self.pending)? {
             Ok(result) => result.map(|contents| {
                 self.contents = Some(contents);

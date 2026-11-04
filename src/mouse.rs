@@ -246,13 +246,15 @@ fn handle_mouse(app: &mut App, event: MouseEvent) {
         app.mouse.scrollbar_drag = None;
         // Native file-dialog buttons activate on release, unlike DN's
         // immediate command targets. Keep the release inside its live scope.
-        if !(focus::current(app) == Focus::EditorModal
-            && matches!(
-                app.desktop
-                    .active_editor()
-                    .and_then(|e| e.modals.editor_modal()),
-                Some(crate::editor::Modal::File(_))
-            ))
+        if !(focus::current(app) == Focus::Plugin
+            && crate::plugins::host::native_pointer_input(app)
+            || focus::current(app) == Focus::EditorModal
+                && matches!(
+                    app.desktop
+                        .active_editor()
+                        .and_then(|e| e.modals.editor_modal()),
+                    Some(crate::editor::Modal::File(_))
+                ))
         {
             return;
         }

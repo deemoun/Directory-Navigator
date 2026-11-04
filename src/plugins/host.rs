@@ -204,9 +204,19 @@ fn apply(app: &mut App, b: Binding, effects: Vec<Effect>) {
                     app.retire_document(w);
                 }
             },
-            Effect::RequestPanelPaths => {
-                let paths = panel_paths(app);
-                dispatch(app, b, Event::PanelPaths(paths));
+            Effect::RequestMusicFile { play } => {
+                if b.plugin != MP3_PLAYER || !cfg!(target_os = "macos") {
+                    continue;
+                }
+                dispatch(
+                    app,
+                    b,
+                    Event::MusicPicker {
+                        base: app.panels[app.active].path.clone(),
+                        hidden: app.config.show_hidden,
+                        play,
+                    },
+                );
             }
             Effect::Mp3Setup {
                 seek_seconds,
@@ -354,6 +364,7 @@ pub(crate) fn update_activity(app: &mut App, now: Instant) -> bool {
             continue;
         };
         let entry = app.desktop.plugins.entries.get_mut(&b.plugin).unwrap();
+        entry.tool.prepare(&ctx);
         if entry.active != Some(ctx.active) {
             entry.active = Some(ctx.active);
             let mut effects = entry.tool.event(Event::Activity(ctx.active), &ctx);
@@ -387,8 +398,35 @@ pub(crate) fn paste(app: &mut App, text: &str) {
         dispatch(app, b, Event::Paste(text));
     }
 }
-pub(crate) fn mouse(app: &mut App, event: MouseEvent, target: Option<Target>) {
+pub(crate) fn native_pointer_input(app: &App) -> bool {
+    active(app).is_some_and(|b| {
+        app.desktop.plugins.entries[&b.plugin]
+            .tool
+            .native_input_page()
+            .is_some()
+    })
+}
+pub(crate) fn mouse(app: &mut App, mut event: MouseEvent, target: Option<Target>) {
     if let Some(b) = active(app) {
+        if let (Owner::Document(owner), Some(page)) = (
+            b.owner,
+            app.desktop.plugins.entries[&b.plugin]
+                .tool
+                .native_input_page(),
+        ) {
+            if let Some(surface) = app
+                .desktop
+                .native()
+                .surface(crate::windowing::geometry::SurfaceKey::Page(owner, page))
+            {
+                event.column = (i32::from(event.column) + i32::from(surface.default.x)
+                    - i32::from(surface.bounds.x))
+                .clamp(0, u16::MAX as i32) as u16;
+                event.row = (i32::from(event.row) + i32::from(surface.default.y)
+                    - i32::from(surface.bounds.y))
+                .clamp(0, u16::MAX as i32) as u16;
+            }
+        }
         let a = match target {
             Some(Target::Plugin(id, a)) if id == b.plugin => Some(a),
             _ => None,

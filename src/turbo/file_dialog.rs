@@ -54,6 +54,7 @@ pub struct Picker {
     placement: Option<Rect>,
     pub(crate) revision: u64,
     last_click: Option<(Point, Instant)>,
+    target: Target,
 }
 impl Picker {
     pub(crate) fn new(mode: Mode, base: PathBuf, language: Language, hidden: bool) -> Self {
@@ -115,9 +116,14 @@ impl Picker {
             placement: None,
             revision: 0,
             last_click: None,
+            target: Target::Editor(EditorAction::FileDialog),
         };
         picker.set_filename(String::new());
         picker
+    }
+    pub(crate) fn with_target(mut self, target: Target) -> Self {
+        self.target = target;
+        self
     }
     fn input_index(&self) -> usize {
         (0..self.widget.child_count())
@@ -376,10 +382,7 @@ impl Picker {
             height: size.height,
             profile,
             cells: BTreeMap::new(),
-            regions: vec![(
-                Rect::new(0, 0, size.width, size.height),
-                Target::Editor(EditorAction::FileDialog),
-            )],
+            regions: vec![(Rect::new(0, 0, size.width, size.height), self.target)],
             cursor: terminal.cursor(),
         };
         let rect = Rect::new(

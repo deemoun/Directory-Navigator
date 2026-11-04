@@ -18,7 +18,7 @@ pub enum Action {
     Help,
 }
 enum Resume {
-    Preview(MemberId),
+    Preview(MemberId, crate::viewer::ViewMode),
     Extract {
         selection: Extraction,
         destination: PathBuf,
@@ -136,13 +136,14 @@ pub(crate) fn password_for_preview(app: &mut App, id: MemberId) {
         return;
     }
     let catalog = a.catalog.as_ref().unwrap().clone();
+    let mode = a.preview_mode;
     app.modals
         .set_archive_dialog(Some(Dialog::new(Operation::Unlock {
             panel,
             generation: id.generation,
             catalog,
             ids: vec![id.index],
-            resume: Resume::Preview(id),
+            resume: Resume::Preview(id, mode),
         })));
 }
 pub(crate) fn password_for_extraction(
@@ -301,14 +302,14 @@ pub(crate) fn poll(app: &mut App) -> bool {
         }
         app.panels[panel].archive_mut().unwrap().password = Some(password.clone());
         match resume {
-            Resume::Preview(id) => {
+            Resume::Preview(id, mode) => {
                 if app.panels[panel]
                     .entries
                     .get(app.panels[panel].cursor)
                     .and_then(|e| app.panels[panel].member(e))
                     == Some(id)
                 {
-                    super::view(app);
+                    super::view_mode(app, mode);
                 }
             }
             Resume::Extract {

@@ -47,7 +47,7 @@ impl App {
 
     pub fn open_viewer_mode(&mut self, mode: crate::viewer::ViewMode) {
         if self.panels[self.active].is_archive() {
-            crate::archive::view(self);
+            crate::archive::view_mode(self, mode);
             return;
         }
         if self.panels[self.active].loading {

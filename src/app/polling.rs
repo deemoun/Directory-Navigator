@@ -118,7 +118,10 @@ impl App {
                 .iter()
                 .any(|id| {
                     self.desktop.identity_pending(*id)
-                        || self.desktop.editor(*id).is_some_and(|e| e.busy())
+                        || self
+                            .desktop
+                            .editor(*id)
+                            .is_some_and(|e| e.busy() || e.markdown_pending())
                 })
             || self
                 .desktop
@@ -129,7 +132,7 @@ impl App {
                         || self
                             .desktop
                             .viewer(*id)
-                            .is_some_and(|v| v.contents.is_none())
+                            .is_some_and(|v| v.contents.is_none() || v.markdown.pending())
                 })
             || self.file_info().is_some_and(|i| i.contents.is_none())
             || self
@@ -183,6 +186,9 @@ impl App {
         for id in ids {
             if !self.desktop.identity_pending(id) {
                 changed |= self.with_document(id, crate::editor::poll);
+                if let Some(editor) = self.desktop.editor_mut(id) {
+                    changed |= editor.poll_markdown();
+                }
             }
         }
         changed
@@ -202,10 +208,12 @@ impl App {
                 match result {
                     Ok(()) => {
                         if let Some(viewer) = self.desktop.viewer(id) {
-                            self.file_tools.histories.record(
-                                crate::file_tools::history::HistoryKind::View,
-                                viewer.path.clone(),
-                            );
+                            if let Some(path) = viewer.native_path() {
+                                self.file_tools.histories.record(
+                                    crate::file_tools::history::HistoryKind::View,
+                                    path.to_path_buf(),
+                                );
+                            }
                         }
                     }
                     Err(message) => {

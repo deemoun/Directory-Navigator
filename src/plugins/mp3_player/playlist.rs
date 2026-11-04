@@ -1,14 +1,13 @@
-//! Session-only queue editor. OK commits the draft; Cancel preserves playback.
+//! Live session-only queue. Navigation never changes the playing track.
 //! Layout adapted from DN CDUTIL.PAS; see THIRD_PARTY_NOTICES.md.
 use super::*;
 use crossterm::event::KeyEvent;
 pub(super) const LIST: usize = 12;
-pub(super) const OK: usize = 200;
+pub(super) const PLAY_TRACK: usize = 200;
 pub(super) const ADD: usize = 201;
-const DELETE: usize = 202;
-const CANCEL: usize = 203;
+pub(super) const DELETE: usize = 202;
+pub(super) const CLOSE_LIST: usize = 203;
 const FIELD: usize = 220;
-const SAVE: usize = 221;
 const SCROLL: usize = 222;
 const ROW: usize = 1000;
 pub(super) const MAX_ORDER: usize = 64;
@@ -59,13 +58,11 @@ impl Selection {
 #[derive(Default)]
 pub(super) struct Playlist {
     pub order: Vec<Track>,
-    draft: Vec<Track>,
     selection: Selection,
     pub open: bool,
 }
 impl Playlist {
     pub fn show(&mut self) {
-        self.draft = self.order.clone();
         self.selection = Selection::default();
         self.open = true;
     }
@@ -73,31 +70,18 @@ impl Playlist {
         self.order.get(self.selection.cursor).map(|t| t.id)
     }
     pub fn append(&mut self, tracks: impl Iterator<Item = Track>) -> usize {
-        let rows = if self.open {
-            &mut self.draft
-        } else {
-            &mut self.order
-        };
+        let rows = &mut self.order;
         let before = rows.len();
         rows.extend(tracks.take(MAX_ORDER.saturating_sub(before)));
         rows.len() - before
     }
     pub fn update_duration(&mut self, id: u64, duration: Duration) {
-        for t in self
-            .order
-            .iter_mut()
-            .chain(self.draft.iter_mut())
-            .filter(|t| t.id == id)
-        {
+        for t in self.order.iter_mut().filter(|t| t.id == id) {
             t.duration = Some(duration);
         }
     }
     pub fn available(&self) -> usize {
-        MAX_ORDER.saturating_sub(if self.open {
-            self.draft.len()
-        } else {
-            self.order.len()
-        })
+        MAX_ORDER.saturating_sub(self.order.len())
     }
     pub fn can_add(&self) -> bool {
         self.available() > 0
@@ -112,21 +96,17 @@ impl Playlist {
             return;
         }
         match id {
-            OK => {
-                self.order = self.draft.clone();
-                self.open = false;
-            }
-            CANCEL => self.open = false,
-            DELETE if !self.draft.is_empty() => {
-                self.draft.remove(self.selection.cursor);
-                self.selection.fit(self.draft.len());
-                self.selection.focus = if self.draft.is_empty() { 2 } else { 3 };
+            CLOSE_LIST => self.open = false,
+            DELETE if !self.order.is_empty() => {
+                self.order.remove(self.selection.cursor);
+                self.selection.fit(self.order.len());
+                self.selection.focus = if self.order.is_empty() { 2 } else { 3 };
             }
             FIELD => self.selection.focus = 0,
-            ROW.. if id < ROW + self.draft.len() => {
+            ROW.. if id < ROW + self.order.len() => {
                 self.selection.cursor = id - ROW;
                 self.selection.focus = 0;
-                self.selection.fit(self.draft.len());
+                self.selection.fit(self.order.len());
             }
             _ => {}
         }
@@ -135,7 +115,7 @@ impl Playlist {
         self.selection.focus = id;
     }
     pub fn key(&mut self, key: KeyEvent) {
-        self.selection.key(key, self.draft.len());
+        self.selection.key(key, self.order.len());
     }
     pub fn wheel(&mut self, down: bool) {
         self.selection.focus = 0;
@@ -163,13 +143,19 @@ impl Playlist {
             .palette
             .styles_for(crate::palette::theme::Group::Dialogs);
         let selected = &self.selection;
-        let mut spec = ctx.dialog(r, selected.focus, language.text("Play order"), OK, CANCEL);
+        let mut spec = ctx.dialog(
+            r,
+            selected.focus,
+            language.text("Playlist"),
+            PLAY_TRACK,
+            CLOSE_LIST,
+        );
         spec.caption(
             Paragraph::new(language.text("Music queue · current session")).style(style(0x78)),
             Rect::new(r.x + 3, r.y + 1, 62, 1),
         );
         let time_width = self
-            .draft
+            .order
             .iter()
             .filter_map(|t| t.duration)
             .map(|d| format_time(d).len())
@@ -190,7 +176,7 @@ impl Playlist {
             crate::turbo::widgets::group_box(""),
             Rect::new(r.x + 2, r.y + 3, 64, 11),
         );
-        let tracks = &self.draft;
+        let tracks = &self.order;
         let items = tracks
             .iter()
             .enumerate()
@@ -252,28 +238,36 @@ impl Playlist {
             );
         }
         spec.caption(
-            Paragraph::new(language.text("Add uses the marked MP3 files in the active panel"))
-                .style(style(0x70)),
+            Paragraph::new(
+                language.text("Add… chooses a music file without interrupting playback"),
+            )
+            .style(style(0x70)),
             Rect::new(r.x + 3, r.y + 14, 62, 1),
         );
         spec.caption(
-            Paragraph::new(language.text("OK applies changes · Cancel discards changes"))
+            Paragraph::new(language.text("Enter plays · Changes apply immediately"))
                 .style(style(0x78)),
             Rect::new(r.x + 3, r.y + 15, 62, 1),
         );
         let buttons = vec![
-            (1, "OK", OK, 2, 12, true),
+            (
+                1,
+                "Play",
+                PLAY_TRACK,
+                3,
+                14,
+                !self.order.is_empty() && cfg!(target_os = "macos"),
+            ),
             (
                 2,
-                "Add",
+                "Add…",
                 ADD,
-                15,
-                12,
+                19,
+                14,
                 cfg!(target_os = "macos") && self.can_add(),
             ),
-            (3, "Delete", DELETE, 28, 12, !self.draft.is_empty()),
-            (4, "Save", SAVE, 41, 12, false),
-            (5, "Cancel", CANCEL, 54, 12, true),
+            (3, "Remove", DELETE, 35, 14, !self.order.is_empty()),
+            (4, "Close", CLOSE_LIST, 51, 14, true),
         ];
         for (id, label, action, x, width, enabled) in buttons {
             let mut c = Control::new(
@@ -299,7 +293,7 @@ impl Playlist {
         let spec = self.controls(ctx);
         let mut frame = NativeFrame::new(ctx.area, ctx.palette);
         frame.render_widget(
-            crate::turbo::widgets::dialog(ctx.language.text("Play order")),
+            crate::turbo::widgets::dialog(ctx.language.text("Playlist")),
             spec.bounds,
         );
         Layer {
