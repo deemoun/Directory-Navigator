@@ -26,6 +26,18 @@ fn document_input_ready(diagnostics: &str, focus: &str) -> bool {
             .is_none_or(|line| line.starts_with("top=SurfaceId { key: Document("))
 }
 
+// A committed frame can be an idle redraw from before the bytes were sent.
+// Acknowledge input as well as pixels before advancing to the next test step.
+fn input_events(diagnostics: &str) -> Option<u64> {
+    diagnostics
+        .lines()
+        .find_map(|line| line.strip_prefix("input_events="))
+        .and_then(|value| value.parse().ok())
+}
+fn input_acknowledged(previous: u64, diagnostics: &str) -> bool {
+    input_events(diagnostics).is_some_and(|current| current > previous)
+}
+
 pub struct Session {
     pub root: PathBuf,
     child: Child,
@@ -196,9 +208,27 @@ impl Session {
     ) -> io::Result<()> {
         self.remember_input(stage, bytes);
         self.pump()?;
+        let previous_input = std::cell::Cell::new(0);
+        self.wait("input diagnostics ready", |s| {
+            let count = fs::read_to_string(s.root.join("settings/dn/diagnostics.txt"))
+                .ok()
+                .and_then(|state| input_events(&state));
+            if let Some(count) = count {
+                previous_input.set(count);
+                true
+            } else {
+                false
+            }
+        })?;
+        let previous_input = previous_input.get();
         let previous = self.screen.revision;
         self.master.write_all(bytes)?;
-        self.wait(stage, |s| s.screen.revision > previous && ready(s))
+        self.wait(stage, |s| {
+            s.screen.revision > previous
+                && fs::read_to_string(s.root.join("settings/dn/diagnostics.txt"))
+                    .is_ok_and(|state| input_acknowledged(previous_input, &state))
+                && ready(s)
+        })
     }
     // Shell/output handoff has no DN screen commit. Its assertions inspect raw
     // alternate-screen or shell acknowledgements rather than application pixels.
@@ -554,6 +584,36 @@ mod tests {
     fn feed(screen: &mut Screen, bytes: &[u8]) {
         screen.pending.extend_from_slice(bytes);
         screen.decode();
+    }
+    #[test]
+    fn idle_redraw_does_not_acknowledge_queued_refresh_input() {
+        let mut screen = Screen::new(80, 25);
+        let ready = "active=WindowInfo { id: WindowId(0), kind: Manager } focus=Manager layout_revision=1\nmodals=[]\npanels_loading=[false, false]\ninput_events=7\n";
+        feed(&mut screen, b"\x1b[24;1H\x1b[?25h");
+        feed(&mut screen, FRAME_END);
+        let previous_frame = screen.revision;
+        // fixture.zip can already be in an initial or idle frame before Ctrl+R
+        // is handled. Neither new pixels nor old ready diagnostics acknowledge it.
+        feed(&mut screen, b"\x1b[6;1Hfixture.zip\x1b[24;1H");
+        feed(&mut screen, FRAME_END);
+        assert!(screen.revision > previous_frame);
+        assert!(screen.text().contains("fixture.zip"));
+        assert!(screen.file_selection_ready(ready));
+        assert!(!super::input_acknowledged(7, ready));
+        let loading = ready
+            .replace("input_events=7", "input_events=8")
+            .replace("[false, false]", "[true, true]");
+        assert!(super::input_acknowledged(7, &loading));
+        assert!(!screen.file_selection_ready(&loading));
+        assert!(screen.file_selection_ready(&ready.replace("input_events=7", "input_events=8")));
+        for incomplete in [
+            "",
+            "input_events=",
+            "input_events=invalid",
+            "input_events=6",
+        ] {
+            assert!(!super::input_acknowledged(7, incomplete));
+        }
     }
     #[test]
     fn manager_chrome_is_not_file_selection_readiness_while_panels_load() {

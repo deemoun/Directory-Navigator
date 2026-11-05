@@ -10,6 +10,7 @@ use std::{
 pub struct Recorder {
     file: Option<File>,
     events: VecDeque<String>,
+    input_events: u64,
     start: Instant,
 }
 impl Recorder {
@@ -28,6 +29,7 @@ impl Recorder {
         Self {
             file,
             events: VecDeque::new(),
+            input_events: 0,
             start: Instant::now(),
         }
     }
@@ -35,6 +37,7 @@ impl Recorder {
         if self.file.is_none() {
             return;
         }
+        self.input_events += 1;
         let description = match event {
             Event::Key(k) => match k.code {
                 KeyCode::Char(_) => format!("character {:?} {:?}", k.modifiers, k.kind),
@@ -56,8 +59,9 @@ impl Recorder {
             return;
         };
         let state = format!(
-            "{}\nrecent events:\n{}\n",
+            "{}\ninput_events={}\nrecent events:\n{}\n",
             dn::testing::diagnostic_state(app),
+            self.input_events,
             self.events.iter().cloned().collect::<Vec<_>>().join("\n")
         );
         let result = (|| -> std::io::Result<()> {
@@ -98,6 +102,7 @@ mod tests {
             let mut recorder = Recorder {
                 file: Some(Recorder::open(&path)?),
                 events: VecDeque::new(),
+                input_events: 0,
                 start: Instant::now(),
             };
             let mut app = dn::app::App::new(temp.0.clone())?;
@@ -111,12 +116,14 @@ mod tests {
                 crossterm::event::KeyModifiers::NONE,
             )));
             assert_eq!(recorder.events.len(), 24);
+            assert_eq!(recorder.input_events, 31);
             app.panels[0].loading = true;
             app.panels[1].loading = false;
             recorder.snapshot(&app);
             let text = std::fs::read_to_string(&path)?;
             assert!(text.contains("paste bytes=13") && text.contains("character"));
             assert!(text.contains("panels_loading=[true, false]"));
+            assert!(text.contains("input_events=31\n"));
             for private in [
                 "PRIVATE_BUFFER",
                 "PRIVATE_PASTE",
