@@ -119,7 +119,7 @@ impl Drop for Stage {
         }
     }
 }
-pub(super) fn component(raw: &[u8]) -> io::Result<OsString> {
+pub(crate) fn component(raw: &[u8]) -> io::Result<OsString> {
     // Reject Windows aliases on every host, keeping archive output portable and
     // preventing name collisions on case-insensitive filesystems.
     let text = std::str::from_utf8(raw)

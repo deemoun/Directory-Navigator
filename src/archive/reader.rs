@@ -394,6 +394,13 @@ pub fn list(path: PathBuf, cancel: &Cancellation) -> io::Result<Catalog> {
     cancel.check()?;
     let format = Format::detect(&path)
         .ok_or_else(|| io::Error::other("Supported formats: ZIP, TAR, TAR.GZ and TGZ"))?;
+    list_format(path, format, cancel)
+}
+pub(crate) fn list_zip(path: PathBuf, cancel: &Cancellation) -> io::Result<Catalog> {
+    list_format(path, Format::Zip, cancel)
+}
+fn list_format(path: PathBuf, format: Format, cancel: &Cancellation) -> io::Result<Catalog> {
+    cancel.check()?;
     let (file, metadata) = source(&path)?;
     let source_identity = crate::platform_fs::entry_identity(&path)?;
     if !crate::platform_fs::owns_file(&path, &file) {
@@ -875,6 +882,49 @@ pub(crate) fn check_password(
     }
     cancel.check()?;
     catalog.validate()
+}
+
+/// APK inspection uses the same checked ZIP source and CRC-validating reader,
+/// with a separate bounded metadata limit rather than the text preview limit.
+pub(crate) fn zip_bytes(
+    catalog: &Catalog,
+    id: usize,
+    limit: u64,
+    cancel: &Cancellation,
+) -> io::Result<Vec<u8>> {
+    let node = catalog
+        .nodes
+        .get(id)
+        .ok_or_else(|| io::Error::other("Unknown ZIP member"))?;
+    if node.kind != Kind::File || node.locked || node.size > limit {
+        return Err(io::Error::other("Unsupported or oversized APK member"));
+    }
+    let (file, metadata) = catalog.checked_source()?;
+    let mut archive = zip_open(file, &metadata, cancel)?;
+    let mut input = zip_entry(
+        &mut archive,
+        node.source
+            .ok_or_else(|| io::Error::other("Missing member source"))?,
+        None,
+    )?;
+    let mut result = Vec::new();
+    let mut buffer = [0; 65536];
+    loop {
+        cancel.check()?;
+        let n = input.read(&mut buffer)?;
+        if n == 0 {
+            break;
+        }
+        if result.len() as u64 + n as u64 > limit {
+            return Err(io::Error::other("APK member exceeds inspection limit"));
+        }
+        result.extend_from_slice(&buffer[..n]);
+    }
+    if result.len() as u64 != node.size {
+        return Err(io::Error::other("APK member size mismatch"));
+    }
+    catalog.validate()?;
+    Ok(result)
 }
 
 #[cfg(test)]

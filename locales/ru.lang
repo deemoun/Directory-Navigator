@@ -989,3 +989,76 @@ Enter plays · Changes apply immediately	Enter запускает · Измен�
 Choose an MP3, FLAC, WAV or Ogg Vorbis file	Выберите файл MP3, FLAC, WAV или Ogg Vorbis
 MP3, FLAC, WAV and Ogg Vorbis playback is available on macOS. Enable this plugin in Options > Configuration > Plugins.\nOpen… uses DN's file picker to add and play one music file, keeping the queue and reusing an existing entry. Playlist… opens the live queue: Enter or Play starts the highlighted track; Add… chooses a file without interrupting playback. Remove applies immediately and stops playback if the current track is removed. Close/Esc keeps queue changes. Playlists are session-only; there is no playlist-file saving.\nUtilities > Add music to player imports marked files or folders from the active panel; without marks it uses the cursor entry. Folders are scanned recursively in name order, skipping links. The queue holds 64 entries. Cancel discards the whole import; closing the player cancels it too.\nPlay/Pause toggles playback; Stop resets the position. Outer arrows select previous/next tracks; −5s/+5s use the saved seek step. Volume −/+ adjusts by 10 percentage points immediately for the session only. Settings… edits the saved seek step and default volume with OK/Cancel. The elapsed/remaining control switches the single time display; remaining time has a minus sign and unknown time shows --:--. The progress bar always shows elapsed position and is display-only. Artist/title and a volume meter appear in the expanded view; the compact counter stays unchanged.\nShuffle applies immediately. Repeat opens an owned Off/One/All selector: Enter or click applies, Esc cancels. Repeat One affects automatic endings, not manual Previous/Next. Shuffle visits each track once; Previous retraces the order. Queue changes rebuild the shuffled cycle.\nInfo… shows title, artist, album and path. Track lengths and supported tags are read in the background without an audio device. Errors remain visible. Music continues while working in other windows. Closing the player, disabling the plugin or quitting DN stops audio.\nTab/Shift+Tab select controls; Enter/Space activates them. F1 opens Help. Alt+Z switches compact/expanded views; Ctrl+F5 moves the player. Open and Add file pickers can be cancelled without changing the queue or playback.	MP3, FLAC, WAV и Ogg Vorbis воспроизводятся в macOS. Включите плагин в настройках.\nОткрыть… выбирает музыкальный файл, добавляет его в очередь и запускает. Существующий элемент используется повторно. Плейлист… открывает живую очередь: Enter или Играть запускает выбранный трек; Добавить… выбирает файл без остановки музыки. Удалить сразу убирает трек из очереди; удаление текущего останавливает музыку. Закрыть/Esc сохраняет изменения очереди. Плейлист хранится только в сеансе.\nУтилиты > Добавить музыку в плеер импортирует отмеченные файлы и папки панели или текущий элемент. Папки сканируются рекурсивно по имени, ссылки пропускаются. Предел — 64 трека. Отмена отклоняет весь импорт, закрытие плеера отменяет его.\nИграть/Пауза переключает воспроизведение, Стоп сбрасывает позицию. Внешние стрелки выбирают трек; −5s/+5s используют шаг перемотки из настроек. Громкость −/+ меняется сразу на 10 процентных пунктов только в сеансе. Настройки… меняют сохранённый шаг и начальную громкость через OK/Отмена. Прошло/Осталось переключает время; оставшееся отмечено минусом, неизвестное показано --:--.\nПеремешивание применяется сразу. Повтор открывает выбор Выкл/Один/Все: Enter или щелчок применяет, Esc отменяет. Один действует при завершении трека, а не при ручном переключении. Перемешивание проходит все треки один раз, назад возвращает по тому же порядку. Изменение очереди перестраивает цикл.\nСведения… показывают название, исполнителя, альбом и путь. Длительность и теги читаются в фоне. Ошибки остаются видимыми. Музыка играет при работе в других окнах; закрытие плеера, отключение плагина или выход из DN останавливает её.\nTab/Shift+Tab выбирают кнопки, Enter/Пробел нажимают их. F1 — справка. Alt+Z переключает вид, Ctrl+F5 перемещает плеер. Отмена выбора файла сохраняет очередь и воспроизведение.\nВ развёрнутом виде исполнитель и название показаны отдельно, время не дублируется. Полоса позиции показывает прошедшее время и не управляет перемоткой. Компактный счётчик сохранён.
 Loading audio…	Загрузка аудио…
+APK Workshop	APK Workshop
+APK ~W~orkshop	APK ~W~orkshop
+Overview	Обзор
+Files	Файлы
+Manifest	Manifest
+DEX	DEX
+Changes	Правки
+Device	Девайс
+Open...	Открыть...
+Project...	Проект...
+Files dir	Папка файлов
+Export...	Экспорт...
+Sign...	Подписать...
+Tools...	Инструменты
+View XML	XML
+Manifest...	Manifest...
+Reset	Сброс
+Test key...	Тест. ключ...
+String uses	Где строка
+Devices	Девайсы
+Install	Установ.
+Launch	Пуск
+Stop log	Стоп лог
+Logcat	Logcat
+Save log	Сохр.лог
+Debuggable (true/false)	Отладка (true/false)
+Version code	Код версии
+Version name	Имя версии
+Permissions (; separated)	Разрешения (через ;)
+Filesystem destination	Каталог назначения
+Keystore	Хранилище ключей
+Key alias	Псевдоним ключа
+New test keystore path	Путь нового тестового ключа
+ADB executable	Исполняемый файл ADB
+zipalign executable	Исполняемый файл zipalign
+apksigner.jar	apksigner.jar
+Java executable	Исполняемый файл Java
+keytool executable	Исполняемый файл keytool
+Working... Esc cancels	Обработка... Esc — отмена
+An APK task is already running	Задача APK уже выполняется
+Create a project first	Сначала создайте проект
+Android tool paths applied for this session	Пути инструментов применены для этого сеанса
+Operation cancelled	Операция отменена
+Open an APK or an APK project	Откройте APK или APK-проект
+Project saved	Проект сохранён
+APK exported successfully	APK успешно экспортирован
+Log saved	Журнал сохранён
+Logcat stopped or device disconnected	Logcat остановлен или устройство отключено
+Select a connected device first	Сначала выберите подключённое устройство
+Export and sign an APK first	Сначала экспортируйте и подпишите APK
+No launcher activity found	Стартовая Activity не найдена
+Enter a string query in Filter first	Сначала введите строку в поле «Фильтр»
+Create a project and select an editable file	Создайте проект и выберите редактируемый файл
+Signing requires zipalign, apksigner.jar and Java	Для подписи нужны zipalign, apksigner.jar и Java
+Preview ready; activate Workshop and request View again	Просмотр готов; активируйте Workshop и нажмите «Просмотр»
+Package	Пакет
+Debuggable	Отладка
+Components	Компоненты
+Partial inspection	Неполный разбор
+ABI	ABI
+SDK	SDK
+APK Workshop: inspect APKs without apktool.\nOverview / Files / Manifest / DEX / Changes / Device.\nEnter opens folders or previews a file/method. F3 previews; F4 edits working files; F5 extracts.\nOpen accepts .apk or apk-project.toml. Project creates a persistent copy in a new folder; Files dir opens its editable files in DN. Add/delete files there, then Refresh. Original APKs are never modified.\nManifest edits: debuggable, version code/name and ordinary permissions. DEX, native libraries and compiled resources are read-only. Java decompilation, split APKs and Smali rebuilding are not supported.\nExport creates a new unsigned APK. Sign requires SDK zipalign, apksigner.jar and Java, plus your keystore or an explicitly created test key. Test key alias: androiddebugkey; password: android. Passwords are never saved.\nDevice requires ADB. Select a connected device, install a signed export, launch, stop or view logcat. Filter applies to displayed log lines. This is log/crash debugging, not a breakpoint debugger.\nEsc cancels the current task/page; closing stops owned logcat processes. F1: Help.	APK Workshop: исследование APK без apktool.\nРазделы: обзор, файлы, manifest, DEX, изменения и устройство.\nEnter открывает папку или просмотр. F3 — просмотр, F4 — правка рабочих файлов, F5 — извлечение.\n«Открыть» принимает .apk и apk-project.toml. «Проект» создаёт постоянную рабочую копию в новой папке. «Папка файлов» открывает редактируемые файлы в DN: добавляйте и удаляйте их, затем нажмите «Обновить». Исходный APK не меняется.\nПравки manifest: debuggable, код/имя версии, обычные разрешения. DEX, библиотеки и скомпилированные ресурсы доступны только для чтения. Нет декомпиляции Java, split APK и пересборки Smali.\n«Экспорт» создаёт неподписанный APK. Для подписи нужны SDK zipalign, apksigner.jar, Java и keystore. Можно явно создать тестовый ключ: псевдоним androiddebugkey, пароль android. Пароли не сохраняются.\nДля устройства нужен ADB. Выберите устройство, установите подписанный результат, запускайте, останавливайте и читайте logcat. Фильтр действует на показанные строки. Отладка здесь — логи и падения, без точек останова.\nEsc отменяет задачу или страницу; закрытие останавливает собственный logcat. F1 — справка.
+Project…	Проект…
+Work dir	Файлы
+Export…	Экспорт…
+Sign…	Подпись…
+Tools…	SDK…
+Extract…	Извлечь…
+Test key	Ключ…
+Uses	Ссылки
+Discard changes to this file?	Отменить изменения этого файла?
+APK Workshop Help	Справка APK Workshop
+Key password (blank: same password)	Пароль ключа (пусто: тот же пароль)

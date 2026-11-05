@@ -78,7 +78,7 @@ fn settings_draft_cancel_commit_disable_live_game_and_reenable_keep_scores() -> 
         .unwrap();
     a.desktop.activate(dn::desktop::WindowId::MANAGER);
     a.open_settings(SettingsKind::Plugins);
-    assert_eq!(a.modals.settings().unwrap().control_count(), 4);
+    assert_eq!(a.modals.settings().unwrap().control_count(), 5);
     key(&mut a, K::Tab);
     key(&mut a, K::Tab);
     key(&mut a, K::Char(' '));
@@ -163,7 +163,7 @@ fn plugins_dialog_localized_native_controls_mouse_keyboard_and_immutable_render(
             key(&mut a, K::BackTab);
             assert_eq!(a.modals.settings().unwrap().cursor, 0);
             key(&mut a, K::BackTab);
-            assert_eq!(a.modals.settings().unwrap().cursor, 5);
+            assert_eq!(a.modals.settings().unwrap().cursor, 6);
             let snap = dn::layout::prepare_window(
                 &mut a,
                 dn::testing::layout::Rect::new(7, 3, 80, 25),
@@ -367,19 +367,19 @@ fn internal_mp3_option_follows_plugin_draft_and_preserves_cancel() -> io::Result
         .mouse
         .regions
         .iter()
-        .any(|(_, t)| *t == Target::Setting(3)));
+        .any(|(_, t)| *t == Target::Setting(4)));
     click(&mut a, Target::Setting(1));
     draw(&mut a, 80, 25)?;
     assert_eq!(
         a.mouse
             .regions
             .iter()
-            .any(|(_, t)| *t == Target::Setting(3)),
+            .any(|(_, t)| *t == Target::Setting(4)),
         cfg!(target_os = "macos")
     );
     #[cfg(target_os = "macos")]
     {
-        click(&mut a, Target::Setting(3));
+        click(&mut a, Target::Setting(4));
         assert!(a.modals.settings().unwrap().draft.mp3.play_on_enter);
         click(&mut a, Target::Setting(1));
         draw(&mut a, 80, 25)?;
@@ -387,7 +387,7 @@ fn internal_mp3_option_follows_plugin_draft_and_preserves_cancel() -> io::Result
             .mouse
             .regions
             .iter()
-            .any(|(_, t)| *t == Target::Setting(3)));
+            .any(|(_, t)| *t == Target::Setting(4)));
         assert!(a.modals.settings().unwrap().draft.mp3.play_on_enter);
     }
     click(&mut a, Target::CancelSettings);
@@ -398,7 +398,7 @@ fn internal_mp3_option_follows_plugin_draft_and_preserves_cancel() -> io::Result
         draw(&mut a, 80, 25)?;
         click(&mut a, Target::Setting(1));
         draw(&mut a, 80, 25)?;
-        click(&mut a, Target::Setting(3));
+        click(&mut a, Target::Setting(4));
         click(&mut a, Target::AcceptSettings);
         assert!(a.config.mp3.play_on_enter && a.config.plugin_enabled(MP3_PLAYER));
     }

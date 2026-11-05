@@ -987,3 +987,76 @@ Enter plays · Changes apply immediately	Enter plays · Changes apply immediatel
 Choose an MP3, FLAC, WAV or Ogg Vorbis file	Choose an MP3, FLAC, WAV or Ogg Vorbis file
 MP3, FLAC, WAV and Ogg Vorbis playback is available on macOS. Enable this plugin in Options > Configuration > Plugins.\nOpen… uses DN's file picker to add and play one music file, keeping the queue and reusing an existing entry. Playlist… opens the live queue: Enter or Play starts the highlighted track; Add… chooses a file without interrupting playback. Remove applies immediately and stops playback if the current track is removed. Close/Esc keeps queue changes. Playlists are session-only; there is no playlist-file saving.\nUtilities > Add music to player imports marked files or folders from the active panel; without marks it uses the cursor entry. Folders are scanned recursively in name order, skipping links. The queue holds 64 entries. Cancel discards the whole import; closing the player cancels it too.\nPlay/Pause toggles playback; Stop resets the position. Outer arrows select previous/next tracks; −5s/+5s use the saved seek step. Volume −/+ adjusts by 10 percentage points immediately for the session only. Settings… edits the saved seek step and default volume with OK/Cancel. The elapsed/remaining control switches the single time display; remaining time has a minus sign and unknown time shows --:--. The progress bar always shows elapsed position and is display-only. Artist/title and a volume meter appear in the expanded view; the compact counter stays unchanged.\nShuffle applies immediately. Repeat opens an owned Off/One/All selector: Enter or click applies, Esc cancels. Repeat One affects automatic endings, not manual Previous/Next. Shuffle visits each track once; Previous retraces the order. Queue changes rebuild the shuffled cycle.\nInfo… shows title, artist, album and path. Track lengths and supported tags are read in the background without an audio device. Errors remain visible. Music continues while working in other windows. Closing the player, disabling the plugin or quitting DN stops audio.\nTab/Shift+Tab select controls; Enter/Space activates them. F1 opens Help. Alt+Z switches compact/expanded views; Ctrl+F5 moves the player. Open and Add file pickers can be cancelled without changing the queue or playback.	MP3, FLAC, WAV and Ogg Vorbis playback is available on macOS. Enable this plugin in Options > Configuration > Plugins.\nOpen… uses DN's file picker to add and play one music file, keeping the queue and reusing an existing entry. Playlist… opens the live queue: Enter or Play starts the highlighted track; Add… chooses a file without interrupting playback. Remove applies immediately and stops playback if the current track is removed. Close/Esc keeps queue changes. Playlists are session-only; there is no playlist-file saving.\nUtilities > Add music to player imports marked files or folders from the active panel; without marks it uses the cursor entry. Folders are scanned recursively in name order, skipping links. The queue holds 64 entries. Cancel discards the whole import; closing the player cancels it too.\nPlay/Pause toggles playback; Stop resets the position. Outer arrows select previous/next tracks; −5s/+5s use the saved seek step. Volume −/+ adjusts by 10 percentage points immediately for the session only. Settings… edits the saved seek step and default volume with OK/Cancel. The elapsed/remaining control switches the single time display; remaining time has a minus sign and unknown time shows --:--. The progress bar always shows elapsed position and is display-only. Artist/title and a volume meter appear in the expanded view; the compact counter stays unchanged.\nShuffle applies immediately. Repeat opens an owned Off/One/All selector: Enter or click applies, Esc cancels. Repeat One affects automatic endings, not manual Previous/Next. Shuffle visits each track once; Previous retraces the order. Queue changes rebuild the shuffled cycle.\nInfo… shows title, artist, album and path. Track lengths and supported tags are read in the background without an audio device. Errors remain visible. Music continues while working in other windows. Closing the player, disabling the plugin or quitting DN stops audio.\nTab/Shift+Tab select controls; Enter/Space activates them. F1 opens Help. Alt+Z switches compact/expanded views; Ctrl+F5 moves the player. Open and Add file pickers can be cancelled without changing the queue or playback.
 Loading audio…	Loading audio…
+APK Workshop	APK Workshop
+APK ~W~orkshop	APK ~W~orkshop
+Overview	Overview
+Files	Files
+Manifest	Manifest
+DEX	DEX
+Changes	Changes
+Device	Device
+Open...	Open...
+Project...	Project...
+Files dir	Files dir
+Export...	Export...
+Sign...	Sign...
+Tools...	Tools...
+View XML	View XML
+Manifest...	Manifest...
+Reset	Reset
+Test key...	Test key...
+String uses	String uses
+Devices	Devices
+Install	Install
+Launch	Launch
+Stop log	Stop log
+Logcat	Logcat
+Save log	Save log
+Debuggable (true/false)	Debuggable (true/false)
+Version code	Version code
+Version name	Version name
+Permissions (; separated)	Permissions (; separated)
+Filesystem destination	Filesystem destination
+Keystore	Keystore
+Key alias	Key alias
+New test keystore path	New test keystore path
+ADB executable	ADB executable
+zipalign executable	zipalign executable
+apksigner.jar	apksigner.jar
+Java executable	Java executable
+keytool executable	keytool executable
+Working... Esc cancels	Working... Esc cancels
+An APK task is already running	An APK task is already running
+Create a project first	Create a project first
+Android tool paths applied for this session	Android tool paths applied for this session
+Operation cancelled	Operation cancelled
+Open an APK or an APK project	Open an APK or an APK project
+Project saved	Project saved
+APK exported successfully	APK exported successfully
+Log saved	Log saved
+Logcat stopped or device disconnected	Logcat stopped or device disconnected
+Select a connected device first	Select a connected device first
+Export and sign an APK first	Export and sign an APK first
+No launcher activity found	No launcher activity found
+Enter a string query in Filter first	Enter a string query in Filter first
+Create a project and select an editable file	Create a project and select an editable file
+Signing requires zipalign, apksigner.jar and Java	Signing requires zipalign, apksigner.jar and Java
+Preview ready; activate Workshop and request View again	Preview ready; activate Workshop and request View again
+Package	Package
+Debuggable	Debuggable
+Components	Components
+Partial inspection	Partial inspection
+ABI	ABI
+SDK	SDK
+APK Workshop: inspect APKs without apktool.\nOverview / Files / Manifest / DEX / Changes / Device.\nEnter opens folders or previews a file/method. F3 previews; F4 edits working files; F5 extracts.\nOpen accepts .apk or apk-project.toml. Project creates a persistent copy in a new folder; Files dir opens its editable files in DN. Add/delete files there, then Refresh. Original APKs are never modified.\nManifest edits: debuggable, version code/name and ordinary permissions. DEX, native libraries and compiled resources are read-only. Java decompilation, split APKs and Smali rebuilding are not supported.\nExport creates a new unsigned APK. Sign requires SDK zipalign, apksigner.jar and Java, plus your keystore or an explicitly created test key. Test key alias: androiddebugkey; password: android. Passwords are never saved.\nDevice requires ADB. Select a connected device, install a signed export, launch, stop or view logcat. Filter applies to displayed log lines. This is log/crash debugging, not a breakpoint debugger.\nEsc cancels the current task/page; closing stops owned logcat processes. F1: Help.	APK Workshop: inspect APKs without apktool.\nOverview / Files / Manifest / DEX / Changes / Device.\nEnter opens folders or previews a file/method. F3 previews; F4 edits working files; F5 extracts.\nOpen accepts .apk or apk-project.toml. Project creates a persistent copy in a new folder; Files dir opens its editable files in DN. Add/delete files there, then Refresh. Original APKs are never modified.\nManifest edits: debuggable, version code/name and ordinary permissions. DEX, native libraries and compiled resources are read-only. Java decompilation, split APKs and Smali rebuilding are not supported.\nExport creates a new unsigned APK. Sign requires SDK zipalign, apksigner.jar and Java, plus your keystore or an explicitly created test key. Test key alias: androiddebugkey; password: android. Passwords are never saved.\nDevice requires ADB. Select a connected device, install a signed export, launch, stop or view logcat. Filter applies to displayed log lines. This is log/crash debugging, not a breakpoint debugger.\nEsc cancels the current task/page; closing stops owned logcat processes. F1: Help.
+Project…	Project…
+Work dir	Work dir
+Export…	Export…
+Sign…	Sign…
+Tools…	Tools…
+Extract…	Extract…
+Test key	Test key
+Uses	Uses
+Discard changes to this file?	Discard changes to this file?
+APK Workshop Help	APK Workshop Help
+Key password (blank: same password)	Key password (blank: same password)

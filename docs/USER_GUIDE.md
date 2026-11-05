@@ -1286,3 +1286,50 @@ to 8 MiB, 100,000 output rows, 64 nested containers and 200,000 style spans.
 Malformed Markdown is displayed tolerantly; exceeded limits or renderer failures
 show source with a notice. Parsing is cancellable and document-owned; stale
 replies cannot replace newer edits or activate an inactive window.
+
+### APK Workshop
+
+Enable **APK Workshop** in Options → Configuration → Plugins (off by default).
+Enter/double-click on a regular `.apk` opens this plugin before file associations;
+explicit OS opening still bypasses it. Utilities → APK Workshop also opens APKs
+or `apk-project.toml` through the native file picker.
+
+The independent DN document has Overview, Files, Manifest, DEX, Changes and Device
+pages. F3 previews; Enter enters a folder or previews a member/method; Backspace
+returns to a parent. F4 opens an editable project file in DN's editor. F5 extracts
+the selected member/folder through Transfer Center. Use Filter to search visible
+rows; DEX → String uses finds references in method instructions. DEX inspection
+is read-only and shows instruction offsets, code units and resolved string/method
+references; it does not reconstruct Java. Unsupported DEX/resource structures are
+reported as partial inspection, not silently treated as complete.
+
+Project creates a **new** persistent directory with `source.apk`, `files/` and
+`apk-project.toml`. Open the metadata file later to resume. Files dir opens the
+working files in the manager: ordinary DN create/delete/edit controls work there.
+Refresh updates Changes. Restore discards the selected file's change (or manifest
+changes); there is no undo for this explicit restore. Assets and other ordinary
+files are editable; DEX, compiled resources, native libraries and signature files
+remain protected. Manifest offers debuggable, version code/name and ordinary
+uses-permission edits; the readable XML is a preview, not an editable build source.
+Resource string/configuration values are shown with the Manifest listing when
+supported. The original selected APK is never changed.
+
+Export creates a new **unsigned** APK, removing obsolete signature records while
+preserving unrelated META-INF entries. Sign runs SDK zipalign, apksigner and
+verification before publishing a new APK. Tools edits SDK paths for the session;
+auto-detection uses PATH, Android SDK environment variables/default locations,
+and JAVA_HOME/Android Studio's runtime when available. Java is used only for SDK
+signing/key generation. No apktool, SDK download or network service is required
+for inspection. Test key explicitly creates a new keystore: alias
+`androiddebugkey`, password `android` (testing only). A custom keystore and alias
+can be used instead; a separate key password is optional (blank reuses the keystore password).
+Passwords are not saved in configuration, projects or logs.
+
+Device → Devices explicitly invokes ADB. Select a device with state `device`,
+then Install a signed export, Launch the detected launcher activity, Stop or
+start/stop Logcat. Multiple devices require a choice; unauthorized/offline devices
+cannot be used. Logcat keeps a bounded recent history, supports text filtering,
+and Save log writes to a new file. Closing the plugin stops its own processes,
+without killing the shared ADB server. DN does not uninstall apps to resolve a
+signature mismatch. The first release supports standalone APKs, not split/APK
+sets, AAB, Smali rewriting or breakpoint/native debugging.

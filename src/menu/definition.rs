@@ -88,6 +88,7 @@ pub const ROOTS: &[Root] = &[
             ),
             line(),
             item("~C~alculator", "Ctrl+K", Plugin(crate::plugins::CALCULATOR)),
+            item("APK ~W~orkshop", "", Plugin(crate::plugins::APK_WORKSHOP)),
             item("Mu~s~ic Player", "", Plugin(crate::plugins::MP3_PLAYER)),
             item("~A~dd music to player", "", AddMp3),
             item(

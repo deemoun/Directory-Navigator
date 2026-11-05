@@ -219,3 +219,12 @@ than external DOS packers. AES support and ephemeral credential clearing use the
 Markdown parsing uses `pulldown-cmark` (MIT), with its table, task-list and
 strikethrough extensions. DN supplies terminal rendering, source mapping and
 editor preview behavior. No browser engine or HTML execution is used.
+
+## APK Workshop design references
+
+APK Workshop is a native Rust implementation using Android's documented binary
+formats (AOSP `androidfw/ResourceTypes.h` and the Dalvik executable specification).
+The workflow was inspired by PulseAPK Core, https://github.com/deemoun/PulseAPK-Core
+(Apache-2.0). No PulseAPK source code, apktool, Java decompiler, Android SDK binaries
+or signing keys are distributed with DN. Android SDK tools are optional separately
+installed programs; DN's own ZIP reader and publication safeguards are reused.

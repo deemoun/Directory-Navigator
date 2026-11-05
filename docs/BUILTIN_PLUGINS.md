@@ -220,3 +220,18 @@ current entry, permutes the rest and supports Previous; Repeat All wraps that
 same cycle. Repeat One applies only at EOF. Queue changes rebuild the cycle;
 repeat-only mode changes preserve it. Modes/import/Info remain macOS-only and
 preferences are session-local.
+
+## APK Workshop
+
+`apk_workshop` is an opt-in document on every platform. Its typed host effects
+open snapshot viewers, real project files in the editor, the working directory
+in the manager, or a captured archive extraction request. Native paths are never
+constructed from display labels; SDK jobs use literal arguments and never invoke
+apktool or an implicit command shell. Each live binding owns its request scope,
+private staging and logcat process. Closing cancels work and retires its pages;
+inactive completions update only that tool and cannot open another document.
+
+Projects are explicit persistent user directories, not DN settings or system-temp
+workspaces. SDK path edits and the last device/export are session-only. The
+existing configuration mechanism stores only the plugin's enabled override.
+See the user guide for supported binary structures and editing restrictions.

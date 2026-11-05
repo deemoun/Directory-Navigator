@@ -1,3 +1,4 @@
+pub mod apk;
 pub const APPLICATION_NAME: &str = "Directory Navigator";
 pub const DISPLAY_VERSION: &str = env!("CARGO_PKG_VERSION");
 

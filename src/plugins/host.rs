@@ -132,6 +132,32 @@ pub(crate) fn open(app: &mut App, id: PluginId) {
             .tool
             .open(&ctx);
     }
+    if id == APK_WORKSHOP {
+        let panel = &app.panels[app.active];
+        let path = (!panel.is_archive() && !panel.loading)
+            .then(|| panel.entries.get(panel.cursor))
+            .flatten()
+            .filter(|e| {
+                !e.directory
+                    && !e.symlink
+                    && e.path
+                        .extension()
+                        .is_some_and(|s| s.eq_ignore_ascii_case("apk"))
+            })
+            .map(|e| e.path.clone());
+        let base = panel.path.clone();
+        let destination = (!app.panels[1 - app.active].is_archive())
+            .then(|| app.panels[1 - app.active].path.clone());
+        dispatch(
+            app,
+            b,
+            Event::ApkContext {
+                base,
+                destination,
+                path,
+            },
+        );
+    }
 }
 /// Feedback and dispatch must agree on which keys use shared controls.
 pub(crate) fn uses_controls(app: &App, key: KeyEvent) -> bool {
@@ -195,6 +221,49 @@ fn apply(app: &mut App, b: Binding, effects: Vec<Effect>) {
             continue;
         }
         match effect {
+            Effect::ApkPreview { label, data } if b.plugin == APK_WORKSHOP => {
+                if data.len() <= 8 * 1024 * 1024 {
+                    let contents = crate::viewer::from_bytes(data, crate::viewer::ViewMode::Auto);
+                    let markdown = crate::markdown::is_path(std::path::Path::new(&label));
+                    app.show_viewer(crate::viewer::Viewer::from_archive_contents(
+                        label.into(),
+                        contents,
+                        markdown,
+                    ));
+                }
+            }
+            Effect::ApkEdit(path) if b.plugin == APK_WORKSHOP => {
+                crate::editor::open_path(app, path)
+            }
+            Effect::ApkDirectory(path) if b.plugin == APK_WORKSHOP => {
+                if crate::archive::extract::Destination::capture(&path)
+                    .and_then(|_| std::fs::read_dir(&path).map(|_| ()))
+                    .is_ok()
+                {
+                    crate::windowing::activate(app, crate::desktop::WindowId::MANAGER);
+                    app.panels[app.active].go_to(path, app.config.show_hidden);
+                } else {
+                    app.error("Cannot open APK working directory");
+                }
+            }
+            Effect::ApkExtract {
+                selection,
+                destination,
+            } if b.plugin == APK_WORKSHOP => {
+                if let Err(e) = crate::transfers::submit_extraction(
+                    app,
+                    selection,
+                    destination,
+                    Default::default(),
+                    None,
+                ) {
+                    app.error(e);
+                }
+            }
+            Effect::ApkPreview { .. }
+            | Effect::ApkEdit(_)
+            | Effect::ApkDirectory(_)
+            | Effect::ApkExtract { .. } => {}
             Effect::Close => match b.owner {
                 Owner::Modal(_) => {
                     app.modals.set_plugin_dialog(None);
@@ -544,6 +613,23 @@ pub(crate) fn play_mp3(app: &mut App, path: PathBuf) -> bool {
     open(app, MP3_PLAYER);
     if let Some(b) = active(app).filter(|b| b.plugin == MP3_PLAYER) {
         dispatch(app, b, Event::PlayMp3(path));
+    }
+    true
+}
+
+/// APK association receives only a captured native regular file, never an archive label.
+pub(crate) fn open_apk(app: &mut App, path: PathBuf) -> bool {
+    if !app.config.plugin_enabled(APK_WORKSHOP)
+        || !path
+            .extension()
+            .is_some_and(|s| s.eq_ignore_ascii_case("apk"))
+    {
+        return false;
+    }
+    let already_open = app.desktop.plugins.binding(APK_WORKSHOP).is_some();
+    open(app, APK_WORKSHOP);
+    if let Some(b) = active(app).filter(|b| b.plugin == APK_WORKSHOP && already_open) {
+        dispatch(app, b, Event::OpenApk(path));
     }
     true
 }

@@ -1,4 +1,5 @@
 //! Built-in tools. Internal Rust API: no binary ABI, loader or third-party SDK.
+pub(crate) mod apk_workshop;
 pub(crate) mod calculator;
 pub(crate) mod host;
 pub(crate) mod mp3_player;
@@ -25,11 +26,12 @@ use std::{
 pub struct PluginId(pub &'static str);
 pub const CALCULATOR: PluginId = PluginId("calculator");
 pub const TETRIS: PluginId = PluginId("tetris");
+pub const APK_WORKSHOP: PluginId = PluginId("apk_workshop");
 pub const MP3_PLAYER: PluginId = PluginId("mp3_player");
 /// Compiled-in defaults are separate from explicit user overrides. Unknown tools
 /// retain the original enabled default; experimental built-ins opt out here.
 pub fn enabled_by_default(id: PluginId) -> bool {
-    const DEFAULT_DISABLED: &[PluginId] = &[MP3_PLAYER];
+    const DEFAULT_DISABLED: &[PluginId] = &[MP3_PLAYER, APK_WORKSHOP];
     !DEFAULT_DISABLED.contains(&id)
 }
 
@@ -112,6 +114,12 @@ impl Context {
     }
 }
 pub(crate) enum Event<'a> {
+    OpenApk(PathBuf),
+    ApkContext {
+        base: PathBuf,
+        destination: Option<PathBuf>,
+        path: Option<PathBuf>,
+    },
     Key(KeyEvent),
     Paste(&'a str),
     Action(ActionId),
@@ -128,6 +136,16 @@ pub(crate) enum Event<'a> {
     },
 }
 pub(crate) enum Effect {
+    ApkPreview {
+        label: String,
+        data: Vec<u8>,
+    },
+    ApkEdit(PathBuf),
+    ApkDirectory(PathBuf),
+    ApkExtract {
+        selection: crate::archive::Extraction,
+        destination: PathBuf,
+    },
     Close,
     CopyText(String),
     RequestMusicFile {
@@ -205,6 +223,8 @@ impl Default for Runtime {
             entries: BTreeMap::new(),
             now: Instant::now(),
         };
+        s.register(Box::<apk_workshop::ApkWorkshop>::default())
+            .expect("APK Workshop ID");
         s.register(Box::<calculator::CalculatorPlugin>::default())
             .expect("calculator ID");
         s.register(Box::<mp3_player::Mp3Player>::default())
@@ -231,7 +251,19 @@ impl Runtime {
         Ok(())
     }
     pub(crate) fn definitions(&self) -> impl Iterator<Item = Definition> + '_ {
-        self.entries.values().map(|e| e.tool.definition())
+        // Preserve established settings positions when adding optional tools.
+        let mut definitions = self
+            .entries
+            .values()
+            .map(|e| e.tool.definition())
+            .collect::<Vec<_>>();
+        definitions.sort_by_key(|d| match d.id {
+            CALCULATOR => 0,
+            MP3_PLAYER => 1,
+            TETRIS => 2,
+            _ => 3,
+        });
+        definitions.into_iter()
     }
     pub(crate) fn definition(&self, id: PluginId) -> Option<Definition> {
         self.entries.get(&id).map(|e| e.tool.definition())

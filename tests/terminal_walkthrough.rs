@@ -1,4 +1,6 @@
 #![cfg(target_os = "macos")]
+#[path = "support/apk.rs"]
+mod apk_fixture;
 #[path = "support/pty.rs"]
 mod pty;
 use pty::Session;
@@ -815,7 +817,9 @@ fn mp3_real_queue_help_cancel_and_volume_restore_terminal() -> io::Result<()> {
     s.send(b"\t \r", "enable player", |s| s.command_prompt_active())?;
     s.select_file("queue-track.mp3")?;
     s.send(b"\x1bua", "import selection", |s| {
-        s.text().contains("Music Player") && !s.text().contains("Adding music files")
+        s.text().contains("Music Player")
+            && !s.text().contains("Adding music files")
+            && s.plugin_document_ready()
     })?;
     s.send(b"\x1bz", "expand", |s| s.text().contains("Volume"))?;
     music_click(&mut s, "Playlist…", "live queue", |s| {
@@ -829,7 +833,7 @@ fn mp3_real_queue_help_cancel_and_volume_restore_terminal() -> io::Result<()> {
             && !s.text().contains("Music Player Help")
     })?;
     s.send(b"\x1b", "close queue", |s| {
-        !s.text().contains("Music queue · current session")
+        !s.text().contains("Music queue · current session") && s.plugin_document_ready()
     })?;
     music_click_row(
         &mut s,
@@ -846,6 +850,14 @@ fn mp3_real_queue_help_cancel_and_volume_restore_terminal() -> io::Result<()> {
         |s| s.text().contains("50%"),
     )?;
     s.resize(100, 32)?;
+    // SIGWINCH can flush a key sent before the resized desktop is committed.
+    s.wait("player resize committed", |s| {
+        s.text()
+            .lines()
+            .last()
+            .is_some_and(|line| line.contains("F10 Quit"))
+            && s.text().contains("Volume")
+    })?;
     s.send(b"\x1b[17;3~", "work in manager", |s| {
         s.command_prompt_active()
     })?;
@@ -1894,5 +1906,94 @@ fn markdown_viewer_and_unsaved_editor_preview_restore_terminal() -> io::Result<(
         })?;
     }
     assert!(!fs::read_to_string(&path)?.contains("UNSAVED"));
+    s.finish()
+}
+
+#[test]
+fn apk_workshop_inspect_project_patch_export_and_terminal_restoration() -> io::Result<()> {
+    let mut s = Session::with_preferences("apk-workshop", "[plugins]\nenabled=['apk_workshop']\n")?;
+    s.wait("manager ready", |s| {
+        s.command_prompt_active() && s.text().contains("item-000.")
+    })?;
+    apk_fixture::write(&s.root.join("fixture.apk"))?;
+    s.send(b"\x12", "refresh APK fixture", |s| {
+        s.text().contains("fixture.apk") && s.command_prompt_active()
+    })?;
+    s.select_file("fixture.apk")?;
+    s.send(b"\r", "Enter opens APK Workshop", |s| {
+        s.text().contains("org.dn.fixture") && s.text().contains("Overview")
+    })?;
+    music_click(&mut s, "Files", "APK files", |s| {
+        s.text().contains("Extract…") && s.text().contains("resources.arsc")
+    })?;
+    music_click_row(&mut s, "assets", None, "select assets", |s| {
+        s.text().contains("assets")
+    })?;
+    s.send(b"\r", "APK folder", |s| s.text().contains("config.txt"))?;
+    music_click(&mut s, "config.txt", "select APK member", |s| {
+        s.text().contains("config.txt")
+    })?;
+    s.send(b"\x1b[13~", "APK member viewer", |s| {
+        s.text().contains("original config")
+    })?;
+    s.send(b"\x1b", "back to APK", |s| {
+        s.text().contains("APK Workshop") && s.text().contains("config.txt")
+    })?;
+    music_click(&mut s, "Project…", "new APK project picker", |s| {
+        s.text().contains("Save As")
+    })?;
+    let project = fs::canonicalize(&s.root)?.join("project");
+    s.send(project.to_str().unwrap().as_bytes(), "project name", |s| {
+        s.text().contains("project")
+    })?;
+    s.send(b"\r", "APK project created", |s| {
+        project.join("apk-project.toml").exists() && s.text().contains("Work dir")
+    })?;
+    music_click(&mut s, "Edit", "manifest edit", |s| {
+        s.text().contains("Debuggable (true/false)")
+    })?;
+    s.send(
+        b"\x1b[H\x1b[3~\x1b[3~\x1b[3~\x1b[3~\x1b[3~true",
+        "enable debuggable",
+        |s| s.text().contains("true"),
+    )?;
+    music_click(&mut s, "OK", "apply manifest", |s| {
+        s.text().contains("Debuggable: true")
+    })?;
+    music_click(&mut s, "Reset", "confirm manifest reset", |s| {
+        s.text().contains("Discard changes to this file?")
+    })?;
+    s.send(b"\r", "default Cancel keeps manifest edit", |s| {
+        !s.text().contains("Discard changes to this file?") && s.text().contains("Debuggable: true")
+    })?;
+    music_click(&mut s, "Export…", "export APK picker", |s| {
+        s.text().contains("Save As")
+    })?;
+    let output = fs::canonicalize(&s.root)?.join("patched.apk");
+    s.send(
+        output.to_str().unwrap().as_bytes(),
+        "APK output path",
+        |s| s.text().contains("patched.apk"),
+    )?;
+    s.send(b"\r", "APK exported", |s| {
+        output.exists() && s.text().contains("APK exported successfully")
+    })?;
+    assert!(
+        dn::apk::Package::open(output, &Default::default())?
+            .manifest
+            .debuggable
+    );
+    s.resize(132, 40)?;
+    s.wait("APK resize", |s| {
+        s.text().contains("APK Workshop") && s.text().contains("Export…")
+    })?;
+    s.resize(80, 25)?;
+    s.wait("APK resize restored", |s| s.text().contains("Work dir"))?;
+    s.send(b"\x1b", "close APK Workshop", |s| s.command_prompt_active())?;
+    assert!(
+        !dn::apk::Package::open(s.root.join("fixture.apk"), &Default::default())?
+            .manifest
+            .debuggable
+    );
     s.finish()
 }

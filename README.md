@@ -44,6 +44,7 @@ and modern filesystem handling.
 - Choose English or Russian, with independent date order and 12/24-hour time.
 - Recall commands through a searchable session history; copy filenames or paths to the internal clipboard.
 - Use the calculator, character table and configurable user menus—or play Tetris or Pentix with separate, persistent high scores.
+- Inspect and modify standalone Android APKs with the opt-in **APK Workshop**: manifest/DEX inspection, persistent working projects, asset and manifest edits, unsigned export, optional SDK signing and ADB/logcat. Works without apktool; see [APK Workshop](docs/USER_GUIDE.md#apk-workshop) for supported edits and SDK requirements.
 - Play local **MP3, FLAC, WAV and Ogg Vorbis** files on macOS in a DN-style player with a session queue, recursive folder import, track tags and durations, shuffle/repeat, pause, seek and volume. Disabled by default; enable it in Options → Configuration → Plugins, then use Utilities → Add music to player. Linux/Windows show the player UI without audio. Based on Dos Navigator by RIT Research Labs.
 
 ## In action
