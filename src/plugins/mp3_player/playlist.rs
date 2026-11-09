@@ -256,7 +256,7 @@ impl Playlist {
                 PLAY_TRACK,
                 3,
                 14,
-                !self.order.is_empty() && cfg!(target_os = "macos"),
+                !self.order.is_empty() && crate::plugins::music_playback_available(),
             ),
             (
                 2,
@@ -264,7 +264,7 @@ impl Playlist {
                 ADD,
                 19,
                 14,
-                cfg!(target_os = "macos") && self.can_add(),
+                crate::plugins::music_playback_available() && self.can_add(),
             ),
             (3, "Remove", DELETE, 35, 14, !self.order.is_empty()),
             (4, "Close", CLOSE_LIST, 51, 14, true),

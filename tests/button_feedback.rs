@@ -207,7 +207,10 @@ fn keyboard_default_and_focused_cancel_show_feedback_without_crossing_owners() -
     );
     Ok(())
 }
-#[cfg(target_os = "macos")]
+#[cfg(all(
+    feature = "audio",
+    any(target_os = "macos", target_os = "linux", target_os = "windows")
+))]
 #[test]
 fn plugin_play_caption_survives_press_and_rendering_is_immutable() -> io::Result<()> {
     let f = support::Fixture::new("button-plugin")?;

@@ -160,7 +160,7 @@ resource strings. The native Rust implementation uses prepared terminal scenes
 instead of direct DOS video-memory access, and does not execute external `.SS`
 programs. The original DOS Navigator notice and license reproduced above are retained.
 
-## MP3 audio libraries (macOS)
+## Music audio libraries (macOS, Linux and Windows)
 
 Rodio 0.22.2: https://github.com/RustAudio/rodio/tree/v0.22.2
 
@@ -193,6 +193,10 @@ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
 IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
+
+The optional, default-enabled `audio` Cargo feature uses these libraries on
+macOS, Linux and Windows. CPAL uses CoreAudio, ALSA and WASAPI respectively.
+Linux links the system ALSA library; DN does not bundle ALSA or extra drivers.
 
 Rodio uses CPAL for audio output (Apache-2.0):
 https://github.com/RustAudio/cpal

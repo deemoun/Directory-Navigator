@@ -4,10 +4,18 @@ Native Rust terminal file manager inspired by DOS Navigator 1.51.
 Original Pascal references are kept locally in `original-dn/` (excluded from Git).
 Directory Navigator is licensed under the [MIT license](../LICENSE).
 
+Install the latest published release from
+[crates.io](https://crates.io/crates/directory-navigator) on macOS, Windows or Linux:
+
 ```sh
-cargo build --release
-./target/release/dn
+cargo install directory-navigator
+dn
 ```
+
+Cargo requires stable Rust and platform build tools. Linux audio builds also need
+ALSA development packages. See the [installation prerequisites](../README.md#get-started)
+for macOS, Windows, Debian/Ubuntu and Fedora, or install without audio using
+`cargo install directory-navigator --no-default-features`.
 
 Starts in the current directory. Minimum terminal: 80×25. Unicode names, native
 paths, mouse menus, panel clicks, double-click opening and wheel scrolling work.
@@ -763,8 +771,14 @@ file pickers, confirmations and exit review retain focus and prevent invocation.
 ## Music Player
 
 Enable **Music Player** in **Options → Configuration → Plugins** first; it is
-experimental and disabled by default. Audio playback currently requires macOS.
-Linux/Windows retain the window and queue UI with audio controls disabled.
+experimental and disabled by default. Audio playback is supported on macOS, Linux and Windows when the build includes
+the default `audio` feature. Linux uses the configured ALSA default device,
+Windows uses WASAPI and macOS uses CoreAudio; Linux tty needs no graphical
+session, but your user must have access to the output. Devices are opened only
+when playing. Missing devices, access failures and disconnections stop playback
+and leave the error visible; Play retries without launching an external app.
+Builds made with `--no-default-features` show an unavailable notice, disable
+import/playback and preserve normal external opening.
 
 Supported files: **MP3**, native **FLAC**, **WAV/WAVE** (PCM or floating-point),
 and **Ogg Vorbis** (`.ogg` / `.oga`). Headers identify the actual media format;
@@ -776,7 +790,7 @@ The saved plugin ID and settings section stay `mp3_player`, so existing enable,
 opening, volume and seek preferences continue to work.
 
 
-On macOS, enable **Play music files in internal player** directly below the plugin
+On any supported audio build, enable **Play music files in internal player** directly below the plugin
 checkbox to use Enter/double-click for internal playback. It is off by default
 and unavailable while the plugin is disabled. It overrides custom associations for supported music files;
 Ctrl+Enter still opens the OS default app. Only the current regular supported music file is

@@ -15,7 +15,10 @@ use dn::{
         Arrangement,
     },
 };
-#[cfg(target_os = "macos")]
+#[cfg(all(
+    feature = "audio",
+    any(target_os = "macos", target_os = "linux", target_os = "windows")
+))]
 use std::fs;
 use std::io;
 fn open(a: &mut App) -> WindowId {
@@ -71,6 +74,52 @@ fn registered_singleton_has_declared_centered_geometry_and_resets_on_reopen() ->
     assert_eq!(
         surface(&mut a, new, 100, 32).bounds,
         Rect::new(32, 11, 36, 9)
+    );
+    Ok(())
+}
+#[cfg(not(feature = "audio"))]
+#[test]
+fn no_audio_build_keeps_unavailable_window_and_normal_association_opening() -> io::Result<()> {
+    let f = support::Fixture::new("music-without-audio")?;
+    std::fs::write(f.0.join("track.MP3"), b"external association text")?;
+    std::fs::write(f.0.join("associations.conf"), ".mp3=@viewer\n")?;
+    let mut a = f.app()?;
+    a.config.mp3.play_on_enter = true; // Retain a preference from an audio build.
+    let owner = open(&mut a);
+    support::draw(&mut a, 80, 25)?;
+    support::modified(&mut a, K::Char('z'), M::ALT);
+    let b = support::draw(&mut a, 80, 25)?;
+    assert!(text(&b).contains("Audio playback is not included in this build"));
+    for action in [2, 7, 8, 201] {
+        assert!(!a
+            .mouse
+            .regions
+            .iter()
+            .any(|(_, t)| { *t == Target::Plugin(MP3_PLAYER, ActionId(action)) }));
+    }
+    support::key(&mut a, K::Esc);
+    assert!(!a.desktop.contains(owner));
+    menu::execute(&mut a, menu::Action::AddMp3);
+    assert_eq!(a.desktop.active().kind, WindowKind::Manager);
+    dn::associations::reload(&mut a);
+    support::wait_until(&mut a, std::time::Duration::from_secs(5), |a| {
+        !a.associations.busy()
+    });
+    a.panels[0].cursor = a.panels[0]
+        .entries
+        .iter()
+        .position(|e| e.name == "track.MP3")
+        .unwrap();
+    support::key(&mut a, K::Enter);
+    support::wait_until(&mut a, std::time::Duration::from_secs(5), |a| {
+        a.desktop
+            .active_viewer()
+            .is_some_and(|v| v.contents.is_some())
+    });
+    assert!(support::text(&mut a, 80, 25)?.contains("external association text"));
+    assert!(
+        a.config.mp3.play_on_enter,
+        "build capability must not erase preferences"
     );
     Ok(())
 }
@@ -162,7 +211,14 @@ fn localized_frames_controls_and_palette_are_clipped_and_paint_is_immutable() ->
                     assert_eq!(
                         count,
                         if expanded {
-                            if cfg!(target_os = "macos") {
+                            if cfg!(all(
+                                feature = "audio",
+                                any(
+                                    target_os = "macos",
+                                    target_os = "linux",
+                                    target_os = "windows"
+                                )
+                            )) {
                                 8
                             } else {
                                 1
@@ -297,7 +353,10 @@ fn page(a: &mut App, owner: WindowId, n: u64) -> bool {
         .iter()
         .any(|s| s.id.key == SurfaceKey::Page(owner, n))
 }
-#[cfg(target_os = "macos")]
+#[cfg(all(
+    feature = "audio",
+    any(target_os = "macos", target_os = "linux", target_os = "windows")
+))]
 #[test]
 fn panel_import_live_removal_and_reopen_preserve_original_files() -> io::Result<()> {
     let f = support::Fixture::new("mp3-import")?;
@@ -390,7 +449,14 @@ fn empty_playlist_and_volume_pages_keep_focus_bounds_and_immutable_frames() -> i
                 }
             }
             action(&mut a, 203)?;
-            if cfg!(target_os = "macos") {
+            if cfg!(all(
+                feature = "audio",
+                any(
+                    target_os = "macos",
+                    target_os = "linux",
+                    target_os = "windows"
+                )
+            )) {
                 action(&mut a, 11)?;
                 assert!(!page(&mut a, id, 3));
                 assert!(support::text(&mut a, 100, 32)?.contains("60%"));
@@ -404,7 +470,10 @@ fn empty_playlist_and_volume_pages_keep_focus_bounds_and_immutable_frames() -> i
     Ok(())
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(all(
+    feature = "audio",
+    any(target_os = "macos", target_os = "linux", target_os = "windows")
+))]
 #[test]
 fn folder_tags_modes_info_and_cancel_use_owned_shared_controls() -> io::Result<()> {
     let f = support::Fixture::new("mp3-features")?;
@@ -508,7 +577,10 @@ fn folder_tags_modes_info_and_cancel_use_owned_shared_controls() -> io::Result<(
     Ok(())
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(all(
+    feature = "audio",
+    any(target_os = "macos", target_os = "linux", target_os = "windows")
+))]
 #[test]
 fn enter_overrides_mp3_association_and_imports_only_current_file() -> io::Result<()> {
     let f = support::Fixture::new("mp3-enter")?;
@@ -554,7 +626,10 @@ fn enter_overrides_mp3_association_and_imports_only_current_file() -> io::Result
     Ok(())
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(all(
+    feature = "audio",
+    any(target_os = "macos", target_os = "linux", target_os = "windows")
+))]
 #[test]
 fn setup_and_time_use_owned_controls_across_languages_sizes_and_palettes() -> io::Result<()> {
     for language in [
@@ -606,7 +681,10 @@ fn setup_and_time_use_owned_controls_across_languages_sizes_and_palettes() -> io
     Ok(())
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(all(
+    feature = "audio",
+    any(target_os = "macos", target_os = "linux", target_os = "windows")
+))]
 #[test]
 fn mixed_music_imports_keep_order_tags_lengths_and_ignore_unavailable_extensions() -> io::Result<()>
 {
@@ -691,7 +769,10 @@ fn music_menu_new_and_legacy_mnemonics_keep_the_existing_plugin_identity() -> io
     Ok(())
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(all(
+    feature = "audio",
+    any(target_os = "macos", target_os = "linux", target_os = "windows")
+))]
 #[test]
 fn enter_and_double_click_route_new_extensions_to_music_player() -> io::Result<()> {
     let f = support::Fixture::new("music-opening")?;
@@ -746,7 +827,10 @@ fn enter_and_double_click_route_new_extensions_to_music_player() -> io::Result<(
     Ok(())
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(all(
+    feature = "audio",
+    any(target_os = "macos", target_os = "linux", target_os = "windows")
+))]
 #[test]
 fn music_file_picker_cancel_add_and_live_queue_keep_panel_context() -> io::Result<()> {
     let f = support::Fixture::new("music-picker")?;
@@ -852,7 +936,10 @@ fn music_file_picker_cancel_add_and_live_queue_keep_panel_context() -> io::Resul
     Ok(())
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(all(
+    feature = "audio",
+    any(target_os = "macos", target_os = "linux", target_os = "windows")
+))]
 #[test]
 fn repeat_selector_is_owned_cancellable_and_keyboard_mouse_accessible() -> io::Result<()> {
     for language in [

@@ -20,6 +20,10 @@ path = "src/lib.rs"
 name = "dn"
 path = "src/main.rs"
 
+[features]
+default = ["audio"]
+audio = ["dep:rodio", "dep:symphonia-core", "dep:symphonia-metadata"]
+
 [dependencies]
 turbo-vision = { version = "=4.1.0", default-features = false }
 toml = "1"
@@ -37,10 +41,11 @@ chrono = { version = "0.4", default-features = false, features = ["clock"] }
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
 
+[target.'cfg(any(target_os = "macos", target_os = "linux", target_os = "windows"))'.dependencies]
+rodio = { version = "=0.22.2", optional = true, default-features = false, features = ["playback", "mp3", "flac", "wav", "vorbis"] }
+symphonia-core = { version = "=0.5.5", optional = true }
+symphonia-metadata = { version = "=0.5.5", optional = true }
 [target.'cfg(target_os = "macos")'.dependencies]
-rodio = { version = "=0.22.2", default-features = false, features = ["playback", "mp3", "flac", "wav", "vorbis"] }
-symphonia-core = "=0.5.5"
-symphonia-metadata = "=0.5.5"
 trash = "5.2.9"
 
 [target.'cfg(windows)'.dependencies]

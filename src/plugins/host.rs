@@ -285,7 +285,7 @@ fn apply(app: &mut App, b: Binding, effects: Vec<Effect>) {
                 }
             },
             Effect::RequestMusicFile { play } => {
-                if b.plugin != MP3_PLAYER || !cfg!(target_os = "macos") {
+                if b.plugin != MP3_PLAYER || !crate::plugins::music_playback_available() {
                     continue;
                 }
                 dispatch(
@@ -307,7 +307,10 @@ fn apply(app: &mut App, b: Binding, effects: Vec<Effect>) {
                     default_volume,
                     ..app.config.mp3
                 };
-                if b.plugin == MP3_PLAYER && cfg!(target_os = "macos") && prefs.valid() {
+                if b.plugin == MP3_PLAYER
+                    && crate::plugins::music_playback_available()
+                    && prefs.valid()
+                {
                     app.config.mp3 = prefs;
                 }
             }
@@ -602,7 +605,7 @@ pub(crate) fn add_mp3(app: &mut App) {
     if !crate::archive::require_native(app) {
         return;
     }
-    if !cfg!(target_os = "macos") || crate::windowing::blocked(app) {
+    if !crate::plugins::music_playback_available() || crate::windowing::blocked(app) {
         return;
     }
     let paths = panel_paths(app);
@@ -614,7 +617,7 @@ pub(crate) fn add_mp3(app: &mut App) {
 
 /// Enter captures a single native regular file, independently of panel marks.
 pub(crate) fn play_mp3(app: &mut App, path: PathBuf) -> bool {
-    if !cfg!(target_os = "macos")
+    if !crate::plugins::music_playback_available()
         || !app.config.mp3.play_on_enter
         || !app.config.plugin_enabled(MP3_PLAYER)
         || !mp3_player::supports_path(&path)

@@ -48,7 +48,10 @@ fn header(b: [u8; 4]) -> Option<Header> {
 /// Reuse the decoder's gapless duration when Xing/Info/VBRI declares frame counts.
 /// Without those headers Symphonia may estimate VBR duration from a single bitrate,
 /// so use a frame-header pass instead of publishing that estimate.
-#[cfg(target_os = "macos")]
+#[cfg(all(
+    feature = "audio",
+    any(target_os = "macos", target_os = "linux", target_os = "windows")
+))]
 pub(super) fn probe(
     file: &mut std::fs::File,
     cancel: &Cancellation,

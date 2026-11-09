@@ -70,7 +70,8 @@ impl Settings {
         rows
     }
     pub(crate) fn mp3_open_enabled(&self) -> bool {
-        cfg!(target_os = "macos") && self.draft.plugin_enabled(crate::plugins::MP3_PLAYER)
+        crate::plugins::music_playback_available()
+            && self.draft.plugin_enabled(crate::plugins::MP3_PLAYER)
     }
     pub fn keyboard_choice(&mut self, reverse: bool) {
         if self.kind == SettingsKind::Keyboard {

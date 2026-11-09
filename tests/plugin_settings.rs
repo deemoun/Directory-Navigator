@@ -375,9 +375,19 @@ fn internal_mp3_option_follows_plugin_draft_and_preserves_cancel() -> io::Result
             .regions
             .iter()
             .any(|(_, t)| *t == Target::Setting(4)),
-        cfg!(target_os = "macos")
+        cfg!(all(
+            feature = "audio",
+            any(
+                target_os = "macos",
+                target_os = "linux",
+                target_os = "windows"
+            )
+        ))
     );
-    #[cfg(target_os = "macos")]
+    #[cfg(all(
+        feature = "audio",
+        any(target_os = "macos", target_os = "linux", target_os = "windows")
+    ))]
     {
         click(&mut a, Target::Setting(4));
         assert!(a.modals.settings().unwrap().draft.mp3.play_on_enter);
@@ -392,7 +402,10 @@ fn internal_mp3_option_follows_plugin_draft_and_preserves_cancel() -> io::Result
     }
     click(&mut a, Target::CancelSettings);
     assert!(!a.config.mp3.play_on_enter && !a.config.plugin_enabled(MP3_PLAYER));
-    #[cfg(target_os = "macos")]
+    #[cfg(all(
+        feature = "audio",
+        any(target_os = "macos", target_os = "linux", target_os = "windows")
+    ))]
     {
         a.open_settings(SettingsKind::Plugins);
         draw(&mut a, 80, 25)?;

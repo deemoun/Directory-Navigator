@@ -12,12 +12,21 @@ use crossterm::event::{KeyCode as K, MouseButton, MouseEventKind};
 
 mod audio;
 mod formats;
-#[cfg(target_os = "macos")]
+#[cfg(all(
+    feature = "audio",
+    any(target_os = "macos", target_os = "linux", target_os = "windows")
+))]
 mod metadata;
 pub(super) fn supports_path(path: &std::path::Path) -> bool {
     formats::Format::from_path(path).is_some()
 }
-#[cfg(any(target_os = "macos", test))]
+#[cfg(any(
+    all(
+        feature = "audio",
+        any(target_os = "macos", target_os = "linux", target_os = "windows")
+    ),
+    test
+))]
 mod duration;
 mod import;
 mod modes;
@@ -29,7 +38,7 @@ const PLAY: usize = 2;
 const ZOOM: usize = 100;
 const CLOSE: usize = 101;
 const HELP: usize = 102;
-const HELP_TEXT: &str = "MP3, FLAC, WAV and Ogg Vorbis playback is available on macOS. Enable this plugin in Options > Configuration > Plugins.\nOpen… uses DN's file picker to add and play one music file, keeping the queue and reusing an existing entry. Playlist… opens the live queue: Enter or Play starts the highlighted track; Add… chooses a file without interrupting playback. Remove applies immediately and stops playback if the current track is removed. Close/Esc keeps queue changes. Playlists are session-only; there is no playlist-file saving.\nUtilities > Add music to player imports marked files or folders from the active panel; without marks it uses the cursor entry. Folders are scanned recursively in name order, skipping links. The queue holds 64 entries. Cancel discards the whole import; closing the player cancels it too.\nPlay/Pause toggles playback; Stop resets the position. Outer arrows select previous/next tracks; −5s/+5s use the saved seek step. Volume −/+ adjusts by 10 percentage points immediately for the session only. Settings… edits the saved seek step and default volume with OK/Cancel. The elapsed/remaining control switches the single time display; remaining time has a minus sign and unknown time shows --:--. The progress bar always shows elapsed position and is display-only. Artist/title and a volume meter appear in the expanded view; the compact counter stays unchanged.\nShuffle applies immediately. Repeat opens an owned Off/One/All selector: Enter or click applies, Esc cancels. Repeat One affects automatic endings, not manual Previous/Next. Shuffle visits each track once; Previous retraces the order. Queue changes rebuild the shuffled cycle.\nInfo… shows title, artist, album and path. Track lengths and supported tags are read in the background without an audio device. Errors remain visible. Music continues while working in other windows. Closing the player, disabling the plugin or quitting DN stops audio.\nTab/Shift+Tab select controls; Enter/Space activates them. F1 opens Help. Alt+Z switches compact/expanded views; Ctrl+F5 moves the player. Open and Add file pickers can be cancelled without changing the queue or playback.";
+const HELP_TEXT: &str = "MP3, FLAC, WAV and Ogg Vorbis playback is available on macOS, Linux and Windows in builds with audio support. Enable this plugin in Options > Configuration > Plugins.\nOpen… uses DN's file picker to add and play one music file, keeping the queue and reusing an existing entry. Playlist… opens the live queue: Enter or Play starts the highlighted track; Add… chooses a file without interrupting playback. Remove applies immediately and stops playback if the current track is removed. Close/Esc keeps queue changes. Playlists are session-only; there is no playlist-file saving.\nUtilities > Add music to player imports marked files or folders from the active panel; without marks it uses the cursor entry. Folders are scanned recursively in name order, skipping links. The queue holds 64 entries. Cancel discards the whole import; closing the player cancels it too.\nPlay/Pause toggles playback; Stop resets the position. Outer arrows select previous/next tracks; −5s/+5s use the saved seek step. Volume −/+ adjusts by 10 percentage points immediately for the session only. Settings… edits the saved seek step and default volume with OK/Cancel. The elapsed/remaining control switches the single time display; remaining time has a minus sign and unknown time shows --:--. The progress bar always shows elapsed position and is display-only. Artist/title and a volume meter appear in the expanded view; the compact counter stays unchanged.\nShuffle applies immediately. Repeat opens an owned Off/One/All selector: Enter or click applies, Esc cancels. Repeat One affects automatic endings, not manual Previous/Next. Shuffle visits each track once; Previous retraces the order. Queue changes rebuild the shuffled cycle.\nInfo… shows title, artist, album and path. Track lengths and supported tags are read in the background without an audio device. Errors remain visible. Music continues while working in other windows. Closing the player, disabling the plugin or quitting DN stops audio.\nTab/Shift+Tab select controls; Enter/Space activates them. F1 opens Help. Alt+Z switches compact/expanded views; Ctrl+F5 moves the player. Open and Add file pickers can be cancelled without changing the queue or playback.";
 const PICKER_PAGE: u64 = 7;
 const PICKER_INPUT: usize = 700;
 const PICKER_CANCEL: usize = 701;
@@ -133,7 +142,7 @@ impl Mp3Player {
         })
     }
     fn enabled(&self, id: usize) -> bool {
-        if !cfg!(target_os = "macos") {
+        if !crate::plugins::music_playback_available() {
             return id == playlist::LIST;
         }
         match id {
@@ -216,9 +225,15 @@ impl Mp3Player {
         }
     }
     fn add_files(&mut self, paths: Vec<PathBuf>, ctx: &Context) {
-        #[cfg(not(target_os = "macos"))]
+        #[cfg(not(all(
+            feature = "audio",
+            any(target_os = "macos", target_os = "linux", target_os = "windows")
+        )))]
         let _ = (paths, ctx);
-        #[cfg(target_os = "macos")]
+        #[cfg(all(
+            feature = "audio",
+            any(target_os = "macos", target_os = "linux", target_os = "windows")
+        ))]
         {
             if self.import.is_some() {
                 return;
@@ -256,7 +271,7 @@ impl Mp3Player {
         }
     }
     fn play_file(&mut self, path: PathBuf, ctx: &Context) {
-        if !cfg!(target_os = "macos") {
+        if !crate::plugins::music_playback_available() {
             return;
         }
         self.expanded = true;
@@ -439,10 +454,13 @@ impl Mp3Player {
             return Vec::new();
         }
         if self.playlist.open {
-            if id == playlist::ADD && self.playlist.can_add() && cfg!(target_os = "macos") {
+            if id == playlist::ADD
+                && self.playlist.can_add()
+                && crate::plugins::music_playback_available()
+            {
                 return vec![Effect::RequestMusicFile { play: false }];
             }
-            if id == playlist::PLAY_TRACK && cfg!(target_os = "macos") {
+            if id == playlist::PLAY_TRACK && crate::plugins::music_playback_available() {
                 if let Some(id) = self.playlist.selected() {
                     self.current = Some(id);
                     self.start(ctx.now);
@@ -1132,8 +1150,10 @@ impl Mp3Player {
             Paragraph::new(format!("{}:", language.text("Repeat"))).style(style(0x70)),
             Rect::new(r.x + 38, r.y + 11, 8, 1),
         );
-        let notice = if !cfg!(target_os = "macos") {
-            language.text("Playback requires macOS").into()
+        let notice = if !crate::plugins::music_playback_available() {
+            language
+                .text("Audio playback is not included in this build")
+                .into()
         } else if !self.notice.is_empty() {
             self.notice.clone()
         } else if self.transport == Transport::Playing && !self.snapshot.ready {
@@ -1416,7 +1436,53 @@ mod tests {
         assert!(p.next_wake(ctx.now).is_none());
         assert!(fake.borrow().request.path.is_none());
     }
-    #[cfg(target_os = "macos")]
+    #[test]
+    fn device_errors_stop_visibly_retry_and_ignore_retired_generations() {
+        for message in [
+            "No default output device",
+            "Permission denied",
+            "Device disconnected",
+        ] {
+            let (mut p, fake) = player();
+            let mut ctx = context();
+            ctx.active = false;
+            p.start(ctx.now);
+            let failed = p.request.generation;
+            fake.borrow_mut().snapshot = audio::Snapshot {
+                generation: failed,
+                error: Some(message.into()),
+                ..Default::default()
+            };
+            p.event(Event::Tick, &ctx);
+            assert_eq!(p.transport, Transport::Stopped);
+            assert_eq!(p.notice, message);
+            assert!(p.expanded);
+            assert!(fake.borrow().request.path.is_none());
+            assert_eq!(p.playlist.order.len(), 2);
+            p.start(ctx.now);
+            let retried = p.request.generation;
+            assert_ne!(retried, failed);
+            assert!(p.notice.is_empty());
+            // The old error cannot stop a newer request while its device opens.
+            p.event(Event::Tick, &ctx);
+            assert_eq!(p.request.generation, retried);
+            assert_eq!(p.transport, Transport::Playing);
+            p.close();
+            fake.borrow_mut().snapshot = audio::Snapshot {
+                generation: retried,
+                ready: true,
+                ..Default::default()
+            };
+            p.event(Event::Tick, &ctx);
+            assert_eq!(p.transport, Transport::Stopped);
+            assert!(fake.borrow().request.path.is_none());
+            assert!(p.playlist.order.is_empty());
+        }
+    }
+    #[cfg(all(
+        feature = "audio",
+        any(target_os = "macos", target_os = "linux", target_os = "windows")
+    ))]
     #[test]
     fn open_picker_plays_existing_entry_and_cancel_keeps_audio_and_queue() {
         use crate::turbo::file_dialog::{Mode, Outcome};
@@ -1519,10 +1585,10 @@ mod tests {
         assert!(!player_row(&f, r, 6).contains('■'));
         p.notice = "A visible error".into();
         assert!(player_row(&rendered_player(&p, &ctx), r, 13).contains(
-            if cfg!(target_os = "macos") {
+            if crate::plugins::music_playback_available() {
                 "A visible error"
             } else {
-                "Playback requires macOS"
+                "Audio playback is not included in this build"
             }
         ));
         p.snapshot.duration = Some(Duration::from_secs(60_001));
@@ -1552,7 +1618,10 @@ mod tests {
         assert_eq!(fit_music_text("界", 1), "…");
         assert_eq!(fit_music_text("abc", 0), "");
     }
-    #[cfg(target_os = "macos")]
+    #[cfg(all(
+        feature = "audio",
+        any(target_os = "macos", target_os = "linux", target_os = "windows")
+    ))]
     #[test]
     fn repeat_popup_selection_cancel_and_parent_focus_preserve_playback() {
         let (mut p, fake) = player();
@@ -1630,7 +1699,10 @@ mod tests {
         p.action(12, &ctx);
         assert_eq!(p.playlist.order.len(), 1);
     }
-    #[cfg(target_os = "macos")]
+    #[cfg(all(
+        feature = "audio",
+        any(target_os = "macos", target_os = "linux", target_os = "windows")
+    ))]
     #[test]
     fn pause_seek_volume_and_neighbor_selection_have_distinct_semantics() {
         let (mut p, fake) = player();
@@ -1701,7 +1773,10 @@ mod tests {
         assert_eq!(p.selected(), Some(1));
         assert_ne!(p.order[0].id, p.order[1].id);
     }
-    #[cfg(target_os = "macos")]
+    #[cfg(all(
+        feature = "audio",
+        any(target_os = "macos", target_os = "linux", target_os = "windows")
+    ))]
     #[test]
     fn inline_modes_apply_and_repeat_one_eof_restarts_once() {
         let (mut p, fake) = player();
@@ -1815,7 +1890,10 @@ mod tests {
         assert_eq!(p.current, Some(0));
         assert_eq!(p.snapshot.position, Duration::from_secs(2));
     }
-    #[cfg(target_os = "macos")]
+    #[cfg(all(
+        feature = "audio",
+        any(target_os = "macos", target_os = "linux", target_os = "windows")
+    ))]
     #[test]
     fn setup_is_a_draft_time_toggles_and_duration_updates_live_and_draft_rows() {
         let (mut p, fake) = player();
@@ -1875,7 +1953,10 @@ mod tests {
         assert!(!p.remaining && p.setup_draft.is_none());
         assert_eq!((p.preferences.seek_seconds, p.request.volume), (10, 70));
     }
-    #[cfg(target_os = "macos")]
+    #[cfg(all(
+        feature = "audio",
+        any(target_os = "macos", target_os = "linux", target_os = "windows")
+    ))]
     #[test]
     fn enter_reuses_entries_when_full_and_busy_or_failed_import_never_stops_audio() {
         let (mut p, fake) = player();
@@ -1900,7 +1981,10 @@ mod tests {
         assert_eq!(p.current, Some(0));
         assert_ne!(p.request.generation, generation);
     }
-    #[cfg(target_os = "macos")]
+    #[cfg(all(
+        feature = "audio",
+        any(target_os = "macos", target_os = "linux", target_os = "windows")
+    ))]
     #[test]
     fn seek_and_remaining_use_imported_duration_when_decoder_has_no_total() {
         let (mut p, fake) = player();

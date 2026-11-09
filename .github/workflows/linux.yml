@@ -46,6 +46,9 @@ jobs:
         run: python3 -m unittest discover -s scripts -p 'test_*.py'
       - name: Set build version
         run: python3 scripts/release.py prepare "$RELEASE_VERSION"
+      - name: Install Linux audio build dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y pkg-config libasound2-dev
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
@@ -56,6 +59,8 @@ jobs:
         run: cargo clippy --locked --all-targets --target ${{ matrix.target }} -- -D warnings
       - name: Test
         run: cargo test --locked --target ${{ matrix.target }}
+      - name: Test without audio
+        run: cargo test --locked --no-default-features --target ${{ matrix.target }} --test mp3_player --test plugin_settings
       - name: Build release
         run: cargo build --release --locked --target ${{ matrix.target }}
       - name: Verify version and package

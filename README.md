@@ -9,6 +9,10 @@ Familiar two-panel browsing, classic colors, keyboard shortcuts and mouse contro
 rebuilt for modern computers. It runs directly in your terminal—no DOS emulator or
 graphical frontend.
 
+Supports **macOS, Windows and Linux**. Install the latest published release from
+[crates.io](https://crates.io/crates/directory-navigator):
+`cargo install directory-navigator`. See [Get started](#get-started) for build prerequisites.
+
 <table>
   <tr>
     <td>
@@ -45,7 +49,7 @@ and modern filesystem handling.
 - Recall commands through a searchable session history; copy filenames or paths to the internal clipboard.
 - Use the calculator, character table and configurable user menus—or play Tetris or Pentix with separate, persistent high scores.
 - Inspect and modify standalone Android APKs with the opt-in **APK Workshop**: manifest/DEX inspection, persistent working projects, asset and manifest edits, unsigned export, optional SDK signing and ADB/logcat. Works without apktool; see [APK Workshop](docs/USER_GUIDE.md#apk-workshop) for supported edits and SDK requirements.
-- Play local **MP3, FLAC, WAV and Ogg Vorbis** files on macOS in a DN-style player with a session queue, recursive folder import, track tags and durations, shuffle/repeat, pause, seek and volume. Disabled by default; enable it in Options → Configuration → Plugins, then use Utilities → Add music to player. Linux/Windows show the player UI without audio. Based on Dos Navigator by RIT Research Labs.
+- Play local **MP3, FLAC, WAV and Ogg Vorbis** files on macOS, Linux and Windows in a DN-style player with a session queue, recursive folder import, track tags and durations, shuffle/repeat, pause, seek and volume. Disabled by default; enable it in Options → Configuration → Plugins, then use Utilities → Add music to player. Audio support is included in default builds. Based on Dos Navigator by RIT Research Labs.
 
 ## In action
 
@@ -89,67 +93,84 @@ and modern filesystem handling.
 
 ## Get started
 
-### Run a supplied binary
+### Install from crates.io (recommended)
 
-On macOS or Linux, open a terminal in the folder containing a compatible `dn`:
+[Directory Navigator on crates.io](https://crates.io/crates/directory-navigator)
+is the primary installation source for **macOS, Windows and Linux**. With stable
+Rust, Cargo and your platform's build tools installed, run:
+
+```sh
+cargo install directory-navigator
+dn
+```
+
+This installs the latest published release and the **`dn`** command. Run the same
+installation command to update. Check your installed version with `dn --version`.
+DN starts in your current directory; use a terminal at least **80 columns × 25 rows**.
+
+Cargo builds the program locally. Required build tools:
+
+- **macOS:** Xcode Command Line Tools (`xcode-select --install`).
+- **Windows:** the MSVC Rust toolchain and Visual Studio Build Tools with the
+  **Desktop development with C++** workload and Windows SDK.
+- **Debian/Ubuntu:** `sudo apt install build-essential pkg-config libasound2-dev`.
+- **Fedora:** `sudo dnf install gcc pkgconf-pkg-config alsa-lib-devel`.
+
+Default builds include audio support; enable the Music Player plugin separately
+in Options → Configuration → Plugins. To install without audio libraries:
+
+```sh
+cargo install directory-navigator --no-default-features
+```
+
+That build keeps normal file associations/external opening and shows an
+unavailable notice in the player. Prebuilt Linux binaries with audio need the
+ALSA runtime (`libasound2t64`/`libasound2` or `alsa-lib`) and a configured default
+output accessible to your user. Windows uses WASAPI; macOS uses CoreAudio.
+No external player, FFmpeg, ASIO SDK or codec installation is required.
+
+### Supported platforms and verification
+
+DN supports **macOS, Windows and Linux**. File-manager operation has been tested
+natively on macOS and confirmed by users on Windows and Linux ARM64. Automated
+tests and cross-compilation checks also cover changes targeting Linux and Windows.
+
+| Platform | Architectures | Verification |
+| --- | --- | --- |
+| macOS | Apple Silicon / Intel | Native Apple Silicon tests, terminal scenarios and audio playback |
+| Windows 10/11 | x86_64 | User-confirmed file-manager operation; cross-compilation and Clippy checks |
+| Linux | x86_64 / ARM64 | User-confirmed ARM64 file-manager operation; cross-compilation and Clippy checks for both targets |
+
+The new Linux/Windows audio backend has passed cross-compilation checks; real
+output-device playback has so far been exercised on macOS.
+
+### Alternative: run a supplied binary
+
+Download the archive matching your operating system and architecture from the
+project's releases or manual build artifacts. Extract it, then run `dn.exe` on
+Windows. On macOS/Linux:
 
 ```sh
 chmod +x dn
 ./dn
 ```
 
-Use `dn --version` (or `dn -V`) to check the installed version.
+Rust and build tools are not needed for a supplied binary. Downloaded macOS builds
+are unsigned and unnotarized, so macOS may block them. Cargo installation above
+builds locally and is the recommended route.
 
-It starts in your current directory. Use a terminal at least **80 columns × 25 rows**.
-The current macOS build is for **Apple Silicon** and is not Developer ID signed or
-notarized, so macOS may block downloaded copies. Test builds need no Rust installation.
+### Alternative: build this checkout
 
-### crates.io package preparation
-
-The registry package is named `directory-navigator`; its executable and Rust
-library remain `dn`. The name `dn` is already registered by an unrelated project.
-Version 1.1.6 uses the published Turbo Vision **4.1.0** crate, with
-`default-features = false`. All dependencies use crates.io registry versions.
-
-DN adapts display-only text surfaces to terminal cells to avoid UTF-8 byte
-clipping in Turbo Vision 4.1.0. Translated status captions also receive enough
-offscreen space for the framework's byte-length checks. These fixes live in DN;
-the published framework dependency remains unchanged, without a fork.
-
-After publication, installation will be:
+With the same platform prerequisites installed:
 
 ```sh
-cargo install directory-navigator --version 1.1.6 --locked
-dn --version
-```
-
-Maintain the existing package contents, including `src/`, `locales/`, test
-fixtures, README files, documentation images, `LICENSE` and `THIRD_PARTY_NOTICES.md`.
-Before publication, review `cargo package --list`, run `cargo publish --dry-run`,
-and verify the built executable's version. A dry run does not upload the crate.
-
-### Build from source
-
-With the stable Rust toolchain installed:
-
-```sh
-cargo build --release
+cargo build --release --locked
 ./target/release/dn
 ```
 
-On Windows, the executable is `target\release\dn.exe`.
-
-Windows MSVC builds statically link the C runtime through `.cargo/config.toml`.
-For an older binary reporting a missing `VCRUNTIME140.dll`, install Microsoft's
-[Visual C++ v14 Redistributable (x64)](https://aka.ms/vc14/vc_redist.x64.exe)
-in the Windows environment where DN runs, or rebuild DN with the current configuration.
-
-| Platform | Current status |
-| --- | --- |
-| macOS Apple Silicon | Primary development and tested platform |
-| Linux ARM64 | User-reported successful launch and operation |
-| Linux x86_64 | Targeted; runtime validation still pending |
-| Windows 10/11 | Best effort; runtime validation still pending |
+On Windows, run `target\release\dn.exe`. Add `--no-default-features` to the build
+command for a build without audio libraries. Windows MSVC builds statically link
+the C runtime through `.cargo/config.toml`.
 
 ## Everyday controls
 
@@ -282,6 +303,18 @@ license, plus a SHA-256 checksum. Downloads are under that run's **Artifacts** a
 are retained for 30 days. These are unsigned builds; this workflow does not publish
 a GitHub Release. **Rust checks** is also manual-only: open it in Actions and choose
 **Run workflow**. Neither workflow runs on pushes, pull requests or a schedule.
+
+### crates.io package checks
+
+The registry package is `directory-navigator`; its executable and Rust library
+are `dn`. Dependencies use published crates.io versions, including unmodified
+Turbo Vision 4.1.0. DN contains its terminal-cell and translated-caption adapters;
+no framework fork is required.
+
+Before manually publishing, review `cargo package --list`, run
+`cargo publish --dry-run`, and verify the executable version. Keep source files,
+locales, test fixtures, README files, documentation images, `LICENSE` and
+`THIRD_PARTY_NOTICES.md` in the package. A dry run does not upload the crate.
 
 ### Unified releases
 

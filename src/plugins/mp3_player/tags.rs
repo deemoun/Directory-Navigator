@@ -20,7 +20,10 @@ impl Tags {
     }
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(all(
+    feature = "audio",
+    any(target_os = "macos", target_os = "linux", target_os = "windows")
+))]
 mod reader {
     use super::Tags;
     use std::io::{self, Read, Seek, SeekFrom};
@@ -200,7 +203,10 @@ mod reader {
         Ok(tags)
     }
 }
-#[cfg(target_os = "macos")]
+#[cfg(all(
+    feature = "audio",
+    any(target_os = "macos", target_os = "linux", target_os = "windows")
+))]
 pub(super) use reader::read;
 
 #[cfg(test)]
@@ -215,7 +221,10 @@ mod tests {
         assert_eq!(tags.description("界.mp3"), "Исполнитель — 界.mp3");
         assert_eq!(Tags::default().description("name.mp3"), "name.mp3");
     }
-    #[cfg(target_os = "macos")]
+    #[cfg(all(
+        feature = "audio",
+        any(target_os = "macos", target_os = "linux", target_os = "windows")
+    ))]
     mod reading {
         use super::*;
         use std::io::Cursor;

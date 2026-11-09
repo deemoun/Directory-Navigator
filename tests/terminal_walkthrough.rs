@@ -461,6 +461,7 @@ fn music_click_row(
     let click = format!("\x1b[<0;{};{}M\x1b[<0;{};{}m", x + 2, y + 1, x + 2, y + 1);
     s.send(click.as_bytes(), purpose, ready)
 }
+#[cfg(feature = "audio")]
 fn music_repeat(s: &Session, value: &str) -> bool {
     s.text()
         .lines()
@@ -468,6 +469,7 @@ fn music_repeat(s: &Session, value: &str) -> bool {
 }
 
 #[test]
+#[cfg(feature = "audio")]
 fn mp3_empty_player_compact_expanded_help_movement_and_close_restore_terminal() -> io::Result<()> {
     let mut s = Session::new("mp3-player")?;
     s.wait("manager ready", |s| {
@@ -806,6 +808,7 @@ fn help_has_one_working_expand_restore_control_in_a_real_terminal() -> io::Resul
 }
 
 #[test]
+#[cfg(feature = "audio")]
 fn mp3_real_queue_help_cancel_and_volume_restore_terminal() -> io::Result<()> {
     let mut s = Session::new("mp3-queue")?;
     fs::write(
@@ -1114,6 +1117,7 @@ fn welcome_expand_restore_resize_and_start_preserve_terminal() -> io::Result<()>
 
 #[test]
 #[ignore = "requires a working macOS audio output device; plays a quiet synthetic tone"]
+#[cfg(feature = "audio")]
 fn mp3_audio_play_pause_seek_background_stop_and_close_restore_terminal() -> io::Result<()> {
     let mut s = Session::with_preferences(
         "mp3-audio",
@@ -1153,6 +1157,7 @@ fn mp3_audio_play_pause_seek_background_stop_and_close_restore_terminal() -> io:
 }
 
 #[test]
+#[cfg(feature = "audio")]
 fn mp3_folder_tags_modes_info_and_resize_restore_terminal() -> io::Result<()> {
     let mut s = Session::new("mp3-folder-modes")?;
     fs::create_dir_all(s.root.join("music/nested"))?;
@@ -1598,6 +1603,7 @@ fn archive_pane_selected_extraction_and_return_restore_terminal() -> io::Result<
 }
 
 #[test]
+#[cfg(feature = "audio")]
 fn mp3_setup_time_and_track_lengths_in_real_terminal() -> io::Result<()> {
     let mut s =
         Session::with_preferences("mp3-enhancements", "[plugins]\nenabled=['mp3_player']\n")?;
@@ -1645,6 +1651,7 @@ fn mp3_setup_time_and_track_lengths_in_real_terminal() -> io::Result<()> {
     s.finish()
 }
 
+#[cfg(feature = "audio")]
 fn music_fixture_queue(s: &mut Session) -> io::Result<()> {
     fs::create_dir(s.root.join("mixed"))?;
     for (name, bytes) in [
@@ -1676,6 +1683,7 @@ fn music_fixture_queue(s: &mut Session) -> io::Result<()> {
     })
 }
 #[test]
+#[cfg(feature = "audio")]
 fn music_mixed_queue_metadata_and_new_menu_mnemonic_restore_terminal() -> io::Result<()> {
     let mut s = Session::with_preferences("music-mixed", "[plugins]\nenabled=['mp3_player']\n")?;
     music_fixture_queue(&mut s)?;
@@ -1697,6 +1705,7 @@ fn music_mixed_queue_metadata_and_new_menu_mnemonic_restore_terminal() -> io::Re
 }
 #[test]
 #[ignore = "requires a working macOS audio output device; plays quiet synthetic tones"]
+#[cfg(feature = "audio")]
 fn music_mixed_audio_play_seek_next_and_channel_changes_restore_terminal() -> io::Result<()> {
     let mut s =
         Session::with_preferences("music-mixed-audio", "[plugins]\nenabled=['mp3_player']\n")?;

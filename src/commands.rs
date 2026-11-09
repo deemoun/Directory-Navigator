@@ -501,7 +501,8 @@ pub(crate) fn manager_available(app: &App, action: Action) -> bool {
         Action::SmartPad => !crate::windowing::blocked(app) && !app.blocking_operation(),
         Action::Plugin(id) => app.config.plugin_enabled(id),
         Action::AddMp3 => {
-            cfg!(target_os = "macos") && app.config.plugin_enabled(crate::plugins::MP3_PLAYER)
+            crate::plugins::music_playback_available()
+                && app.config.plugin_enabled(crate::plugins::MP3_PLAYER)
         }
         Action::WindowTile | Action::WindowCascade => crate::windowing::can_arrange(app),
         Action::WindowMove => {

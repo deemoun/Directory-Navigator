@@ -28,6 +28,18 @@ pub const CALCULATOR: PluginId = PluginId("calculator");
 pub const TETRIS: PluginId = PluginId("tetris");
 pub const APK_WORKSHOP: PluginId = PluginId("apk_workshop");
 pub const MP3_PLAYER: PluginId = PluginId("mp3_player");
+
+/// Compile-time capability only; audio devices are opened lazily by the worker.
+pub(crate) const fn music_playback_available() -> bool {
+    cfg!(all(
+        feature = "audio",
+        any(
+            target_os = "macos",
+            target_os = "linux",
+            target_os = "windows"
+        )
+    ))
+}
 /// Compiled-in defaults are separate from explicit user overrides. Unknown tools
 /// retain the original enabled default; experimental built-ins opt out here.
 pub fn enabled_by_default(id: PluginId) -> bool {

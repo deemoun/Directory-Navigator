@@ -40,7 +40,10 @@ impl Pending {
             })
     }
 }
-#[cfg(target_os = "macos")]
+#[cfg(all(
+    feature = "audio",
+    any(target_os = "macos", target_os = "linux", target_os = "windows")
+))]
 pub(super) fn scan(
     paths: Vec<PathBuf>,
     capacity: usize,
@@ -190,7 +193,13 @@ pub(super) fn scan(
     scanner.result
 }
 
-#[cfg(all(test, target_os = "macos"))]
+#[cfg(all(
+    test,
+    all(
+        feature = "audio",
+        any(target_os = "macos", target_os = "linux", target_os = "windows")
+    )
+))]
 mod tests {
     use super::*;
     use std::{
@@ -218,14 +227,17 @@ mod tests {
     #[test]
     fn recursive_import_is_sorted_bounded_and_never_follows_directory_or_file_links(
     ) -> io::Result<()> {
-        use std::os::unix::fs::symlink;
         let f = Fixture::new()?;
         fs::create_dir(f.0.join("album"))?;
         fs::write(f.0.join("album/a.MP3"), b"no tags")?;
         fs::write(f.0.join("z.mp3"), b"no tags")?;
         fs::write(f.0.join("ignore.txt"), b"ignored")?;
-        symlink(&f.0, f.0.join("album/loop"))?;
-        symlink(f.0.join("z.mp3"), f.0.join("link.mp3"))?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::symlink;
+            symlink(&f.0, f.0.join("album/loop"))?;
+            symlink(f.0.join("z.mp3"), f.0.join("link.mp3"))?;
+        }
         let cancel = crate::task::Cancellation::default();
         let result = scan(vec![f.0.clone()], 64, &cancel, &Progress::default());
         assert_eq!(result.errors, 0);

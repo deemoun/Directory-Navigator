@@ -170,6 +170,7 @@ impl Session {
     pub fn command_prompt_active(&self) -> bool {
         self.screen.command_prompt_active()
     }
+    #[cfg(feature = "audio")]
     pub fn plugin_document_ready(&self) -> bool {
         fs::read_to_string(self.root.join("settings/dn/diagnostics.txt")).is_ok_and(|state| {
             document_input_ready(&state, " focus=Plugin ")

@@ -161,7 +161,7 @@ immediately; Repeat uses an owned Off/One/All page with apply/cancel. The expand
 presentation derives separate metadata, one timer and display-only position/volume
 meters from existing state. Compact controls retain their previous layout. The queue has no unavailable Save button.
 
-On macOS, the optional `plugins.mp3_player.play_on_enter` preference routes regular
+On supported audio builds, the optional `plugins.mp3_player.play_on_enter` preference routes regular
 supported music files through a typed `PlayMp3(PathBuf)` event before custom associations.
 Explicit OS opening bypasses that route. The player reuses a matching native path
 or imports the captured single file and starts it after successful completion;
@@ -186,7 +186,7 @@ snapshots reconcile live queue durations by entry ID. Drawing reads
 these values without changing state. Time switches elapsed/remaining track time;
 Settings applies seek/default-volume drafts; inline volume remains session-only.
 
-macOS uses Rodio with playback and MP3/FLAC/PCM-WAV/Vorbis features. One lazily started worker per
+macOS, Linux and Windows use Rodio with playback and MP3/FLAC/PCM-WAV/Vorbis features. One lazily started worker per
 plugin owns the decoder and output device. A fixed-size shared mailbox coalesces
 requests; UI callbacks never open audio files or seek synchronously. Files use
 `filesystem::open_regular`. Generation checks reject superseded loads and
@@ -196,9 +196,12 @@ window openings and exits when its engine is dropped.
 
 `next_wake`/`Tick` poll snapshots while playing or paused, including inactive
 windows, without requesting focus or dialogs. Rendering is immutable. End of track
-advances once; end of queue or an error stops. Playback remains macOS-only;
-other platforms compile without the Rodio dependency and disable audio/import
-controls. Tests use an injected engine so ordinary CI needs no audio hardware.
+advances once; end of queue or an error stops. The default Cargo feature `audio` enables Rodio/Symphonia on macOS, Linux and
+Windows. One shared compile-time capability gates player controls, imports, menu
+actions, plugin effects and internal file opening. Builds without that feature
+compile without those dependencies and retain the unavailable window, disabled
+audio/import controls and external opening. Device availability is checked
+lazily, not when enabling the plugin. Tests use an injected engine so ordinary CI needs no audio hardware.
 
 The import worker uses the existing bounded task pool with a document-owned
 request scope. One pending batch is retained per player. Cancellation discards
@@ -214,12 +217,12 @@ text frames to 16 KiB and displayed fields to 512 characters. Only artist, title
 and album text reaches the metadata parser; artwork is skipped. ID3v1 supplies
 missing fields. File handles use safe regular opens and identity checks.
 
-The Mode page edits a temporary Shuffle/Repeat draft. Playback order uses stable
+Shuffle applies immediately; Repeat opens an owned Off/One/All selector. Playback order uses stable
 entry IDs independently of visible queue order. A shuffled cycle anchors the
 current entry, permutes the rest and supports Previous; Repeat All wraps that
 same cycle. Repeat One applies only at EOF. Queue changes rebuild the cycle;
-repeat-only mode changes preserve it. Modes/import/Info remain macOS-only and
-preferences are session-local.
+repeat-only mode changes preserve it. Modes/import/Info work on every supported audio build. Shuffle/repeat remain
+session-local; seek/default-volume preferences use the existing settings bridge.
 
 ## APK Workshop
 
