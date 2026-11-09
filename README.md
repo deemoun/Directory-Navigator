@@ -187,6 +187,21 @@ On Windows, run `target\release\dn.exe`. Add `--no-default-features` to the buil
 command for a build without audio libraries. Windows MSVC builds statically link
 the C runtime through `.cargo/config.toml`.
 
+### Linux virtual consoles
+
+In a real Linux virtual console (`/dev/ttyN`), DN automatically uses an existing
+GPM daemon for mouse input. Install/configure your distribution's `gpm` service;
+DN itself needs no root privileges or `libgpm` shared library. DN uses
+console-compatible colors there without changing the system palette. Graphical
+terminals, SSH and tmux retain their usual mouse input and extended colors.
+
+**Utilities → System Information** reports the terminal mode, color output, mouse
+source, GPM errors and Unicode font-mapping coverage. Missing Cyrillic glyphs need
+a suitable console font; changing the locale alone cannot add them. DN does not
+change fonts or keyboard modes. See the guide for
+[GPM and console colors](docs/USER_GUIDE.md#mouse-in-a-linux-virtual-console-gpm)
+and [Cyrillic troubleshooting](docs/USER_GUIDE.md#cyrillic-in-a-linux-tty).
+
 ## Everyday controls
 
 New installations open a short welcome with keyboard guidance, Help and keyboard
@@ -232,8 +247,8 @@ menu or window list. Window geometry lasts for the session.
 Copy and Move use a switchable **Transfer Center**: continue browsing or editing
 while one transfer runs and others wait in its queue. **Manager → Transfers…**
 reopens progress and results. Closing the window keeps work running; errors or
-cancellation pause the queue until you resume it. Existing destinations are never
-overwritten.
+cancellation pause the queue until you resume it. File conflicts prompt before
+replacement; existing folders can be merged. See [file handling](#larger-files-and-replacing-existing-files).
 
 The bottom row is a command prompt. Type a command and press **Enter** to run it
 in the active panel's directory; **Esc** clears it. **Ctrl+E / Ctrl+X** recall command
@@ -273,19 +288,55 @@ hardware settings and custom palettes are excluded; Trash and confirmation safeg
 are retained. Compatibility is based on source-derived fixtures; a real user-supplied
 `DN.CFG` has not yet been tested.
 
-File operations refuse existing destinations by default. Copy can explicitly skip
-conflicts without overwriting. Trash is the default deletion mode;
-a Trash failure never falls back to permanent deletion. Permanent deletion can be
-selected in File Manager Setup and still requires confirmation.
-Detected changes to queued entries or their parent directories stop the operation.
-Cancellation or failure retains completed work; multi-file operations have no automatic rollback.
+Trash is the default deletion mode; a Trash failure never falls back to permanent
+deletion. Permanent deletion can be selected in File Manager Setup and still
+requires confirmation. Detected changes to queued entries or their parent
+directories stop the operation. Cancellation or failure retains completed work;
+multi-file operations have no automatic rollback.
 
-This is a **beta**. Archive browsing is read-only; the viewer is a bounded preview,
-and the editor handles text up to 16 MiB / 250,000 lines, with strict encoding conversion. Test important
-workflows on copies and report problems with your OS, terminal and reproduction steps.
+This is a **beta**. Archive panes are read-only, and text viewing/editing uses the
+limits below. Test important workflows on copies and report problems with your
+OS, terminal and reproduction steps. For detailed shortcuts, limits and user-menu
+configuration, see the [user guide](docs/USER_GUIDE.md).
 
-For detailed shortcuts, limits and user-menu configuration, see the
-[user guide](docs/USER_GUIDE.md).
+### Larger files and replacing existing files
+
+F3 reads up to 64 MiB of source bytes, with limits of 192 MiB of decoded text and
+1,000,000 lines. Larger files use a clearly labelled bounded preview. F4 supports
+up to 16 MiB for both the Unicode buffer and encoded output, and 250,000 lines;
+oversized documents or saves are refused without truncating content.
+
+Copy, Move and archive extraction ask before replacing files by default:
+**Replace / Skip / Replace all / Skip all / Cancel**, with Skip initially selected.
+“All” choices apply only to the current transfer. Esc cancels it; completed work
+remains. Existing folders merge recursively, preserving unrelated contents.
+Explicit Refuse and Skip policies remain available. File/directory mismatches,
+links and special destinations are refused. **Save As** asks **Replace / Cancel**,
+with Cancel selected initially; ordinary F2 retains external-change checks.
+
+### Text encodings
+
+The viewer and editor support UTF-8, UTF-16 LE/BE, CP866, Windows-1251, KOI8-R and
+Windows-1252. BOM and valid UTF-8 are detected automatically; other plausible text
+opens an encoding chooser with a preview. F8 changes the encoding; in the editor
+it rereads the file after handling unsaved changes. F2 preserves encoding, BOM and
+mixed line endings. **File → Save with encoding…** converts explicitly;
+unrepresentable characters block saving instead of being replaced. New documents
+use UTF-8 without BOM. See [text encodings](docs/USER_GUIDE.md#text-encodings-in-f3-and-f4).
+
+### PDF text previews
+
+Press F3 on a PDF to read extracted text internally, with page indicators, search
+and Go to page. Enter retains external opening. Archive members are supported.
+Encrypted PDFs use a masked password prompt with retry and cancellation. PDF and
+ZIP passwords are separate and are never saved. Graphics and OCR are not supported.
+
+### Open TXT files inside DN
+
+Enable **Options → File Manager → Setup → Open TXT files in internal viewer**
+to use Enter or double-click for `.txt` / `.TXT` files on all three platforms.
+It is off by default and overrides TXT associations when enabled. Ctrl+Enter
+always opens externally; F3 and F4 retain their usual viewer/editor actions.
 
 ### Tetris, Pentix and original scores
 
@@ -388,32 +439,8 @@ python3 -m unittest discover -s scripts -p 'test_*.py'
 
 The Rust application lives in `src/`, with tests in `tests/`.
 
-### Linux console mouse
-
-In a real Linux virtual console (`/dev/ttyN`), DN automatically uses an existing
-GPM daemon. Install/configure your distribution's `gpm` service when physical
-mouse input is needed there; DN itself needs no root privileges or `libgpm`
-shared library. Utilities → System Information reports the active mouse source
-and GPM errors. Graphical terminals, SSH/tmux, macOS and Windows keep their usual
-terminal mouse input. See [the guide](docs/USER_GUIDE.md#mouse-in-a-linux-virtual-console-gpm).
-
-
 ## License
 
 Directory Navigator is available under the [MIT license](LICENSE).
 
 Copyright (c) 2026 Dmitry Yarygin.
-
-### PDF text previews
-
-Press F3 on a PDF to read extracted text internally, with page indicators, search
-and Go to page. Enter retains external opening. Archive members are supported.
-Encrypted PDFs use a masked password prompt with retry and cancellation. PDF and
-ZIP passwords are separate and are never saved. Graphics and OCR are not supported.
-
-### Open TXT files inside DN
-
-Enable **Options → File Manager → Setup → Open TXT files in internal viewer**
-to use Enter or double-click for `.txt` / `.TXT` files on all three platforms.
-It is off by default and overrides TXT associations when enabled. Ctrl+Enter
-always opens externally; F3 and F4 retain their usual viewer/editor actions.
