@@ -235,6 +235,21 @@ impl Session {
                 && ready(s)
         })
     }
+    /// Bulk text must arrive as one Paste event, independent of redraw speed.
+    pub fn paste(
+        &mut self,
+        text: &str,
+        stage: &str,
+        ready: impl Fn(&Self) -> bool,
+    ) -> io::Result<()> {
+        let event = format!("paste bytes={}\n", text.len());
+        let framed = format!("\x1b[200~{text}\x1b[201~");
+        self.send(framed.as_bytes(), stage, |s| {
+            ready(s)
+                && fs::read_to_string(s.root.join("settings/dn/diagnostics.txt"))
+                    .is_ok_and(|state| state.contains(&event))
+        })
+    }
     // Shell/output handoff has no DN screen commit. Its assertions inspect raw
     // alternate-screen or shell acknowledgements rather than application pixels.
     pub fn send_output(

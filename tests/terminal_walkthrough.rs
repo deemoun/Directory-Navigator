@@ -1951,8 +1951,13 @@ fn apk_workshop_inspect_project_patch_export_and_terminal_restoration() -> io::R
     music_click(&mut s, "Project…", "new APK project picker", |s| {
         s.text().contains("Save As")
     })?;
-    let project = fs::canonicalize(&s.root)?.join("project");
-    s.send(project.to_str().unwrap().as_bytes(), "project name", |s| {
+    // Keep long absolute Unicode paths covered even with a short TMPDIR.
+    let destinations = fs::canonicalize(&s.root)?
+        .join("paths")
+        .join(format!("{}界", "long-".repeat(18)));
+    fs::create_dir_all(&destinations)?;
+    let project = destinations.join("project");
+    s.paste(project.to_str().unwrap(), "project name", |s| {
         s.text().contains("project")
     })?;
     s.send(b"\r", "APK project created", |s| {
@@ -1978,12 +1983,10 @@ fn apk_workshop_inspect_project_patch_export_and_terminal_restoration() -> io::R
     music_click(&mut s, "Export…", "export APK picker", |s| {
         s.text().contains("Save As")
     })?;
-    let output = fs::canonicalize(&s.root)?.join("patched.apk");
-    s.send(
-        output.to_str().unwrap().as_bytes(),
-        "APK output path",
-        |s| s.text().contains("patched.apk"),
-    )?;
+    let output = destinations.join("patched.apk");
+    s.paste(output.to_str().unwrap(), "APK output path", |s| {
+        s.text().contains("patched.apk")
+    })?;
     s.send(b"\r", "APK exported", |s| {
         output.exists() && s.text().contains("APK exported successfully")
     })?;
