@@ -5,16 +5,27 @@ Original Pascal references are kept locally in `original-dn/` (excluded from Git
 Directory Navigator is licensed under the [MIT license](../LICENSE).
 
 Install the latest published release from
-[crates.io](https://crates.io/crates/directory-navigator) on macOS, Windows or Linux:
+[crates.io](https://crates.io/crates/directory-navigator) on macOS, Windows or Linux.
+
+**Linux audio is included by default. Install these build dependencies first:**
+
+| Distribution | Required packages |
+| --- | --- |
+| Debian / Ubuntu / Linux Mint | `sudo apt install build-essential pkg-config libasound2-dev` |
+| Fedora | `sudo dnf install gcc pkgconf-pkg-config alsa-lib-devel` |
+| Arch Linux / Manjaro | `sudo pacman -S --needed base-devel pkgconf alsa-lib` |
+
+Then install and run DN:
 
 ```sh
 cargo install directory-navigator
 dn
 ```
 
-Cargo requires stable Rust and platform build tools. Linux audio builds also need
-ALSA development packages. See the [installation prerequisites](../README.md#get-started)
-for macOS, Windows, Debian/Ubuntu and Fedora, or install without audio using
+Cargo requires stable Rust and platform build tools. If `pkg-config` or ALSA is
+reported missing, install the packages above and retry; `pkg-config --modversion alsa` checks that both are available. Other distributions need `pkg-config`, ALSA
+headers and `alsa.pc` metadata. See the [installation prerequisites](../README.md#get-started)
+for macOS and Windows, or install without audio using
 `cargo install directory-navigator --no-default-features`.
 
 Starts in the current directory. Minimum terminal: 80×25. Unicode names, native

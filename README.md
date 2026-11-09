@@ -97,7 +97,9 @@ and modern filesystem handling.
 
 [Directory Navigator on crates.io](https://crates.io/crates/directory-navigator)
 is the primary installation source for **macOS, Windows and Linux**. With stable
-Rust, Cargo and your platform's build tools installed, run:
+Rust, Cargo and your platform's build tools installed, run the command below.
+**On Linux, install the audio build dependencies listed below first:** audio is
+included by default, and Cargo needs `pkg-config` plus ALSA development files.
 
 ```sh
 cargo install directory-navigator
@@ -113,8 +115,21 @@ Cargo builds the program locally. Required build tools:
 - **macOS:** Xcode Command Line Tools (`xcode-select --install`).
 - **Windows:** the MSVC Rust toolchain and Visual Studio Build Tools with the
   **Desktop development with C++** workload and Windows SDK.
-- **Debian/Ubuntu:** `sudo apt install build-essential pkg-config libasound2-dev`.
-- **Fedora:** `sudo dnf install gcc pkgconf-pkg-config alsa-lib-devel`.
+
+**Linux audio build dependencies** — choose your distribution and run this before
+`cargo install directory-navigator`:
+
+| Distribution | Install build tools and audio development files |
+| --- | --- |
+| Debian / Ubuntu / Linux Mint | `sudo apt install build-essential pkg-config libasound2-dev` |
+| Fedora | `sudo dnf install gcc pkgconf-pkg-config alsa-lib-devel` |
+| Arch Linux / Manjaro | `sudo pacman -S --needed base-devel pkgconf alsa-lib` |
+
+If installation reports **“The pkg-config command could not be found”** or
+**“The system library alsa was not found”**, install the packages above, then retry
+`cargo install directory-navigator`. Check that both are available with
+`pkg-config --modversion alsa`. On other distributions, install the packages that
+provide the `pkg-config` command, ALSA headers and `alsa.pc` metadata.
 
 Default builds include audio support; enable the Music Player plugin separately
 in Options → Configuration → Plugins. To install without audio libraries:

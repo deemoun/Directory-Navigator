@@ -97,7 +97,9 @@
 
 [Directory Navigator на crates.io](https://crates.io/crates/directory-navigator) —
 основной источник установки для **macOS, Windows и Linux**. Установите стабильный
-Rust, Cargo и инструменты сборки для своей платформы, затем выполните:
+Rust, Cargo и инструменты сборки для своей платформы.
+**В Linux сначала установите пакеты из таблицы ниже:** звук включён по умолчанию,
+поэтому Cargo нужны `pkg-config` и файлы разработки ALSA. Затем выполните:
 
 ```sh
 cargo install directory-navigator
@@ -113,8 +115,21 @@ Cargo собирает программу локально. Необходимы
 - **macOS:** Xcode Command Line Tools (`xcode-select --install`).
 - **Windows:** Rust с MSVC и Visual Studio Build Tools с компонентами
   **Desktop development with C++** и Windows SDK.
-- **Debian/Ubuntu:** `sudo apt install build-essential pkg-config libasound2-dev`.
-- **Fedora:** `sudo dnf install gcc pkgconf-pkg-config alsa-lib-devel`.
+
+**Зависимости сборки со звуком в Linux** — выполните команду для своего дистрибутива
+перед `cargo install directory-navigator`:
+
+| Дистрибутив | Инструменты сборки и файлы разработки звука |
+| --- | --- |
+| Debian / Ubuntu / Linux Mint | `sudo apt install build-essential pkg-config libasound2-dev` |
+| Fedora | `sudo dnf install gcc pkgconf-pkg-config alsa-lib-devel` |
+| Arch Linux / Manjaro | `sudo pacman -S --needed base-devel pkgconf alsa-lib` |
+
+При ошибке **«The pkg-config command could not be found»** или
+**«The system library alsa was not found»** установите пакеты из таблицы и повторите
+`cargo install directory-navigator`. Проверка наличия обеих зависимостей:
+`pkg-config --modversion alsa`. Для других дистрибутивов нужны пакеты с командой
+`pkg-config`, заголовочными файлами ALSA и метаданными `alsa.pc`.
 
 Обычная сборка включает звук; сам Music Player включается отдельно в
 Options → Configuration → Plugins. Установка без звуковых библиотек:
