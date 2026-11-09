@@ -105,6 +105,14 @@ fn refresh(app: &mut App) {
         app.utilities.size,
     ) {
         Ok(info) => {
+            #[cfg(target_os = "linux")]
+            let info = {
+                let mut info = info;
+                if kind == information::Kind::System {
+                    info.set_mouse_fields(app.console_mouse.fields());
+                }
+                info
+            };
             if app.desktop.tool(app.desktop.target()).is_some() {
                 info.requests
                     .bind(crate::requests::Owner::Document(app.desktop.target()));

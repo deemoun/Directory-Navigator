@@ -17,6 +17,8 @@ pub struct Information {
     pub(crate) requests: crate::requests::RequestScope,
     pub kind: Kind,
     pub fields: Fields,
+    #[cfg(target_os = "linux")]
+    pub(crate) mouse_fields: Fields,
     pub offset: usize,
     pub horizontal: u16,
     pub rows: usize,
@@ -30,6 +32,8 @@ impl Information {
             requests,
             kind,
             fields: Vec::new(),
+            #[cfg(target_os = "linux")]
+            mouse_fields: Vec::new(),
             offset: 0,
             horizontal: 0,
             rows: 10,
@@ -50,9 +54,23 @@ impl Information {
         });
         if let Some(fields) = reply {
             self.fields = fields;
+            #[cfg(target_os = "linux")]
+            self.fields.extend(self.mouse_fields.clone());
             true
         } else {
             false
+        }
+    }
+    #[cfg(target_os = "linux")]
+    pub(crate) fn set_mouse_fields(&mut self, fields: Fields) {
+        if self.kind != Kind::System || self.mouse_fields == fields {
+            return;
+        }
+        self.mouse_fields = fields;
+        if !self.loading() {
+            self.fields
+                .retain(|(key, _)| !matches!(key.as_str(), "Mouse input" | "GPM status"));
+            self.fields.extend(self.mouse_fields.clone());
         }
     }
     pub fn step(&mut self, amount: isize) {

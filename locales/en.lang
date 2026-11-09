@@ -1093,3 +1093,15 @@ Invalid KOI8-R text; choose another encoding or Hex.	Invalid KOI8-R text; choose
 Some characters cannot be saved as KOI8-R. Choose UTF-8; the file was not changed.	Some characters cannot be saved as KOI8-R. Choose UTF-8; the file was not changed.
 Invalid Windows-1252 text; choose another encoding or Hex.	Invalid Windows-1252 text; choose another encoding or Hex.
 Some characters cannot be saved as Windows-1252. Choose UTF-8; the file was not changed.	Some characters cannot be saved as Windows-1252. Choose UTF-8; the file was not changed.
+Mouse input	Mouse input
+GPM status	GPM status
+Keyboard only	Keyboard only
+Not initialized	Not initialized
+Not a Linux virtual console	Not a Linux virtual console
+Waiting for GPM	Waiting for GPM
+Connecting to GPM	Connecting to GPM
+Connected	Connected
+Suspended	Suspended
+Inactive virtual console	Inactive virtual console
+GPM unavailable	GPM unavailable
+Linux virtual consoles use an existing GPM daemon automatically. Utilities > System Information shows the mouse source and GPM errors. Terminal emulators and SSH keep normal terminal mouse input.	Linux virtual consoles use an existing GPM daemon automatically. Utilities > System Information shows the mouse source and GPM errors. Terminal emulators and SSH keep normal terminal mouse input.

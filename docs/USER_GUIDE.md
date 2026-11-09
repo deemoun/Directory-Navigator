@@ -1364,3 +1364,29 @@ its Unicode buffer and encoded output to 2 MiB and refuses oversized documents
 without silently truncating them. Recovery retains the output encoding and BOM;
 old checkpoints remain UTF-8. Encoding choices are document-local, not global or
 persisted per filename. Markdown formatting/search operate on decoded text.
+
+## Mouse in a Linux virtual console (GPM)
+
+On a real Linux virtual console such as `/dev/tty1`, DN automatically connects
+to an already-running GPM daemon through `/dev/gpmctl`. DN runs as your normal
+user. The daemon and socket permissions must be configured by the system
+administrator; DN never starts a service or changes permissions. On a systemd
+system you can inspect the service with `systemctl status gpm`.
+
+GPM supplies left/middle/right press and release, dragging, vertical wheel
+scrolling and Shift/Ctrl/Alt modifiers to the same controls used in a terminal
+emulator. DN retains its existing double-click handling. A reversed-cell pointer
+follows movement without replacing the editor's text cursor. Wide Unicode
+characters are highlighted as a whole; the pointer is excluded from screensaver
+snapshots and hidden while a saver or external-command output is displayed.
+
+**Utilities → System Information** shows **Mouse input** and **GPM status**.
+Missing sockets, permission failures and disconnects leave keyboard input working.
+DN retries at most once every two seconds while it owns the active console.
+Leaving that virtual console or losing GPM cancels held mouse buttons and drags;
+returning to DN permits reconnection. External commands receive the console with
+DN's GPM connection released.
+
+Linux console detection checks the actual terminal device, not just `TERM`.
+Linux PTYs, SSH/tmux, macOS and Windows retain their existing terminal mouse
+handling. No GPM shared library, new setting or configuration migration is needed.

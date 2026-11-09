@@ -163,9 +163,15 @@ impl Browser {
                 .join("\n");
             let mut content=format!("# {} {{#context}}\n{body}\n\n[{contents}](#contents)\n\n# {contents} {{#contents}}\n[{}](#context)\n{links}\n",language.text(&self.title),language.text("Back"));
             for (id, title, body) in pages {
+                let body = language.text(body);
+                #[cfg(target_os = "linux")]
+                let body = if id == "panels" {
+                    format!("{body}\n\n{}", language.text("Linux virtual consoles use an existing GPM daemon automatically. Utilities > System Information shows the mouse source and GPM errors. Terminal emulators and SSH keep normal terminal mouse input."))
+                } else {
+                    body.to_owned()
+                };
                 content.push_str(&format!(
-                    "\n# {title} {{#{id}}}\n{}\n\n[{contents}](#contents)\n",
-                    language.text(body)
+                    "\n# {title} {{#{id}}}\n{body}\n\n[{contents}](#contents)\n"
                 ));
             }
             if let Some(actions) = &self.landing {

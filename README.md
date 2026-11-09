@@ -340,6 +340,16 @@ python3 -m unittest discover -s scripts -p 'test_*.py'
 
 The Rust application lives in `src/`, with tests in `tests/`.
 
+### Linux console mouse
+
+In a real Linux virtual console (`/dev/ttyN`), DN automatically uses an existing
+GPM daemon. Install/configure your distribution's `gpm` service when physical
+mouse input is needed there; DN itself needs no root privileges or `libgpm`
+shared library. Utilities → System Information reports the active mouse source
+and GPM errors. Graphical terminals, SSH/tmux, macOS and Windows keep their usual
+terminal mouse input. See [the guide](docs/USER_GUIDE.md#mouse-in-a-linux-virtual-console-gpm).
+
+
 ## License
 
 Directory Navigator is available under the [MIT license](LICENSE).

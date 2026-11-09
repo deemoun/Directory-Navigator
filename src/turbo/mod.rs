@@ -39,6 +39,8 @@ struct Transport<W> {
     codec: Arc<Mutex<Codec>>,
     dimensions: Arc<Mutex<Size>>,
     input: Arc<Mutex<Option<crossterm::event::Event>>>,
+    #[cfg(target_os = "linux")]
+    console: Arc<Mutex<Option<crate::terminal::gpm::Shared>>>,
 }
 impl<W: Write + Send + 'static> TvBackend for Transport<W> {
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
@@ -56,6 +58,15 @@ impl<W: Write + Send + 'static> TvBackend for Transport<W> {
         Ok((s.width, s.height))
     }
     fn poll_event(&mut self, timeout: Duration) -> io::Result<Option<Event>> {
+        #[cfg(target_os = "linux")]
+        if let Some(console) = lock(&self.console)?.clone() {
+            let size = *lock(&self.dimensions)?;
+            if let Some(event) = lock(&console)?.input(timeout, (size.width, size.height))? {
+                *lock(&self.input)? = Some(event);
+                return Ok(Some(Event::command(0xff00)));
+            }
+            return Ok(None);
+        }
         if crossterm::event::poll(timeout)? {
             *lock(&self.input)? = Some(crossterm::event::read()?);
             // Keep the original event intact: shortcut modifiers, paste payloads,
@@ -88,6 +99,8 @@ pub struct TurboBackend<W: Write + Send + 'static> {
     dimensions: Arc<Mutex<Size>>,
     writer: Arc<Mutex<W>>,
     input: Arc<Mutex<Option<crossterm::event::Event>>>,
+    #[cfg(target_os = "linux")]
+    console: Arc<Mutex<Option<crate::terminal::gpm::Shared>>>,
     cursor: Position,
     cursor_visible: bool,
     fixed: bool,
@@ -108,11 +121,15 @@ impl<W: Write + Send + 'static> TurboBackend<W> {
         let dimensions = Arc::new(Mutex::new(size));
         lock(&codec)?.resize(size);
         let input = Arc::new(Mutex::new(None));
+        #[cfg(target_os = "linux")]
+        let console = Arc::new(Mutex::new(None));
         let terminal = TvTerminal::with_backend(Box::new(Transport {
             writer: writer.clone(),
             codec: codec.clone(),
             dimensions: dimensions.clone(),
             input: input.clone(),
+            #[cfg(target_os = "linux")]
+            console: console.clone(),
         }))
         .map_err(|e| io::Error::other(e.to_string()))?;
         Ok(Self {
@@ -125,6 +142,8 @@ impl<W: Write + Send + 'static> TurboBackend<W> {
             dimensions,
             writer,
             input,
+            #[cfg(target_os = "linux")]
+            console,
             cursor: Position::ORIGIN,
             cursor_visible: false,
             fixed,
@@ -145,6 +164,10 @@ impl<W: Write + Send + 'static> TurboBackend<W> {
     pub fn show_cursor(&mut self) -> io::Result<()> {
         self.cursor_visible = true;
         Ok(())
+    }
+    #[cfg(target_os = "linux")]
+    pub(crate) fn attach_console(&mut self, console: crate::terminal::gpm::Shared) {
+        *self.console.lock().unwrap_or_else(|e| e.into_inner()) = Some(console);
     }
     pub fn bind_desktop(&mut self, desktop: desktop::NativeDesktop) {
         self.desktop = desktop;
@@ -195,6 +218,16 @@ impl<W: Write + Send + 'static> TurboBackend<W> {
             app,
             crate::presentation::layout::Rect::new(0, 0, size.width, size.height),
         );
+        #[cfg(target_os = "linux")]
+        let scene = {
+            let mut scene = scene;
+            let position = app.console_mouse.position.filter(|_| {
+                app.console_mouse.connected && !app.screensaver.active && !app.output_visible
+            });
+            crate::terminal::gpm::remember_pointer(&scene, position);
+            crate::terminal::gpm::pointer(&mut scene, position);
+            scene
+        };
         self.cursor_visible = scene.cursor.is_some();
         if let Some((x, y)) = scene.cursor {
             self.cursor = Position::new(x, y);

@@ -1,3 +1,5 @@
+#[cfg(any(target_os = "linux", test))]
+pub(crate) mod gpm;
 use crossterm::{
     cursor::{Hide, SetCursorStyle, Show},
     event::{
@@ -19,9 +21,16 @@ pub type Screen = crate::turbo::TurboBackend<Stdout>;
 
 pub struct Session {
     mouse_down: Cell<bool>,
+    #[cfg(target_os = "linux")]
+    console: gpm::Shared,
 }
 
 pub fn restore() {
+    #[cfg(target_os = "linux")]
+    {
+        gpm::client::panic_close();
+        gpm::hide_pointer();
+    }
     restore_input(false);
 }
 fn stop_capture(mouse_down: bool) {
@@ -82,6 +91,54 @@ impl Session {
             _ => {}
         }
     }
+    fn capture_input(&self) -> io::Result<()> {
+        #[cfg(target_os = "linux")]
+        {
+            let mut console = self.console.lock().unwrap_or_else(|e| e.into_inner());
+            console.resume();
+            if console.snapshot.console {
+                return execute!(
+                    io::stdout(),
+                    EnterAlternateScreen,
+                    DisableMouseCapture,
+                    EnableBracketedPaste
+                );
+            }
+        }
+        execute!(
+            io::stdout(),
+            EnterAlternateScreen,
+            EnableMouseCapture,
+            EnableBracketedPaste
+        )
+    }
+    fn release_mouse(&self) -> bool {
+        let down = self.mouse_down.replace(false);
+        #[cfg(target_os = "linux")]
+        {
+            let mut console = self.console.lock().unwrap_or_else(|e| e.into_inner());
+            let gpm = console.snapshot.console;
+            console.suspend();
+            if gpm {
+                gpm::hide_pointer();
+                return false;
+            }
+        }
+        down
+    }
+    #[cfg(target_os = "linux")]
+    pub fn sync_console(&self, app: &mut crate::app::App) -> bool {
+        let snapshot = self
+            .console
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .snapshot
+            .clone();
+        if snapshot.reset != app.console_mouse.reset {
+            self.mouse_down.set(false);
+        }
+        crate::terminal::gpm::sync(app, snapshot)
+    }
     pub fn cursor_style(&self, command: bool) -> io::Result<()> {
         execute!(
             io::stdout(),
@@ -93,11 +150,11 @@ impl Session {
         )
     }
     pub fn suspend(&self) {
-        restore_input(self.mouse_down.replace(false));
+        restore_input(self.release_mouse());
     }
     /// Keep raw input in DN while exposing the real primary screen/scrollback.
     pub fn reveal_output(&self) -> io::Result<()> {
-        stop_capture(self.mouse_down.replace(false));
+        stop_capture(self.release_mouse());
         execute!(
             io::stdout(),
             SetAttribute(Attribute::Reset),
@@ -110,6 +167,11 @@ impl Session {
     /// A finished child relinquishes input to DN's nonblocking output scope.
     /// Raw input and atomic paste prevent text leaking into command execution.
     pub fn prepare_output_input(&self) -> io::Result<()> {
+        #[cfg(target_os = "linux")]
+        self.console
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .suspend();
         enable_raw_mode()?;
         execute!(
             io::stdout(),
@@ -120,12 +182,7 @@ impl Session {
     }
     pub fn resume(&self, screen: &mut Screen) -> io::Result<()> {
         enable_raw_mode()?;
-        execute!(
-            io::stdout(),
-            EnterAlternateScreen,
-            EnableMouseCapture,
-            EnableBracketedPaste
-        )?;
+        self.capture_input()?;
         screen.clear()?;
         Ok(())
     }
@@ -144,15 +201,18 @@ impl Session {
         }));
         let guard = Self {
             mouse_down: Cell::new(false),
+            #[cfg(target_os = "linux")]
+            console: gpm::Controller::current(),
         };
         enable_raw_mode()?;
-        execute!(
-            io::stdout(),
-            EnterAlternateScreen,
-            EnableMouseCapture,
-            EnableBracketedPaste
-        )?;
+        guard.capture_input()?;
         let screen = crate::turbo::TurboBackend::new(io::stdout())?;
+        #[cfg(target_os = "linux")]
+        let screen = {
+            let mut screen = screen;
+            screen.attach_console(guard.console.clone());
+            screen
+        };
 
         Ok((guard, screen))
     }
@@ -160,6 +220,6 @@ impl Session {
 
 impl Drop for Session {
     fn drop(&mut self) {
-        restore_input(self.mouse_down.replace(false));
+        restore_input(self.release_mouse());
     }
 }

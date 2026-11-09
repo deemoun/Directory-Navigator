@@ -13,6 +13,8 @@ mod modals;
 mod polling;
 
 pub struct App {
+    #[cfg(target_os = "linux")]
+    pub(crate) console_mouse: crate::terminal::gpm::Snapshot,
     pub transfers: crate::transfers::State,
     pub(crate) button_feedback: crate::button_feedback::State,
     pub modals: crate::modals::ModalStack,
@@ -67,6 +69,8 @@ impl App {
     pub fn new(path: PathBuf) -> io::Result<Self> {
         let config = Config::default();
         let mut app = Self {
+            #[cfg(target_os = "linux")]
+            console_mouse: Default::default(),
             transfers: Default::default(),
             button_feedback: Default::default(),
             modals: Default::default(),

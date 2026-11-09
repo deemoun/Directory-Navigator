@@ -219,6 +219,18 @@ pub(crate) fn utility_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
                     .skip(info.offset)
                     .take(info.rows)
                 {
+                    #[cfg(target_os = "linux")]
+                    let translated = if matches!(name.as_str(), "Mouse input" | "GPM status") {
+                        if let Some((prefix, detail)) = value.split_once(": ") {
+                            format!("{}: {detail}", app.config.language.text(prefix))
+                        } else {
+                            app.config.language.text(value).to_owned()
+                        }
+                    } else {
+                        value.clone()
+                    };
+                    #[cfg(target_os = "linux")]
+                    let value = &translated;
                     spec.caption(
                         Paragraph::new(format!(
                             "{}: {}",

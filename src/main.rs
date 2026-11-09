@@ -40,6 +40,10 @@ fn run() -> io::Result<()> {
     let mut showing_output = false;
     let mut exit_settings_saved = false;
     loop {
+        #[cfg(target_os = "linux")]
+        {
+            dirty |= session.sync_console(&mut app);
+        }
         dirty |= app.poll();
         if app.output_visible != showing_output {
             if app.output_visible {
@@ -103,7 +107,12 @@ fn run() -> io::Result<()> {
             continue;
         }
         let timeout = app.wait_duration(std::time::Instant::now());
-        if let Some(event) = session.poll(&mut terminal, timeout)? {
+        let event = session.poll(&mut terminal, timeout)?;
+        #[cfg(target_os = "linux")]
+        {
+            dirty |= session.sync_console(&mut app);
+        }
+        if let Some(event) = event {
             diagnostics.event(&event);
             if showing_output {
                 dn::terminal_output::event(&mut app, &event);

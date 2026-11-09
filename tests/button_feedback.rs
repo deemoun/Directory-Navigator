@@ -240,7 +240,20 @@ fn plugin_play_caption_survives_press_and_rendering_is_immutable() -> io::Result
         "Play caption retained"
     );
     finish(&mut a);
-    let restored = support::draw(&mut a, 80, 25)?;
+    // Starting playback is asynchronous. The invalid fixture must reach its
+    // stopped/error state before comparing the original Play face: the 90 ms
+    // button animation says nothing about the audio worker's completion.
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let restored = loop {
+        a.poll();
+        let frame = support::draw(&mut a, 80, 25)?;
+        let text = frame.content.iter().map(|c| c.symbol()).collect::<String>();
+        if text.contains("Stopped") {
+            break frame;
+        }
+        assert!(Instant::now() < deadline, "invalid audio did not stop");
+        std::thread::yield_now();
+    };
     for y in r.y..=r.bottom() {
         for x in r.x..r.right() {
             assert_eq!(

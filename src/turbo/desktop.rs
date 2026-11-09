@@ -726,6 +726,20 @@ impl NativeDesktop {
         h.interaction.revision += 1;
         true
     }
+    #[cfg(target_os = "linux")]
+    pub(crate) fn cancel_mouse_capture(&self) {
+        let captured = {
+            let mut h = self.0.borrow_mut();
+            h.interaction.last_title = None;
+            h.interaction.capture.as_ref().is_some_and(|c| !c.keyboard)
+        };
+        if captured {
+            self.geometry_key(crossterm::event::KeyEvent::new(
+                crossterm::event::KeyCode::Esc,
+                crossterm::event::KeyModifiers::NONE,
+            ));
+        }
+    }
     pub(crate) fn geometry_key(&self, key: crossterm::event::KeyEvent) -> bool {
         use crossterm::event::KeyCode;
         let mut h = self.0.borrow_mut();

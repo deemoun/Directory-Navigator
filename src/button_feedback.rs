@@ -116,6 +116,17 @@ pub(crate) fn diagnostic(app: &App) -> String {
         },
     )
 }
+#[cfg(target_os = "linux")]
+pub(crate) fn cancel_mouse(app: &mut App) {
+    if app
+        .button_feedback
+        .press
+        .as_ref()
+        .is_some_and(|p| !matches!(p.event, Activation::Key(_)))
+    {
+        app.button_feedback.press = None;
+    }
+}
 pub(crate) fn cancel(app: &mut App) {
     app.button_feedback.press = None;
 }

@@ -1095,3 +1095,15 @@ Invalid KOI8-R text; choose another encoding or Hex.	Некорректный т
 Some characters cannot be saved as KOI8-R. Choose UTF-8; the file was not changed.	Часть символов не представима в KOI8-R. Выберите UTF-8; файл не изменён.
 Invalid Windows-1252 text; choose another encoding or Hex.	Некорректный текст Windows-1252; выберите другую кодировку или Hex.
 Some characters cannot be saved as Windows-1252. Choose UTF-8; the file was not changed.	Часть символов не представима в Windows-1252. Выберите UTF-8; файл не изменён.
+Mouse input	Источник мыши
+GPM status	Состояние GPM
+Keyboard only	Только клавиатура
+Not initialized	Не инициализировано
+Not a Linux virtual console	Не виртуальная консоль Linux
+Waiting for GPM	Ожидание GPM
+Connecting to GPM	Подключение к GPM
+Connected	Подключено
+Suspended	Приостановлено
+Inactive virtual console	Виртуальная консоль неактивна
+GPM unavailable	GPM недоступен
+Linux virtual consoles use an existing GPM daemon automatically. Utilities > System Information shows the mouse source and GPM errors. Terminal emulators and SSH keep normal terminal mouse input.	В виртуальной консоли Linux мышь автоматически работает через запущенную службу GPM. Utilities > System Information показывает источник мыши и ошибки GPM. В эмуляторах терминала и SSH сохраняется обычный ввод мыши.

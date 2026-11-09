@@ -230,6 +230,37 @@ or signing keys are distributed with DN. Android SDK tools are optional separate
 installed programs; DN's own ZIP reader and publication safeguards are reused.
 
 
+## Linux console mouse support (Youta)
+
+The GPM packet codec and mouse mapping in `src/terminal/gpm.rs` are adapted
+from Youta's `src/gpm.rs` by Vitaly Zdanevich and Youta contributors.
+Upstream: https://github.com/vitaly-zdanevich/youta/blob/main/src/gpm.rs
+Reviewed source blob: `76242ed25b27387cafa7496eb457205783268b3f`.
+DN maintains its own bounded socket lifecycle and terminal integration.
+Youta is not a runtime or Cargo dependency; DN does not link libgpm.
+
+MIT License
+
+Copyright (c) 2026 Vitaly Zdanevich and Youta contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
 ## encoding_rs
 
 Source: https://github.com/hsivonen/encoding_rs
