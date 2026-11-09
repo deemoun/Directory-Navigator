@@ -684,7 +684,23 @@ mod tests {
     fn disconnect_cancels_mouse_geometry_and_scrollbar_but_preserves_keyboard_geometry() {
         use crate::{presentation::layout::Rect, windowing::geometry::SurfaceKey};
         let mut app = crate::app::App::new(std::env::current_dir().unwrap()).unwrap();
+        // Opening an editor is intentionally blocked during the initial panel
+        // scan. Wait for that state transition before testing GPM capture: the
+        // manager surface cannot move and is not the intended test document.
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while app.panels.iter().any(|panel| panel.loading) {
+            app.poll();
+            assert!(
+                std::time::Instant::now() < deadline,
+                "initial panel scan did not finish"
+            );
+            std::thread::yield_now();
+        }
         crate::editor::open(&mut app, true);
+        assert_eq!(
+            app.desktop.active().kind,
+            crate::desktop::WindowKind::Editor
+        );
         let owner = app.desktop.active().id;
         crate::layout::prepare(&mut app, Rect::new(0, 0, 80, 25));
         let native = app.desktop.native();
