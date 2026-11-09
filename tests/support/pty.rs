@@ -193,6 +193,10 @@ impl Session {
     pub fn command_prompt_active(&self) -> bool {
         self.screen.command_prompt_active()
     }
+    pub fn manager_document_ready(&self) -> bool {
+        fs::read_to_string(self.root.join("settings/dn/diagnostics.txt"))
+            .is_ok_and(|state| document_input_ready(&state, " focus=Manager "))
+    }
     #[cfg(feature = "audio")]
     pub fn plugin_document_ready(&self) -> bool {
         fs::read_to_string(self.root.join("settings/dn/diagnostics.txt")).is_ok_and(|state| {
@@ -296,11 +300,14 @@ impl Session {
     pub fn wait(&mut self, stage: &str, ready: impl Fn(&Self) -> bool) -> io::Result<()> {
         let deadline = Instant::now() + Duration::from_secs(10);
         loop {
+            // Observe exit before draining output: a child can write its final
+            // reply and exit between a PTY read and a later status check.
+            let exited = self.child.try_wait()?.is_some();
             self.pump()?;
             if ready(self) {
                 return Ok(());
             }
-            if Instant::now() >= deadline || self.child.try_wait()?.is_some() {
+            if Instant::now() >= deadline || exited {
                 return Err(io::Error::other(format!(
                     "{stage}: child={:?}\n{}",
                     self.child.try_wait()?,
@@ -586,6 +593,20 @@ impl Drop for Session {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn manager_activation_does_not_require_an_unoccluded_command_cursor() {
+        let mut screen = Screen::new(80, 25);
+        feed(&mut screen, b"\x1b[?25l\x1b[4;4HCalculator");
+        feed(&mut screen, FRAME_END);
+        let manager = "active=WindowInfo { id: WindowId(0), kind: Manager } focus=Manager layout_revision=24\nmodals=[]\n";
+        assert!(!screen.command_prompt_active());
+        assert!(super::document_input_ready(manager, " focus=Manager "));
+        assert!(!super::document_input_ready(
+            &manager.replace("focus=Manager", "focus=Calculator"),
+            " focus=Manager "
+        ));
+    }
+
     #[test]
     fn failure_report_contains_bounded_inputs_and_live_owned_geometry() -> std::io::Result<()> {
         let mut s = super::Session::new("diagnostics")?;

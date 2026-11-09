@@ -596,7 +596,9 @@ fn tree_and_calculator_share_menus_switching_and_terminal_restoration() -> io::R
         s.text().contains("Calculator")
     })?;
     s.send(b"\x1b[17;3~", "cycle to manager", |s| {
-        s.command_prompt_active()
+        // A short native path puts the command cursor behind the floating tree.
+        // The cursor is correctly hidden; document activation is authoritative.
+        s.manager_document_ready()
     })?;
     assert!(s.text().contains("Directory tree") && s.text().contains("Calculator"));
     s.send(b"\x1b[17;3~", "cycle to tree", |s| {
