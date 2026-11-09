@@ -167,6 +167,20 @@ impl<W: Write + Send + 'static> TurboBackend<W> {
     }
     #[cfg(target_os = "linux")]
     pub(crate) fn attach_console(&mut self, console: crate::terminal::gpm::Shared) {
+        // Device identity, not the GPM connection or TERM, determines color support.
+        let verified = console
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .snapshot
+            .console;
+        self.codec
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .output_colors = if verified {
+            crate::terminal::colors::OutputColors::linux_console()
+        } else {
+            Default::default()
+        };
         *self.console.lock().unwrap_or_else(|e| e.into_inner()) = Some(console);
     }
     pub fn bind_desktop(&mut self, desktop: desktop::NativeDesktop) {

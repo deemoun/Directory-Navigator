@@ -1104,7 +1104,7 @@ Connected	Connected
 Suspended	Suspended
 Inactive virtual console	Inactive virtual console
 GPM unavailable	GPM unavailable
-Linux virtual consoles use an existing GPM daemon automatically. Utilities > System Information shows the mouse source and GPM errors. Terminal emulators and SSH keep normal terminal mouse input.	Linux virtual consoles use an existing GPM daemon automatically. Utilities > System Information shows the mouse source and GPM errors. Terminal emulators and SSH keep normal terminal mouse input.
+Linux virtual consoles use an existing GPM daemon automatically. System Information shows console, color, audio and Unicode diagnostics. Russian alphabet coverage checks 66 font mappings including Yo; it does not verify display decoding or glyph appearance. Fix missing fonts through your system console setup. DN does not change fonts or keyboard modes. Audio devices are not probed. Terminal emulators and SSH keep normal terminal mouse input.	Linux virtual consoles use an existing GPM daemon automatically. System Information shows console, color, audio and Unicode diagnostics. Russian alphabet coverage checks 66 font mappings including Yo; it does not verify display decoding or glyph appearance. Fix missing fonts through your system console setup. DN does not change fonts or keyboard modes. Audio devices are not probed. Terminal emulators and SSH keep normal terminal mouse input.
 ~A~sk before replacing	~A~sk before replacing
 Awaiting decision	Awaiting decision
 Replace existing file?	Replace existing file?
@@ -1149,3 +1149,29 @@ PDF password contains unsupported characters.	PDF password contains unsupported 
 Enter the PDF password to view its text. The field is masked. An incorrect password can be retried. Cancel closes this PDF and returns to the previous document or file pane. Passwords are not saved or shared with ZIP archives. Unlocking uses the loaded PDF bytes, without rereading a changed file.	Enter the PDF password to view its text. The field is masked. An incorrect password can be retried. Cancel closes this PDF and returns to the previous document or file pane. Passwords are not saved or shared with ZIP archives. Unlocking uses the loaded PDF bytes, without rereading a changed file.
 PDF password help	PDF password help
 Open T~X~T files in internal viewer	Open T~X~T files in internal viewer
+Terminal input	Terminal input
+Terminal output	Terminal output
+Terminal mode	Terminal mode
+Color output	Color output
+Audio support	Audio support
+Audio backend	Audio backend
+Audio device	Audio device
+Linux virtual console	Linux virtual console
+No virtual console detected	No virtual console detected
+Extended colors (indexed / RGB)	Extended colors (indexed / RGB)
+Console colors (16 foreground / 8 background)	Console colors (16 foreground / 8 background)
+Included	Included
+Not included in this build	Not included in this build
+ALSA (system default)	ALSA (system default)
+Unavailable without audio support	Unavailable without audio support
+Not probed; opened only on Play	Not probed; opened only on Play
+Unavailable	Unavailable
+Effective locale	Effective locale
+DN text output	DN text output
+Console display decoding	Console display decoding
+Keyboard mode	Keyboard mode
+Russian alphabet mappings	Russian alphabet mappings
+Console frame mappings	Console frame mappings
+Cyrillic sample	Cyrillic sample
+Not verified	Not verified
+Not applicable outside a virtual console	Not applicable outside a virtual console

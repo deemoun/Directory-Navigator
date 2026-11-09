@@ -166,7 +166,7 @@ impl Browser {
                 let body = language.text(body);
                 #[cfg(target_os = "linux")]
                 let body = if id == "panels" {
-                    format!("{body}\n\n{}", language.text("Linux virtual consoles use an existing GPM daemon automatically. Utilities > System Information shows the mouse source and GPM errors. Terminal emulators and SSH keep normal terminal mouse input."))
+                    format!("{body}\n\n{}", language.text("Linux virtual consoles use an existing GPM daemon automatically. System Information shows console, color, audio and Unicode diagnostics. Russian alphabet coverage checks 66 font mappings including Yo; it does not verify display decoding or glyph appearance. Fix missing fonts through your system console setup. DN does not change fonts or keyboard modes. Audio devices are not probed. Terminal emulators and SSH keep normal terminal mouse input."))
                 } else {
                     body.to_owned()
                 };

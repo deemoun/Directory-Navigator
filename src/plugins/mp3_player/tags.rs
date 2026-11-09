@@ -263,6 +263,43 @@ mod tests {
             data
         }
         #[test]
+        fn standard_utf8_and_utf16_cyrillic_tags_preserve_yo_and_combining_sequences() {
+            for utf16 in [false, true] {
+                let mut body = Vec::new();
+                for (key, value) in [
+                    (b"TIT2", "Ёжик Mix е\u{308}"),
+                    (b"TPE1", "Группа Ёлка"),
+                    (b"TALB", "Альбом Ёё"),
+                ] {
+                    let text = if utf16 {
+                        [
+                            vec![1, 255, 254],
+                            value.encode_utf16().flat_map(u16::to_le_bytes).collect(),
+                        ]
+                        .concat()
+                    } else {
+                        [vec![3], value.as_bytes().to_vec()].concat()
+                    };
+                    assert!(
+                        text.len() < 128,
+                        "frame sizes are identical in v2.3 and v2.4 here"
+                    );
+                    body.extend(key);
+                    body.extend((text.len() as u32).to_be_bytes());
+                    body.extend([0, 0]);
+                    body.extend(text);
+                }
+                let mut data = header(if utf16 { 3 } else { 4 }, body.len());
+                data.extend(body);
+                let original = data.clone();
+                let tags = read(&mut Cursor::new(data)).unwrap();
+                assert_eq!(tags.title, "Ёжик Mix е\u{308}");
+                assert_eq!(tags.artist, "Группа Ёлка");
+                assert_eq!(tags.album, "Альбом Ёё");
+                assert_eq!(tags, read(&mut Cursor::new(original)).unwrap());
+            }
+        }
+        #[test]
         fn unicode_v23_tags_override_v1_and_fill_missing_album_without_control_sequences() {
             let title = [vec![3], "Название 界\n\x1b[31m".as_bytes().to_vec()].concat();
             let mut data = v23(&[

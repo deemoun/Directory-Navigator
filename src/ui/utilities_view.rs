@@ -219,23 +219,16 @@ pub(crate) fn utility_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
                     .skip(info.offset)
                     .take(info.rows)
                 {
-                    #[cfg(target_os = "linux")]
-                    let translated = if matches!(name.as_str(), "Mouse input" | "GPM status") {
-                        if let Some((prefix, detail)) = value.split_once(": ") {
-                            format!("{}: {detail}", app.config.language.text(prefix))
-                        } else {
-                            app.config.language.text(value).to_owned()
-                        }
-                    } else {
-                        value.clone()
-                    };
-                    #[cfg(target_os = "linux")]
-                    let value = &translated;
+                    let value = crate::utilities::information::display_value(
+                        app.config.language,
+                        name,
+                        value,
+                    );
                     spec.caption(
                         Paragraph::new(format!(
                             "{}: {}",
                             app.config.language.text(name),
-                            display_name(value)
+                            display_name(&value)
                         ))
                         .scroll((0, info.horizontal))
                         .style(dos(theme::TEXT)),

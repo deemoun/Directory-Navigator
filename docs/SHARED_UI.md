@@ -187,16 +187,39 @@ close cancellation, nested Help and independent undo state. Unit sequences in
 replacing requests or retiring their document; late replies are rejected and
 current background replies remain deliverable without foreground activation.
 
-`tests/terminal_walkthrough.rs` checks the previously manual macOS walkthroughs
-through a real PTY using `tests/support/pty.rs`. The bounded harness decodes enough
+`tests/terminal_desktop.rs` runs the shared Linux/macOS desktop and transfer
+walkthroughs through a real PTY using `tests/support/pty.rs`. Twenty existing
+scenarios retain their assertions and now run on both platforms. They cover
+queued copies, overwrite decisions, archive extraction, Temp Drive, cancelled
+settings, Unicode prompts, button press/release, nested dialogs, first-click
+menus, document activation, mouse/keyboard movement, tile/cascade, resize and
+external-output handoff. An additional EN/RU scenario checks cancelled moves,
+completed copies/moves, captured source selection and unchanged original data.
+
+The bounded harness decodes enough
 terminal output to wait for the visible screen rather than historical output,
 uses private files/configuration and a private child process group, and kills
-that group on failure. It covers Unicode mkdir submit/cancel, cancelled settings
-drafts, overlapping editor/viewer activation, native FileDialog and Help,
-Tetris page movement, manipulation paste isolation, resize, Ctrl+O handoff,
-terminal flags and input back in the parent shell. No Python, terminal emulator
-application or new dependency is required. Windows/Linux validation is deferred.
-Run these cases with `cargo test --test lifecycle_sequences --test terminal_walkthrough`.
+that group on failure. File selection waits for completed panel preparation and
+supports localized quick-search labels. Every scenario verifies restored terminal
+flags and usable parent-shell input after exit. No audio device, running GPM
+daemon, Python, graphical terminal or new dependency is required. PTY checks do
+not establish physical virtual-console font, color or GPM hardware behavior.
+
+`tests/terminal_unicode.rs` also runs on Linux/macOS. Remaining tool-focused and
+audible-audio walkthroughs retain their macOS gates in `terminal_walkthrough.rs`;
+Windows PTY walkthroughs remain outside these targets. Existing manual workflows
+discover the shared targets through `cargo test`; their triggers are unchanged.
+
+Run shared scenarios with:
+
+```sh
+cargo test --locked --test terminal_desktop --test terminal_unicode
+cargo test --locked --no-default-features --test terminal_desktop --test terminal_unicode
+```
+
+Set `DN_WALK_BINARY` to the absolute path of a freshly rebuilt executable to test
+that binary through the same harness. Compilation checks alone are not evidence
+that terminal scenarios ran on a platform; report actual runtime coverage.
 
 `testing::InputClock` injects per-test time into the production button-feedback
 entry points. Deadline, hold, release and cancellation tests can advance time

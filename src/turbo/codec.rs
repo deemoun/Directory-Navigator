@@ -46,6 +46,7 @@ impl Cell {
 }
 #[derive(Default)]
 pub(super) struct Codec {
+    pub(super) output_colors: crate::terminal::colors::OutputColors,
     glyphs: HashMap<char, (String, usize)>,
     symbols: HashMap<String, char>,
     positions: Vec<Option<char>>,
@@ -174,6 +175,9 @@ impl Codec {
         let text = std::str::from_utf8(bytes)
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
         let mut output = String::with_capacity(text.len());
+        // Transport resets attributes after every write; track only this batch.
+        let mut output_fg = Color::Reset;
+        let mut output_bg = Color::Reset;
         let mut rest = text;
         while !rest.is_empty() {
             if let Some(sgr) = rest.strip_prefix("\x1b[") {
@@ -199,11 +203,46 @@ impl Codec {
                                     .checked_sub(COLOR_BASE)
                                     .and_then(|index| self.colors.get(index as usize))
                                 {
-                                    decoded.push(color_parameters(*color, parameters[i] == "38"));
+                                    let color = *color;
+                                    if parameters[i] == "38" {
+                                        output_fg = color;
+                                        decoded
+                                            .push(self.output_colors.foreground(color, output_bg));
+                                    } else {
+                                        output_bg = color;
+                                        decoded.push(self.output_colors.parameters(color, false));
+                                        // Reevaluate foreground when console background
+                                        // quantization changes contrast. Extended output
+                                        // deliberately keeps its exact existing bytes.
+                                        if self.output_colors.is_console() {
+                                            decoded.push(
+                                                self.output_colors.foreground(output_fg, color),
+                                            );
+                                        }
+                                    }
                                     i += 5;
                                     continue;
                                 }
                             }
+                        }
+                        match parameters[i] {
+                            "0" | "" => {
+                                output_fg = Color::Reset;
+                                output_bg = Color::Reset;
+                            }
+                            "39" => output_fg = Color::Reset,
+                            "49" => {
+                                output_bg = Color::Reset;
+                                if self.output_colors.is_console() {
+                                    decoded.push("49".into());
+                                    decoded.push(
+                                        self.output_colors.foreground(output_fg, Color::Reset),
+                                    );
+                                    i += 1;
+                                    continue;
+                                }
+                            }
+                            _ => {}
                         }
                         decoded.push(parameters[i].to_string());
                         i += 1;
@@ -226,35 +265,56 @@ impl Codec {
         Ok(output.into_bytes())
     }
 }
-fn color_parameters(color: Color, foreground: bool) -> String {
-    let kind = if foreground { 38 } else { 48 };
-    let index = match color {
-        Color::Reset => return if foreground { "39" } else { "49" }.into(),
-        Color::Indexed(index) => return format!("{kind};5;{index}"),
-        Color::Rgb(r, g, b) => return format!("{kind};2;{r};{g};{b}"),
-        Color::Black => 0,
-        Color::Red => 1,
-        Color::Green => 2,
-        Color::Yellow => 3,
-        Color::Blue => 4,
-        Color::Magenta => 5,
-        Color::Cyan => 6,
-        Color::Gray => 7,
-        Color::DarkGray => 8,
-        Color::LightRed => 9,
-        Color::LightGreen => 10,
-        Color::LightYellow => 11,
-        Color::LightBlue => 12,
-        Color::LightMagenta => 13,
-        Color::LightCyan => 14,
-        Color::White => 15,
-    };
-    format!("{kind};5;{index}")
-}
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn console_output_converts_colors_without_changing_cells_or_unicode() -> io::Result<()> {
+        let mut codec = Codec::default();
+        codec.resize(Size::new(8, 2));
+        let mut cell = Cell::default();
+        cell.set_symbol("界\u{301}");
+        cell.set_style(crate::palette::PaletteProfile::ClassicDn.dos(0x70));
+        let glyph = codec.cell(0, 0, &cell)?.0.ch;
+        let fg = codec.color(Color::Indexed(16))?;
+        let bg = codec.color(Color::Indexed(248))?;
+        let parameter = |color: TvColor| match color {
+            TvColor::Rgb { r, g, b } => format!("{r};{g};{b}"),
+            _ => panic!("expected color token"),
+        };
+        let encoded = format!(
+            "\x1b[38;2;{};48;2;{};1m{glyph}\x1b[39;49;0m",
+            parameter(fg),
+            parameter(bg)
+        );
+        let extended = codec.decode(encoded.as_bytes())?;
+        assert_eq!(
+            extended,
+            "\x1b[38;5;16;48;5;248;1m界\u{301}\x1b[39;49;0m".as_bytes()
+        );
+        codec.output_colors = crate::terminal::colors::OutputColors::linux_console();
+        for _ in 0..4 {
+            assert_eq!(
+                codec.decode(encoded.as_bytes())?,
+                "\x1b[30;47;30;1m界\u{301}\x1b[39;49;39;0m".as_bytes()
+            );
+        }
+        codec.output_colors = Default::default();
+        assert_eq!(codec.decode(encoded.as_bytes())?, extended);
+        codec.output_colors = crate::terminal::colors::OutputColors::linux_console();
+        let fg = parameter(codec.color(Color::Indexed(248))?);
+        let bg = parameter(codec.color(Color::Indexed(240))?);
+        for encoded in [
+            format!("\x1b[38;2;{fg};48;2;{bg}m{glyph}\x1b[49m{glyph}"),
+            format!("\x1b[48;2;{bg};38;2;{fg}m{glyph}\x1b[49m{glyph}"),
+        ] {
+            let output = String::from_utf8(codec.decode(encoded.as_bytes())?).unwrap();
+            assert!(output.contains(";97m界\u{301}"), "{output:?}");
+            assert!(output.ends_with("\x1b[49;37m界\u{301}"));
+        }
+        Ok(())
+    }
     #[test]
     fn frame_retirement_reuses_live_graphemes_and_reclaims_only_after_commit() -> io::Result<()> {
         let mut codec = Codec::default();

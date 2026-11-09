@@ -431,6 +431,83 @@ fn native_information_refresh_close_and_stale_replies() -> io::Result<()> {
     Ok(())
 }
 #[test]
+fn linux_diagnostic_fields_fit_and_localize_without_changing_on_redraw() -> io::Result<()> {
+    use dn::{
+        localization::Language,
+        palette::{theme, PaletteProfile},
+    };
+    let t = Temp::new()?;
+    for language in [Language::English, Language::Russian] {
+        for profile in [
+            PaletteProfile::ClassicDn,
+            PaletteProfile::Custom(theme::DEFAULTS.map(|v| v ^ 1)),
+        ] {
+            let mut app = t.app()?;
+            app.config.language = language;
+            app.config.palette = profile;
+            utilities::open(&mut app, Kind::System);
+            wait(&mut app, |a| {
+                a.utility_state()
+                    .information
+                    .as_ref()
+                    .is_some_and(|info| !info.loading())
+            });
+            app.utility_state_mut().information.as_mut().unwrap().fields = [
+                ("Terminal input", "/dev/tty2"),
+                ("Terminal output", "/dev/tty2"),
+                ("Terminal mode", "Linux virtual console"),
+                (
+                    "Color output",
+                    "Console colors (16 foreground / 8 background)",
+                ),
+                ("GPM status", "GPM unavailable: fixture error"),
+                ("Audio device", "Not probed; opened only on Play"),
+                ("Effective locale", "C.UTF-8 (LANG)"),
+                ("DN text output", "UTF-8"),
+                ("Console display decoding", "Not verified"),
+                ("Keyboard mode", "K_UNICODE (3)"),
+                ("Russian alphabet mappings", "64/66; U+0401 U+0451"),
+                ("Console frame mappings", "12/12"),
+                ("Cyrillic sample", "Привет, Ёжик! / Test 123"),
+            ]
+            .map(|(name, value)| (name.into(), value.into()))
+            .to_vec();
+            for (width, height) in [(80, 25), (132, 40), (40, 12), (80, 25)] {
+                let screen = draw(&mut app, width, height)?;
+                if width >= 80 {
+                    assert!(screen.contains("/dev/tty2"));
+                    assert!(screen.contains(language.text("Linux virtual console")));
+                    assert!(screen
+                        .contains(language.text("Console colors (16 foreground / 8 background)")));
+                    assert!(screen.contains(language.text("Not probed; opened only on Play")));
+                    assert!(screen.contains("fixture error"));
+                    assert!(screen.contains("64/66; U+0401 U+0451"));
+                    assert!(screen.contains("K_UNICODE (3)"));
+                    assert!(screen.contains(language.text("Not verified")));
+                }
+                let fields = app
+                    .utility_state()
+                    .information
+                    .as_ref()
+                    .unwrap()
+                    .fields
+                    .clone();
+                for _ in 0..3 {
+                    assert_eq!(draw(&mut app, width, height)?, screen);
+                    assert_eq!(
+                        app.utility_state().information.as_ref().unwrap().fields,
+                        fields
+                    );
+                }
+            }
+            key(&mut app, KeyCode::Esc, KeyModifiers::NONE);
+            assert!(app.utility_state().information.is_none());
+        }
+    }
+    Ok(())
+}
+
+#[test]
 fn information_long_fields_scroll_sanitization_and_unavailable() -> io::Result<()> {
     let t = Temp::new()?;
     let mut app = t.app()?;

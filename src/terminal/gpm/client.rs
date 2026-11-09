@@ -19,6 +19,10 @@ use std::{
 const CONNECT_TIMEOUT: Duration = Duration::from_millis(250);
 const RETRY: Duration = Duration::from_secs(2);
 const PROBE: Duration = Duration::from_millis(100);
+// Catch up with a burst before delivering a position to the renderer. Keep both
+// decoded packets and fragmented/interrupted reads bounded for keyboard fairness.
+const MAX_PACKETS_PER_DRAIN: usize = 128;
+const MAX_READ_STEPS: usize = MAX_PACKETS_PER_DRAIN * 4;
 #[cfg(target_os = "linux")]
 static PANIC_SOCKET: AtomicI32 = AtomicI32::new(-1);
 
@@ -100,11 +104,12 @@ impl Client {
         size: (u16, u16),
         pending: &mut VecDeque<MouseEvent>,
     ) -> io::Result<()> {
-        // At most 16 packets / 64 reads, including fragmented and interrupted reads.
         // Reserve the maximum expansion of a wheel packet before consuming one.
         let mut packets = 0;
-        for _ in 0..64 {
-            if pending.len() > MAX_PENDING - MAX_EVENTS_PER_PACKET || packets == 16 {
+        for _ in 0..MAX_READ_STEPS {
+            if pending.len() > MAX_PENDING - MAX_EVENTS_PER_PACKET
+                || packets == MAX_PACKETS_PER_DRAIN
+            {
                 break;
             }
             if let Some(event) = self.decoder.take() {
@@ -435,7 +440,7 @@ fn connect_socket(path: &Path) -> io::Result<(UnixStream, bool)> {
     Ok((stream, connecting))
 }
 #[cfg(target_os = "linux")]
-fn console_fd() -> Option<(OwnedFd, u16)> {
+pub(crate) fn console_fd() -> Option<(OwnedFd, u16)> {
     probe_console(0, 1)
 }
 #[cfg(target_os = "linux")]
@@ -692,6 +697,63 @@ mod tests {
                     MouseEventKind::Up(MouseButton::Left)
                 ]
             );
+        }
+    }
+    #[test]
+    fn private_socket_drag_bursts_catch_up_without_delaying_keyboard_or_release() {
+        use crossterm::event::{Event, KeyCode, KeyEvent};
+        for count in [96, MAX_PACKETS_PER_DRAIN + 20] {
+            let (_t, listener, mut c, now) = fixture();
+            c.service(true, now, (256, 25), connect);
+            let mut peer = accept(&listener);
+            let mut bytes = packet(GPM_DOWN, 4).to_vec();
+            for x in 6..6 + count as i16 {
+                let mut drag = packet(GPM_DRAG, 4);
+                drag[8..10].copy_from_slice(&x.to_ne_bytes());
+                bytes.extend_from_slice(&drag);
+            }
+            let mut release = packet(GPM_UP, 4);
+            release[8..10].copy_from_slice(&(5 + count as i16).to_ne_bytes());
+            bytes.extend_from_slice(&release);
+            peer.write_all(&bytes).unwrap();
+            c.service(true, now, (256, 25), connect);
+            if count < MAX_PACKETS_PER_DRAIN {
+                assert_eq!(
+                    c.pending.len(),
+                    3,
+                    "short burst must include release in one pass"
+                );
+            } else {
+                assert_eq!(c.pending.len(), 2, "packet budget must stop before release");
+                assert_eq!(c.pending[1].column, (MAX_PACKETS_PER_DRAIN + 3) as u16);
+            }
+            let key = Event::Key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
+            assert_eq!(
+                c.multiplex(Duration::ZERO, |_| {}, |_| Ok(Some(key.clone())))
+                    .unwrap(),
+                Some(key)
+            );
+            // A second bounded pass merges with the tail of the first pass.
+            c.service(true, now, (256, 25), connect);
+            let events: Vec<_> = std::iter::from_fn(|| c.pop()).collect();
+            assert_eq!(events.len(), 3);
+            let Event::Mouse(down) = events[0] else {
+                panic!("mouse press")
+            };
+            let Event::Mouse(drag) = events[1] else {
+                panic!("latest drag")
+            };
+            let Event::Mouse(up) = events[2] else {
+                panic!("mouse release")
+            };
+            assert_eq!(down.kind, MouseEventKind::Down(MouseButton::Left));
+            assert_eq!(drag.kind, MouseEventKind::Drag(MouseButton::Left));
+            assert_eq!(up.kind, MouseEventKind::Up(MouseButton::Left));
+            assert_eq!(drag.column, (4 + count) as u16);
+            assert_eq!(up.column, drag.column);
+            assert_eq!(c.snapshot.pressed, 0);
+            assert_eq!(c.snapshot.position, Some((drag.column, drag.row)));
+            assert!(c.pop().is_none(), "no motion may trail the release");
         }
     }
     #[test]

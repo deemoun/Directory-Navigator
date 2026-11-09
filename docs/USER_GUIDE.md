@@ -1422,6 +1422,13 @@ persisted per filename. Markdown formatting/search operate on decoded text.
 
 ## Mouse in a Linux virtual console (GPM)
 
+On a real Linux virtual console DN also uses native console color sequences,
+independently of GPM availability. The console has fewer background colors than
+a windowed terminal: DN's dark-gray pane surface becomes the available lighter
+gray, with contrasting text. Saved palettes are unchanged. Windowed terminals,
+SSH and tmux keep the existing extended-color output; setting `TERM=linux` alone
+does not enable console conversion. DN does not modify the system console palette.
+
 On a real Linux virtual console such as `/dev/tty1`, DN automatically connects
 to an already-running GPM daemon through `/dev/gpmctl`. DN runs as your normal
 user. The daemon and socket permissions must be configured by the system
@@ -1434,8 +1441,20 @@ emulator. DN retains its existing double-click handling. A reversed-cell pointer
 follows movement without replacing the editor's text cursor. Wide Unicode
 characters are highlighted as a whole; the pointer is excluded from screensaver
 snapshots and hidden while a saver or external-command output is displayed.
+Consecutive movement or drag updates with the same button and modifiers use the
+latest position, avoiding a backlog of obsolete window positions. Press, release,
+wheel and modifier transitions retain their order; input processing stays bounded
+so dragging does not starve the keyboard.
 
 **Utilities → System Information** shows **Mouse input** and **GPM status**.
+On Linux it also lists the input/output device paths from `/proc/self/fd`, the
+detected terminal mode, and DN's selected color-output mode. `$TERM` remains a
+separate environment value; it does not establish that a virtual console exists.
+**Audio support** and **Audio backend** describe the build, not tested hardware.
+**Audio device** explicitly reports that it has not been probed: the player opens
+the system default output only on Play. Missing device-path information shows
+the query error. GPM connection changes update open System Information windows;
+Refresh collects a new snapshot without changing configuration or opening audio.
 Missing sockets, permission failures and disconnects leave keyboard input working.
 DN retries at most once every two seconds while it owns the active console.
 Leaving that virtual console or losing GPM cancels held mouse buttons and drags;
@@ -1445,6 +1464,56 @@ DN's GPM connection released.
 Linux console detection checks the actual terminal device, not just `TERM`.
 Linux PTYs, SSH/tmux, macOS and Windows retain their existing terminal mouse
 handling. No GPM shared library, new setting or configuration migration is needed.
+
+### Cyrillic in a Linux tty
+
+DN sends UTF-8, including native filenames and music artist/title metadata. A tty
+also needs a compatible display-decoding mode and a font containing the required
+glyphs. These are separate from the keyboard layout and the locale. Missing glyphs
+often appear as boxes or question marks; UTF-8 decoded as an 8-bit encoding often
+appears as several garbled characters for each letter. Compare the same text in
+the shell, DN's pane and the player before changing file encodings or music tags.
+
+On Linux, **Utilities → System Information** reports the effective locale
+(`LC_ALL`, then `LC_CTYPE`, then `LANG`, ignoring empty values), DN's output format,
+the keyboard mode and a short Cyrillic sample. `K_UNICODE (3)` describes keyboard
+input only: DN explicitly leaves **Console display decoding** as **Not verified**.
+A UTF-8 locale or `TERM=linux` does not establish the console's decoding mode.
+
+**Russian alphabet mappings** checks the 66 Russian letters, including Ё/ё.
+**Console frame mappings** checks the 12 basic single/double frame characters.
+For example, `64/66; U+0401 U+0451` means Ё/ё have no mappings. Missing lists are
+bounded and use ASCII code points so the report remains readable with a deficient
+font. Complete mappings do not prove that glyph bitmaps look correct, and this is
+not a claim of coverage for every Cyrillic language or all Unicode characters.
+Read-only queries run when opening or refreshing System Information, never while
+painting or polling the mouse. PTYs are not probed; failed queries show their
+native error rather than claiming that letters are missing.
+
+For Ubuntu Server, exit DN and confirm `tty` reports `/dev/ttyN`. Try:
+
+```sh
+printf 'Привет, Ёжик! / Test 123\n'
+sudo dpkg-reconfigure console-setup
+sudo setupcon
+```
+
+In console setup choose **UTF-8**, a Cyrillic-capable codeset such as **CyrSlav**,
+and a suitable face/size (for example Terminus at a size appropriate to the
+screen). Retain the current size when suitable. CyrSlav is a small codeset;
+prefer a suitable 256-glyph font when available. Bigger 512-glyph fonts can reduce
+the available foreground colors on VGA text consoles. See Ubuntu's
+[console-setup manual](https://manpages.ubuntu.com/manpages/noble/man5/console-setup.5.html).
+Run the sample again, restart DN and refresh its font mapping report. Compare a
+Cyrillic filename in the pane and player, including after switching virtual
+consoles or returning from an external command. Setting `LANG=C.UTF-8` alone does
+not load font glyphs. Keyboard layout configuration is a separate task.
+
+These are manual administrator steps outside DN. DN never loads a font, changes
+keyboard/console decoding modes, rewrites system locale configuration, guesses a
+filename code page or transliterates text to hide a missing font. Missing combining
+marks or other Unicode glyphs remain subject to the console font and kernel's
+rendering capabilities. Music metadata is read without opening an audio device.
 
 ### Replacing a file with Save As
 

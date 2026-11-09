@@ -17,8 +17,8 @@ pub struct Information {
     pub(crate) requests: crate::requests::RequestScope,
     pub kind: Kind,
     pub fields: Fields,
-    #[cfg(target_os = "linux")]
-    pub(crate) mouse_fields: Fields,
+    #[cfg(any(target_os = "linux", test))]
+    pub(crate) terminal_fields: Fields,
     pub offset: usize,
     pub horizontal: u16,
     pub rows: usize,
@@ -32,8 +32,8 @@ impl Information {
             requests,
             kind,
             fields: Vec::new(),
-            #[cfg(target_os = "linux")]
-            mouse_fields: Vec::new(),
+            #[cfg(any(target_os = "linux", test))]
+            terminal_fields: Vec::new(),
             offset: 0,
             horizontal: 0,
             rows: 10,
@@ -54,23 +54,27 @@ impl Information {
         });
         if let Some(fields) = reply {
             self.fields = fields;
-            #[cfg(target_os = "linux")]
-            self.fields.extend(self.mouse_fields.clone());
+            #[cfg(any(target_os = "linux", test))]
+            self.fields.extend(self.terminal_fields.clone());
             true
         } else {
             false
         }
     }
-    #[cfg(target_os = "linux")]
-    pub(crate) fn set_mouse_fields(&mut self, fields: Fields) {
-        if self.kind != Kind::System || self.mouse_fields == fields {
+    #[cfg(any(target_os = "linux", test))]
+    pub(crate) fn set_terminal_fields(&mut self, fields: Fields) {
+        if self.kind != Kind::System || self.terminal_fields == fields {
             return;
         }
-        self.mouse_fields = fields;
+        let old_fields = std::mem::replace(&mut self.terminal_fields, fields);
         if !self.loading() {
-            self.fields
-                .retain(|(key, _)| !matches!(key.as_str(), "Mouse input" | "GPM status"));
-            self.fields.extend(self.mouse_fields.clone());
+            self.fields.retain(|(key, _)| {
+                !old_fields
+                    .iter()
+                    .chain(&self.terminal_fields)
+                    .any(|(name, _)| name == key)
+            });
+            self.fields.extend(self.terminal_fields.clone());
         }
     }
     pub fn step(&mut self, amount: isize) {
@@ -135,6 +139,17 @@ pub fn collect(kind: Kind, path: PathBuf, size: (u16, u16)) -> Fields {
         Ok(std::process::id().to_string()),
     );
     field(&mut fields, "Terminal", environment("TERM"));
+    #[cfg(target_os = "linux")]
+    fields.extend(linux_diagnostics(
+        crate::plugins::music_playback_available(),
+        |fd| {
+            std::fs::read_link(format!("/proc/self/fd/{fd}"))
+                .map(|path| path.to_string_lossy().into_owned())
+                .map_err(|error| error.to_string())
+        },
+    ));
+    #[cfg(target_os = "linux")]
+    fields.extend(crate::terminal::unicode::collect());
     field(
         &mut fields,
         "Terminal size",
@@ -151,6 +166,241 @@ pub fn collect(kind: Kind, path: PathBuf, size: (u16, u16)) -> Fields {
         Ok(path.to_string_lossy().into_owned()),
     );
     fields
+}
+
+#[cfg(any(target_os = "linux", test))]
+fn linux_diagnostics(audio: bool, mut device: impl FnMut(u8) -> Result<String, String>) -> Fields {
+    let mut fields = Vec::new();
+    field(&mut fields, "Terminal input", device(0));
+    field(&mut fields, "Terminal output", device(1));
+    fields.push((
+        "Audio support".into(),
+        if audio {
+            "Included"
+        } else {
+            "Not included in this build"
+        }
+        .into(),
+    ));
+    fields.push((
+        "Audio backend".into(),
+        if audio {
+            "ALSA (system default)"
+        } else {
+            "Unavailable without audio support"
+        }
+        .into(),
+    ));
+    fields.push((
+        "Audio device".into(),
+        if audio {
+            "Not probed; opened only on Play"
+        } else {
+            "Unavailable without audio support"
+        }
+        .into(),
+    ));
+    fields
+}
+
+/// Translate status vocabulary, retaining diagnostic paths and native errors verbatim.
+pub(crate) fn display_value(
+    language: crate::localization::Language,
+    name: &str,
+    value: &str,
+) -> String {
+    if matches!(
+        name,
+        "Mouse input"
+            | "GPM status"
+            | "Terminal mode"
+            | "Color output"
+            | "Audio support"
+            | "Audio backend"
+            | "Audio device"
+            | "DN text output"
+            | "Console display decoding"
+            | "Keyboard mode"
+            | "Russian alphabet mappings"
+            | "Console frame mappings"
+    ) {
+        if let Some((prefix, detail)) = value.split_once(": ") {
+            format!("{}: {detail}", language.text(prefix))
+        } else {
+            language.text(value).to_owned()
+        }
+    } else if let Some(detail) = value
+        .strip_prefix("Unavailable: ")
+        .filter(|_| matches!(name, "Terminal input" | "Terminal output"))
+    {
+        format!("{}: {detail}", language.text("Unavailable"))
+    } else {
+        value.into()
+    }
+}
+
+#[cfg(test)]
+mod diagnostics_tests {
+    use super::*;
+    use crate::localization::Language;
+
+    #[test]
+    fn linux_device_and_audio_fields_do_not_claim_a_device_was_tested() {
+        for audio in [false, true] {
+            let mut descriptors = Vec::new();
+            let fields = linux_diagnostics(audio, |fd| {
+                descriptors.push(fd);
+                if fd == 0 {
+                    Ok("/dev/tty2".into())
+                } else {
+                    Err("Permission denied: fixture".into())
+                }
+            });
+            assert_eq!(descriptors, [0, 1]);
+            assert_eq!(fields[0], ("Terminal input".into(), "/dev/tty2".into()));
+            assert_eq!(
+                fields[1],
+                (
+                    "Terminal output".into(),
+                    "Unavailable: Permission denied: fixture".into()
+                )
+            );
+            assert_eq!(
+                fields[2].1,
+                if audio {
+                    "Included"
+                } else {
+                    "Not included in this build"
+                }
+            );
+            assert_eq!(
+                fields[3].1,
+                if audio {
+                    "ALSA (system default)"
+                } else {
+                    "Unavailable without audio support"
+                }
+            );
+            assert_eq!(
+                fields[4].1,
+                if audio {
+                    "Not probed; opened only on Play"
+                } else {
+                    "Unavailable without audio support"
+                }
+            );
+        }
+        assert_eq!(
+            linux_diagnostics(true, |_| Ok("/dev/pts/4".into()))[0].1,
+            "/dev/pts/4"
+        );
+    }
+
+    #[test]
+    fn live_terminal_fields_survive_worker_completion_without_duplicates_or_memory_dialog_fields(
+    ) -> std::io::Result<()> {
+        for kind in [Kind::System, Kind::Memory] {
+            let mut info = Information::open(kind, PathBuf::from("diagnostic-fixture"), (80, 25))?;
+            let fields = vec![
+                ("Terminal mode".into(), "Linux virtual console".into()),
+                (
+                    "Color output".into(),
+                    "Console colors (16 foreground / 8 background)".into(),
+                ),
+                ("GPM status".into(), "Connected".into()),
+            ];
+            info.set_terminal_fields(fields.clone());
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+            while info.loading() {
+                info.poll();
+                assert!(
+                    std::time::Instant::now() < deadline,
+                    "information worker completion"
+                );
+                std::thread::yield_now();
+            }
+            for (name, _) in &fields {
+                assert_eq!(
+                    info.fields.iter().filter(|(key, _)| key == name).count(),
+                    usize::from(kind == Kind::System)
+                );
+            }
+            for reason in ["GPM disconnected", "Connected", "Connected"] {
+                let mut update = fields.clone();
+                update[2].1 = reason.into();
+                info.set_terminal_fields(update);
+                for (name, _) in &fields {
+                    assert_eq!(
+                        info.fields.iter().filter(|(key, _)| key == name).count(),
+                        usize::from(kind == Kind::System)
+                    );
+                }
+                if kind == Kind::System {
+                    assert_eq!(
+                        info.fields
+                            .iter()
+                            .find(|(key, _)| key == "GPM status")
+                            .unwrap()
+                            .1,
+                        reason
+                    );
+                }
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn diagnostic_values_localize_without_translating_paths_or_native_error_details() {
+        let ru = Language::Russian;
+        assert_eq!(
+            display_value(ru, "Terminal mode", "Linux virtual console"),
+            "Виртуальная консоль Linux"
+        );
+        assert_eq!(
+            display_value(
+                ru,
+                "GPM status",
+                "GPM unavailable: Permission denied: /dev/gpmctl"
+            ),
+            format!(
+                "{}: Permission denied: /dev/gpmctl",
+                ru.text("GPM unavailable")
+            )
+        );
+        assert_eq!(
+            display_value(ru, "Terminal input", "/dev/tty2"),
+            "/dev/tty2"
+        );
+        assert_eq!(
+            display_value(ru, "Terminal output", "Unavailable: fixture error"),
+            "Недоступно: fixture error"
+        );
+        assert_eq!(
+            display_value(
+                ru,
+                "Russian alphabet mappings",
+                "Unavailable: native ioctl error"
+            ),
+            "Недоступно: native ioctl error"
+        );
+        assert_eq!(
+            display_value(ru, "Russian alphabet mappings", "64/66; U+0401 U+0451"),
+            "64/66; U+0401 U+0451"
+        );
+        assert_eq!(
+            display_value(ru, "Console display decoding", "Not verified"),
+            "Не проверено"
+        );
+        assert_eq!(
+            display_value(
+                Language::English,
+                "Audio device",
+                "Not probed; opened only on Play"
+            ),
+            "Not probed; opened only on Play"
+        );
+    }
 }
 /// Parse Linux's explicitly labelled KiB fields; reject malformed units/overflow.
 pub fn kib_field(text: &str, key: &str) -> Result<u64, String> {

@@ -159,13 +159,7 @@ impl Mapper {
                 return Ok(());
             }
             let ev = mouse_event(MouseEventKind::Moved, column, row, modifiers);
-            if pending
-                .back()
-                .is_some_and(|e| e.kind == MouseEventKind::Moved)
-            {
-                pending.pop_back();
-            }
-            pending.push_back(ev);
+            append_motion(pending, ev);
             return Ok(());
         }
         let buttons = event.buttons & 7;
@@ -201,11 +195,27 @@ impl Mapper {
                 GPM_DRAG if self.pressed & bit != 0 => MouseEventKind::Drag(button),
                 _ => continue,
             };
-            pending.push_back(mouse_event(kind, column, row, modifiers));
+            let event = mouse_event(kind, column, row, modifiers);
+            if matches!(kind, MouseEventKind::Drag(_)) {
+                append_motion(pending, event);
+            } else {
+                pending.push_back(event);
+            }
         }
         append_wheel(pending);
         Ok(())
     }
+}
+
+/// Skip obsolete positions only within one uninterrupted motion sequence.
+/// Clicks, releases, wheel input, button changes and modifiers are barriers.
+fn append_motion(pending: &mut VecDeque<MouseEvent>, event: MouseEvent) {
+    if pending.back().is_some_and(|previous| {
+        previous.kind == event.kind && previous.modifiers == event.modifiers
+    }) {
+        pending.pop_back();
+    }
+    pending.push_back(event);
 }
 fn mouse_event(kind: MouseEventKind, column: u16, row: u16, modifiers: KeyModifiers) -> MouseEvent {
     MouseEvent {
@@ -226,9 +236,27 @@ pub(crate) struct Snapshot {
     pub reset: u64,
 }
 impl Snapshot {
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", test))]
     pub fn fields(&self) -> crate::utilities::information::Fields {
         vec![
+            (
+                "Terminal mode".into(),
+                if self.console {
+                    "Linux virtual console"
+                } else {
+                    "No virtual console detected"
+                }
+                .into(),
+            ),
+            (
+                "Color output".into(),
+                if self.console {
+                    "Console colors (16 foreground / 8 background)"
+                } else {
+                    "Extended colors (indexed / RGB)"
+                }
+                .into(),
+            ),
             ("Mouse input".into(), self.source().into()),
             (
                 "GPM status".into(),
@@ -319,44 +347,32 @@ fn pointer_restore(
     use crate::presentation::style::{Color, Modifier};
     use crossterm::{
         cursor::{MoveTo, RestorePosition, SavePosition},
-        style::{
-            Attribute, Color as C, Print, SetAttribute, SetBackgroundColor, SetForegroundColor,
-        },
+        style::{Attribute, Print, SetAttribute},
     };
+    use std::io::Write;
     let Some((x, y)) = pointer_cell(scene, position) else {
         return Ok(Vec::new());
     };
     let glyph = &scene.cells[&(x, y)];
     let style = glyph.resolved(scene.profile);
-    let color = |value: Color| match value {
-        Color::Reset => C::Reset,
-        Color::Black => C::Black,
-        Color::Red => C::DarkRed,
-        Color::Green => C::DarkGreen,
-        Color::Yellow => C::DarkYellow,
-        Color::Blue => C::DarkBlue,
-        Color::Magenta => C::DarkMagenta,
-        Color::Cyan => C::DarkCyan,
-        Color::Gray => C::Grey,
-        Color::DarkGray => C::DarkGrey,
-        Color::LightRed => C::Red,
-        Color::LightGreen => C::Green,
-        Color::LightYellow => C::Yellow,
-        Color::LightBlue => C::Blue,
-        Color::LightMagenta => C::Magenta,
-        Color::LightCyan => C::Cyan,
-        Color::White => C::White,
-        Color::Indexed(n) => C::AnsiValue(n),
-        Color::Rgb(r, g, b) => C::Rgb { r, g, b },
-    };
     let mut patch = Vec::new();
     crossterm::queue!(
         patch,
         SavePosition,
         MoveTo(x, y),
-        SetAttribute(Attribute::Reset),
-        SetForegroundColor(color(style.fg.unwrap_or(Color::Reset))),
-        SetBackgroundColor(color(style.bg.unwrap_or(Color::Reset)))
+        SetAttribute(Attribute::Reset)
+    )?;
+    // Pointer restoration bypasses the scene codec, so use the same console
+    // conversion explicitly. This patch is only used by the console pointer.
+    let colors = crate::terminal::colors::OutputColors::linux_console();
+    write!(
+        patch,
+        "\x1b[{}m\x1b[{}m",
+        colors.foreground(
+            style.fg.unwrap_or(Color::Reset),
+            style.bg.unwrap_or(Color::Reset)
+        ),
+        colors.parameters(style.bg.unwrap_or(Color::Reset), false)
     )?;
     for (modifier, attribute) in [
         (Modifier::BOLD, Attribute::Bold),
@@ -478,7 +494,7 @@ pub(crate) fn sync(app: &mut crate::app::App, snapshot: Snapshot) -> bool {
     {
         let fields = snapshot.fields();
         if let Some(info) = &mut app.utilities.state.information {
-            info.set_mouse_fields(fields.clone());
+            info.set_terminal_fields(fields.clone());
         }
         for id in app.desktop.document_ids(crate::desktop::WindowKind::Tool(
             crate::tool_windows::Kind::System,
@@ -488,7 +504,7 @@ pub(crate) fn sync(app: &mut crate::app::App, snapshot: Snapshot) -> bool {
                 .tool_mut(id)
                 .and_then(|t| t.utility.information.as_mut())
             {
-                info.set_mouse_fields(fields.clone());
+                info.set_terminal_fields(fields.clone());
             }
         }
     }
@@ -602,6 +618,90 @@ mod tests {
         assert_eq!(out.back().unwrap().column, 4);
     }
     #[test]
+    fn drag_bursts_keep_latest_position_before_release() {
+        let mut mapper = Mapper::default();
+        let mut out = VecDeque::new();
+        mapper
+            .map_into(event(GPM_DOWN, 4, 1, 1), 7, (1024, 25), &mut out)
+            .unwrap();
+        for x in 2..=513 {
+            mapper
+                .map_into(event(GPM_DRAG, 4, x, 1), 7, (1024, 25), &mut out)
+                .unwrap();
+        }
+        mapper
+            .map_into(event(GPM_UP, 4, 513, 1), 7, (1024, 25), &mut out)
+            .unwrap();
+        assert_eq!(
+            out.len(),
+            3,
+            "obsolete drag positions must not queue for painting"
+        );
+        assert_eq!(out[0].kind, MouseEventKind::Down(MouseButton::Left));
+        assert_eq!(out[1].kind, MouseEventKind::Drag(MouseButton::Left));
+        assert_eq!(out[1].column, 512);
+        assert_eq!(out[2].kind, MouseEventKind::Up(MouseButton::Left));
+        assert_eq!(mapper.pressed, 0);
+    }
+
+    #[test]
+    fn movement_and_drag_coalescing_preserves_modifiers_wheels_and_button_edges() {
+        let mut mapper = Mapper::default();
+        let mut out = VecDeque::new();
+        for kind in [GPM_MOVE, GPM_DRAG] {
+            if kind == GPM_DRAG {
+                mapper
+                    .map_into(event(GPM_DOWN, 4, 1, 1), 7, (80, 25), &mut out)
+                    .unwrap();
+            }
+            for (x, modifiers) in [
+                (2, 0),
+                (3, GPM_MOD_SHIFT),
+                (4, GPM_MOD_SHIFT),
+                (5, GPM_MOD_CONTROL),
+                (6, GPM_MOD_ALT),
+            ] {
+                let mut packet = event(kind, if kind == GPM_DRAG { 4 } else { 0 }, x, 1);
+                packet.modifiers = modifiers;
+                mapper.map_into(packet, 7, (80, 25), &mut out).unwrap();
+            }
+            let start = usize::from(kind == GPM_DRAG);
+            assert_eq!(out.len(), start + 4);
+            assert_eq!(out[start].modifiers, KeyModifiers::NONE);
+            assert_eq!(out[start + 1].column, 3);
+            assert_eq!(out[start + 1].modifiers, KeyModifiers::SHIFT);
+            assert_eq!(out[start + 2].modifiers, KeyModifiers::CONTROL);
+            assert_eq!(out[start + 3].modifiers, KeyModifiers::ALT);
+            out.clear();
+        }
+        for (kind, button, wheel) in [
+            (GPM_DRAG, 4, 0),
+            (GPM_DRAG, 4, 1),
+            (GPM_DRAG, 4, 0),
+            (GPM_DOWN, 1, 0),
+            (GPM_DRAG, 5, 0),
+            (GPM_UP, 5, 0),
+        ] {
+            let mut packet = event(kind, button, 7, 1);
+            packet.wheel_y = wheel;
+            mapper.map_into(packet, 7, (80, 25), &mut out).unwrap();
+        }
+        let kinds: Vec<_> = out.iter().map(|e| e.kind).collect();
+        assert_eq!(
+            kinds,
+            [
+                MouseEventKind::Drag(MouseButton::Left),
+                MouseEventKind::ScrollUp,
+                MouseEventKind::Drag(MouseButton::Left),
+                MouseEventKind::Down(MouseButton::Right),
+                MouseEventKind::Drag(MouseButton::Left),
+                MouseEventKind::Drag(MouseButton::Right),
+                MouseEventKind::Up(MouseButton::Left),
+                MouseEventKind::Up(MouseButton::Right)
+            ]
+        );
+    }
+    #[test]
     fn wheel_expansion_is_bounded_and_legacy_release_is_not_a_second_scroll() {
         let mut mapper = Mapper::default();
         let mut out = VecDeque::new();
@@ -678,6 +778,37 @@ mod tests {
         s.connected = true;
         assert_eq!(s.source(), "GPM");
         assert_eq!((s.pressed, s.reset), (0, 0));
+    }
+    #[test]
+    fn terminal_diagnostics_report_detection_and_output_independently_of_gpm() {
+        let mut state = Snapshot::default();
+        let value = |state: &Snapshot, name: &str| {
+            state
+                .fields()
+                .into_iter()
+                .find(|(key, _)| key == name)
+                .map(|(_, value)| value)
+                .expect("diagnostic field")
+        };
+        assert_eq!(
+            value(&state, "Terminal mode"),
+            "No virtual console detected"
+        );
+        assert_eq!(
+            value(&state, "Color output"),
+            "Extended colors (indexed / RGB)"
+        );
+        state.console = true;
+        for connected in [false, true, false] {
+            state.connected = connected;
+            assert_eq!(value(&state, "Terminal mode"), "Linux virtual console");
+            assert_eq!(
+                value(&state, "Color output"),
+                "Console colors (16 foreground / 8 background)"
+            );
+        }
+        state.reason = "GPM unavailable: Permission denied".into();
+        assert_eq!(value(&state, "GPM status"), state.reason);
     }
     #[cfg(target_os = "linux")]
     #[test]
@@ -797,5 +928,25 @@ mod tests {
                 original
             );
         }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn pointer_restores_console_gray_with_native_background_codes() {
+        let mut scene = crate::turbo::scene::Scene {
+            width: 80,
+            height: 25,
+            profile: crate::palette::PaletteProfile::ClassicDn,
+            cells: Default::default(),
+            regions: Vec::new(),
+            cursor: None,
+        };
+        scene.text(0, 0, 80, "界", 0x87);
+        scene.normalize_wide();
+        let patch = String::from_utf8(pointer_restore(&scene, Some((1, 0))).unwrap()).unwrap();
+        assert!(patch.contains("\x1b[47m"), "gray background: {patch:?}");
+        assert!(!patch.contains(";5;"));
+        assert!(patch.contains("\x1b[97m"));
+        assert!(patch.ends_with("界\x1b8"));
     }
 }

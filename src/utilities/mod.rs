@@ -109,7 +109,7 @@ fn refresh(app: &mut App) {
             let info = {
                 let mut info = info;
                 if kind == information::Kind::System {
-                    info.set_mouse_fields(app.console_mouse.fields());
+                    info.set_terminal_fields(app.console_mouse.fields());
                 }
                 info
             };

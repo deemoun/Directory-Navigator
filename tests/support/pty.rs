@@ -62,6 +62,21 @@ impl Session {
         Self::with_settings(label, checkpoint, "")
     }
     fn with_settings(label: &str, checkpoint: bool, preferences: &str) -> io::Result<Self> {
+        Self::with_terminal_settings(label, checkpoint, preferences, "xterm-256color")
+    }
+    pub fn with_terminal_preferences(
+        label: &str,
+        preferences: &str,
+        terminal: &str,
+    ) -> io::Result<Self> {
+        Self::with_terminal_settings(label, false, preferences, terminal)
+    }
+    fn with_terminal_settings(
+        label: &str,
+        checkpoint: bool,
+        preferences: &str,
+        terminal: &str,
+    ) -> io::Result<Self> {
         static NEXT: AtomicU64 = AtomicU64::new(0);
         let root = std::env::temp_dir().join(format!(
             "dn-walk-{label}-{}-{}",
@@ -134,7 +149,7 @@ impl Session {
             std::env::var_os("DN_WALK_BINARY").unwrap_or_else(|| env!("CARGO_BIN_EXE_dn").into());
         let mut command = Command::new("/bin/sh");
         command.args(["-c", "\"$1\"; dn_result=$?; printf '\\nDN_STATUS:%s\\n' \"$dn_result\"; IFS= read -r token; printf '\\nDN_INPUT:%s\\n' \"$token\"; exit \"$dn_result\"", "dn-walk"]).arg(binary)
-            .current_dir(&root).env("TERM","xterm-256color").env("XDG_CONFIG_HOME",root.join("settings"))
+            .current_dir(&root).env("TERM",terminal).env("XDG_CONFIG_HOME",root.join("settings"))
             .env("DN_TEST_DIAGNOSTICS", root.join("settings/dn/diagnostics.txt"))
             .stdin(Stdio::from(slave.try_clone()?)).stdout(Stdio::from(slave.try_clone()?)).stderr(Stdio::from(slave.try_clone()?));
         // SAFETY: only async-signal-safe calls are made between fork and exec.
@@ -180,6 +195,13 @@ impl Session {
         })
     }
     pub fn select_file(&mut self, name: &str) -> io::Result<()> {
+        self.select_file_with_language(name, dn::localization::Language::English)
+    }
+    pub fn select_file_with_language(
+        &mut self,
+        name: &str,
+        language: dn::localization::Language,
+    ) -> io::Result<()> {
         // A burst of relative arrows assumes a specific selection throughout
         // asynchronous panel preparation. Select and acknowledge a stable name.
         // The manager menu and command cursor may precede the initial scans.
@@ -187,16 +209,17 @@ impl Session {
             fs::read_to_string(s.root.join("settings/dn/diagnostics.txt"))
                 .is_ok_and(|state| s.screen.file_selection_ready(&state))
         })?;
+        let find = format!("{}:", language.text("Find"));
         self.send(b"\x1b[18;3~", "fixture quick search", |s| {
-            s.text().contains("Find:")
+            s.text().contains(&find)
         })?;
-        let query = format!("Find: {name}▌");
+        let query = format!("{find} {name}▌");
         self.send(name.as_bytes(), "fixture file selected", |s| {
             let text = s.text();
-            text.contains(&query) && !text.contains("No match")
+            text.contains(&query) && !text.contains(language.text(" · No match"))
         })?;
         self.send(b"\r", "fixture selection accepted", |s| {
-            !s.text().contains("Find:") && s.command_prompt_active()
+            !s.text().contains(&find) && s.command_prompt_active()
         })
     }
     pub fn occurrences(&self, bytes: &[u8]) -> usize {

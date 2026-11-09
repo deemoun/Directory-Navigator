@@ -1106,7 +1106,7 @@ Connected	Подключено
 Suspended	Приостановлено
 Inactive virtual console	Виртуальная консоль неактивна
 GPM unavailable	GPM недоступен
-Linux virtual consoles use an existing GPM daemon automatically. Utilities > System Information shows the mouse source and GPM errors. Terminal emulators and SSH keep normal terminal mouse input.	В виртуальной консоли Linux мышь автоматически работает через запущенную службу GPM. Utilities > System Information показывает источник мыши и ошибки GPM. В эмуляторах терминала и SSH сохраняется обычный ввод мыши.
+Linux virtual consoles use an existing GPM daemon automatically. System Information shows console, color, audio and Unicode diagnostics. Russian alphabet coverage checks 66 font mappings including Yo; it does not verify display decoding or glyph appearance. Fix missing fonts through your system console setup. DN does not change fonts or keyboard modes. Audio devices are not probed. Terminal emulators and SSH keep normal terminal mouse input.	В виртуальной консоли Linux мышь автоматически работает через запущенную службу GPM. System Information показывает сведения о консоли, цветах, звуке и Unicode. Проверяются 66 русских букв в карте шрифта, включая Ё/ё; это не проверка декодирования экрана или вида глифов. Недостающие шрифты настраиваются средствами системы. DN не меняет шрифты и режимы клавиатуры. Аудиоустройства не проверяются. В эмуляторах терминала и SSH сохраняется обычный ввод мыши.
 ~A~sk before replacing	~З~апрашивать замену
 Awaiting decision	Ожидание решения
 Replace existing file?	Заменить существующий файл?
@@ -1151,3 +1151,29 @@ PDF password contains unsupported characters.	Пароль PDF содержит 
 Enter the PDF password to view its text. The field is masked. An incorrect password can be retried. Cancel closes this PDF and returns to the previous document or file pane. Passwords are not saved or shared with ZIP archives. Unlocking uses the loaded PDF bytes, without rereading a changed file.	Введите пароль PDF для просмотра текста. Поле скрывает пароль. После ошибки можно повторить ввод. Отмена закрывает PDF и возвращает в предыдущее окно или файловую панель. Пароли не сохраняются и не используются для ZIP. Открывается уже загруженный снимок PDF без повторного чтения изменённого файла.
 PDF password help	Справка по паролю PDF
 Open T~X~T files in internal viewer	~О~ткрывать TXT во встроенном просмотрщике
+Terminal input	Устройство ввода
+Terminal output	Устройство вывода
+Terminal mode	Режим терминала
+Color output	Вывод цветов
+Audio support	Поддержка звука
+Audio backend	Звуковая система
+Audio device	Аудиоустройство
+Linux virtual console	Виртуальная консоль Linux
+No virtual console detected	Виртуальная консоль не обнаружена
+Extended colors (indexed / RGB)	Расширенные цвета (индексы / RGB)
+Console colors (16 foreground / 8 background)	Цвета консоли (16 текста / 8 фона)
+Included	Включена
+Not included in this build	Не включена в эту сборку
+ALSA (system default)	ALSA (системный вывод)
+Unavailable without audio support	Недоступно без поддержки звука
+Not probed; opened only on Play	Не проверено; открывается при воспроизведении
+Unavailable	Недоступно
+Effective locale	Действующая локаль
+DN text output	Вывод текста DN
+Console display decoding	Декодирование в консоли
+Keyboard mode	Режим клавиатуры
+Russian alphabet mappings	Русский алфавит в карте шрифта
+Console frame mappings	Рамки в карте шрифта
+Cyrillic sample	Пример кириллицы
+Not verified	Не проверено
+Not applicable outside a virtual console	Неприменимо вне виртуальной консоли

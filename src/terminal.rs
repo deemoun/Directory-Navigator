@@ -1,5 +1,8 @@
+pub(crate) mod colors;
 #[cfg(any(target_os = "linux", test))]
 pub(crate) mod gpm;
+#[cfg(any(target_os = "linux", test))]
+pub(crate) mod unicode;
 use crossterm::{
     cursor::{Hide, SetCursorStyle, Show},
     event::{

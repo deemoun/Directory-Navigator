@@ -1535,6 +1535,51 @@ mod tests {
             .collect()
     }
     #[test]
+    fn cyrillic_metadata_and_filename_survive_player_layouts_queue_and_info() {
+        let (mut p, _) = player();
+        p.current = Some(0);
+        p.playlist.order[0].path = "Каталог/Ёжик-е\u{308}.mp3".into();
+        p.playlist.order[0].tags = tags::Tags {
+            title: "Ёжик Mix е\u{308}".into(),
+            artist: "Группа Ёлка".into(),
+            album: "Альбом Ёё".into(),
+        };
+        for language in [
+            crate::localization::Language::English,
+            crate::localization::Language::Russian,
+        ] {
+            let mut ctx = context();
+            ctx.language = language;
+            for expanded in [true, false, true] {
+                p.expanded = expanded;
+                for _ in 0..3 {
+                    let frame = rendered_player(&p, &ctx);
+                    if expanded {
+                        assert!(player_row(&frame, p.bounds(&ctx), 2).contains("Группа Ёлка"));
+                        assert!(player_row(&frame, p.bounds(&ctx), 3).contains("Ёжик Mix е\u{308}"));
+                    }
+                    let [Effect::Help { text, .. }] = &p.info(&ctx)[..] else {
+                        panic!("track Info")
+                    };
+                    assert!(text.contains("Ёжик Mix е\u{308}"));
+                    assert!(text.contains("Каталог/Ёжик-е\u{308}.mp3"));
+                    assert_eq!(p.playlist.order[0].name(), "Ёжик-е\u{308}.mp3");
+                }
+            }
+        }
+        p.playlist.order[0].tags = Default::default();
+        let ctx = context();
+        p.expanded = true;
+        assert!(
+            player_row(&rendered_player(&p, &ctx), p.bounds(&ctx), 3).contains("Ёжик-е\u{308}.mp3")
+        );
+        assert_eq!(p.playlist.order[0].description(), "Ёжик-е\u{308}.mp3");
+        let long = "Ёе\u{308}".repeat(80);
+        let clipped = fit_music_text(&long, 62);
+        assert!(unicode_width::UnicodeWidthStr::width(clipped.as_str()) <= 62);
+        assert!(!clipped.contains('\u{fffd}'));
+    }
+    #[test]
     fn expanded_design_has_one_timer_separate_metadata_and_readonly_meters() {
         let (mut p, _) = player();
         let ctx = context();

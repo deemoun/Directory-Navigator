@@ -452,6 +452,60 @@ mod tests {
     const WAV: &[u8] = include_bytes!("../../../tests/fixtures/music/tone.wav");
     const OGG: &[u8] = include_bytes!("../../../tests/fixtures/music/tone.ogg");
     #[test]
+    fn cyrillic_flac_and_vorbis_comments_keep_exact_unicode_without_audio() -> io::Result<()> {
+        let mut comments = Vec::new();
+        comments.extend(0u32.to_le_bytes()); // Empty vendor.
+        comments.extend(3u32.to_le_bytes());
+        for text in [
+            "TITLE=Ёжик Mix е\u{308}",
+            "ARTIST=Группа Ёлка",
+            "ALBUM=Альбом Ёё",
+        ] {
+            comments.extend((text.len() as u32).to_le_bytes());
+            comments.extend(text.as_bytes());
+        }
+        let mut stream = [0u8; 34];
+        stream[10..18].copy_from_slice(&((44100u64 << 44) | 44100).to_be_bytes());
+        let mut flac = b"fLaC\0\0\0\x22".to_vec();
+        flac.extend(stream);
+        flac.push(0x84);
+        flac.extend(&(comments.len() as u32).to_be_bytes()[1..]);
+        flac.extend(&comments);
+        let mut identification = vec![0u8; 30];
+        identification[..7].copy_from_slice(b"\x01vorbis");
+        identification[11] = 1;
+        identification[12..16].copy_from_slice(&44100u32.to_le_bytes());
+        identification[29] = 1;
+        let mut comment = b"\x03vorbis".to_vec();
+        comment.extend(comments);
+        comment.push(1);
+        let mut ogg = Vec::new();
+        for (sequence, packet) in [identification, comment].iter().enumerate() {
+            assert!(packet.len() < 255);
+            let mut page = [0u8; 27];
+            page[..4].copy_from_slice(b"OggS");
+            page[5] = if sequence == 0 { 2 } else { 4 };
+            page[14..18].copy_from_slice(&7u32.to_le_bytes());
+            page[18..22].copy_from_slice(&(sequence as u32).to_le_bytes());
+            page[26] = 1;
+            let lacing = [packet.len() as u8];
+            let crc = ogg_crc(&[&page, &lacing, packet]);
+            page[22..26].copy_from_slice(&crc.to_le_bytes());
+            ogg.extend(page);
+            ogg.extend(lacing);
+            ogg.extend(packet);
+        }
+        for bytes in [flac, ogg] {
+            let f = Fixture::new(&bytes)?;
+            let info = f.read()?;
+            assert_eq!(info.tags.title, "Ёжик Mix е\u{308}");
+            assert_eq!(info.tags.artist, "Группа Ёлка");
+            assert_eq!(info.tags.album, "Альбом Ёё");
+            assert_eq!(fs::read(&f.0)?, bytes);
+        }
+        Ok(())
+    }
+    #[test]
     fn formats_read_duration_text_and_decode_different_sample_formats_without_a_device(
     ) -> io::Result<()> {
         use rodio::Source;
