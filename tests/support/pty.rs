@@ -38,6 +38,17 @@ fn input_acknowledged(previous: u64, diagnostics: &str) -> bool {
     input_events(diagnostics).is_some_and(|current| current > previous)
 }
 
+fn resize_acknowledged(previous: u64, width: u16, height: u16, diagnostics: &str) -> bool {
+    input_acknowledged(previous, diagnostics)
+        && diagnostics
+            .lines()
+            .next()
+            .is_some_and(|line| line.ends_with(&format!("viewport=({width}, {height})")))
+        && diagnostics
+            .lines()
+            .any(|line| line.ends_with(&format!("ms Resize({width}, {height})")))
+}
+
 pub struct Session {
     pub root: PathBuf,
     child: Child,
@@ -363,6 +374,35 @@ impl Session {
     }
     pub fn resize(&mut self, width: u16, height: u16) -> io::Result<()> {
         self.pump()?;
+        if (self.screen.width, self.screen.height) == (width as usize, height as usize) {
+            return Ok(());
+        }
+        let previous_input = std::cell::Cell::new(0);
+        self.wait("pre-resize diagnostics ready", |s| {
+            if let Some(count) = fs::read_to_string(s.root.join("settings/dn/diagnostics.txt"))
+                .ok()
+                .and_then(|state| input_events(&state))
+            {
+                previous_input.set(count);
+                true
+            } else {
+                false
+            }
+        })?;
+        if previous_input.get() == 0 {
+            // The first frame can precede Crossterm's signal registration. An
+            // ignored focus report establishes the input reader before SIGWINCH.
+            self.send_output(b"\x1b[I", "initial input reader ready", |s| {
+                fs::read_to_string(s.root.join("settings/dn/diagnostics.txt"))
+                    .ok()
+                    .and_then(|state| input_events(&state))
+                    .is_some_and(|count| {
+                        previous_input.set(count);
+                        count > 0
+                    })
+            })?;
+        }
+        let previous_frame = self.screen.revision;
         self.screen.resize(width as usize, height as usize);
         let size = libc::winsize {
             ws_row: height,
@@ -378,7 +418,15 @@ impl Session {
                 return Err(io::Error::last_os_error());
             }
         }
-        Ok(())
+        // Do not race the next key against SIGWINCH. A background redraw can
+        // discover the new dimensions before the resize event is consumed, so
+        // require both an acknowledged resize and a newly committed frame.
+        self.wait("resize acknowledged and drawn", |s| {
+            s.screen.revision > previous_frame
+                && fs::read_to_string(s.root.join("settings/dn/diagnostics.txt")).is_ok_and(
+                    |state| resize_acknowledged(previous_input.get(), width, height, &state),
+                )
+        })
     }
     pub fn finish(&mut self) -> io::Result<()> {
         self.send_output(b"\x1b[21~", "normal exit", |s| {
@@ -593,6 +641,26 @@ impl Drop for Session {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn resized_pixels_and_unrelated_input_do_not_acknowledge_resize() {
+        let state = "active=WindowInfo { id: WindowId(1), kind: Tool(System) } focus=Utility layout_revision=9 viewport=(100, 32)\ninput_events=3\nrecent events:\n182ms Resize(100, 32)\n";
+        assert!(super::resize_acknowledged(2, 100, 32, state));
+        assert!(!super::resize_acknowledged(3, 100, 32, state));
+        assert!(!super::resize_acknowledged(2, 80, 25, state));
+        assert!(!super::resize_acknowledged(
+            2,
+            100,
+            32,
+            &state.replace("Resize(100, 32)", "key End KeyModifiers(0x0) Press")
+        ));
+        assert!(!super::resize_acknowledged(
+            2,
+            100,
+            32,
+            &state.replace("viewport=(100, 32)", "viewport=(80, 25)")
+        ));
+    }
+
     #[test]
     fn manager_activation_does_not_require_an_unoccluded_command_cursor() {
         let mut screen = Screen::new(80, 25);
