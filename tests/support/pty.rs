@@ -112,12 +112,20 @@ impl Session {
             )?;
         }
         let (mut master, mut slave) = (0, 0);
-        let mut size = libc::winsize {
+        let size = libc::winsize {
             ws_row: 25,
             ws_col: 80,
             ws_xpixel: 0,
             ws_ypixel: 0,
         };
+        // libc's Linux API takes a const winsize pointer; the macOS API takes
+        // a mutable one. Match each signature without casts or lint suppression.
+        #[cfg(target_os = "macos")]
+        let mut size = size;
+        #[cfg(target_os = "macos")]
+        let size_pointer = &mut size;
+        #[cfg(target_os = "linux")]
+        let size_pointer = &size;
         // SAFETY: openpty initializes distinct owned descriptors; size is valid storage.
         if unsafe {
             libc::openpty(
@@ -125,7 +133,7 @@ impl Session {
                 &mut slave,
                 std::ptr::null_mut(),
                 std::ptr::null_mut(),
-                &mut size,
+                size_pointer,
             )
         } != 0
         {
