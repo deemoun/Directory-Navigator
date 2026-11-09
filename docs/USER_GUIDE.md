@@ -111,7 +111,8 @@ The control tables below describe the Classic DN keys, also retained as aliases.
 
 Enter or double-click browses ZIP/TAR/TAR.GZ/TGZ archives inside DN; other files
 use a configured custom association, or open in the operating system's default
-application. Custom associations can also override archive opening. Ctrl+Enter
+application. The optional TXT viewer preference described below takes precedence
+for `.txt` files. Custom associations can also override archive opening. Ctrl+Enter
 or File → Open with default app always bypasses custom rules and archive browsing.
 F3 explicitly opens DN's viewer; F4 explicitly opens DN's editor. Ordinary
 directories stay inside DN. Links to files open externally, links to directories
@@ -122,6 +123,26 @@ Opening uses macOS `/usr/bin/open`, Linux `xdg-open` (requires xdg-utils and a
 desktop session), or Windows ShellExecute. Native paths are passed directly,
 without shell command substitution. Launching is asynchronous; opener errors
 are reported in DN without falling back to the viewer/editor.
+
+### Open TXT files in the internal viewer
+
+Enable **Options → File Manager → Setup → Open TXT files in internal viewer**
+to open regular disk `.txt` files in DN's viewer with Enter or double-click.
+Matching ignores case, so `.TXT` works too. The option is available on Linux,
+macOS and Windows and is off by default. It applies only to the current file,
+regardless of marks, and takes precedence over custom `.txt` associations.
+
+**Ctrl+Enter / File → Open with default app** always uses the system application.
+F3 and F4 keep their explicit viewer/editor actions. Other extensions, directory
+navigation, links and archive-member opening keep their existing behavior.
+The viewer retains its usual encoding selection, search, wrapping and size limits;
+an internal opening error does not launch an external app automatically.
+
+The checkbox uses the normal settings draft: OK applies it, while Cancel or Esc
+discards changes. Persistence follows Save settings on exit and Save desktop.
+The saved boolean is `open_txt_in_viewer` in `[file_manager]`; older configuration
+files without this key load with the option off. No configuration-version change
+is needed.
 
 ### Custom file associations
 
@@ -315,8 +336,14 @@ save checks still apply. No transfer queue is restored after restarting DN.
 
 Moves prefer native no-overwrite rename, with a copy fallback when needed.
 Symlinks are copied as links and are not recursively traversed. Copy metadata
-support varies by platform. No overwrite, automatic retry or concurrent transfers
-are introduced.
+support varies by platform. File conflicts ask **Replace / Skip / Replace all / Skip all / Cancel** by default,
+with Skip initially selected. All choices apply only to that transfer. Existing
+folders merge recursively and retain unrelated files. Explicit Refuse and Skip
+policies still refuse or skip existing selected folders as a whole. Type conflicts,
+links and special destinations are not replaced. No automatic retry or concurrent
+transfers are introduced. Pending decisions appear in Transfer Center; an inactive
+transfer never interrupts an editor. Open its details to answer. Esc cancels the
+transfer and keeps completed files. Replacement contents are staged before publication.
 
 F8 and Delete move items to Trash by default, with confirmation. Change
 **Options → File Manager → Setup → Move deleted files to Trash** to select
@@ -338,7 +365,7 @@ White directories, green executables, cyan source, magenta archives, red media,
 blue links and yellow marks use the DOS-derived palette. Actual ANSI shades
 follow terminal preferences; high background intensity is steady, not blinking.
 
-The viewer loads at most 2 MiB / 100,000 lines, clips very long lines and labels
+The viewer loads at most 64 MiB / 1,000,000 lines, clips very long lines and labels
 bounded previews. Binary files display in hex. Arrows/page keys scroll; Esc or
 the Close button returns to panels. Preferences save automatically on normal exit by default.
 Options → Save desktop saves immediately; Options → Configuration → System Setup
@@ -391,7 +418,7 @@ Validation: `cargo fmt --check`, `cargo clippy -- -D warnings`, `cargo test`,
 
 Directory comparison uses visible cached file metadata, never file contents or recursive scans.
 List export refuses existing destinations and paths that cannot be represented as UTF-8 lines.
-Like editor Save As, complete list publication requires filesystem hard-link support.
+Like saving a new editor file, complete list publication requires filesystem hard-link support.
 
 Utilities also provides System Information. Information dialogs are read-only snapshots;
 Refresh updates them. Unsupported or denied native fields display their errors.
@@ -618,7 +645,7 @@ rejected before extraction. Portable output names exclude Windows device names,
 case-folding collisions and names invalid on Windows. No archive ownership or
 privileged permission bits are restored. Available times and ordinary permissions
 are retained. Files are streamed into private staging on the destination volume;
-checksums and source identity are checked before guarded no-overwrite publication.
+checksums and source identity are checked before guarded publication with confirmed replacement.
 Cancellation removes owned staging; already published items remain if a later
 publication fails. Previewed members stay in memory and do not enter file history.
 
@@ -628,7 +655,7 @@ limited to 256 MiB. Indexing/preview reads have ten-second work budgets; full
 extraction streams separately with cancellation and a one-hour worker read budget.
 ZIP indexing validates the central directory within a 64 MiB read budget; full
 payload reads are separately bounded by the accepted source size. Preview remains
-limited to 2 MiB/100,000 lines, while extraction can read full members. ZIP supports
+limited to 64 MiB/1,000,000 lines, while extraction can read full members. ZIP supports
 Stored and Deflate; ZIP64, multi-volume/self-extracting layouts and duplicate ZIP
 names are unsupported. ZIP timestamps use local time; TAR timestamps use UTC.
 The native codecs use the existing `zip`, `tar` and `flate2` dependencies.
@@ -770,7 +797,7 @@ SmartPad uses the normal editor: Unicode, search, undo, F2 / Ctrl+S save, Save A
 window movement/zoom and the Open windows list. It starts with a plain empty
 buffer and uses the active panel directory as the initial Save As location.
 No destination file is created until you save. Save As retains the SmartPad identity and
-normal no-overwrite checks. Closing or quitting protects unsaved notes through
+normal confirmation and conflict checks. Closing or quitting protects unsaved notes through
 the existing save/discard/cancel guard. Closing the document ends that scratchpad;
 the next invocation creates a new empty one.
 
@@ -1056,9 +1083,10 @@ dismissed. Keyboard mnemonics and mouse controls are available in both languages
 Unicode filenames and pasted paths are supported.
 
 Open keeps the current document and activates a separate editor, or reuses the
-editor already holding that file. Save As requires a new destination: existing
-files and destinations owned or reserved by another editor are refused. An error
-leaves the document's changes intact.
+editor already holding that file. Save As asks before replacing an existing
+regular file, with Cancel selected initially. Links, directories and destinations
+owned or reserved by another editor are refused. An error leaves the document's
+changes intact.
 
 ## Switching open windows
 
@@ -1200,8 +1228,8 @@ may be lost after a crash. It does not automatically save over your source files
 On startup, abandoned sessions offer **Recover / Inspect / Discard / Later**:
 
 - Recover opens a separate, dirty untitled document, retaining the text, encoding and BOM
-  preference and checkpoint cursor/selection. Save As uses the existing
-  no-overwrite safeguards. Undo history is not restored.
+  preference and checkpoint cursor/selection. Save As requires confirmation
+  before replacing an existing regular file. Undo history is not restored.
 - Inspect opens a bounded, read-only preview using owned Help, then returns to
   the same recovery dialog and focused button.
 - Discard removes that checkpoint. Later/Esc leaves it on disk; use
@@ -1258,8 +1286,9 @@ action and returning to its remembered bounds.
 `Utilities → Temp Drive` opens DN's persistent storage directory in the active
 panel. These are real files, not references to originals. Use F5 from the other
 panel, or `File → Copy to Temp Drive…` to open the standard Copy dialog for marked
-items (the current item when nothing is marked). Existing destinations are refused
-by default; the usual queue, Skip, cancellation and copy options apply.
+items (the current item when nothing is marked). Existing files prompt for
+replacement by default; Refuse and Skip remain available. The usual queue,
+cancellation and copy options apply.
 
 The directory is `temp-drive` beside the actual configuration file: normally
 `~/.config/dn/temp-drive` on macOS/Linux (honouring `XDG_CONFIG_HOME`), or
@@ -1306,8 +1335,9 @@ line endings remain intact. Previewing creates no temporary file or view-history
 path. In the Mac profile, Ctrl+O then 5 previews/returns; Ctrl+O then m toggles
 Markdown/source in a viewer. F1 explains the new controls.
 
-Existing input limits remain 2 MiB and 100,000 source lines. Rendering is limited
-to 8 MiB, 100,000 output rows, 64 nested containers and 200,000 style spans.
+Markdown input is bounded to 64 MiB. Rendering is limited to 64 MiB,
+500,000 output rows, 64 nested containers and 1,000,000 style spans. Exceeding
+a rendering budget falls back to source with a notice.
 Malformed Markdown is displayed tolerantly; exceeded limits or renderer failures
 show source with a notice. Parsing is cancellable and document-owned; stale
 replies cannot replace newer edits or activate an inactive window.
@@ -1383,10 +1413,10 @@ Characters that cannot be represented stop saving without changing the file;
 choose UTF-8 instead. No replacement characters or Unicode normalization are used.
 Failed conversion does not change the document's current encoding or undo history.
 
-The viewer reads at most 2 MiB of original bytes and bounds decoded text to 8 MiB
-and 100,000 lines. Its existing long-line clipping remains. The editor limits both
-its Unicode buffer and encoded output to 2 MiB and refuses oversized documents
-without silently truncating them. Recovery retains the output encoding and BOM;
+The viewer reads at most 64 MiB of original bytes and bounds decoded text to
+192 MiB and 1,000,000 lines. Its existing long-line clipping remains. The editor limits both
+its Unicode buffer and encoded output to 16 MiB and permits at most 250,000 lines.
+It refuses oversized documents without silently truncating them. Recovery retains the output encoding and BOM;
 old checkpoints remain UTF-8. Encoding choices are document-local, not global or
 persisted per filename. Markdown formatting/search operate on decoded text.
 
@@ -1415,3 +1445,50 @@ DN's GPM connection released.
 Linux console detection checks the actual terminal device, not just `TERM`.
 Linux PTYs, SSH/tmux, macOS and Windows retain their existing terminal mouse
 handling. No GPM shared library, new setting or configuration migration is needed.
+
+### Replacing a file with Save As
+
+Save As asks **Replace / Cancel** when a regular destination file exists. Cancel
+is selected initially. Cancelling preserves the buffer, dirty state and undo
+history. DN rechecks the approved destination before publishing the staged file.
+Files owned or reserved by another editor, links and directory destinations remain
+protected. Ordinary F2 saves retain their external-change checks. Large editable
+documents keep the existing bounded undo budget and use compatible recovery records.
+
+## PDF text viewing
+
+F3 opens PDF files as extracted, read-only text on Linux, macOS and Windows.
+Page separators preserve page boundaries, and the status bar shows the current
+page and total page count. F2 controls wrapping; search and next/previous match
+work on the displayed text. Go to accepts an original **page number** for PDFs.
+F8 encoding is unavailable: PDF fonts and their character maps determine decoding.
+
+Enter and double-click in a disk pane retain normal associations and external
+opening. Explicit As Text and As Hex keep their original raw-byte behavior. Quick
+View is unchanged. PDF archive members use the same text reader, including members
+of password-protected ZIPs after archive authentication. Original PDF bytes remain
+unchanged. This does not add PDF editing.
+
+This first implementation extracts text; it does not reproduce visual page layout,
+render images, run scripts, open links or load remote resources. Reading order may
+differ for columns or complex layouts. Scanned/image-only pages need OCR, which DN
+does not provide. Encrypted PDFs open an owned, masked password prompt, with
+OK, Cancel and Help. Incorrect passwords can be retried. Cancel (or Esc) closes
+the locked PDF and restores the previous document or archive pane. PDF and ZIP
+passwords are separate: an encrypted PDF inside an encrypted ZIP asks for each
+password in turn. Supported PDF encryption includes legacy RC4 and AES-128/AES-256;
+unsupported encryption reports an error. No password is stored in settings, history
+or a session-wide cache. Reopening a closed PDF asks again. Successful unlocking
+keeps only the displayed document, and password entry buffers are cleared.
+
+Unlocking uses the original, complete encrypted bytes already loaded for this
+viewer, even if the disk file or containing archive changes during the prompt.
+The source is never modified or written to a temporary decrypted file. Decryption
+runs in an owned background task; closing the viewer cancels the pending request
+and ignores late results. Empty-user-password PDFs open without an extra prompt.
+
+PDF input is limited to 64 MiB and must be complete. Text output is limited to
+64 MiB, 1,000,000 lines and 2,000 pages. Oversized or unreadable PDFs produce an
+error rather than parsing a truncated file. Processing runs in the existing bounded
+background task pool; cancellation is checked between pages and while emitting text.
+These limits bound input/output, not every allocation inside the PDF parser.

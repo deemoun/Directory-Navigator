@@ -1,5 +1,6 @@
 //! Workspace-owned transfer queue. The optional document is only a view; App.job
 //! remains the active-worker adapter for existing operation callers.
+mod conflicts;
 mod view;
 use crate::{
     app::App,
@@ -7,6 +8,7 @@ use crate::{
     requests::{Owner, RequestScope},
     task::Task,
 };
+pub(crate) use conflicts::{conflict_dialog, conflict_spec};
 use std::{
     collections::{BTreeSet, VecDeque},
     ffi::OsString,
@@ -29,6 +31,7 @@ pub enum Status {
     Preparing,
     Queued,
     Running,
+    Waiting,
     Cancelling,
     Completed,
     Cancelled,
@@ -43,6 +46,7 @@ impl Status {
             Self::Preparing => "Preparing",
             Self::Queued => "Queued",
             Self::Running => "Running",
+            Self::Waiting => "Awaiting decision",
             Self::Cancelling => "Cancelling",
             Self::Completed => "Completed",
             Self::Cancelled => "Cancelled",
@@ -169,6 +173,8 @@ pub struct State {
     pub(crate) exit: ExitMode,
     pub(crate) quit_prompt: Option<crate::modals::ModalId>,
     pub(crate) quit_focus: usize,
+    pub(crate) conflict_prompt: Option<(crate::modals::ModalId, TransferId)>,
+    pub(crate) conflict_focus: usize,
 }
 impl State {
     pub fn has_work(&self) -> bool {
@@ -247,6 +253,7 @@ pub enum Action {
     QuitWait,
     QuitCancel,
     QuitReturn,
+    Conflict(TransferId, operations::conflict::Decision),
 }
 pub fn open(app: &mut App) {
     crate::tool_windows::open(app, crate::tool_windows::Kind::Transfers, None);
@@ -665,6 +672,7 @@ pub(crate) fn poll(app: &mut App, now: Instant) -> bool {
     if app.transfers.exit == ExitMode::Cancel {
         app.transfers.paused = false;
     }
+    conflicts::poll(app);
     start_next(app, now);
     if app.transfers.active.is_some() {
         changed = true;
@@ -680,6 +688,7 @@ pub(crate) fn poll(app: &mut App, now: Instant) -> bool {
 pub fn action(app: &mut App, action: Action) {
     let now = Instant::now();
     match action {
+        Action::Conflict(id, decision) => conflicts::answer(app, id, decision),
         Action::Open => open(app),
         Action::Select(id) => {
             if app.transfers.entries.iter().any(|e| e.id == id) {
@@ -715,7 +724,7 @@ pub fn action(app: &mut App, action: Action) {
     }
     app.transfers.trim();
 }
-const HELP: &str = "Copy and Move run one at a time. Closing this window keeps transfers running. Cancel stops the selected request; completed items remain. Failure or cancellation pauses the queue. Resume queue starts waiting requests, without retrying failed work. Totals and remaining time are estimates. Existing destinations are never overwritten.";
+const HELP: &str = "Copy and Move run one at a time. Closing this window keeps transfers running. Cancel stops the selected request; completed items remain. Failure or cancellation pauses the queue. Resume queue starts waiting requests, without retrying failed work. Totals and remaining time are estimates. Existing files require confirmation by default. Existing folders are merged; unrelated contents are kept.";
 fn cancel_selected(app: &mut App, now: Instant) {
     let Some(id) = app.transfers.selected else {
         return;
@@ -783,6 +792,14 @@ fn begin_exit(app: &mut App, action: Action, now: Instant) {
     poll(app, now);
 }
 fn show_details(app: &mut App) {
+    if app
+        .transfers
+        .selected()
+        .is_some_and(|e| e.status == Status::Waiting)
+    {
+        conflicts::show(app);
+        return;
+    }
     let Some(e) = app.transfers.selected() else {
         return;
     };

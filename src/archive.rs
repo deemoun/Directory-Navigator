@@ -15,7 +15,7 @@ pub struct Extraction {
     pub members: Vec<MemberId>,
     pub password: Option<Password>,
 }
-pub const HELP: &str = "ZIP / TAR / TAR.GZ / TGZ in the file pane.\nEnter: folder or read-only preview · F3: preview\nInsert / Space / Ctrl+click: mark · + / -: group\nF5: extract marked items, or the current item\nFolders include descendants and empty directories.\nBackspace / ..: parent; at root returns to disk\nCtrl+PgUp: exit archive from any folder\nEsc: cancel indexing or preview · Ctrl+R: refresh\nBoth panes can browse archives independently.\nChoose a disk destination when both show archives.\nArchives are read-only; extract before editing.\nExisting destinations are refused or skipped whole.";
+pub const HELP: &str = "ZIP / TAR / TAR.GZ / TGZ in the file pane.\nEnter: folder or read-only preview · F3: preview\nInsert / Space / Ctrl+click: mark · + / -: group\nF5: extract marked items, or the current item\nFolders include descendants and empty directories.\nBackspace / ..: parent; at root returns to disk\nCtrl+PgUp: exit archive from any folder\nEsc: cancel indexing or preview · Ctrl+R: refresh\nBoth panes can browse archives independently.\nChoose a disk destination when both show archives.\nArchives are read-only; extract before editing.\nExisting files ask Replace / Skip / Cancel; folders merge.";
 pub const EXTRACT_FIRST: &str = "Extract archive members to disk first (F5).";
 pub fn require_native(app: &mut App) -> bool {
     if app.panels[app.active].is_archive() {

@@ -141,6 +141,28 @@ fn shared_logic_preserves_native_frames() -> io::Result<()> {
                                 "{footer}"
                             );
                         }
+                        if case == 2 {
+                            let buffer = Buffer::rendered(ui::render(&a, &snapshot));
+                            let text = buffer
+                                .content
+                                .iter()
+                                .map(|c| c.symbol())
+                                .collect::<String>();
+                            assert!(text.contains(&dn::menu::plain(
+                                language.text(dn::settings::Setting::TxtViewer.label())
+                            )));
+                            let row = a
+                                .modals
+                                .settings()
+                                .unwrap()
+                                .rows()
+                                .iter()
+                                .position(|s| *s == dn::settings::Setting::TxtViewer)
+                                .unwrap();
+                            assert!(result.hit_regions().iter().any(|(r, t)| *t
+                                == dn::mouse::Target::Setting(row)
+                                && r.width >= 60));
+                        }
                         if case == 4 {
                             let buffer = Buffer::rendered(ui::render(&a, &snapshot));
                             let text = buffer

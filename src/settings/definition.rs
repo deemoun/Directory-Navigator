@@ -35,6 +35,7 @@ fields! {
     Space: ("~S~PACE toggles selection", "file_manager", "space_select", space_select),
     DeleteKey: ("~D~EL erases file(s)", "file_manager", "delete_key", delete_key),
     Trash: ("Move deleted files to T~r~ash", "file_manager", "use_trash", use_trash),
+    TxtViewer: ("Open T~X~T files in internal viewer", "file_manager", "open_txt_in_viewer", open_txt_in_viewer),
     Backspace: ("BS - go to ~u~pper directory", "file_manager", "backspace_parent", backspace_parent),
 }
 pub struct Form {
@@ -63,7 +64,9 @@ impl SettingsKind {
                 " File Manager Setup ",
                 74,
                 14,
-                &[Space, DeleteKey, Backspace, Tags, Highlight, Trash],
+                &[
+                    Space, DeleteKey, Backspace, Tags, Highlight, Trash, TxtViewer,
+                ],
                 true,
             ),
             Self::Highlight => (" Highlight Groups ", 76, 19, &[Highlight], false),
@@ -80,7 +83,8 @@ impl SettingsKind {
 impl Form {
     pub fn bounds(&self, rect: Rect, index: usize) -> Rect {
         let trash = self.rows[index] == Setting::Trash;
-        let right = self.columns && index >= 3 && !trash;
+        let txt = self.rows[index] == Setting::TxtViewer;
+        let right = self.columns && index >= 3 && !trash && !txt;
         Rect::new(
             rect.x + if right { 39 } else { theme::CONTENT_X },
             rect.y
@@ -89,10 +93,16 @@ impl Form {
                     index as u16 - 3
                 } else if trash {
                     3
+                } else if txt {
+                    4
                 } else {
                     index as u16
                 },
-            if self.columns { 32 } else { self.width - 6 },
+            if self.columns && !txt {
+                32
+            } else {
+                self.width - 6
+            },
             1,
         )
     }

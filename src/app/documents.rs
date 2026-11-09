@@ -111,6 +111,15 @@ impl App {
             }
             if browse && !entry.directory && !entry.symlink {
                 let path = entry.path.clone();
+                if self.config.open_txt_in_viewer
+                    && entry.file_type.is_some_and(|kind| kind.is_file())
+                    && path
+                        .extension()
+                        .is_some_and(|ext| ext.eq_ignore_ascii_case("txt"))
+                {
+                    self.open_viewer();
+                    return;
+                }
                 if entry.file_type.is_some_and(|kind| kind.is_file())
                     && (crate::plugins::host::open_apk(self, path.clone())
                         || crate::plugins::host::play_mp3(self, path.clone()))

@@ -74,11 +74,24 @@ impl Viewer {
                     .map_err(|_| "Enter a decimal byte offset or 0x hexadecimal offset.")?
             }
         } else {
-            field
-                .parse::<usize>()
-                .map_err(|_| "Enter a line number starting at 1.")?
+            field.parse::<usize>().map_err(|_| {
+                if contents.pdf.is_some() {
+                    "Enter a page number starting at 1."
+                } else {
+                    "Enter a line number starting at 1."
+                }
+            })?
         };
-        if contents.binary {
+        if let Some(pdf) = &contents.pdf {
+            let line = value
+                .checked_sub(1)
+                .and_then(|p| pdf.page_lines.get(p))
+                .copied()
+                .ok_or("Page is outside the loaded PDF.")?;
+            self.current = None;
+            self.go_to_line(line + 1);
+            self.layout(self.layout_width.max(1) as u16);
+        } else if contents.binary {
             if value >= contents.loaded_bytes.max(1) {
                 return Err("Offset is outside the loaded preview.".into());
             }
@@ -105,7 +118,9 @@ impl Viewer {
     }
 
     pub fn text_ready(&self) -> bool {
-        self.contents.as_ref().is_some_and(|c| !c.binary)
+        self.contents
+            .as_ref()
+            .is_some_and(|c| !c.binary && c.pdf.as_ref().is_none_or(|p| !p.locked))
     }
     pub fn layout(&mut self, width: u16) {
         let width = usize::from(width.max(1));
@@ -324,7 +339,18 @@ impl Viewer {
     }
 }
 pub fn action(app: &mut App, action: Action) {
+    if super::pdf::password::action(app, action) {
+        return;
+    }
     if action == Action::Help {
+        if app
+            .desktop
+            .active_viewer()
+            .is_some_and(|v| v.contents.as_ref().is_some_and(|c| c.pdf.is_some()))
+        {
+            app.push_dialog(crate::dialog::Dialog { title: " Viewer Help ", message: app.config.language.text("PDF text view: F2 wraps, F7 searches, Shift+F7 finds the next match. Go to accepts a page number. Page separators mark the original PDF pages. F8 encoding is unavailable because PDF fonts define the text encoding. Scanned pages need OCR; graphics are not supported. Encrypted PDFs ask for a password. Enter in the file pane still opens your system application.").into() });
+            return;
+        }
         app.push_dialog(crate::dialog::Dialog {title:" Viewer Help ",message:format!("{}\n{}", app.config.language.text("F6 toggles Markdown/source for .md and .markdown files. Search uses displayed text; Go to uses source line numbers. F5 returns from an editor preview. Links and images do not open automatically."), app.config.language.text("F8 chooses the reading encoding. File → Save with encoding converts the file; F2 preserves its current encoding, BOM and line endings. Unrepresentable characters stop saving."))});
         return;
     }
@@ -464,6 +490,14 @@ pub fn action(app: &mut App, action: Action) {
     }
 }
 pub fn paste(app: &mut App, text: &str) {
+    if let Some(d) = app
+        .desktop
+        .active_viewer_mut()
+        .and_then(|v| v.modals.viewer_pdf_password_mut())
+    {
+        d.edit(Some(text), KeyCode::Null);
+        return;
+    }
     if let Some(dialog) = app
         .desktop
         .active_viewer_mut()
@@ -483,6 +517,9 @@ pub fn paste(app: &mut App, text: &str) {
     }
 }
 pub fn key(app: &mut App, key: KeyEvent) {
+    if super::pdf::password::key(app, key) {
+        return;
+    }
     if key.code == KeyCode::Esc {
         if let Some(v) = app
             .desktop

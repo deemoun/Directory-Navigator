@@ -57,7 +57,7 @@ fn read_cancelled(
     let metadata = file.metadata()?;
     if metadata.len() > MAX_BYTES as u64 {
         return Err(io::Error::other(
-            "Editor limit is 2 MiB. Use F3 for a bounded preview.",
+            "Editor limit is 16 MiB. Use F3 for a bounded preview.",
         ));
     }
     let mut bytes = Vec::new();
@@ -72,7 +72,9 @@ fn read_cancelled(
         bytes.extend_from_slice(&chunk[..n]);
     }
     if bytes.len() > MAX_BYTES {
-        return Err(io::Error::other("File grew beyond the 2 MiB editor limit."));
+        return Err(io::Error::other(
+            "File grew beyond the 16 MiB editor limit.",
+        ));
     }
     let after = file.metadata()?;
     if metadata.len() != after.len() || metadata.modified().ok() != after.modified().ok() {
@@ -135,6 +137,43 @@ fn verify(path: &Path, original: &Snapshot) -> io::Result<()> {
     }
     Ok(())
 }
+/// Identity and revision approved by the Save As replacement prompt.
+#[derive(Clone, Debug)]
+pub struct Replacement(crate::operations::conflict::Approved);
+pub(crate) fn replacement(path: &Path) -> Result<Option<Replacement>, String> {
+    match fs::symlink_metadata(path) {
+        Ok(metadata) => {
+            if !metadata.is_file() || crate::operations::conflict::redirected(&metadata) {
+                return Err(
+                    "Only regular files can be replaced; links and directories are retained".into(),
+                );
+            }
+            let file = filesystem::open_regular(path).map_err(|e| e.to_string())?;
+            crate::operations::conflict::verify_replacement(path, &metadata)
+                .map_err(|e| e.to_string())?;
+            if !crate::platform_fs::same_identity(
+                &metadata,
+                &file.metadata().map_err(|e| e.to_string())?,
+            ) {
+                return Err("Destination changed before confirmation".into());
+            }
+            Ok(Some(Replacement(
+                crate::operations::conflict::Approved::capture(path, metadata)
+                    .map_err(|e| e.to_string())?,
+            )))
+        }
+        Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(None),
+        Err(e) => Err(e.to_string()),
+    }
+}
+pub(crate) fn save_replacing(
+    path: &Path,
+    text: &str,
+    format: TextFormat,
+    approved: &Replacement,
+) -> Result<SaveOutcome, String> {
+    save_prepared_with(path, text, format, None, Some(approved), |_| Ok(()))
+}
 /// An error means this attempt did not publish. A successful result always
 /// carries the published identity, even when its durability is uncertain.
 #[derive(Debug)]
@@ -162,17 +201,29 @@ fn save_with(
     text: &str,
     format: impl Into<TextFormat>,
     original: Option<&Snapshot>,
+    check: impl FnMut(Stage) -> io::Result<()>,
+) -> Result<SaveOutcome, String> {
+    save_prepared_with(path, text, format, original, None, check)
+}
+fn save_prepared_with(
+    path: &Path,
+    text: &str,
+    format: impl Into<TextFormat>,
+    original: Option<&Snapshot>,
+    replacement: Option<&Replacement>,
     mut check: impl FnMut(Stage) -> io::Result<()>,
 ) -> Result<SaveOutcome, String> {
     let bytes = format.into().encode(text)?;
     let prepare = || -> io::Result<_> {
         if text.len() > MAX_BYTES || bytes.len() > MAX_BYTES {
             return Err(io::Error::other(
-                "Saved file exceeds the 2 MiB editor limit.",
+                "Saved file exceeds the 16 MiB editor limit.",
             ));
         }
         if let Some(original) = original {
             verify(path, original)?;
+        } else if let Some(replacement) = replacement {
+            replacement.0.verify(path)?;
         } else if fs::symlink_metadata(path).is_ok() {
             return Err(io::Error::new(
                 io::ErrorKind::AlreadyExists,
@@ -185,10 +236,13 @@ fn save_with(
     let publish = || -> io::Result<_> {
         check(Stage::Write)?;
         staged.file.write_all(&bytes)?;
-        if let Some(original) = original {
+        if original.is_some() || replacement.is_some() {
             let input = filesystem::open_regular(path)?;
             crate::platform_fs::copy_extended_metadata(&input, &staged.file)?;
-            staged.file.set_permissions(original.permissions.clone())?;
+            let permissions = original
+                .map(|o| o.permissions.clone())
+                .unwrap_or_else(|| replacement.unwrap().0.metadata.permissions());
+            staged.file.set_permissions(permissions)?;
         }
         check(Stage::FileSync)?;
         staged.file.sync_all()?;
@@ -196,6 +250,12 @@ fn save_with(
         check(Stage::Publish)?;
         if let Some(original) = original {
             verify(path, original)?;
+            if !crate::platform_fs::owns_file(staged.path(), &staged.file) {
+                return Err(io::Error::other("Temporary save was replaced"));
+            }
+            fs::rename(staged.path(), path)?;
+        } else if let Some(replacement) = replacement {
+            replacement.0.verify(path)?;
             if !crate::platform_fs::owns_file(staged.path(), &staged.file) {
                 return Err(io::Error::other("Temporary save was replaced"));
             }
@@ -232,13 +292,13 @@ pub fn confirm_durability(path: &Path, snapshot: &Snapshot) -> Result<SaveOutcom
 #[cfg(test)]
 mod tests {
     use super::*;
-    struct Temp(std::path::PathBuf);
+    pub(super) struct Temp(pub(super) std::path::PathBuf);
     impl Drop for Temp {
         fn drop(&mut self) {
             let _ = fs::remove_dir_all(&self.0);
         }
     }
-    fn fixture(label: &str) -> Temp {
+    pub(super) fn fixture(label: &str) -> Temp {
         static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
         let p = std::env::temp_dir().join(format!(
             "dn-save-outcome-{label}-{}-{}",
@@ -333,5 +393,36 @@ mod tests {
         })
         .is_err());
         assert_eq!(fs::read(&p).unwrap(), b"later");
+    }
+}
+
+#[cfg(test)]
+mod replacement_tests {
+    use super::*;
+    #[test]
+    fn replacement_failure_keeps_old_bytes_and_changed_revision_is_rejected() {
+        let f = super::tests::fixture("replace");
+        let path = f.0.join("old");
+        fs::write(&path, b"old").unwrap();
+        let approved = replacement(&path).unwrap().unwrap();
+        let r = save_prepared_with(
+            &path,
+            "new",
+            TextFormat::default(),
+            None,
+            Some(&approved),
+            |stage| {
+                if matches!(stage, Stage::Publish) {
+                    return Err(io::Error::other("Injected publication failure"));
+                }
+                Ok(())
+            },
+        );
+        assert!(r.is_err());
+        assert_eq!(fs::read(&path).unwrap(), b"old");
+        assert_eq!(fs::read_dir(&f.0).unwrap().count(), 1);
+        fs::write(&path, b"externally changed").unwrap();
+        assert!(save_replacing(&path, "new", TextFormat::default(), &approved).is_err());
+        assert_eq!(fs::read(&path).unwrap(), b"externally changed");
     }
 }

@@ -1,5 +1,6 @@
 pub(crate) mod markdown;
 mod navigation;
+pub mod pdf;
 mod search_controller;
 use crate::filesystem::open_regular;
 pub use navigation::{
@@ -11,8 +12,8 @@ use std::{
 };
 use unicode_segmentation::UnicodeSegmentation;
 
-pub const MAX_BYTES: usize = 2 * 1024 * 1024;
-const MAX_LINES: usize = 100_000;
+pub const MAX_BYTES: usize = crate::limits::VIEWER_BYTES;
+const MAX_LINES: usize = crate::limits::VIEWER_LINES;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ViewMode {
@@ -23,6 +24,7 @@ pub enum ViewMode {
 
 #[derive(Clone)]
 pub struct Contents {
+    pub pdf: Option<std::sync::Arc<pdf::Info>>,
     pub source: Option<std::sync::Arc<str>>,
     pub raw: Option<std::sync::Arc<[u8]>>,
     pub format: Option<crate::text_encoding::TextFormat>,
@@ -67,11 +69,24 @@ fn load_mode_cancelled(
         }
         bytes.extend_from_slice(&chunk[..n]);
     }
-    Ok(from_bytes(bytes, mode))
+    if resolve_link {
+        pdf::document_bytes(bytes, mode, pdf::is_path(path), cancel)
+    } else {
+        from_bytes_cancelled(bytes, mode, cancel)
+    }
 }
 
 /// Decode an in-memory, bounded preview using the ordinary viewer's rules.
-pub fn from_bytes(mut bytes: Vec<u8>, mode: ViewMode) -> Contents {
+pub fn from_bytes(bytes: Vec<u8>, mode: ViewMode) -> Contents {
+    from_bytes_cancelled(bytes, mode, &crate::task::Cancellation::default())
+        .expect("uncancelled preview")
+}
+pub(crate) fn from_bytes_cancelled(
+    mut bytes: Vec<u8>,
+    mode: ViewMode,
+    cancel: &crate::task::Cancellation,
+) -> io::Result<Contents> {
+    cancel.check()?;
     let mut truncated = bytes.len() > MAX_BYTES;
     bytes.truncate(MAX_BYTES);
     let raw_truncated = truncated;
@@ -92,18 +107,21 @@ pub fn from_bytes(mut bytes: Vec<u8>, mode: ViewMode) -> Contents {
     let binary = mode == ViewMode::Hex || detected.is_none();
     if !binary {
         if let Some(text) = detected.and_then(|format| format.decode(&bytes, raw_truncated).ok()) {
-            let mut c = text_contents(&text);
+            let mut c = text_contents_cancelled(&text, cancel)?;
             c.loaded_bytes = bytes.len();
             c.raw = Some(bytes.into());
             c.format = detected;
             c.truncated |= raw_truncated;
             c.raw_truncated = raw_truncated;
-            return c;
+            return Ok(c);
         }
     }
     let source = None;
     let mut lines = Vec::new();
     for (index, chunk) in bytes.chunks(16).take(MAX_LINES + 1).enumerate() {
+        if index % 1024 == 0 {
+            cancel.check()?;
+        }
         let hex = chunk
             .iter()
             .map(|b| format!("{b:02X} "))
@@ -127,21 +145,23 @@ pub fn from_bytes(mut bytes: Vec<u8>, mode: ViewMode) -> Contents {
     if lines.is_empty() {
         lines.push(String::new());
     }
-    Contents {
+    let loaded_bytes = if binary {
+        bytes.len().min(MAX_LINES * 16)
+    } else {
+        bytes.len()
+    };
+    Ok(Contents {
+        pdf: None,
         raw_truncated,
-        raw: Some(bytes.clone().into()),
+        raw: Some(bytes.into()),
         format: detected,
         encoding_needed,
         source,
-        loaded_bytes: if binary {
-            bytes.len().min(MAX_LINES * 16)
-        } else {
-            bytes.len()
-        },
+        loaded_bytes,
         lines,
         binary,
         truncated,
-    }
+    })
 }
 
 pub fn from_encoded_bytes(
@@ -150,7 +170,7 @@ pub fn from_encoded_bytes(
     truncated: bool,
 ) -> Result<Contents, String> {
     if bytes.len() > MAX_BYTES {
-        return Err("Encoded preview exceeds the 2 MiB limit.".into());
+        return Err("Encoded preview exceeds the 64 MiB limit.".into());
     }
     let text = format.decode(&bytes, truncated)?;
     let mut contents = text_contents(&text);
@@ -163,14 +183,20 @@ pub fn from_encoded_bytes(
 }
 /// Already-decoded snapshots never acquire a filesystem encoding or path.
 pub fn text_contents(text: &str) -> Contents {
-    let mut end = text.len().min(8 * 1024 * 1024);
+    text_contents_cancelled(text, &crate::task::Cancellation::default()).expect("uncancelled text")
+}
+fn text_contents_cancelled(text: &str, cancel: &crate::task::Cancellation) -> io::Result<Contents> {
+    let mut end = text.len().min(crate::limits::DECODED_BYTES);
     while !text.is_char_boundary(end) {
         end -= 1;
     }
     let mut truncated = end < text.len();
     let text = &text[..end];
     let mut lines = Vec::new();
-    for line in text.lines().take(MAX_LINES + 1) {
+    for (index, line) in text.lines().take(MAX_LINES + 1).enumerate() {
+        if index % 256 == 0 {
+            cancel.check()?;
+        }
         let mut output = String::new();
         let mut count = 0;
         for grapheme in line.graphemes(true) {
@@ -198,7 +224,8 @@ pub fn text_contents(text: &str) -> Contents {
     if lines.is_empty() {
         lines.push(String::new());
     }
-    Contents {
+    Ok(Contents {
+        pdf: None,
         source: Some(std::sync::Arc::from(text)),
         raw: None,
         format: None,
@@ -208,7 +235,7 @@ pub fn text_contents(text: &str) -> Contents {
         lines,
         binary: false,
         truncated,
-    }
+    })
 }
 
 pub struct Viewer {
@@ -267,7 +294,8 @@ impl Viewer {
     ) -> Self {
         let mut viewer = Self::from_contents(label, contents);
         viewer.memory_only = true;
-        viewer.markdown.hint = markdown_hint;
+        viewer.markdown.hint =
+            markdown_hint && viewer.contents.as_ref().is_none_or(|c| c.pdf.is_none());
         viewer.markdown.requested = true;
         viewer
     }
@@ -281,6 +309,7 @@ impl Viewer {
         } else {
             ViewMode::Text
         };
+        viewer.wrap = contents.pdf.is_some();
         viewer.contents = Some(contents);
         viewer.offer_encoding();
         viewer
@@ -312,6 +341,9 @@ impl Viewer {
     }
 
     pub fn poll(&mut self) -> Option<Result<(), String>> {
+        if self.poll_pdf_password() {
+            return Some(Ok(()));
+        }
         if self.modals.viewer_encoding_mut().is_some_and(|d| d.poll()) {
             return Some(Ok(()));
         }
@@ -344,6 +376,10 @@ impl Viewer {
         }
         Some(match crate::task::take_reply(&mut self.pending)? {
             Ok(result) => result.map(|contents| {
+                self.wrap = contents.pdf.is_some();
+                if contents.pdf.is_some() {
+                    self.markdown.hint = false;
+                }
                 self.contents = Some(contents);
                 self.offer_encoding();
                 self.layout_width = 0;
@@ -355,6 +391,20 @@ impl Viewer {
 
     fn offer_encoding(&mut self) {
         if let Some(c) = &self.contents {
+            if let Some(pdf) = &c.pdf {
+                if pdf.locked && self.modals.viewer_pdf_password().is_none() {
+                    if let Some(bytes) = &c.raw {
+                        self.modals
+                            .set_viewer_pdf_password(Some(pdf::password::Dialog::new(
+                                bytes.clone(),
+                            )));
+                    }
+                }
+                if pdf.empty {
+                    self.notice = pdf::EMPTY_NOTICE.into();
+                }
+                return;
+            }
             if let Some(raw) = &c.raw {
                 if let Err(error) = crate::text_encoding::detect(raw, c.raw_truncated) {
                     self.notice = error;
@@ -376,13 +426,20 @@ impl Viewer {
         }
     }
     pub fn encoding_available(&self) -> bool {
-        self.contents.as_ref().is_some_and(|c| c.raw.is_some())
+        self.contents
+            .as_ref()
+            .is_some_and(|c| c.raw.is_some() && c.pdf.is_none())
     }
     pub(crate) fn apply_encoding(
         &mut self,
         format: Option<crate::text_encoding::TextFormat>,
     ) -> Result<(), String> {
         let c = self.contents.as_ref().ok_or("Wait for the file to load.")?;
+        if c.pdf.is_some() {
+            return Err(
+                "PDF text uses its embedded fonts; a text encoding cannot be selected.".into(),
+            );
+        }
         let bytes = c
             .raw
             .clone()

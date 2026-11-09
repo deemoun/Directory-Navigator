@@ -275,7 +275,7 @@ fn native_cancel_button_routes_mouse_at_translated_window_coordinates() -> io::R
     Ok(())
 }
 #[test]
-fn native_open_reuses_documents_and_failed_save_never_overwrites() -> io::Result<()> {
+fn native_open_reuses_documents_and_save_as_waits_for_confirmation() -> io::Result<()> {
     let (root, mut app) = Temp::app()?;
     editor::open_path(&mut app, root.root.join("a.txt"));
     wait(&mut app);
@@ -300,7 +300,16 @@ fn native_open_reuses_documents_and_failed_save_never_overwrites() -> io::Result
     );
     assert_eq!(text(&app, new), "draft");
     assert!(app.desktop.editor(new).unwrap().dirty());
-    assert!(!app.dialogs().is_empty());
+    assert!(matches!(
+        app.desktop.editor(new).unwrap().modals.editor_modal(),
+        Some(editor::Modal::ConfirmOverwrite { .. })
+    ));
+    key(&mut app, K::Enter); // Cancel is initially focused.
+    assert!(app.desktop.editor(new).unwrap().dirty());
+    assert_eq!(
+        fs::read_to_string(root.root.join("occupied.txt"))?,
+        "outside"
+    );
     Ok(())
 }
 

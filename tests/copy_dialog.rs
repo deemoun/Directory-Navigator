@@ -103,7 +103,7 @@ fn dn_layout_disabled_choices_focus_resize_and_cancel_never_write() -> io::Resul
         key(&mut app, K::Tab);
         focuses.push(app.modals.prompt().unwrap().focus);
     }
-    assert_eq!(focuses, vec![10, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0]);
+    assert_eq!(focuses, vec![10, 11, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0]);
     copy_dialog::action(&mut app, Action::RemoveSources);
     copy_dialog::action(&mut app, Action::Verify);
     assert_eq!(app.modals.prompt().unwrap().focus, 5);
@@ -289,10 +289,11 @@ fn native_copy_paint_is_repeatable_translated_clipped_and_localized() -> io::Res
 }
 
 #[test]
-fn skip_completion_is_visible_and_default_conflicts_still_refuse() -> io::Result<()> {
+fn skip_completion_is_visible_and_explicit_refuse_preserves_conflicts() -> io::Result<()> {
     let t = Sandbox::new()?;
     let mut app = t.app()?;
     fs::write(t.0.join("out/source.txt"), b"existing winner")?;
+    copy_dialog::action(&mut app, Action::Refuse);
     let owner = copy_dialog::parent(&app).unwrap();
     copy_dialog::pick(&mut app, owner, t.0.join("out"));
     key(&mut app, K::Enter);

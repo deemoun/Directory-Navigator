@@ -567,9 +567,11 @@ fn extract(a: &mut App, destination: &Path, skip: bool) {
     let draft = p.copy.as_mut().unwrap();
     assert!(!draft.options.remove_sources);
     draft.picked = Some(destination.to_path_buf());
-    if skip {
-        draft.options.existing = dn::operations::ExistingDestination::Skip;
-    }
+    draft.options.existing = if skip {
+        dn::operations::ExistingDestination::Skip
+    } else {
+        dn::operations::ExistingDestination::Refuse
+    };
     a.submit_prompt();
     wait(a, |a| !a.transfers.has_work());
     key(a, KeyCode::Esc);
@@ -1378,13 +1380,15 @@ fn encrypted_preview_authenticates_beyond_preview_limit_and_keeps_bounded_conten
     )?;
     writer.write_all(&vec![b'x'; dn::viewer::MAX_BYTES + 100])?;
     writer.finish()?;
-    let c = reader::list(path.clone(), &Cancellation::default())?;
+    let c = reader::list(path.clone(), &Cancellation::default())
+        .map_err(|e| io::Error::other(format!("encrypted listing: {e}")))?;
     reader::preview_with_password(
         &c,
         1,
         Some(&archive::Password::new("secret")),
         &Cancellation::default(),
-    )?;
+    )
+    .map_err(|e| io::Error::other(format!("encrypted preview: {e}")))?;
     let mut zip = zip::ZipArchive::new(fs::File::open(&path)?)?;
     let raw = zip.by_index_raw(0)?;
     let at = raw.data_start().unwrap() + raw.compressed_size() - 1;
@@ -1463,5 +1467,50 @@ fn creation_from_desktop_menu_activates_manager_and_preserves_other_documents() 
     assert!(a.desktop.viewer(viewer).is_some());
     assert_eq!(fs::read(t.0.join("source.txt"))?, b"keep");
     assert!(!t.0.join("source.txt.zip").exists());
+    Ok(())
+}
+
+#[test]
+fn extraction_ask_merges_existing_folders_and_confirms_file_replacement() -> io::Result<()> {
+    use dn::{
+        operations::conflict::Decision,
+        transfers::{self, Action, Status},
+    };
+    let t = Temp::new()?;
+    let archive_path = t.0.join("merge.zip");
+    clean_zip(&archive_path, false)?;
+    let out = t.0.join("out");
+    fs::create_dir_all(out.join("docs"))?;
+    fs::write(out.join("docs/a.txt"), b"old")?;
+    fs::write(out.join("docs/keep.txt"), b"unrelated")?;
+    let mut app = t.app()?;
+    archive::open(&mut app, archive_path);
+    finish(&mut app);
+    select(&mut app, "docs");
+    app.prompt_operation(dn::operations::Kind::Copy, false);
+    app.modals
+        .prompt_mut()
+        .unwrap()
+        .copy
+        .as_mut()
+        .unwrap()
+        .picked = Some(out.clone());
+    app.submit_prompt();
+    wait(&mut app, |a| {
+        a.transfers
+            .entries
+            .back()
+            .is_some_and(|e| e.status == Status::Waiting)
+    });
+    let id = app.transfers.entries.back().unwrap().id;
+    transfers::action(&mut app, Action::Conflict(id, Decision::ReplaceAll));
+    wait(&mut app, |a| !a.transfers.has_work());
+    assert_eq!(
+        app.transfers.entries.back().unwrap().status,
+        Status::Completed
+    );
+    assert_ne!(fs::read(out.join("docs/a.txt"))?, b"old");
+    assert!(out.join("docs/b.txt").is_file());
+    assert_eq!(fs::read(out.join("docs/keep.txt"))?, b"unrelated");
     Ok(())
 }

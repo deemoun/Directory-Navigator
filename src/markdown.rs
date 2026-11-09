@@ -4,9 +4,9 @@ use crate::task::Cancellation;
 use pulldown_cmark::{Alignment, CodeBlockKind, Event, Options, Parser, Tag, TagEnd};
 use std::{io, ops::Range, path::Path};
 use unicode_width::UnicodeWidthStr;
-pub const MAX_OUTPUT: usize = 8 * 1024 * 1024;
-pub const MAX_ROWS: usize = 100_000;
-const MAX_SPANS: usize = 200_000;
+pub const MAX_OUTPUT: usize = crate::limits::MARKDOWN_BYTES;
+pub const MAX_ROWS: usize = crate::limits::MARKDOWN_ROWS;
+const MAX_SPANS: usize = crate::limits::MARKDOWN_SPANS;
 pub const LIMIT_NOTICE: &str = "Markdown rendering limit reached; showing source";
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Role {
@@ -283,6 +283,9 @@ pub fn parse(source: &str, cancel: &Cancellation) -> io::Result<Document> {
     }
     let mut starts = vec![0];
     for (i, b) in source.bytes().enumerate() {
+        if i % 65536 == 0 {
+            cancel.check()?;
+        }
         if b == b'\n' {
             starts.push(i + 1);
         }
@@ -600,7 +603,7 @@ mod bounds_tests {
     fn wide_tables_are_rejected_before_padding_can_expand_quadratically() {
         let source = format!(
             "| {} | b |\n|---|---|\n{}",
-            "x".repeat(100_000),
+            "x".repeat(MAX_OUTPUT / 100 + 1),
             "| a | b |\n".repeat(100)
         );
         assert_eq!(

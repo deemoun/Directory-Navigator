@@ -13,6 +13,7 @@ pub enum EditorAction {
     FileDialog,
     Save,
     SaveAs,
+    ConfirmOverwrite,
     Find,
     FindNext,
     FindPrevious,
@@ -195,9 +196,18 @@ fn prepare_save(app: &mut App, path: PathBuf, save_as: bool) -> Result<(), Strin
         .expect("live editor")
         .requests
         .spawn("dn-save-identity", move |_| {
-            crate::requests::destination_key(&path)
-                .map(|key| SaveDestination { path, key, save_as })
-                .map_err(|e| e.to_string())
+            let key = crate::requests::destination_key(&path).map_err(|e| e.to_string())?;
+            let replacement = if save_as {
+                storage::replacement(&path)?
+            } else {
+                None
+            };
+            Ok(SaveDestination {
+                path,
+                key,
+                save_as,
+                replacement,
+            })
         })
         .map_err(|e| {
             app.desktop.release_reservations(id);
@@ -231,15 +241,35 @@ pub fn poll(app: &mut App) -> bool {
         if let Some(e) = app.desktop.editor_mut(id) {
             e.save_prepare = None;
         }
-        let result = preparation.and_then(|SaveDestination { path, key, save_as }| {
-            app.desktop.reserve(id, key.clone())?;
-            let editor = app
-                .desktop
-                .editor_mut(id)
-                .ok_or("Editor closed".to_string())?;
-            editor.save_identity = Some(key);
-            editor.save(path, save_as)
-        });
+        let result = preparation.and_then(
+            |SaveDestination {
+                 path,
+                 key,
+                 save_as,
+                 replacement,
+             }| {
+                app.desktop.reserve(id, key.clone())?;
+                let editor = app
+                    .desktop
+                    .editor_mut(id)
+                    .ok_or("Editor closed".to_string())?;
+                if let Some(approved) = replacement {
+                    editor.saving = false;
+                    editor.notice.clear();
+                    editor
+                        .modals
+                        .set_editor_modal(Some(Modal::ConfirmOverwrite {
+                            path,
+                            key,
+                            approved: Box::new(approved),
+                            focus: 1,
+                        }));
+                    return Ok(());
+                }
+                editor.save_identity = Some(key);
+                editor.save(path, save_as)
+            },
+        );
         if let Err(error) = result {
             app.desktop.release_reservations(id);
             if let Some(e) = app.desktop.editor_mut(id) {
@@ -783,6 +813,38 @@ pub fn action(app: &mut App, command: EditorAction) {
     }
     app.sync_modals();
     use EditorAction as A;
+    if command == A::ConfirmOverwrite {
+        let id = app.desktop.target();
+        let result = (|| {
+            let e = app.desktop.editor_mut(id).ok_or("Editor closed")?;
+            let Some(Modal::ConfirmOverwrite {
+                path,
+                key,
+                approved,
+                ..
+            }) = e.modals.take_editor_modal()
+            else {
+                return Ok(());
+            };
+            e.save_identity = Some(key);
+            e.save_approved(path, true, Some(*approved))
+        })();
+        if let Err(error) = result {
+            app.desktop.release_reservations(id);
+            app.error(error);
+        }
+        return;
+    }
+    if command == A::Cancel
+        && app.desktop.active_editor().is_some_and(|e| {
+            matches!(
+                e.modals.editor_modal(),
+                Some(Modal::ConfirmOverwrite { .. })
+            )
+        })
+    {
+        app.desktop.release_reservations(app.desktop.target());
+    }
     if command == A::Submit
         && matches!(
             app.desktop
@@ -931,7 +993,8 @@ fn apply(app: &mut App, command: EditorAction) -> Result<(), String> {
         return search_controls::decision(editor, command);
     }
     match command {
-        A::MarkdownPreview
+        A::ConfirmOverwrite
+        | A::MarkdownPreview
         | A::Encoding
         | A::SaveEncoding
         | A::EncodingChoice(_)

@@ -6,7 +6,7 @@ use std::{
     path::{Path, PathBuf},
     sync::Arc,
 };
-const LIMIT: u64 = 10 * 1024 * 1024;
+const LIMIT: u64 = crate::limits::RECOVERY_BYTES;
 fn invalid() -> io::Error {
     io::Error::other("Invalid or unsafe editor recovery data")
 }

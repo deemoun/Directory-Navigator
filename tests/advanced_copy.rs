@@ -48,7 +48,14 @@ fn refuse_preflights_the_batch_and_skip_retains_existing_bytes_and_sources() -> 
     fs::create_dir(t.0.join("out"))?;
     fs::write(t.0.join("out/b"), b"existing-b")?;
     let plan = t.plan(&["a", "b"], "out");
-    assert!(run(&plan, CopyOptions::default()).is_err());
+    assert!(run(
+        &plan,
+        CopyOptions {
+            existing: ExistingDestination::Refuse,
+            ..Default::default()
+        }
+    )
+    .is_err());
     assert!(!t.0.join("out/a").exists());
     let progress = run(
         &plan,

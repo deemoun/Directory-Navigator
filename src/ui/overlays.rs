@@ -210,6 +210,9 @@ pub(crate) fn message_spec<'a>(
     app: &'a App,
     message: &crate::layout::MessageLayout,
 ) -> Option<DialogSpec<'a>> {
+    if crate::transfers::conflict_dialog(app) {
+        return crate::transfers::conflict_spec(app, message.rect);
+    }
     if crate::transfers::quit_dialog(app) {
         return crate::transfers::quit_spec(app, message.rect);
     }

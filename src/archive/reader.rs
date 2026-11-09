@@ -357,20 +357,34 @@ fn zip_open_for(
     cancel: &Cancellation,
     extract: bool,
 ) -> io::Result<zip::ZipArchive<Guard<File>>> {
-    let mut input = Guard::new(
-        file,
-        cancel,
-        if extract {
-            MAX_SOURCE + 64 * 1024 * 1024
-        } else {
-            64 * 1024 * 1024
-        },
-    );
+    let limit = if extract {
+        MAX_SOURCE + 64 * 1024 * 1024
+    } else {
+        64 * 1024 * 1024
+    };
+    zip_open_bounded(file, metadata, cancel, limit, extract)
+}
+fn zip_open_bounded(
+    file: File,
+    metadata: &Metadata,
+    cancel: &Cancellation,
+    limit: u64,
+    extract: bool,
+) -> io::Result<zip::ZipArchive<Guard<File>>> {
+    let mut input = Guard::new(file, cancel, limit);
     if extract {
         input.deadline = Instant::now() + Duration::from_secs(3600);
     }
     let count = zip_guard(&mut input, metadata.len())?;
-    let archive = zip::ZipArchive::new(input).map_err(io::Error::other)?;
+    // zip_guard already validated absolute central-directory offsets. Avoid
+    // automatic offset detection scanning large payloads during metadata reads.
+    let archive = zip::ZipArchive::with_config(
+        zip::read::Config {
+            archive_offset: zip::read::ArchiveOffset::Known(0),
+        },
+        input,
+    )
+    .map_err(io::Error::other)?;
     if archive.len() != count {
         return Err(io::Error::other(
             "Duplicate ZIP member names are not supported",
@@ -408,10 +422,10 @@ fn list_format(path: PathBuf, format: Format, cancel: &Cancellation) -> io::Resu
     }
     let mut result = Catalog::new(path, format, metadata, source_identity);
     if format == Format::Zip {
-        let mut archive = zip_open(file, &result.identity, cancel)?;
+        let archive = zip_open(file, &result.identity, cancel)?;
         for index in 0..archive.len() {
             cancel.check()?;
-            let entry = archive.by_index_raw(index).map_err(io::Error::other)?;
+            let entry = archive.by_index_data(index).map_err(io::Error::other)?;
             let kind = if entry.unix_mode().is_some_and(|m| m & 0o170000 == 0o120000) {
                 Kind::Link
             } else if entry.is_dir() {
@@ -515,6 +529,7 @@ fn read_preview(
     cancel: &Cancellation,
     expected: u64,
     mode: ViewMode,
+    pdf_hint: bool,
 ) -> io::Result<Contents> {
     let mut bytes = Vec::new();
     let mut input = input.take(viewer::MAX_BYTES as u64 + 1);
@@ -533,7 +548,7 @@ fn read_preview(
             "Archive member ended before its declared length",
         ));
     }
-    Ok(viewer::from_bytes(bytes, mode))
+    viewer::pdf::document_bytes(bytes, mode, pdf_hint, cancel)
 }
 pub fn preview(catalog: &Catalog, id: usize, cancel: &Cancellation) -> io::Result<Contents> {
     preview_with_password(catalog, id, None, cancel)
@@ -566,9 +581,16 @@ pub fn preview_with_mode(
     let index = node
         .source
         .ok_or_else(|| io::Error::other("Member has no data"))?;
+    let pdf_hint = viewer::pdf::is_path(Path::new(String::from_utf8_lossy(&node.path).as_ref()));
     let (file, metadata) = catalog.checked_source()?;
     if catalog.format == Format::Zip {
-        let mut archive = zip_open(file, &metadata, cancel)?;
+        let mut archive = zip_open_bounded(
+            file,
+            &metadata,
+            cancel,
+            MAX_STREAM + MAX_METADATA as u64,
+            false,
+        )?;
         let mut entry = zip_entry(&mut archive, index, password)?;
         if entry.name_raw() != node.raw {
             return Err(io::Error::other("Archive member changed"));
@@ -600,9 +622,9 @@ pub fn preview_with_mode(
             if total != node.size {
                 return Err(io::Error::other("Truncated encrypted member"));
             }
-            viewer::from_bytes(bytes, mode)
+            viewer::pdf::document_bytes(bytes, mode, pdf_hint, cancel)?
         } else {
-            read_preview(&mut entry, cancel, node.size, mode)?
+            read_preview(&mut entry, cancel, node.size, mode, pdf_hint)?
         };
         catalog.validate()?;
         Ok(contents)
@@ -615,7 +637,7 @@ pub fn preview_with_mode(
                 if entry.path_bytes().as_ref() != node.raw {
                     return Err(io::Error::other("Archive member changed"));
                 }
-                return read_preview(&mut entry, cancel, node.size, mode);
+                return read_preview(&mut entry, cancel, node.size, mode, pdf_hint);
             }
         }
         Err(io::Error::other("Archive member disappeared"))

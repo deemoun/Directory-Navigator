@@ -98,8 +98,13 @@ pub(crate) fn copy_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
         Target::Copy(Action::History),
     ));
     for (row, label, action, checked, focus) in [
-        (0, "~O~verwrite all existing files", None, false, usize::MAX),
-        (1, "A~p~pend to all existing files", None, false, usize::MAX),
+        (
+            0,
+            "~A~sk before replacing",
+            Some(Action::Ask),
+            copy.options.existing == ExistingDestination::Ask,
+            11,
+        ),
         (
             2,
             "~R~efuse existing destinations",
@@ -114,7 +119,6 @@ pub(crate) fn copy_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
             copy.options.existing == ExistingDestination::Skip,
             2,
         ),
-        (4, "Refresh o~l~d files", None, false, usize::MAX),
     ] {
         let area = Rect::new(rect.x + 3, rect.y + 4 + row, 53, 1);
         let mut control = Control::new(
@@ -135,7 +139,7 @@ pub(crate) fn copy_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
         spec.control(control);
     }
     spec.caption(
-        Paragraph::new(language.text("Existing destinations are never replaced."))
+        Paragraph::new(language.text("Existing files require confirmation by default."))
             .style(dos(theme::DISABLED)),
         Rect::new(rect.x + 3, rect.y + 9, 53, 1),
     );

@@ -220,11 +220,31 @@ impl Extraction {
         self.selected()?;
         self.catalog.validate()
     }
+    #[cfg(test)]
     pub(crate) fn run(
         &self,
         destination: &Destination,
         options: CopyOptions,
         cancel: Arc<AtomicBool>,
+        notify: impl FnMut(&Progress),
+    ) -> io::Result<Progress> {
+        if options.remove_sources {
+            return Err(io::Error::other("Archive members are read-only"));
+        }
+        self.run_with_conflicts(
+            destination,
+            options,
+            cancel,
+            &mut operations::conflict::no_prompt,
+            notify,
+        )
+    }
+    pub(crate) fn run_with_conflicts(
+        &self,
+        destination: &Destination,
+        options: CopyOptions,
+        cancel: Arc<AtomicBool>,
+        ask: &mut operations::conflict::Ask<'_>,
         mut notify: impl FnMut(&Progress),
     ) -> io::Result<Progress> {
         if options.remove_sources {
@@ -260,7 +280,8 @@ impl Extraction {
             } else {
                 destination.path.clone()
             };
-            if fs::symlink_metadata(&target).is_ok() {
+            if options.existing != ExistingDestination::Ask && fs::symlink_metadata(&target).is_ok()
+            {
                 if options.existing == ExistingDestination::Refuse {
                     return Err(io::Error::new(
                         io::ErrorKind::AlreadyExists,
@@ -386,6 +407,17 @@ impl Extraction {
                 notify(&shown)
             },
             &prepared,
+            &mut |c| {
+                let mut display = c.clone();
+                if let Ok(member) = c.source.strip_prefix(&stage.path) {
+                    display.source_label = Some(format!(
+                        "{}!{}",
+                        self.catalog.path.display(),
+                        member.display()
+                    ));
+                }
+                ask(&display)
+            },
         )?;
         result.skipped += skipped;
         result.path = destination.path.clone();

@@ -281,7 +281,7 @@ Detected changes to queued entries or their parent directories stop the operatio
 Cancellation or failure retains completed work; multi-file operations have no automatic rollback.
 
 This is a **beta**. Archive browsing is read-only; the viewer is a bounded preview,
-and the editor handles text up to 2 MiB / 100,000 lines, with strict encoding conversion. Test important
+and the editor handles text up to 16 MiB / 250,000 lines, with strict encoding conversion. Test important
 workflows on copies and report problems with your OS, terminal and reproduction steps.
 
 For detailed shortcuts, limits and user-menu configuration, see the
@@ -403,3 +403,17 @@ terminal mouse input. See [the guide](docs/USER_GUIDE.md#mouse-in-a-linux-virtua
 Directory Navigator is available under the [MIT license](LICENSE).
 
 Copyright (c) 2026 Dmitry Yarygin.
+
+### PDF text previews
+
+Press F3 on a PDF to read extracted text internally, with page indicators, search
+and Go to page. Enter retains external opening. Archive members are supported.
+Encrypted PDFs use a masked password prompt with retry and cancellation. PDF and
+ZIP passwords are separate and are never saved. Graphics and OCR are not supported.
+
+### Open TXT files inside DN
+
+Enable **Options → File Manager → Setup → Open TXT files in internal viewer**
+to use Enter or double-click for `.txt` / `.TXT` files on all three platforms.
+It is off by default and overrides TXT associations when enabled. Ctrl+Enter
+always opens externally; F3 and F4 retain their usual viewer/editor actions.

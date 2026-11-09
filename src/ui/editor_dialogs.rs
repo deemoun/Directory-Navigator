@@ -81,6 +81,7 @@ pub(crate) fn editor_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
     }
     let title = match modal {
         Modal::File(_) | Modal::Encoding(_) => unreachable!(),
+        Modal::ConfirmOverwrite { .. } => "Replace existing file?",
         Modal::ConfirmClose { .. } => " Unsaved changes ",
         Modal::Help => " Editor Help ",
         Modal::Search(dialog) => {
@@ -98,6 +99,7 @@ pub(crate) fn editor_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
     };
     let (width, height) = match modal {
         Modal::Prompt { .. } => (60, 7),
+        Modal::ConfirmOverwrite { .. } => (70, 10),
         Modal::ConfirmClose { .. } => (66, 10),
         Modal::Replace(_) => (72, 15),
         _ => (72, 20),
@@ -105,6 +107,7 @@ pub(crate) fn editor_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
     let (focus, default) = match modal {
         Modal::Search(d) => (d.focus, A::SearchSubmit(false)),
         Modal::Replace(s) => (s.focus, A::Cancel),
+        Modal::ConfirmOverwrite { focus, .. } => (*focus, A::Cancel),
         Modal::ConfirmClose { focus } => (*focus, A::Cancel),
         Modal::Prompt { focus, .. } => (*focus, A::Submit),
         _ => (0, A::Cancel),
@@ -312,6 +315,32 @@ pub(crate) fn editor_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
                 A::Cancel,
                 0,
             );
+        }
+        Modal::ConfirmOverwrite { path, .. } => {
+            spec.memo(
+                &format!(
+                    "{}\n{}",
+                    app.config.language.text("Replace this existing file?"),
+                    crate::formatting::tail(
+                        &crate::filesystem::display_name(&path.to_string_lossy()),
+                        rect.width - 6
+                    )
+                ),
+                Rect::new(rect.x + 3, rect.y + 2, rect.width - 6, 3),
+            );
+            for (i, (label, command)) in [("Replace", A::ConfirmOverwrite), ("Cancel", A::Cancel)]
+                .into_iter()
+                .enumerate()
+            {
+                button(
+                    &mut spec,
+                    app,
+                    Rect::new(rect.x + 10 + i as u16 * 28, rect.bottom() - 3, 20, 1),
+                    label,
+                    command,
+                    i,
+                );
+            }
         }
         Modal::ConfirmClose { .. } => {
             spec.memo(app.config.language.text("This document has unsaved changes.\nSave before closing or switching files?\n\nS: Save · D: Discard · Esc: Cancel\nTab / Shift+Tab chooses · Enter activates"), Rect::new(rect.x + 3, rect.y + 2, rect.width-6, 5));

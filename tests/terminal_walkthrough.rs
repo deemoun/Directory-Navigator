@@ -1,6 +1,8 @@
 #![cfg(target_os = "macos")]
 #[path = "support/apk.rs"]
 mod apk_fixture;
+#[path = "support/pdf.rs"]
+mod pdf_fixture;
 #[path = "support/pty.rs"]
 mod pty;
 use pty::Session;
@@ -16,6 +18,9 @@ fn transfer_center_queues_without_blocking_editing_and_restores_terminal() -> io
     })?;
     s.select_file("item-000.txt")?;
     s.send(b"\x1b[15~", "copy form", |s| s.text().contains("Copy file"))?;
+    s.send(b"\x1br", "choose explicit Refuse policy", |s| {
+        s.text().contains("Refuse existing destinations")
+    })?;
     s.send(b"item-001.txt\r", "refused conflict pauses queue", |s| {
         s.text().contains("Transfer Center")
             && s.text().contains("Failed")
@@ -2077,5 +2082,218 @@ fn encoding_choices_conversion_and_cancel_restore_terminal() -> io::Result<()> {
     s.send(b"\x1b", "close converted editor", |s| {
         s.command_prompt_active()
     })?;
+    s.finish()
+}
+
+#[test]
+fn larger_files_and_confirmed_replacement_restore_terminal() -> io::Result<()> {
+    let mut s = Session::new("large-files-overwrite")?;
+    s.wait("manager ready", |s| {
+        s.command_prompt_active() && s.text().contains("item-000.")
+    })?;
+    let text = "large-text-fixture abcdefghijklmnopqrstuvwxyz 0123456789\n".repeat(60_000);
+    assert!(text.len() > 2 * 1024 * 1024);
+    fs::write(s.root.join("large.txt"), &text)?;
+    fs::write(s.root.join("item-001.txt"), b"old destination")?;
+    s.send(b"\x12", "refresh large fixture", |s| {
+        s.command_prompt_active()
+    })?;
+    s.select_file("large.txt")?;
+    s.send(b"\x1b[13~", "large viewer", |s| {
+        s.text().contains("F3 Viewer") && s.text().contains("large-text-fixture")
+    })?;
+    s.resize(100, 32)?;
+    s.wait("resized large viewer", |s| {
+        s.text().contains("large-text-fixture")
+    })?;
+    s.resize(80, 25)?;
+    s.send(b"\x1b", "close large viewer", |s| s.command_prompt_active())?;
+    s.send(b"\x1b[14~", "large editor", |s| {
+        s.text().contains("F2 Save") && s.text().contains("large-text-fixture")
+    })?;
+    s.send(b"\x1b", "close unchanged large editor", |s| {
+        s.command_prompt_active() && !s.text().contains("F2 Save")
+    })?;
+    assert_eq!(fs::read_to_string(s.root.join("large.txt"))?, text);
+    s.select_file("item-000.txt")?;
+    for replace in [false, true] {
+        s.send(b"\x1b[15~", "copy form", |s| {
+            s.text().contains("Ask before replacing")
+        })?;
+        s.send(b"item-001.txt\r", "overwrite decision", |s| {
+            s.text().contains("Replace existing file?") && s.text().contains("Replace all")
+        })?;
+        if replace {
+            s.send(b"\x1b[Z", "focus Replace", |s| {
+                s.text().contains("Replace existing file?")
+            })?;
+        }
+        s.send(b"\r", "transfer completed", |s| {
+            s.text().contains("Transfer Center")
+                && s.text().contains("Completed")
+                && s.text().contains("Active: 0")
+                && s.text().contains("Queued: 0")
+                && !s.text().contains("Replace existing file?")
+                && (!replace
+                    || fs::read(s.root.join("item-001.txt"))
+                        .is_ok_and(|bytes| bytes == b"fixture\n"))
+        })?;
+        assert_eq!(
+            fs::read(s.root.join("item-001.txt"))?,
+            if replace {
+                b"fixture\n".as_slice()
+            } else {
+                b"old destination".as_slice()
+            }
+        );
+        s.send(b"\x1b", "return to file panel", |s| {
+            s.command_prompt_active() && !s.text().contains("Transfer Center")
+        })?;
+    }
+    s.finish()
+}
+
+#[test]
+fn pdf_text_pages_search_and_terminal_restoration() -> io::Result<()> {
+    let mut s = Session::new("pdf-text")?;
+    s.wait("manager ready", |s| {
+        s.command_prompt_active() && s.text().contains("item-000.")
+    })?;
+    fs::write(
+        s.root.join("readme.pdf"),
+        pdf_fixture::bytes(&[b"first PDF page", b"second PDF page unique-search"])?,
+    )?;
+    s.send(b"\x12", "refresh PDF fixture", |s| {
+        s.command_prompt_active()
+    })?;
+    s.select_file("readme.pdf")?;
+    s.send(b"\x1b[13~", "PDF text viewer", |s| {
+        s.text().contains("PDF")
+            && s.text().contains("first PDF page")
+            && s.text().contains("Page 1/2")
+    })?;
+    s.send(b"\x07", "PDF page navigation", |s| {
+        s.text().contains("Page number (from 1)")
+    })?;
+    s.send(b"2\r", "PDF second page", |s| {
+        !s.text().contains("Viewer Go to") && s.text().contains("Page 2/2")
+    })?;
+    s.send(b"\x1b[18~", "PDF text search", |s| {
+        s.text().contains("Find")
+    })?;
+    s.send(b"unique-search\r", "found PDF text", |s| {
+        !s.text().contains("Viewer search") && s.text().contains("unique-search")
+    })?;
+    s.resize(100, 32)?;
+    s.wait("PDF resize", |s| {
+        s.text().contains("PDF") && s.text().contains("unique-search")
+    })?;
+    s.send(b"\x1b", "close PDF", |s| {
+        s.command_prompt_active() && !s.text().contains("F3 Viewer")
+    })?;
+    s.finish()
+}
+
+#[test]
+fn pdf_password_retry_help_cancel_and_terminal_restoration() -> io::Result<()> {
+    let mut s = Session::new("pdf-password")?;
+    s.wait("manager ready", |s| {
+        s.command_prompt_active() && s.text().contains("item-000.")
+    })?;
+    let password = "unique-PDF-secret";
+    let bytes = pdf_fixture::encrypted_modern(&[b"authenticated PDF body"], password)?;
+    fs::write(s.root.join("private.pdf"), &bytes)?;
+    s.send(b"\x12", "refresh encrypted PDF", |s| {
+        s.command_prompt_active()
+    })?;
+    s.select_file("private.pdf")?;
+    s.send(b"\x1b[13~", "PDF password prompt", |s| {
+        s.text().contains("PDF password") && s.text().contains("Password")
+    })?;
+    s.send(b"bad-guess", "masked wrong password", |s| {
+        s.text().contains("*********")
+    })?;
+    assert!(!s.text().contains("bad-guess"));
+    s.send(b"\r", "incorrect password retry", |s| {
+        s.text().contains("Incorrect PDF password. Try again.")
+    })?;
+    s.resize(100, 32)?;
+    s.wait("resized PDF password prompt", |s| {
+        s.text().contains("PDF password")
+    })?;
+    s.send(b"\x1bOP", "PDF password Help", |s| {
+        s.text().contains("PDF password help")
+    })?;
+    s.send(b"\x1b", "return to password field", |s| {
+        s.text().contains("PDF password") && !s.text().contains("PDF password help")
+    })?;
+    s.paste(password, "masked correct password", |s| {
+        s.text().contains("*****************")
+    })?;
+    assert!(!s.text().contains(password));
+    let diagnostics = fs::read_to_string(s.root.join("settings/dn/diagnostics.txt"))?;
+    assert!(!diagnostics.contains(password));
+    assert!(!diagnostics.contains("bad-guess"));
+    s.send(b"\r", "authenticated PDF text", |s| {
+        s.text().contains("authenticated PDF body") && !s.text().contains("PDF password")
+    })?;
+    s.send(b"\x1b", "close unlocked PDF", |s| {
+        s.command_prompt_active() && !s.text().contains("F3 Viewer")
+    })?;
+    s.send(b"\x1b[13~", "reopened PDF asks again", |s| {
+        s.text().contains("PDF password")
+    })?;
+    s.send(b"\x1b", "cancel PDF password", |s| {
+        s.command_prompt_active()
+            && !s.text().contains("PDF password")
+            && !s.text().contains("F3 Viewer")
+    })?;
+    assert_eq!(fs::read(s.root.join("private.pdf"))?, bytes);
+    s.finish()
+}
+
+#[test]
+fn txt_preference_settings_enter_cancel_and_terminal_restoration() -> io::Result<()> {
+    let mut s = Session::with_preferences(
+        "txt-preference",
+        "\n[file_manager]\nopen_txt_in_viewer=false\n",
+    )?;
+    s.wait("manager ready", |s| {
+        s.command_prompt_active() && s.text().contains("item-000.")
+    })?;
+    s.select_file("item-000.txt")?;
+    s.send(b"\x1bofs", "file manager setup", |s| {
+        s.text().contains("File Manager Setup")
+            && s.text().contains("Open TXT files in internal viewer")
+    })?;
+    s.send(b"x", "TXT draft enabled", |s| {
+        s.text().contains("[X] Open TXT files in internal viewer")
+    })?;
+    s.send(b"\x1b", "cancel TXT draft", |s| {
+        s.command_prompt_active() && !s.text().contains("File Manager Setup")
+    })?;
+    s.send(b"\x1bofs", "reopen unmodified TXT setting", |s| {
+        s.text().contains("[ ] Open TXT files in internal viewer")
+    })?;
+    s.send(b"x\r", "apply TXT preference", |s| {
+        s.command_prompt_active() && !s.text().contains("File Manager Setup")
+    })?;
+    s.send(b"\r", "TXT opens in viewer", |s| {
+        s.text().contains("F3 Viewer") && s.text().contains("fixture")
+    })?;
+    s.resize(100, 32)?;
+    s.wait("resized TXT viewer", |s| {
+        s.text().contains("F3 Viewer") && s.text().contains("fixture")
+    })?;
+    s.send(b"\x1b", "return to panel", |s| {
+        s.command_prompt_active() && !s.text().contains("F3 Viewer")
+    })?;
+    s.send(b"\x1b[14~", "explicit TXT editor", |s| {
+        s.text().contains("F2 Save") && s.text().contains("fixture")
+    })?;
+    s.send(b"\x1b", "close unchanged editor", |s| {
+        s.command_prompt_active() && !s.text().contains("F2 Save")
+    })?;
+    assert_eq!(fs::read(s.root.join("item-000.txt"))?, b"fixture\n");
     s.finish()
 }

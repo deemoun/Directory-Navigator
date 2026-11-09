@@ -78,8 +78,15 @@ fn conflicts_pause_remaining_queue_and_resume_never_retries_failed_entries() -> 
     fs::write(f.0.join("out/one"), "keep")?;
     let mut a = f.app()?;
     a.transfers.paused = true;
-    let first =
-        transfers::submit(&mut a, plan(&f.0, "one", "out"), CopyOptions::default()).unwrap();
+    let first = transfers::submit(
+        &mut a,
+        plan(&f.0, "one", "out"),
+        CopyOptions {
+            existing: ExistingDestination::Refuse,
+            ..Default::default()
+        },
+    )
+    .unwrap();
     transfers::submit(&mut a, plan(&f.0, "two", "out"), CopyOptions::default()).unwrap();
     wait(&mut a, |a| {
         a.transfers
@@ -439,5 +446,101 @@ fn queued_symlink_parent_retargeting_is_rejected_without_writing_either_target()
         assert_eq!(fs::read(f.0.join("b/source"))?, b"second");
         assert!(!f.0.join("out/source").exists());
     }
+    Ok(())
+}
+
+#[test]
+fn conflict_prompt_defaults_to_skip_and_replace_all_is_owned_and_mouse_accessible() -> io::Result<()>
+{
+    use dn::{localization::Language, mouse::Target, operations::conflict::Decision};
+    for language in [Language::English, Language::Russian] {
+        let f = support::Fixture::new("transfer-prompts")?.canonicalized()?;
+        fs::write(f.0.join("one"), "new")?;
+        fs::create_dir(f.0.join("out"))?;
+        fs::write(f.0.join("out/one"), "keep")?;
+        let mut a = f.app()?;
+        a.config.language = language;
+        let id =
+            transfers::submit(&mut a, plan(&f.0, "one", "out"), CopyOptions::default()).unwrap();
+        wait(&mut a, |a| {
+            a.transfers
+                .entries
+                .iter()
+                .any(|e| e.id == id && e.status == Status::Waiting)
+                && !a.modal_infos().is_empty()
+        });
+        for (w, h) in [(80, 25), (132, 40), (80, 25)] {
+            let first = support::draw(&mut a, w, h)?;
+            assert_eq!(first, support::draw(&mut a, w, h)?);
+            for decision in [
+                Decision::Replace,
+                Decision::Skip,
+                Decision::ReplaceAll,
+                Decision::SkipAll,
+                Decision::Cancel,
+            ] {
+                assert!(a
+                    .mouse
+                    .regions
+                    .iter()
+                    .any(|(_, t)| *t == Target::Transfer(Action::Conflict(id, decision))));
+            }
+        }
+        assert!(support::text(&mut a, 80, 25)?.contains(language.text("Replace all")));
+        support::draw(&mut a, 50, 12)?;
+        support::draw(&mut a, 80, 25)?;
+        support::key(&mut a, K::Enter);
+        wait(&mut a, |a| !a.transfers.has_work());
+        assert_eq!(fs::read(f.0.join("out/one"))?, b"keep");
+        assert_eq!(a.transfers.entries[0].progress.skipped, 1);
+        support::key(&mut a, K::Esc);
+        let id =
+            transfers::submit(&mut a, plan(&f.0, "one", "out"), CopyOptions::default()).unwrap();
+        wait(&mut a, |a| {
+            a.transfers
+                .entries
+                .iter()
+                .any(|e| e.id == id && e.status == Status::Waiting)
+                && !a.modal_infos().is_empty()
+        });
+        support::draw(&mut a, 80, 25)?;
+        support::click(
+            &mut a,
+            Target::Transfer(Action::Conflict(id, Decision::ReplaceAll)),
+        );
+        wait(&mut a, |a| !a.transfers.has_work());
+        assert_eq!(fs::read(f.0.join("out/one"))?, b"new");
+        // An answer from a retired prompt must not change anything.
+        transfers::action(&mut a, Action::Conflict(id, Decision::Cancel));
+        assert_eq!(
+            a.transfers.entries.back().unwrap().status,
+            Status::Completed
+        );
+    }
+    Ok(())
+}
+#[test]
+fn waiting_conflict_does_not_take_focus_from_editor_and_cancellation_wakes_worker() -> io::Result<()>
+{
+    let f = support::Fixture::new("transfer-inactive-prompt")?.canonicalized()?;
+    fs::write(f.0.join("one"), "new")?;
+    fs::create_dir(f.0.join("out"))?;
+    fs::write(f.0.join("out/one"), "keep")?;
+    let mut a = f.app()?;
+    a.transfers.paused = true;
+    transfers::submit(&mut a, plan(&f.0, "one", "out"), CopyOptions::default()).unwrap();
+    support::key(&mut a, K::Esc);
+    dn::editor::open(&mut a, true);
+    dn::editor::paste(&mut a, "draft");
+    let editor = a.desktop.active().id;
+    transfers::action(&mut a, Action::Resume);
+    wait(&mut a, |a| a.transfers.entries[0].status == Status::Waiting);
+    assert_eq!(a.desktop.active().id, editor);
+    assert!(a.modal_infos().is_empty());
+    transfers::action(&mut a, Action::Cancel);
+    wait(&mut a, |a| !a.transfers.has_work());
+    assert_eq!(a.desktop.active().id, editor);
+    assert_eq!(a.transfers.entries[0].status, Status::Cancelled);
+    assert_eq!(fs::read(f.0.join("out/one"))?, b"keep");
     Ok(())
 }

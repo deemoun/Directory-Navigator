@@ -139,6 +139,7 @@ impl Viewer {
             self.markdown.source_wrap = self.wrap;
             let document = self.markdown.document.as_ref().unwrap();
             self.contents = Some(Contents {
+                pdf: None,
                 raw: source.raw,
                 format: source.format,
                 encoding_needed: false,

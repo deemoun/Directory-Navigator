@@ -50,6 +50,7 @@ impl History {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Action {
     Field,
+    Ask,
     Refuse,
     Skip,
     CheckSpace,
@@ -58,7 +59,7 @@ pub enum Action {
     History,
     Tree,
 }
-pub const FOCUS: [usize; 11] = [0, 10, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+pub const FOCUS: [usize; 12] = [0, 10, 11, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 pub fn parent(app: &App) -> Option<ModalId> {
     app.modals
         .infos()

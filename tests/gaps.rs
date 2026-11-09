@@ -508,6 +508,7 @@ fn viewport_search_highlights_only_rendered_rows_and_menu_fit() -> io::Result<()
     fs::write(&path, "a")?;
     let mut v = loaded_viewer(path)?;
     v.contents = Some(Contents {
+        pdf: None,
         raw: None,
         format: None,
         encoding_needed: false,

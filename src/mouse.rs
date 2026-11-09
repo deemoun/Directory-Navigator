@@ -311,7 +311,7 @@ fn handle_mouse(app: &mut App, event: MouseEvent) {
         return;
     }
     if focus == Focus::Message {
-        if crate::transfers::quit_dialog(app) {
+        if crate::transfers::quit_dialog(app) || crate::transfers::conflict_dialog(app) {
             if event.kind == MouseEventKind::Down(MouseButton::Left) {
                 if let Some(Target::Transfer(a)) = target {
                     crate::transfers::action(app, a);

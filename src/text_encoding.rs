@@ -144,8 +144,8 @@ impl TextFormat {
                 .ok_or_else(invalid)?
                 .into_owned(),
         };
-        if text.len() > 8 * 1024 * 1024 {
-            return Err("Decoded text exceeds the 8 MiB viewer limit.".into());
+        if text.len() > crate::limits::DECODED_BYTES {
+            return Err("Decoded text exceeds the 192 MiB viewer limit.".into());
         }
         Ok(text)
     }
@@ -203,11 +203,11 @@ pub fn detect(bytes: &[u8], truncated: bool) -> Result<Option<TextFormat>, Strin
         }
     }
     let format = TextFormat::default();
-    Ok(format
-        .decode(bytes, truncated)
-        .ok()
-        .filter(|s| !s.contains('\0'))
-        .map(|_| format))
+    let valid = match std::str::from_utf8(bytes) {
+        Ok(_) => true,
+        Err(e) => truncated && e.error_len().is_none(),
+    };
+    Ok((valid && !bytes.contains(&0)).then_some(format))
 }
 pub fn plausible_text(bytes: &[u8]) -> bool {
     !bytes
@@ -276,7 +276,8 @@ impl EncodingDialog {
         let truncated = self.truncated;
         match self.requests.spawn("dn-encoding-preview", move |cancel| {
             cancel.check().map_err(|e| e.to_string())?;
-            let text = format.decode(&bytes, truncated)?;
+            let end = bytes.len().min(64 * 1024);
+            let text = format.decode(&bytes[..end], truncated || end < bytes.len())?;
             cancel.check().map_err(|e| e.to_string())?;
             Ok(text
                 .lines()

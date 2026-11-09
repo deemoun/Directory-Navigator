@@ -331,3 +331,16 @@ SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
 CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+## PDF text extraction
+
+DN uses `pdf-extract` 0.12.1 (MIT), by Jeff Muizelaar and contributors, for
+text-only PDF viewing. Registry: https://crates.io/crates/pdf-extract/0.12.1
+Source: https://github.com/jrmuizel/pdf-extract
+
+Its pure-Rust parser is `lopdf` 0.42.0 (MIT):
+https://github.com/J-F-Liu/lopdf — https://crates.io/crates/lopdf/0.42.0
+Font character maps use `adobe-cmap-parser`, `cff-parser`, `postscript` and
+`type1-encoding-parser`; Unicode normalization uses `unicode-normalization`.
+Upstream package licenses and notices apply to these transitive dependencies.
+No native PDFium, Poppler or external PDF command is required.

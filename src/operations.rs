@@ -1,4 +1,5 @@
-//! No-replace file operations. Existing destinations are refused or explicitly skipped.
+//! Guarded file operations. Replacement requires a per-job conflict decision.
+pub mod conflict;
 mod copy_options;
 mod guards;
 pub(crate) mod transfer;
@@ -109,6 +110,7 @@ pub enum MoveStrategy {
 }
 pub struct Job {
     pub transfer: Option<crate::transfers::TransferId>,
+    pub(crate) conflicts: conflict::Mailbox,
     pub(crate) requests: crate::requests::RequestScope,
     token: crate::requests::RequestToken,
     pub events: Receiver<Event>,
@@ -137,9 +139,13 @@ impl Job {
     }
     fn start_inner(
         plan: Plan,
-        options: CopyOptions,
+        mut options: CopyOptions,
         prepared: Option<transfer::Prepared>,
     ) -> io::Result<Self> {
+        // Legacy blocking jobs have no confirmation UI; retain preflight refusal.
+        if options.existing == ExistingDestination::Ask {
+            options.existing = ExistingDestination::Refuse;
+        }
         let requests = crate::requests::RequestScope::new(crate::requests::Owner::Workspace);
         let token = requests.start("file-operation");
         let (sender, events) = mpsc::sync_channel(8);
@@ -181,6 +187,7 @@ impl Job {
                     MoveStrategy::PreferRename,
                     |path| crate::volume_space::read(path).map(|s| s.available),
                     prepared.as_ref(),
+                    &mut conflict::no_prompt,
                 )
                 .map_err(|error| OperationFailure {
                     kind: error.kind(),
@@ -191,6 +198,7 @@ impl Job {
             })?;
         Ok(Self {
             transfer: None,
+            conflicts: Default::default(),
             requests,
             token,
             events,
@@ -364,6 +372,10 @@ fn mappings(
                 "Two sources have the same destination name",
             ));
         }
+        if policy == ExistingDestination::Ask {
+            pairs.push((source, target));
+            continue;
+        }
         match absent(&target) {
             Err(e)
                 if e.kind() == io::ErrorKind::AlreadyExists
@@ -482,12 +494,31 @@ pub fn run_with_options(
         crate::volume_space::read(path).map(|s| s.available)
     })
 }
+pub fn run_with_conflicts(
+    plan: &Plan,
+    options: CopyOptions,
+    cancel: &AtomicBool,
+    notify: impl FnMut(&Progress),
+    ask: &mut impl FnMut(&conflict::Conflict) -> io::Result<conflict::Decision>,
+) -> io::Result<Progress> {
+    run_checked_expected(
+        plan,
+        options,
+        cancel,
+        notify,
+        MoveStrategy::PreferRename,
+        |path| crate::volume_space::read(path).map(|s| s.available),
+        None,
+        ask,
+    )
+}
 pub(crate) fn publish_extraction(
     plan: &Plan,
     options: CopyOptions,
     cancel: &AtomicBool,
     notify: impl FnMut(&Progress),
     prepared: &transfer::Prepared,
+    ask: &mut conflict::Ask<'_>,
 ) -> io::Result<Progress> {
     run_checked_expected(
         plan,
@@ -497,18 +528,33 @@ pub(crate) fn publish_extraction(
         MoveStrategy::PreferRename,
         |path| crate::volume_space::read(path).map(|s| s.available),
         Some(prepared),
+        ask,
     )
 }
 fn run_checked(
     plan: &Plan,
-    options: CopyOptions,
+    mut options: CopyOptions,
     cancel: &AtomicBool,
     notify: impl FnMut(&Progress),
     strategy: MoveStrategy,
     space: impl Fn(&Path) -> io::Result<u128>,
 ) -> io::Result<Progress> {
-    run_checked_expected(plan, options, cancel, notify, strategy, space, None)
+    // Synchronous callers cannot answer prompts. Refuse before any writes.
+    if options.existing == ExistingDestination::Ask {
+        options.existing = ExistingDestination::Refuse;
+    }
+    run_checked_expected(
+        plan,
+        options,
+        cancel,
+        notify,
+        strategy,
+        space,
+        None,
+        &mut conflict::no_prompt,
+    )
 }
+#[allow(clippy::too_many_arguments)]
 fn run_checked_expected(
     plan: &Plan,
     options: CopyOptions,
@@ -517,7 +563,9 @@ fn run_checked_expected(
     strategy: MoveStrategy,
     space: impl Fn(&Path) -> io::Result<u128>,
     expected: Option<&transfer::Prepared>,
+    ask: &mut conflict::Ask<'_>,
 ) -> io::Result<Progress> {
+    let mut resolver = conflict::Resolver::new(options.existing, ask);
     let mut effective = plan.clone();
     if let Some(expected) = expected {
         expected.validate(plan)?;
@@ -647,7 +695,15 @@ fn run_checked_expected(
     let mut copied = Vec::new();
     let mut buffer = vec![0_u8; 128 * 1024];
     for (source, target) in pairs {
-        if prefer_rename {
+        if prefer_rename && options.check_free_space && fs::symlink_metadata(&target).is_ok() {
+            copy_options::preflight(
+                &[(source.clone(), target.clone())],
+                &mut guards,
+                cancel,
+                &space,
+            )?;
+        }
+        if prefer_rename && fs::symlink_metadata(&target).is_err() {
             progress.phase = Phase::Renaming;
             check(cancel)?;
             let original = &source.metadata;
@@ -727,6 +783,20 @@ fn run_checked_expected(
             guards.verify_parent(&source)?;
             guards.verify_parent(&target)?;
             let metadata = verify_entry(&source, &original)?;
+            let existing = fs::symlink_metadata(&target).ok();
+            let merging = metadata.is_dir()
+                && existing
+                    .as_ref()
+                    .is_some_and(|m| m.is_dir() && !conflict::redirected(m))
+                && options.existing == ExistingDestination::Ask;
+            if existing.is_some() && !merging && options.existing == ExistingDestination::Skip {
+                progress.skipped += 1;
+                progress.detail(source.clone(), "Skipped existing destination".into());
+                continue;
+            }
+            if existing.is_some() && !merging && !metadata.is_file() {
+                absent(&target)?;
+            }
             if metadata.is_symlink() {
                 copy_link(&source, &target)?;
                 guards.verify_parent(&source)?;
@@ -737,17 +807,21 @@ fn run_checked_expected(
                 if !crate::platform_fs::same_identity(&metadata, &source_directory.metadata()?) {
                     return Err(io::Error::other("Source directory changed before copy"));
                 }
-                fs::create_dir(&target)?;
+                if !merging {
+                    fs::create_dir(&target)?;
+                }
                 let target_directory = crate::platform_fs::open_directory(&target)?;
                 guards.capture(&source)?;
                 guards.capture(&target)?;
-                stack.push(Work::Permissions(
-                    source.clone(),
-                    target.clone(),
-                    source_directory,
-                    target_directory,
-                    metadata.clone(),
-                ));
+                if !merging {
+                    stack.push(Work::Permissions(
+                        source.clone(),
+                        target.clone(),
+                        source_directory,
+                        target_directory,
+                        metadata.clone(),
+                    ));
+                }
                 for child in fs::read_dir(&source)? {
                     check(cancel)?;
                     guards.verify_directory(&source)?;
@@ -765,7 +839,11 @@ fn run_checked_expected(
                 if !unchanged_file(&metadata, &input.metadata()?) {
                     return Err(io::Error::other("Source changed before copy"));
                 }
-                absent(&target)?;
+                let Some(approved) = resolver.file(&source, &metadata, &target)? else {
+                    progress.skipped += 1;
+                    progress.detail(source.clone(), "Skipped existing destination".into());
+                    continue;
+                };
                 let mut staged = crate::publication::StagedFile::create(&target)?;
                 let output = &mut staged.file;
                 let mut remaining = metadata.len();
@@ -816,7 +894,7 @@ fn run_checked_expected(
                 guards.verify_parent(&source)?;
                 guards.verify_parent(&target)?;
                 verify_entry(&source, &metadata)?;
-                staged.publish(&target)?;
+                conflict::publish(&staged, &target, approved.as_ref())?;
             } else {
                 return Err(io::Error::other(format!(
                     "Unsupported special file: {}",
@@ -868,6 +946,9 @@ fn run_checked_expected(
             if original.is_dir() {
                 if !current.is_dir() || !crate::platform_fs::same_identity(&original, &current) {
                     return Err(io::Error::other("Source directory changed; retained"));
+                }
+                if progress.skipped > 0 && fs::read_dir(&source)?.next().is_some() {
+                    continue;
                 }
                 fs::remove_dir(&source)?;
             } else {
@@ -958,6 +1039,7 @@ mod prepared_delete_tests {
             MoveStrategy::PreferRename,
             |_| Ok(u128::MAX),
             Some(&prepared),
+            &mut conflict::no_prompt,
         );
         assert_eq!(result.unwrap_err().kind(), io::ErrorKind::Interrupted);
         assert!(!plan.sources[0].exists());

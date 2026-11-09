@@ -100,27 +100,44 @@ pub(super) fn draw_viewer(frame: &mut impl Frame, app: &App, area: Rect) {
     if let Some(contents) = &viewer.contents {
         draw_text(frame, viewer, regions[1], profile, app.config.language);
         let line = viewer.source_line() + 1;
-        frame.render_widget(
-            Paragraph::new(format!(
-                " {} │ {line}/{} lines{} · {} · {}",
-                if viewer.markdown.rendered {
-                    "Markdown"
-                } else if contents.binary {
-                    "Hex"
-                } else if viewer.wrap {
-                    "Text Wrap"
-                } else {
-                    "Text"
-                },
-                viewer.source_line_count(),
-                if contents.truncated {
-                    " [bounded preview]"
-                } else {
-                    ""
-                },
-                contents.format.map(|f| f.to_string()).unwrap_or_default(),
+        let pdf_status = contents.pdf.as_ref().map(|pdf| {
+            if pdf.locked {
+                return format!(
+                    " PDF · {}",
+                    app.config.language.text("This PDF requires a password.")
+                );
+            }
+            format!(
+                " PDF · {} {}/{} · {}",
+                app.config.language.text("Page"),
+                pdf.page(viewer.source_line()),
+                pdf.page_lines.len(),
                 app.config.language.text(&viewer.notice)
-            ))
+            )
+        });
+        frame.render_widget(
+            Paragraph::new(pdf_status.unwrap_or_else(|| {
+                format!(
+                    " {} │ {line}/{} lines{} · {} · {}",
+                    if viewer.markdown.rendered {
+                        "Markdown"
+                    } else if contents.binary {
+                        "Hex"
+                    } else if viewer.wrap {
+                        "Text Wrap"
+                    } else {
+                        "Text"
+                    },
+                    viewer.source_line_count(),
+                    if contents.truncated {
+                        " [bounded preview]"
+                    } else {
+                        ""
+                    },
+                    contents.format.map(|f| f.to_string()).unwrap_or_default(),
+                    app.config.language.text(&viewer.notice)
+                )
+            }))
             .style(dos(0x30)),
             regions[2],
         );
@@ -178,6 +195,9 @@ pub(crate) fn viewer_search_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>
         .palette
         .styles_for(crate::palette::theme::Group::Viewer);
     let viewer = app.desktop.active_viewer()?;
+    if viewer.modals.viewer_pdf_password().is_some() {
+        return crate::viewer::pdf::password::spec(app, area);
+    }
     if let Some(dialog) = viewer.modals.viewer_encoding() {
         return crate::text_encoding::spec(app, area, dialog, false);
     }
@@ -194,7 +214,9 @@ pub(crate) fn viewer_search_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>
         let input = Rect::new(rect.x + 2, rect.y + 3, rect.width - 4, 1);
         spec.caption(
             Paragraph::new(app.config.language.text(
-                if viewer.contents.as_ref().is_some_and(|c| c.binary) {
+                if viewer.contents.as_ref().is_some_and(|c| c.pdf.is_some()) {
+                    "Page number (from 1)"
+                } else if viewer.contents.as_ref().is_some_and(|c| c.binary) {
                     "Byte offset (decimal or 0x hexadecimal, from 0)"
                 } else {
                     "Line number (from 1)"

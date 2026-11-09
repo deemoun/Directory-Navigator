@@ -20,6 +20,7 @@ pub mod file_tools;
 pub mod filesystem;
 pub mod formatting;
 pub mod input;
+pub mod limits;
 pub mod menu;
 pub mod mouse;
 pub mod operations;

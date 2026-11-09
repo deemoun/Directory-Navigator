@@ -1,8 +1,8 @@
 use std::ops::Range;
 use unicode_segmentation::UnicodeSegmentation;
 
-pub const MAX_LINES: usize = 100_000;
-pub const MAX_BYTES: usize = 2 * 1024 * 1024;
+pub const MAX_LINES: usize = crate::limits::EDITOR_LINES;
+pub const MAX_BYTES: usize = crate::limits::EDITOR_BYTES;
 const HISTORY_BYTES: usize = 16 * 1024 * 1024;
 #[derive(Clone, Copy, Debug)]
 pub struct Line {
@@ -36,10 +36,10 @@ pub struct Buffer {
 impl Buffer {
     pub fn new(text: String) -> Result<Self, String> {
         if text.len() > MAX_BYTES {
-            return Err("Editor limit is 2 MiB. Use F3 for a bounded preview.".into());
+            return Err("Editor limit is 16 MiB. Use F3 for a bounded preview.".into());
         }
         if count_lines(text.bytes()) > MAX_LINES {
-            return Err("Editor limit is 100,000 lines. Use F3.".into());
+            return Err("Editor limit is 250,000 lines. Use F3.".into());
         }
         if text
             .chars()
@@ -222,7 +222,7 @@ impl Buffer {
             last + 1
         };
         if self.lines.len() - (through - first) + lines.len() > MAX_LINES {
-            return Err("Editor limit is 100,000 lines; change was not applied.".into());
+            return Err("Editor limit is 250,000 lines; change was not applied.".into());
         }
         let following = first + lines.len();
         let removed = range.len();
@@ -328,7 +328,7 @@ impl Buffer {
             return Err("Invalid text boundary".into());
         }
         if self.text.len() - range.len() + text.len() > MAX_BYTES {
-            return Err("Editor limit is 2 MiB; change was not applied.".into());
+            return Err("Editor limit is 16 MiB; change was not applied.".into());
         }
         if self.text[range.clone()] == *text {
             self.move_to(range.start + text.len(), false);

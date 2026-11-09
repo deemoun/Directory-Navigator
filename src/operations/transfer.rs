@@ -1,5 +1,5 @@
 //! Queue snapshots pin identities, not file contents. Execution retains the
-//! original no-replace engine and its ancestor/publication safeguards.
+//! guarded engine and its ancestor/publication safeguards.
 use super::*;
 #[derive(Clone)]
 pub(crate) struct Prepared {
@@ -138,6 +138,7 @@ impl Job {
         (
             Self {
                 transfer: Some(id),
+                conflicts: Default::default(),
                 requests,
                 token,
                 events,
@@ -164,6 +165,8 @@ impl Job {
         let (sender, events) = mpsc::sync_channel(8);
         let cancel = Arc::new(AtomicBool::new(false));
         let worker_cancel = cancel.clone();
+        let conflicts = conflict::Mailbox::default();
+        let worker_conflicts = conflicts.clone();
         let kind = plan.kind;
         thread::Builder::new()
             .name("dn-transfer".into())
@@ -208,6 +211,7 @@ impl Job {
                         MoveStrategy::PreferRename,
                         |path| crate::volume_space::read(path).map(|s| s.available),
                         Some(&prepared),
+                        &mut |c| worker_conflicts.ask(c, &worker_cancel),
                     )?;
                     progress.transfer = Some(id);
                     progress.total_bytes =
@@ -223,6 +227,7 @@ impl Job {
             })?;
         Ok(Self {
             transfer: Some(id),
+            conflicts,
             requests,
             token,
             events,
@@ -247,6 +252,7 @@ impl Job {
         let (sender, events) = mpsc::sync_channel(8);
         let cancel = Arc::new(AtomicBool::new(false));
         let worker_cancel = cancel.clone();
+        let conflicts = conflict::Mailbox::default();
         thread::Builder::new()
             .name("dn-archive-create".into())
             .spawn(move || {
@@ -279,6 +285,7 @@ impl Job {
             })?;
         Ok(Self {
             transfer: Some(id),
+            conflicts,
             requests,
             token,
             events,
@@ -303,6 +310,8 @@ impl Job {
         let (sender, events) = mpsc::sync_channel(8);
         let cancel = Arc::new(AtomicBool::new(false));
         let worker_cancel = cancel.clone();
+        let conflicts = conflict::Mailbox::default();
+        let worker_conflicts = conflicts.clone();
         thread::Builder::new()
             .name("dn-extraction".into())
             .spawn(move || {
@@ -317,14 +326,20 @@ impl Job {
                     if let Some(root) = &root {
                         root.validate()?;
                     }
-                    selection.run(&destination, options, worker_cancel, |p| {
-                        latest = p.clone();
-                        latest.transfer = Some(id);
-                        if last.elapsed() >= Duration::from_millis(80) {
-                            let _ = sender.try_send(Event::Progress(latest.clone()));
-                            last = Instant::now();
-                        }
-                    })
+                    selection.run_with_conflicts(
+                        &destination,
+                        options,
+                        worker_cancel.clone(),
+                        &mut |c| worker_conflicts.ask(c, &worker_cancel),
+                        |p| {
+                            latest = p.clone();
+                            latest.transfer = Some(id);
+                            if last.elapsed() >= Duration::from_millis(80) {
+                                let _ = sender.try_send(Event::Progress(latest.clone()));
+                                last = Instant::now();
+                            }
+                        },
+                    )
                 })()
                 .map(|mut p| {
                     p.transfer = Some(id);
@@ -339,6 +354,7 @@ impl Job {
             })?;
         Ok(Self {
             transfer: Some(id),
+            conflicts,
             requests,
             token,
             events,

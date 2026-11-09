@@ -68,6 +68,12 @@ pub enum Modal {
     },
     Search(search::SearchDialog),
     Replace(search::ReplaceSession),
+    ConfirmOverwrite {
+        path: PathBuf,
+        key: PathBuf,
+        approved: Box<storage::Replacement>,
+        focus: usize,
+    },
     ConfirmClose {
         focus: usize,
     },
@@ -83,6 +89,7 @@ struct SaveDestination {
     path: PathBuf,
     key: PathBuf,
     save_as: bool,
+    replacement: Option<storage::Replacement>,
 }
 pub struct Editor {
     pub(crate) requests: crate::requests::RequestScope,
@@ -229,6 +236,14 @@ impl Editor {
         self.durability_pending.is_some() || self.buffer.as_ref().is_some_and(Buffer::dirty)
     }
     fn save(&mut self, path: PathBuf, save_as: bool) -> Result<(), String> {
+        self.save_approved(path, save_as, None)
+    }
+    fn save_approved(
+        &mut self,
+        path: PathBuf,
+        save_as: bool,
+        replacement: Option<storage::Replacement>,
+    ) -> Result<(), String> {
         if self.busy() {
             return Ok(());
         }
@@ -249,6 +264,8 @@ impl Editor {
                             &path,
                             original.as_ref().expect("published snapshot"),
                         )
+                    } else if let Some(approved) = &replacement {
+                        storage::save_replacing(&path, &text, format, approved)
                     } else {
                         storage::save(&path, &text, format, original.as_ref())
                     })

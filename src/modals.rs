@@ -557,6 +557,9 @@ slot!(
 );
 
 fn bind_payload(state: &mut dyn Any, owner: crate::requests::Owner) {
+    if let Some(s) = state.downcast_mut::<crate::viewer::pdf::password::Dialog>() {
+        s.requests.bind(owner);
+    }
     if let Some(s) = state.downcast_mut::<crate::text_encoding::EncodingDialog>() {
         s.requests.bind(owner);
     }
@@ -644,5 +647,14 @@ slot!(
     take_viewer_encoding,
     set_viewer_encoding,
     crate::text_encoding::EncodingDialog,
+    ViewerSearch
+);
+
+slot!(
+    viewer_pdf_password,
+    viewer_pdf_password_mut,
+    take_viewer_pdf_password,
+    set_viewer_pdf_password,
+    crate::viewer::pdf::password::Dialog,
     ViewerSearch
 );

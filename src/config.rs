@@ -58,6 +58,7 @@ pub struct Config {
     pub space_select: bool,
     pub delete_key: bool,
     pub use_trash: bool,
+    pub open_txt_in_viewer: bool,
     pub backspace_parent: bool,
 }
 
@@ -88,6 +89,7 @@ impl Default for Config {
             space_select: true,
             delete_key: true,
             use_trash: true,
+            open_txt_in_viewer: false,
             backspace_parent: true,
         }
     }

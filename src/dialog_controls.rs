@@ -84,6 +84,9 @@ fn set_focus(app: &mut App, scope: Focus, next: usize) {
         return;
     }
     match scope {
+        Focus::Message if crate::transfers::conflict_dialog(app) => {
+            app.transfers.conflict_focus = next
+        }
         Focus::Message if crate::transfers::quit_dialog(app) => app.transfers.quit_focus = next,
         Focus::Settings => {
             if let Some(m) = app.modals.settings_mut() {
@@ -103,13 +106,22 @@ fn set_focus(app: &mut App, scope: Focus, next: usize) {
                     Some(crate::editor::Modal::Replace(d)) => d.focus = next,
                     Some(
                         crate::editor::Modal::Prompt { focus: f, .. }
-                        | crate::editor::Modal::ConfirmClose { focus: f },
+                        | crate::editor::Modal::ConfirmClose { focus: f }
+                        | crate::editor::Modal::ConfirmOverwrite { focus: f, .. },
                     ) => *f = next,
                     _ => {}
                 }
             }
         }
         Focus::ViewerSearch => {
+            if let Some(d) = app
+                .desktop
+                .active_viewer_mut()
+                .and_then(|v| v.modals.viewer_pdf_password_mut())
+            {
+                d.focus = next;
+                return;
+            }
             if let Some(d) = app
                 .desktop
                 .active_viewer_mut()

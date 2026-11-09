@@ -116,11 +116,11 @@ fn dn_move_layout_locked_removal_focus_mouse_and_resize() -> io::Result<()> {
             .remove_sources
     );
     let mut focuses = Vec::new();
-    for _ in 0..10 {
+    for _ in 0..11 {
         key(&mut app, K::Tab);
         focuses.push(app.modals.prompt().unwrap().focus);
     }
-    assert_eq!(focuses, vec![10, 1, 2, 3, 4, 6, 7, 8, 9, 0]);
+    assert_eq!(focuses, vec![10, 11, 1, 2, 3, 4, 6, 7, 8, 9, 0]);
     copy_dialog::action(&mut app, Action::Verify);
     assert!(
         app.modals
@@ -192,6 +192,7 @@ fn move_refusal_and_skip_never_replace_destinations_or_remove_skipped_sources() 
     let t = Sandbox::new()?;
     let mut app = t.app()?;
     fs::write(t.0.join("out/source.txt"), b"winner")?;
+    copy_dialog::action(&mut app, Action::Refuse);
     let owner = copy_dialog::parent(&app).unwrap();
     copy_dialog::pick(&mut app, owner, t.0.join("out"));
     key(&mut app, K::Enter);

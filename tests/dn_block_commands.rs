@@ -306,7 +306,7 @@ fn viewer_hex_goto_is_exact_bounded_and_handles_empty_files() -> io::Result<()> 
     assert!(v.current.is_none());
     assert!(v.go_to("1").is_err());
     let contents = viewer::from_bytes(vec![0; viewer::MAX_BYTES + 1], ViewMode::Hex);
-    assert_eq!(contents.loaded_bytes, 100_000 * 16);
+    assert_eq!(contents.loaded_bytes, dn::limits::VIEWER_LINES * 16);
     assert!(contents.truncated);
     Ok(())
 }

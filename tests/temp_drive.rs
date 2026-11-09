@@ -104,6 +104,7 @@ fn quick_copy_pins_sources_and_native_destination_with_cancel_collisions_and_fol
     key(&mut app, K::Esc); // hide Transfer Center
     select(&mut app, "文.txt");
     menu::execute(&mut app, Action::CopyToTempDrive);
+    dn::copy_dialog::action(&mut app, dn::copy_dialog::Action::Refuse);
     app.submit_prompt();
     done(&mut app);
     assert_eq!(

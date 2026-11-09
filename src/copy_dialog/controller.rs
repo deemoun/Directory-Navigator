@@ -19,6 +19,10 @@ pub(super) fn reduce(prompt: &mut Prompt, action: Action) -> Effect {
     };
     match action {
         Action::Field => prompt.focus = 0,
+        Action::Ask => {
+            copy.options.existing = ExistingDestination::Ask;
+            prompt.focus = 11;
+        }
         Action::Refuse => {
             copy.options.existing = ExistingDestination::Refuse;
             prompt.focus = 1;
@@ -62,17 +66,16 @@ pub(super) fn edit(prompt: &mut Prompt, key: KeyEvent) {
     if key.modifiers.contains(M::ALT) {
         return;
     }
-    if (prompt.focus == 1 || prompt.focus == 2)
+    if [11, 1, 2].contains(&prompt.focus)
         && matches!(key.code, K::Up | K::Down | K::Left | K::Right)
     {
-        reduce(
-            prompt,
-            if prompt.focus == 1 {
-                Action::Skip
-            } else {
-                Action::Refuse
-            },
-        );
+        let position = [11, 1, 2]
+            .iter()
+            .position(|id| *id == prompt.focus)
+            .unwrap();
+        let reverse = matches!(key.code, K::Up | K::Left);
+        let next = crate::control_focus::cycle(position, 3, reverse);
+        reduce(prompt, [Action::Ask, Action::Refuse, Action::Skip][next]);
     } else if prompt.focus == 0 && !key.modifiers.intersects(M::CONTROL | M::SUPER) {
         prompt.edit(key.code);
     }
@@ -98,7 +101,7 @@ mod tests {
         reduce(&mut copy, Action::Verify);
         let options = &copy.copy.as_ref().unwrap().options;
         assert!(options.remove_sources && options.verify_writes);
-        assert_eq!(options.existing, ExistingDestination::Refuse);
+        assert_eq!(options.existing, ExistingDestination::Ask);
         let mut moving = prompt(Kind::Move);
         assert_eq!(reduce(&mut moving, Action::RemoveSources), Effect::None);
         assert!(!moving.copy.as_ref().unwrap().options.remove_sources);
@@ -123,5 +126,19 @@ mod tests {
         let text = p.field.clone();
         edit(&mut p, KeyEvent::new(K::Char('x'), M::CONTROL));
         assert_eq!(p.field, text);
+    }
+    #[test]
+    fn conflict_policy_arrows_cycle_in_both_directions() {
+        let mut p = prompt(Kind::Copy);
+        reduce(&mut p, Action::Ask);
+        for (key, expected) in [
+            (K::Up, ExistingDestination::Skip),
+            (K::Left, ExistingDestination::Refuse),
+            (K::Right, ExistingDestination::Skip),
+            (K::Down, ExistingDestination::Ask),
+        ] {
+            edit(&mut p, KeyEvent::new(key, M::NONE));
+            assert_eq!(p.copy.as_ref().unwrap().options.existing, expected);
+        }
     }
 }
