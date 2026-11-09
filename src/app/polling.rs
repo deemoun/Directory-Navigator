@@ -188,6 +188,11 @@ impl App {
                 changed |= self.with_document(id, crate::editor::poll);
                 if let Some(editor) = self.desktop.editor_mut(id) {
                     changed |= editor.poll_markdown();
+                    if let Some(crate::editor::Modal::Encoding(d)) =
+                        editor.modals.editor_modal_mut()
+                    {
+                        changed |= d.poll();
+                    }
                 }
             }
         }

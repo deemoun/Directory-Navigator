@@ -339,6 +339,8 @@ pub const EDITOR_ROOTS: &[EditorRoot] = &[
             editor_item("~O~pen...", "F3", A::Open),
             editor_item("~S~ave", "F2", A::Save),
             editor_item("Save ~a~s...", "Shift+F2", A::SaveAs),
+            editor_item("Open with ~e~ncoding...", "F8", A::Encoding),
+            editor_item("Save with encodin~g~...", "", A::SaveEncoding),
             editor_line(),
             editor_item("~W~indows...", "Alt+0", A::Windows),
             editor_item("~C~lose editor", "Ctrl+F4", A::Close),
@@ -481,8 +483,8 @@ pub const EDITOR_BAR: &[BarItem<A>] = &[
     },
     BarItem {
         key: "F8",
-        label: "",
-        action: None,
+        label: "Encoding",
+        action: Some(A::Encoding),
         width: C::Fill(1),
     },
     BarItem {
@@ -500,6 +502,12 @@ pub const EDITOR_BAR: &[BarItem<A>] = &[
 ];
 use crate::viewer::Action as V;
 pub const VIEWER_BAR: &[BarItem<V>] = &[
+    BarItem {
+        key: "F8",
+        label: "Encoding",
+        action: Some(V::Encoding),
+        width: C::Length(14),
+    },
     BarItem {
         key: "F5",
         label: "Editor",

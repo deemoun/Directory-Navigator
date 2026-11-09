@@ -98,6 +98,7 @@ fn set_focus(app: &mut App, scope: Focus, next: usize) {
         Focus::EditorModal => {
             if let Some(e) = app.desktop.active_editor_mut() {
                 match e.modals.editor_modal_mut() {
+                    Some(crate::editor::Modal::Encoding(d)) => d.focus = next,
                     Some(crate::editor::Modal::Search(d)) => d.focus = next,
                     Some(crate::editor::Modal::Replace(d)) => d.focus = next,
                     Some(
@@ -109,6 +110,14 @@ fn set_focus(app: &mut App, scope: Focus, next: usize) {
             }
         }
         Focus::ViewerSearch => {
+            if let Some(d) = app
+                .desktop
+                .active_viewer_mut()
+                .and_then(|v| v.modals.viewer_encoding_mut())
+            {
+                d.focus = next;
+                return;
+            }
             if let Some(d) = app
                 .desktop
                 .active_viewer_mut()

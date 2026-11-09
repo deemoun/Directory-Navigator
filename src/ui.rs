@@ -40,7 +40,7 @@ use overlays::{draw_info_dialog, draw_operation_overlays};
 pub(crate) use settings_view::{settings_choice_bounds, settings_spec};
 pub(crate) use user_menu_view::user_menu_spec;
 pub(crate) use utilities_view::utility_spec;
-pub(crate) use viewer_view::viewer_search_spec;
+pub(crate) use viewer_view::{viewer_footer_rows, viewer_search_spec};
 pub(crate) use windows_view::windows_spec;
 pub(crate) fn paint_spec_close(
     frame: &mut impl Frame,

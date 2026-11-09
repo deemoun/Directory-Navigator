@@ -11,7 +11,7 @@ cargo build --release
 
 Starts in the current directory. Minimum terminal: 80×25. Unicode names, native
 paths, mouse menus, panel clicks, double-click opening and wheel scrolling work.
-Ctrl+click marks files. F4 opens the native UTF-8 editor.
+Ctrl+click marks files. F4 opens the native text editor.
 
 ## First start
 
@@ -1174,7 +1174,7 @@ may be lost after a crash. It does not automatically save over your source files
 
 On startup, abandoned sessions offer **Recover / Inspect / Discard / Later**:
 
-- Recover opens a separate, dirty untitled document, retaining the text, UTF-8 BOM
+- Recover opens a separate, dirty untitled document, retaining the text, encoding and BOM
   preference and checkpoint cursor/selection. Save As uses the existing
   no-overwrite safeguards. Undo history is not restored.
 - Inspect opens a bounded, read-only preview using owned Help, then returns to
@@ -1255,7 +1255,7 @@ normally. A file or link substituted for the Temp Drive root is rejected.
 
 ## Markdown viewing and editing
 
-F3 opens UTF-8 `.md` and `.markdown` files (case-insensitively) as formatted
+F3 opens decoded `.md` and `.markdown` files (case-insensitively) as formatted
 Markdown. F6 switches between Markdown and source; explicit **As Text** starts
 with source, and **As Hex** keeps the ordinary hex viewer. Enter associations
 and the Quick View pane keep their existing behavior. Archive members, including
@@ -1333,3 +1333,34 @@ and Save log writes to a new file. Closing the plugin stops its own processes,
 without killing the shared ADB server. DN does not uninstall apps to resolve a
 signature mismatch. The first release supports standalone APKs, not split/APK
 sets, AAB, Smali rewriting or breakpoint/native debugging.
+
+
+## Text encodings in F3 and F4
+
+The viewer and editor support UTF-8, UTF-16 LE/BE, CP866, Windows-1251,
+KOI8-R and Windows-1252 on every platform. BOM and valid UTF-8 are detected
+without statistical guessing. Unknown plausible text opens an owned encoding
+chooser with a preview. F3 also offers Hex; binary files default to Hex and
+are refused by the editor. UTF-32 is unsupported.
+
+**F8 Encoding** reinterprets the viewer's loaded bytes, including archive members,
+without reading a changed source again. Hex always shows original bytes.
+Editor **File → Open with encoding…** (F8) safely rereads the file. Dirty documents
+first offer Save / Discard / Cancel; failed saves stop reopening. A successful
+reread clears the old undo history and retains the closest valid cursor position.
+Generated Unicode views and editor Markdown snapshots cannot be reinterpreted.
+
+F2 preserves the document's encoding, BOM and mixed line endings. New documents
+use UTF-8 without BOM. **File → Save with encoding…** converts and immediately
+saves, requesting a filename for untitled documents. Unicode formats offer a BOM
+checkbox; a newly selected UTF-8 defaults to no BOM and UTF-16 defaults to BOM.
+Characters that cannot be represented stop saving without changing the file;
+choose UTF-8 instead. No replacement characters or Unicode normalization are used.
+Failed conversion does not change the document's current encoding or undo history.
+
+The viewer reads at most 2 MiB of original bytes and bounds decoded text to 8 MiB
+and 100,000 lines. Its existing long-line clipping remains. The editor limits both
+its Unicode buffer and encoded output to 2 MiB and refuses oversized documents
+without silently truncating them. Recovery retains the output encoding and BOM;
+old checkpoints remain UTF-8. Encoding choices are document-local, not global or
+persisted per filename. Markdown formatting/search operate on decoded text.

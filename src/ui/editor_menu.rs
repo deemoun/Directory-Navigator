@@ -111,7 +111,9 @@ pub(super) fn draw_dropdown(frame: &mut impl Frame, app: &App, area: Rect) {
                 item.shortcut,
             )
             .into_owned(),
-            enabled: item.action.is_some(),
+            enabled: item
+                .action
+                .is_some_and(|action| crate::commands::editor_available(editor, action)),
             checked: states[row],
             submenu: false,
         })

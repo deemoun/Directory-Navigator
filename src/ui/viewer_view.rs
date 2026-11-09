@@ -5,6 +5,50 @@ use crate::presentation::{
 };
 use crate::turbo::dialog_spec::{centered, scope, Control, ControlKind, DialogSpec};
 use crate::{app::App, filesystem::display_name, formatting::tail, mouse::Target, viewer::Action};
+fn bar_caption<'a>(
+    app: &'a App,
+    viewer: &crate::viewer::Viewer,
+    entry: &crate::menu::definition::BarItem<Action>,
+) -> &'a str {
+    app.config.language.text(
+        if entry.action == Some(Action::ToggleMarkdown) && viewer.markdown.rendered {
+            "Source"
+        } else {
+            entry.label
+        },
+    )
+}
+fn bar_width(
+    app: &App,
+    viewer: &crate::viewer::Viewer,
+    entry: &crate::menu::definition::BarItem<Action>,
+) -> u16 {
+    (Line::from(
+        crate::shortcuts::label(
+            app.config.shortcuts,
+            crate::focus::Screen::Viewer,
+            entry.key,
+        )
+        .as_ref(),
+    )
+    .width()
+        + Line::from(bar_caption(app, viewer, entry)).width()
+        + 2)
+    .min(u16::MAX as usize) as u16
+}
+pub(crate) fn viewer_footer_rows(app: &App, viewer: &crate::viewer::Viewer, width: u16) -> u16 {
+    let mut rows = 1;
+    let mut x: u16 = 0;
+    for entry in crate::menu::definition::viewer_bar(viewer) {
+        let length = bar_width(app, viewer, &entry).min(width);
+        if x > 0 && x.saturating_add(length) > width {
+            rows += 1;
+            x = 0;
+        }
+        x = x.saturating_add(length);
+    }
+    rows
+}
 pub(super) fn draw_viewer(frame: &mut impl Frame, app: &App, area: Rect) {
     let profile = app.config.palette;
     let dos = profile.styles_for(crate::palette::theme::Group::Viewer);
@@ -21,7 +65,7 @@ pub(super) fn draw_viewer(frame: &mut impl Frame, app: &App, area: Rect) {
         Constraint::Length(1),
         Constraint::Min(1),
         Constraint::Length(1),
-        Constraint::Length(1),
+        Constraint::Length(viewer_footer_rows(app, viewer, area.width)),
     ])
     .split(area);
     let title = format!(
@@ -58,7 +102,7 @@ pub(super) fn draw_viewer(frame: &mut impl Frame, app: &App, area: Rect) {
         let line = viewer.source_line() + 1;
         frame.render_widget(
             Paragraph::new(format!(
-                " {} │ {line}/{} lines{} · {}",
+                " {} │ {line}/{} lines{} · {} · {}",
                 if viewer.markdown.rendered {
                     "Markdown"
                 } else if contents.binary {
@@ -74,7 +118,8 @@ pub(super) fn draw_viewer(frame: &mut impl Frame, app: &App, area: Rect) {
                 } else {
                     ""
                 },
-                viewer.notice
+                contents.format.map(|f| f.to_string()).unwrap_or_default(),
+                app.config.language.text(&viewer.notice)
             ))
             .style(dos(0x30)),
             regions[2],
@@ -87,37 +132,18 @@ pub(super) fn draw_viewer(frame: &mut impl Frame, app: &App, area: Rect) {
     }
     frame.render_widget(Block::default().style(profile.bar(true)), regions[3]);
     let entries = crate::menu::definition::viewer_bar(viewer);
-    let caption = |entry: &crate::menu::definition::BarItem<Action>| {
-        app.config.language.text(
-            if entry.action == Some(Action::ToggleMarkdown) && viewer.markdown.rendered {
-                "Source"
-            } else {
-                entry.label
-            },
-        )
-    };
-    let extra = viewer.markdown_available() || viewer.preview_editor.is_some();
-    let cells = Layout::horizontal(entries.iter().map(|entry| {
-        if extra && entry.action != Some(Action::GoTo) {
-            Constraint::Length(
-                (Line::from(
-                    crate::shortcuts::label(
-                        app.config.shortcuts,
-                        crate::focus::Screen::Viewer,
-                        entry.key,
-                    )
-                    .as_ref(),
-                )
-                .width()
-                    + Line::from(caption(entry)).width()
-                    + 2)
-                .min(u16::MAX as usize) as u16,
-            )
-        } else {
-            entry.width
+    let mut cells = Vec::new();
+    let mut x = regions[3].x;
+    let mut y = regions[3].y;
+    for entry in &entries {
+        let width = bar_width(app, viewer, entry).min(regions[3].width);
+        if x > regions[3].x && x.saturating_add(width) > regions[3].right() {
+            x = regions[3].x;
+            y += 1;
         }
-    }))
-    .split(regions[3]);
+        cells.push(Rect::new(x, y, width, 1));
+        x += width;
+    }
     for (i, entry) in entries.iter().enumerate() {
         let enabled = entry
             .action
@@ -131,7 +157,7 @@ pub(super) fn draw_viewer(frame: &mut impl Frame, app: &App, area: Rect) {
             )
         );
         frame.render_widget(
-            crate::turbo::widgets::function_status(&key, caption(entry), enabled),
+            crate::turbo::widgets::function_status(&key, bar_caption(app, viewer, entry), enabled),
             cells[i],
         );
         if enabled {
@@ -152,6 +178,9 @@ pub(crate) fn viewer_search_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>
         .palette
         .styles_for(crate::palette::theme::Group::Viewer);
     let viewer = app.desktop.active_viewer()?;
+    if let Some(dialog) = viewer.modals.viewer_encoding() {
+        return crate::text_encoding::spec(app, area, dialog, false);
+    }
     if let Some(dialog) = viewer.modals.viewer_goto() {
         let rect = centered(area, 58, 10);
         let mut spec = DialogSpec::new(

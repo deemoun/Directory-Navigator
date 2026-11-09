@@ -202,7 +202,11 @@ pub fn prepare_window(
                 }
             }
             crate::focus::Screen::Viewer => {
-                app.page_rows = regions[1].height as usize;
+                let footer = app
+                    .desktop
+                    .active_viewer()
+                    .map_or(1, |v| crate::ui::viewer_footer_rows(app, v, area.width));
+                app.page_rows = usize::from(area.height.saturating_sub(2 + footer));
                 if let Some(v) = app.desktop.active_viewer_mut() {
                     v.layout(regions[1].width);
                 }

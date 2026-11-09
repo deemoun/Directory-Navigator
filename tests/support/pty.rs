@@ -91,6 +91,7 @@ impl Session {
                     cursor: 0,
                     anchor: None,
                     bom: true,
+                    encoding: Default::default(),
                     time: 1700000000,
                 },
             )?;
@@ -128,8 +129,11 @@ impl Session {
                 return Err(io::Error::last_os_error());
             }
         }
+        // Allow the same walkthrough to validate a rebuilt release executable.
+        let binary =
+            std::env::var_os("DN_WALK_BINARY").unwrap_or_else(|| env!("CARGO_BIN_EXE_dn").into());
         let mut command = Command::new("/bin/sh");
-        command.args(["-c", "\"$1\"; dn_result=$?; printf '\\nDN_STATUS:%s\\n' \"$dn_result\"; IFS= read -r token; printf '\\nDN_INPUT:%s\\n' \"$token\"; exit \"$dn_result\"", "dn-walk", env!("CARGO_BIN_EXE_dn")])
+        command.args(["-c", "\"$1\"; dn_result=$?; printf '\\nDN_STATUS:%s\\n' \"$dn_result\"; IFS= read -r token; printf '\\nDN_INPUT:%s\\n' \"$token\"; exit \"$dn_result\"", "dn-walk"]).arg(binary)
             .current_dir(&root).env("TERM","xterm-256color").env("XDG_CONFIG_HOME",root.join("settings"))
             .env("DN_TEST_DIAGNOSTICS", root.join("settings/dn/diagnostics.txt"))
             .stdin(Stdio::from(slave.try_clone()?)).stdout(Stdio::from(slave.try_clone()?)).stderr(Stdio::from(slave.try_clone()?));

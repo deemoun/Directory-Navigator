@@ -231,7 +231,7 @@ fn safe_save_preserves_bytes_bom_endings_final_newline_and_permissions() -> io::
             fs::set_permissions(&path, fs::Permissions::from_mode(0o640))?;
         }
         let (b, snapshot, bom) = storage::load(&path).unwrap();
-        assert!(bom);
+        assert!(bom.bom);
         assert_eq!(&b.text, text);
         let snapshot = storage::save(&path, &b.text, bom, Some(&snapshot))
             .unwrap()
@@ -273,7 +273,7 @@ fn storage_rejects_conflicts_existing_destinations_missing_files_and_binary() ->
     assert!(storage::save(&path, "edited", false, Some(&original)).is_err());
     assert!(!path.exists());
     assert!(storage::load(&temp.0).is_err());
-    fs::write(&path, [0xff, 0xfe])?;
+    fs::write(&path, [0xff, 0xfe, 0x41])?;
     assert!(storage::load(&path).is_err());
     fs::write(&path, b"has\0nul")?;
     assert!(storage::load(&path).is_err());

@@ -32,7 +32,7 @@ and modern filesystem handling.
 - Browse two folders side by side, mark files, and copy, move or rename them.
 - Create directories and send files to Trash with confirmation.
 - Find files, compare directories, calculate folder sizes and use bookmarks.
-- Preview text or hex, edit UTF-8 files, and search or replace text.
+- Preview text or hex, edit Unicode and legacy-encoded text files, and search or replace text.
 - Read formatted Markdown with F3, edit highlighted source with F4, and preview unsaved text with F5.
 - Keep multiple editors and viewers open, and switch between them with **Alt+0**.
 - Browse ZIP, TAR and TAR.GZ/TGZ directly in either file pane; extract selected files and folders with F5.
@@ -76,7 +76,7 @@ and modern filesystem handling.
       <a href="docs/images/editor.png">
         <img src="docs/images/editor.png" alt="Built-in editor displaying a UTF-8 Markdown file with line numbers and editor menus" width="500">
       </a>
-      <br><strong>Built-in editor</strong><br>Edit UTF-8 text without leaving the terminal.
+      <br><strong>Built-in editor</strong><br>Edit Unicode and legacy text without leaving the terminal.
     </td>
     <td align="center" width="50%" valign="top">
       <a href="docs/images/make-directory.png">
@@ -245,7 +245,7 @@ Detected changes to queued entries or their parent directories stop the operatio
 Cancellation or failure retains completed work; multi-file operations have no automatic rollback.
 
 This is a **beta**. Archive browsing is read-only; the viewer is a bounded preview,
-and the editor handles UTF-8 files up to 2 MiB / 100,000 lines. Test important
+and the editor handles text up to 2 MiB / 100,000 lines, with strict encoding conversion. Test important
 workflows on copies and report problems with your OS, terminal and reproduction steps.
 
 For detailed shortcuts, limits and user-menu configuration, see the

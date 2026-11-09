@@ -139,6 +139,10 @@ impl Viewer {
             self.markdown.source_wrap = self.wrap;
             let document = self.markdown.document.as_ref().unwrap();
             self.contents = Some(Contents {
+                raw: source.raw,
+                format: source.format,
+                encoding_needed: false,
+                raw_truncated: source.raw_truncated,
                 source: source.source,
                 loaded_bytes: source.loaded_bytes,
                 binary: false,
@@ -225,11 +229,7 @@ impl Viewer {
         text: &str,
         line: usize,
     ) -> Self {
-        let mut viewer = Self::from_archive_contents(
-            label,
-            from_bytes(text.as_bytes().to_vec(), ViewMode::Text),
-            true,
-        );
+        let mut viewer = Self::from_archive_contents(label, text_contents(text), true);
         viewer.preview_editor = Some(owner);
         viewer.reveal_line = Some(line);
         viewer

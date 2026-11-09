@@ -7,10 +7,12 @@ pub(super) fn key(app: &mut App, key: KeyEvent) -> bool {
         let Some(spec) = crate::ui::editor_spec(app, input_area(app)) else {
             return false;
         };
-        let search = app
-            .desktop
-            .active_editor()
-            .is_some_and(|e| matches!(e.modals.editor_modal(), Some(Modal::Search(_))));
+        let search = app.desktop.active_editor().is_some_and(|e| {
+            matches!(
+                e.modals.editor_modal(),
+                Some(Modal::Search(_) | Modal::Encoding(_))
+            )
+        });
         // Preserve existing text/shortcut semantics; Space toggles search options.
         if !matches!(
             key.code,

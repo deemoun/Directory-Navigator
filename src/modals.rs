@@ -557,6 +557,12 @@ slot!(
 );
 
 fn bind_payload(state: &mut dyn Any, owner: crate::requests::Owner) {
+    if let Some(s) = state.downcast_mut::<crate::text_encoding::EncodingDialog>() {
+        s.requests.bind(owner);
+    }
+    if let Some(crate::editor::Modal::Encoding(s)) = state.downcast_mut::<crate::editor::Modal>() {
+        s.requests.bind(owner);
+    }
     if let Some(s) = state.downcast_mut::<crate::archive::dialogs::Dialog>() {
         s.requests.bind(owner);
     }
@@ -630,4 +636,13 @@ slot!(
     set_recovery,
     crate::editor::recovery::Dialog,
     Recovery
+);
+
+slot!(
+    viewer_encoding,
+    viewer_encoding_mut,
+    take_viewer_encoding,
+    set_viewer_encoding,
+    crate::text_encoding::EncodingDialog,
+    ViewerSearch
 );

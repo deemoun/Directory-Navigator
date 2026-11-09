@@ -301,7 +301,18 @@ fn function_bars_profiles_mouse_and_disabled_editor_actions() -> io::Result<()> 
         .iter()
         .any(|(rect, target)| rect.contains((35, 24).into())
             && *target == dn::mouse::Target::Editor(dn::editor::EditorAction::MarkdownPreview)));
-    for column in [24, 56, 64] {
+    // F8 now has an encoding caption, but reading encoding is unavailable
+    // until this untitled document has a native source file.
+    assert_eq!(
+        terminal.backend().buffer()[(58, 24)].fg,
+        app.config.palette.color(8)
+    );
+    assert!(!app
+        .mouse
+        .regions
+        .iter()
+        .any(|(_, target)| *target == Target::Editor(dn::editor::EditorAction::Encoding)));
+    for column in [24, 64] {
         let label: String = (column + 2..column + 8)
             .map(|x| terminal.backend().buffer()[(x, 24)].symbol())
             .collect();

@@ -73,11 +73,14 @@ pub(crate) fn editor_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
         .styles_for(crate::palette::theme::Group::Dialogs);
     let editor = app.desktop.active_editor()?;
     let modal = editor.modals.editor_modal()?;
+    if let Modal::Encoding(d) = modal {
+        return crate::text_encoding::spec(app, area, d, true);
+    }
     if matches!(modal, Modal::File(_)) {
         return None;
     }
     let title = match modal {
-        Modal::File(_) => unreachable!(),
+        Modal::File(_) | Modal::Encoding(_) => unreachable!(),
         Modal::ConfirmClose { .. } => " Unsaved changes ",
         Modal::Help => " Editor Help ",
         Modal::Search(dialog) => {
@@ -116,7 +119,7 @@ pub(crate) fn editor_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
         Target::Editor(A::Cancel),
     );
     match modal {
-        Modal::File(_) => unreachable!(),
+        Modal::File(_) | Modal::Encoding(_) => unreachable!(),
         Modal::Search(dialog) => {
             let replacing = dialog.replacing;
             let selection = dialog.selection.is_some();

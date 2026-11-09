@@ -12,6 +12,7 @@ pub mod search;
 mod search_controller;
 mod search_controls;
 pub mod storage;
+use crate::text_encoding::{EncodingDialog, TextFormat};
 use buffer::Buffer;
 pub use controls::{
     action, open, open_path, open_path_background, open_smartpad, paste, poll, request_close,
@@ -27,6 +28,7 @@ use storage::Snapshot;
 pub enum PendingAction {
     Close,
     Quit,
+    ReopenEncoding,
 }
 // Compatibility for callers asking to close the editor or the application.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -70,10 +72,12 @@ pub enum Modal {
         focus: usize,
     },
     Help,
+    Encoding(EncodingDialog),
 }
 enum Reply {
-    Loaded(PathBuf, Result<(Buffer, Snapshot, bool), String>),
-    Saved(Result<(PathBuf, storage::SaveOutcome), String>),
+    Loaded(PathBuf, Result<(Buffer, Snapshot, TextFormat), String>),
+    Saved(Result<(PathBuf, storage::SaveOutcome, TextFormat), String>),
+    EncodingBytes(Result<Vec<u8>, String>),
 }
 struct SaveDestination {
     path: PathBuf,
@@ -103,9 +107,12 @@ pub struct Editor {
     pub search: String,
     original: Option<Snapshot>,
     pub(crate) recovery_source: Option<PathBuf>,
+    recovery_generation: u64,
     pub(crate) durability_pending: Option<u64>,
     reveal_line: Option<usize>,
-    bom: bool,
+    format: TextFormat,
+    save_format: Option<TextFormat>,
+    reopen_position: Option<(usize, usize)>,
     worker: Option<crate::task::Task<Reply>>,
     saving: bool,
     closing: Option<PendingAction>,
@@ -113,6 +120,9 @@ pub struct Editor {
     save_prepare: Option<crate::task::Task<Result<SaveDestination, String>>>,
 }
 impl Editor {
+    pub fn text_format(&self) -> TextFormat {
+        self.format
+    }
     pub fn is_smartpad(&self) -> bool {
         self.smartpad
     }
@@ -162,9 +172,12 @@ impl Editor {
             search: String::new(),
             original: None,
             recovery_source: None,
+            recovery_generation: 0,
             durability_pending: None,
             reveal_line: None,
-            bom: false,
+            format: TextFormat::default(),
+            save_format: None,
+            reopen_position: None,
             worker: None,
             saving: false,
             closing: None,
@@ -177,8 +190,11 @@ impl Editor {
         let file = path.clone();
         let receive = editor
             .requests
-            .spawn("dn-editor-load", move |_| {
-                Reply::Loaded(file.clone(), storage::load(&file))
+            .spawn("dn-editor-load", move |cancel| {
+                Reply::Loaded(
+                    file.clone(),
+                    storage::load_format_cancelled(&file, None, &cancel),
+                )
             })
             .map_err(|e| e.to_string())?;
         editor.path = Some(path);
@@ -221,8 +237,9 @@ impl Editor {
         };
         let text = buffer.text.clone();
         let original = if save_as { None } else { self.original.clone() };
-        let bom = self.bom;
-        let confirm = !save_as && self.durability_pending == Some(buffer.revision());
+        let format = self.save_format.unwrap_or(self.format);
+        let confirm =
+            !save_as && format == self.format && self.durability_pending == Some(buffer.revision());
         let receive = self
             .requests
             .spawn("dn-editor-save", move |_| {
@@ -233,9 +250,9 @@ impl Editor {
                             original.as_ref().expect("published snapshot"),
                         )
                     } else {
-                        storage::save(&path, &text, bom, original.as_ref())
+                        storage::save(&path, &text, format, original.as_ref())
                     })
-                    .map(|snapshot| (path, snapshot)),
+                    .map(|snapshot| (path, snapshot, format)),
                 )
             })
             .map_err(|e| e.to_string())?;

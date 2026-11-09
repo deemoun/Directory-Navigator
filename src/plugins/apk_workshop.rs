@@ -96,7 +96,7 @@ enum Reply {
     ),
     Project(Project, apk::manifest::Manifest),
     Rows(Vec<String>),
-    Preview(String, Vec<u8>),
+    Preview(String, Vec<u8>, bool),
     Devices(Vec<Device>),
     Notice(String),
     Export(PathBuf, bool),
@@ -606,6 +606,7 @@ impl ApkWorkshop {
             2 => {
                 if let Item::Text(text) = self.selected() {
                     return vec![Effect::ApkPreview {
+                        unicode: true,
                         label: "APK decoded text".into(),
                         data: text.into_bytes(),
                     }];
@@ -625,6 +626,7 @@ impl ApkWorkshop {
                             Ok(Reply::Preview(
                                 "AndroidManifest.xml (decoded)".into(),
                                 xml.into_bytes(),
+                                true,
                             ))
                         });
                     }
@@ -649,6 +651,7 @@ impl ApkWorkshop {
                                                 2 * 1024 * 1024,
                                                 &c,
                                             )?,
+                                            false,
                                         ))
                                     });
                                 }
@@ -664,6 +667,7 @@ impl ApkWorkshop {
                                     Ok(Reply::Preview(
                                         dex.methods[m].name.clone(),
                                         dex.instructions(m, &c)?.join("\n").into_bytes(),
+                                        true,
                                     ))
                                 });
                             }
@@ -979,9 +983,13 @@ impl ApkWorkshop {
                 self.notice = "Project saved".into();
             }
             Ok(Reply::Rows(rows)) => self.detail = rows,
-            Ok(Reply::Preview(label, data)) => {
+            Ok(Reply::Preview(label, data, unicode)) => {
                 if ctx.active {
-                    return vec![Effect::ApkPreview { label, data }];
+                    return vec![Effect::ApkPreview {
+                        label,
+                        data,
+                        unicode,
+                    }];
                 }
                 self.notice = "Preview ready; activate Workshop and request View again".into();
             }

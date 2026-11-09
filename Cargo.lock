@@ -350,6 +350,7 @@ version = "1.1.6"
 dependencies = [
  "chrono",
  "crossterm",
+ "encoding_rs",
  "flate2",
  "libc",
  "pulldown-cmark",

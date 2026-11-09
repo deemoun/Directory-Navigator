@@ -49,6 +49,7 @@ fn record(root: &Path) -> Record {
         cursor: 0,
         anchor: None,
         bom: true,
+        encoding: Default::default(),
         time: 1700000000,
     }
 }

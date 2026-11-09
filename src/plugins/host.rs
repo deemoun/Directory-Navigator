@@ -221,9 +221,20 @@ fn apply(app: &mut App, b: Binding, effects: Vec<Effect>) {
             continue;
         }
         match effect {
-            Effect::ApkPreview { label, data } if b.plugin == APK_WORKSHOP => {
+            Effect::ApkPreview {
+                label,
+                data,
+                unicode,
+            } if b.plugin == APK_WORKSHOP => {
                 if data.len() <= 8 * 1024 * 1024 {
-                    let contents = crate::viewer::from_bytes(data, crate::viewer::ViewMode::Auto);
+                    let contents = if unicode {
+                        let Ok(text) = std::str::from_utf8(&data) else {
+                            continue;
+                        };
+                        crate::viewer::text_contents(text)
+                    } else {
+                        crate::viewer::from_bytes(data, crate::viewer::ViewMode::Auto)
+                    };
                     let markdown = crate::markdown::is_path(std::path::Path::new(&label));
                     app.show_viewer(crate::viewer::Viewer::from_archive_contents(
                         label.into(),

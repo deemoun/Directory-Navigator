@@ -34,6 +34,7 @@ pub mod shortcuts;
 mod temp_drive;
 pub mod terminal;
 pub mod tetris;
+pub mod text_encoding;
 pub mod tool_windows;
 pub mod transfers;
 pub mod ui;

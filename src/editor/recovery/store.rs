@@ -175,6 +175,7 @@ pub fn write(path: &Path, record: &Record) -> io::Result<()> {
         t.insert("anchor".into(), (a as i64).into());
     }
     t.insert("bom".into(), record.bom.into());
+    t.insert("encoding".into(), record.encoding.name().into());
     t.insert("time".into(), record.time.into());
     let body = toml::to_string(&t).map_err(io::Error::other)?;
     if body.len() as u64 > LIMIT {
@@ -252,6 +253,13 @@ pub fn read(path: &Path) -> io::Result<Record> {
         .and_then(toml::Value::as_integer)
         .ok_or_else(invalid)?;
     Ok(Record {
+        encoding: match t.get("encoding") {
+            Some(v) => v
+                .as_str()
+                .and_then(crate::text_encoding::TextEncoding::named)
+                .ok_or_else(invalid)?,
+            None => Default::default(),
+        },
         text,
         base,
         path,
@@ -315,6 +323,7 @@ mod tests {
                 cursor: 0,
                 anchor: None,
                 bom: false,
+                encoding: Default::default(),
                 time: 0,
             },
         )?;

@@ -149,8 +149,9 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
         })
         .unwrap_or_default();
     let status = format!(
-        " {position} │ {} │ {}",
+        " {position} │ {} │ {} · {}",
         editor.highlight.language.label(),
+        editor.text_format(),
         app.config.language.text(&editor.notice)
     );
     frame.render_widget(
@@ -178,10 +179,9 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
             entry.key.strip_prefix('F').unwrap_or(entry.key).to_owned()
         };
         let name = entry.label;
-        let command = entry.action.filter(|action| {
-            *action != crate::editor::EditorAction::MarkdownPreview
-                || (editor.buffer.is_some() && !editor.busy())
-        });
+        let command = entry
+            .action
+            .filter(|action| crate::commands::editor_available(editor, *action));
         frame.render_widget(
             crate::turbo::widgets::function_status(
                 &key,

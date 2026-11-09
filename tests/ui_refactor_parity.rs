@@ -1,7 +1,8 @@
 //! Frozen shared-dialog frames. Window chrome/window-list fixtures reflect the
 //! floating desktop; nested choices center over their parent. Surface targets
 //! are checked by floating_windows rather than mixed into legacy control hashes.
-//! Viewer backgrounds include Go to; editor Help includes the block commands.
+//! Viewer backgrounds include Go to and F8 Encoding; editor frames show encoding
+//! status, the encoding commands and their context-dependent availability.
 //! Plugin preferences and editor frames include the approved music-opening and
 //! Markdown-preview controls. Russian tool footers preserve every shortcut and
 //! the full Close caption, including at 80 columns.

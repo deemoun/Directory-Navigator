@@ -21,6 +21,7 @@ pub struct Record {
     pub cursor: usize,
     pub anchor: Option<usize>,
     pub bom: bool,
+    pub encoding: crate::text_encoding::TextEncoding,
     pub time: i64,
 }
 pub struct Dialog {
@@ -36,17 +37,22 @@ pub enum Action {
     Discard,
     Later,
 }
+type CheckpointRevision = (u64, u64, crate::text_encoding::TextFormat);
 enum Reply {
     Started(io::Result<store::Store>),
     Read(PathBuf, io::Result<Record>),
-    Updated(Vec<(WindowId, u64)>, Vec<PathBuf>, io::Result<()>),
+    Updated(
+        Vec<(WindowId, CheckpointRevision)>,
+        Vec<PathBuf>,
+        io::Result<()>,
+    ),
     Deleted(io::Result<()>),
 }
 pub struct Manager {
     scope: RequestScope,
     store: Option<store::Store>,
     job: Option<Task<Reply>>,
-    written: HashMap<WindowId, u64>,
+    written: HashMap<WindowId, CheckpointRevision>,
     origins: HashMap<WindowId, PathBuf>,
     cleanup: std::collections::BTreeSet<PathBuf>,
     root: PathBuf,
@@ -193,6 +199,7 @@ pub fn poll(app: &mut App, now: Instant) -> bool {
                     cursor: 0,
                     anchor: None,
                     bom: false,
+                    encoding: Default::default(),
                     time: 0,
                 },
                 Some(e.to_string()),
@@ -258,7 +265,9 @@ pub fn poll(app: &mut App, now: Instant) -> bool {
                     if let Some(b) = &e.buffer {
                         if e.dirty() {
                             m.cleanup.remove(&s.path(*id));
-                            if m.written.get(id) != Some(&b.revision()) {
+                            if m.written.get(id)
+                                != Some(&(b.revision(), e.recovery_generation, e.format))
+                            {
                                 writes.push((
                                     s.path(*id),
                                     Record {
@@ -267,7 +276,8 @@ pub fn poll(app: &mut App, now: Instant) -> bool {
                                         base: e.base.clone(),
                                         cursor: b.cursor,
                                         anchor: b.anchor,
-                                        bom: e.bom,
+                                        bom: e.format.bom,
+                                        encoding: e.format.encoding,
                                         time: SystemTime::now()
                                             .duration_since(UNIX_EPOCH)
                                             .unwrap_or_default()
@@ -275,7 +285,8 @@ pub fn poll(app: &mut App, now: Instant) -> bool {
                                             as i64,
                                     },
                                 ));
-                                revisions.push((*id, b.revision()));
+                                revisions
+                                    .push((*id, (b.revision(), e.recovery_generation, e.format)));
                             }
                         } else if m.written.remove(id).is_some() {
                             m.cleanup.insert(s.path(*id));
@@ -391,7 +402,10 @@ pub fn action(app: &mut App, action: Action) {
                         b.move_to(d.record.cursor, true);
                     }
                     e.buffer = Some(b);
-                    e.bom = d.record.bom;
+                    e.format = crate::text_encoding::TextFormat {
+                        encoding: d.record.encoding,
+                        bom: d.record.bom,
+                    };
                     e.recovery_source = d.record.path.clone();
                     e.apply_preferences(app.config.editor);
                     e.notice = format!(

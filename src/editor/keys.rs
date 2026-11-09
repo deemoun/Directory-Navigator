@@ -15,12 +15,33 @@ pub fn key(app: &mut App, key: KeyEvent) {
     }
     if editor.busy() {
         if key.code == KeyCode::Esc {
+            if editor.buffer.is_some() && editor.reopen_position.take().is_some() {
+                editor.worker = None;
+                editor.notice.clear();
+                return;
+            }
             request_close(app, CloseIntent::Panel);
         }
         return;
     }
     if matches!(editor.modals.editor_modal(), Some(Modal::File(_))) {
         file_key(app, key);
+        return;
+    }
+    if matches!(editor.modals.editor_modal(), Some(Modal::Encoding(_)))
+        && matches!(key.code, KeyCode::Up | KeyCode::Down)
+    {
+        if let Some(Modal::Encoding(d)) = editor.modals.editor_modal_mut() {
+            let index = crate::text_encoding::TextEncoding::ALL
+                .iter()
+                .position(|e| *e == d.format.encoding)
+                .unwrap_or(0);
+            d.choose(crate::control_focus::cycle(
+                index,
+                7,
+                key.code == KeyCode::Up,
+            ));
+        }
         return;
     }
     if super::dialog_controls::key(app, key) {
@@ -84,7 +105,7 @@ pub fn key(app: &mut App, key: KeyEvent) {
         return;
     }
     if editor.modals.editor_menu().is_some() {
-        let accelerator = matches!(key.code, KeyCode::F(1 | 2 | 3 | 5 | 6 | 7)) || ctrl;
+        let accelerator = matches!(key.code, KeyCode::F(1 | 2 | 3 | 5 | 6 | 7 | 8)) || ctrl;
         if accelerator {
             editor.modals.set_editor_menu(None);
         } else {

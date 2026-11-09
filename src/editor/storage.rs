@@ -1,5 +1,6 @@
 use super::buffer::{Buffer, MAX_BYTES};
 use crate::filesystem;
+use crate::text_encoding::{self, TextFormat};
 use std::{
     fs::{self, Metadata, Permissions},
     io::{self, Read, Write},
@@ -39,6 +40,13 @@ impl Snapshot {
     }
 }
 fn read(path: &Path) -> io::Result<(Vec<u8>, Metadata)> {
+    read_cancelled(path, &crate::task::Cancellation::default())
+}
+fn read_cancelled(
+    path: &Path,
+    cancel: &crate::task::Cancellation,
+) -> io::Result<(Vec<u8>, Metadata)> {
+    cancel.check()?;
     let entry = fs::symlink_metadata(path)?;
     if !entry.is_file() {
         return Err(io::Error::other(
@@ -53,9 +61,16 @@ fn read(path: &Path) -> io::Result<(Vec<u8>, Metadata)> {
         ));
     }
     let mut bytes = Vec::new();
-    (&mut file)
-        .take(MAX_BYTES as u64 + 1)
-        .read_to_end(&mut bytes)?;
+    let mut limited = (&mut file).take(MAX_BYTES as u64 + 1);
+    let mut chunk = [0; 65536];
+    loop {
+        cancel.check()?;
+        let n = limited.read(&mut chunk)?;
+        if n == 0 {
+            break;
+        }
+        bytes.extend_from_slice(&chunk[..n]);
+    }
     if bytes.len() > MAX_BYTES {
         return Err(io::Error::other("File grew beyond the 2 MiB editor limit."));
     }
@@ -67,14 +82,37 @@ fn read(path: &Path) -> io::Result<(Vec<u8>, Metadata)> {
     }
     Ok((bytes, metadata))
 }
-pub fn load(path: &Path) -> Result<(Buffer, Snapshot, bool), String> {
-    let (bytes, metadata) = read(path).map_err(|e| e.to_string())?;
-    let bom = bytes.starts_with(&[0xef, 0xbb, 0xbf]);
-    let content = std::str::from_utf8(if bom { &bytes[3..] } else { &bytes }).map_err(|_| {
-        "File is not UTF-8 text. Use F3; editing would risk changing its encoding.".to_owned()
-    })?;
-    let buffer = Buffer::new(content.into())?;
-    Ok((buffer, Snapshot::new(bytes, &metadata), bom))
+pub fn load(path: &Path) -> Result<(Buffer, Snapshot, TextFormat), String> {
+    load_format(path, None)
+}
+pub fn load_format(
+    path: &Path,
+    chosen: Option<TextFormat>,
+) -> Result<(Buffer, Snapshot, TextFormat), String> {
+    load_format_cancelled(path, chosen, &crate::task::Cancellation::default())
+}
+pub(crate) fn load_format_cancelled(
+    path: &Path,
+    chosen: Option<TextFormat>,
+    cancel: &crate::task::Cancellation,
+) -> Result<(Buffer, Snapshot, TextFormat), String> {
+    let (bytes, metadata) = read_cancelled(path, cancel).map_err(|e| e.to_string())?;
+    let format = match chosen {
+        Some(format) => format,
+        None => text_encoding::detect(&bytes, false)?.ok_or("Choose a text encoding with F8.")?,
+    };
+    cancel.check().map_err(|e| e.to_string())?;
+    let buffer = Buffer::new(format.decode(&bytes, false)?)?;
+    cancel.check().map_err(|e| e.to_string())?;
+    Ok((buffer, Snapshot::new(bytes, &metadata), format))
+}
+pub(crate) fn encoding_bytes_cancelled(
+    path: &Path,
+    cancel: &crate::task::Cancellation,
+) -> Result<Vec<u8>, String> {
+    read_cancelled(path, cancel)
+        .map(|(bytes, _)| bytes)
+        .map_err(|e| e.to_string())
 }
 fn verify(path: &Path, original: &Snapshot) -> io::Result<()> {
     let (bytes, metadata) = read(path)?;
@@ -114,20 +152,21 @@ enum Stage {
 pub fn save(
     path: &Path,
     text: &str,
-    bom: bool,
+    format: impl Into<TextFormat>,
     original: Option<&Snapshot>,
 ) -> Result<SaveOutcome, String> {
-    save_with(path, text, bom, original, |_| Ok(()))
+    save_with(path, text, format, original, |_| Ok(()))
 }
 fn save_with(
     path: &Path,
     text: &str,
-    bom: bool,
+    format: impl Into<TextFormat>,
     original: Option<&Snapshot>,
     mut check: impl FnMut(Stage) -> io::Result<()>,
 ) -> Result<SaveOutcome, String> {
+    let bytes = format.into().encode(text)?;
     let prepare = || -> io::Result<_> {
-        if text.len() + if bom { 3 } else { 0 } > MAX_BYTES {
+        if text.len() > MAX_BYTES || bytes.len() > MAX_BYTES {
             return Err(io::Error::other(
                 "Saved file exceeds the 2 MiB editor limit.",
             ));
@@ -143,12 +182,7 @@ fn save_with(
         crate::publication::StagedFile::create(path)
     };
     let mut staged = prepare().map_err(|e| e.to_string())?;
-    let mut publish = || -> io::Result<_> {
-        let mut bytes = Vec::with_capacity(text.len() + 3);
-        if bom {
-            bytes.extend_from_slice(&[0xef, 0xbb, 0xbf]);
-        }
-        bytes.extend_from_slice(text.as_bytes());
+    let publish = || -> io::Result<_> {
         check(Stage::Write)?;
         staged.file.write_all(&bytes)?;
         if let Some(original) = original {

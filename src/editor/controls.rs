@@ -3,6 +3,10 @@ use crate::{app::App, dialog, menu};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EditorAction {
     MarkdownPreview,
+    Encoding,
+    SaveEncoding,
+    EncodingChoice(usize),
+    EncodingAccept,
     WindowMove,
     WindowZoom,
     Open,
@@ -240,6 +244,7 @@ pub fn poll(app: &mut App) -> bool {
             app.desktop.release_reservations(id);
             if let Some(e) = app.desktop.editor_mut(id) {
                 e.saving = false;
+                e.save_format = None;
                 e.closing = None;
             }
             app.abort_quit();
@@ -268,11 +273,15 @@ pub fn poll(app: &mut App) -> bool {
         editor.worker = None;
         editor.saving = false;
         match reply {
-            Reply::Loaded(path, Ok((mut buffer, snapshot, bom))) => {
+            Reply::Loaded(path, Ok((mut buffer, snapshot, format))) => {
+                editor.recovery_generation = editor
+                    .recovery_generation
+                    .checked_add(1)
+                    .expect("editor reload generations exhausted");
                 buffer.tab_size = usize::from(editor.preferences.tab_size);
                 editor.buffer = Some(buffer);
                 editor.original = Some(snapshot);
-                editor.bom = bom;
+                editor.format = format;
                 editor.base = path
                     .parent()
                     .map(PathBuf::from)
@@ -286,13 +295,20 @@ pub fn poll(app: &mut App) -> bool {
                 editor.scroll_column = 0;
                 editor.search_scope = None;
                 editor.modals.set_editor_modal(None);
-                editor.notice = "UTF-8 · F2 Save · F7 Search · F10 Menu · Esc Close".into();
+                editor.notice = "F2 Save · F7 Search · F8 Encoding · F10 Menu · Esc Close".into();
+                if let Some((row, column)) = editor.reopen_position.take() {
+                    if let Some(b) = &mut editor.buffer {
+                        let pos = b.position_at(row.min(b.lines.len().saturating_sub(1)), column);
+                        b.move_to(pos, false);
+                    }
+                    editor.keep_visible();
+                }
                 editor.recolor();
                 if let Some(line) = editor.reveal_line.take() {
                     editor.go_to_line(line);
                 }
             }
-            Reply::Saved(Ok((path, outcome))) => {
+            Reply::Saved(Ok((path, outcome, format))) => {
                 editor.base = path
                     .parent()
                     .map(PathBuf::from)
@@ -304,6 +320,8 @@ pub fn poll(app: &mut App) -> bool {
                 }
                 editor.path = Some(path);
                 editor.original = Some(outcome.snapshot);
+                editor.format = format;
+                editor.save_format = None;
                 if let Some(buffer) = &mut editor.buffer {
                     if outcome.warning.is_none() {
                         buffer.mark_saved();
@@ -321,10 +339,62 @@ pub fn poll(app: &mut App) -> bool {
                 editor.recolor();
                 saved = true;
             }
+            Reply::EncodingBytes(result) => {
+                editor.reopen_position = None;
+                match result {
+                    Ok(bytes)
+                        if crate::text_encoding::plausible_text(&bytes)
+                            || crate::text_encoding::detect(&bytes, false)
+                                .ok()
+                                .flatten()
+                                .is_some() =>
+                    {
+                        let format = if editor.buffer.is_some() {
+                            editor.format
+                        } else {
+                            crate::text_encoding::detect(&bytes, false)
+                                .ok()
+                                .flatten()
+                                .unwrap_or(
+                                    crate::text_encoding::TextEncoding::Cp866.default_format(),
+                                )
+                        };
+                        editor
+                            .modals
+                            .set_editor_modal(Some(Modal::Encoding(EncodingDialog::new(
+                                format,
+                                bytes.into(),
+                                false,
+                                false,
+                                false,
+                            ))));
+                        editor.notice.clear();
+                    }
+                    Ok(_) => error = Some("Binary files cannot be edited. Use F3 Hex.".into()),
+                    Err(message) => error = Some(message),
+                }
+            }
             Reply::Loaded(_, Err(message)) | Reply::Saved(Err(message)) => {
+                if message == "Choose a text encoding with F8." {
+                    if let Some(path) = editor.path.clone() {
+                        match editor.requests.spawn("dn-editor-encoding", move |cancel| {
+                            Reply::EncodingBytes(storage::encoding_bytes_cancelled(&path, &cancel))
+                        }) {
+                            Ok(task) => {
+                                editor.worker = Some(task);
+                                return true;
+                            }
+                            Err(e) => error = Some(e.to_string()),
+                        }
+                    }
+                }
+                editor.save_format = None;
+                editor.reopen_position = None;
                 editor.closing = None;
                 editor.notice = "File access failed — current text retained".into();
-                error = Some(message);
+                if error.is_none() {
+                    error = Some(message);
+                }
             }
         }
     }
@@ -421,6 +491,11 @@ fn complete_pending(app: &mut App) {
         Some(PendingAction::Close) => {
             let id = app.desktop.target();
             app.retire_document(id);
+        }
+        Some(PendingAction::ReopenEncoding) => {
+            if let Err(error) = open_encoding(app, false) {
+                app.error(error);
+            }
         }
         Some(PendingAction::Quit) => {
             app.approve_quit(app.desktop.target());
@@ -593,7 +668,111 @@ fn submit_prompt(app: &mut App) -> Result<(), String> {
     }
     Ok(())
 }
+fn open_encoding(app: &mut App, saving: bool) -> Result<(), String> {
+    let Some(e) = app.desktop.active_editor_mut() else {
+        return Ok(());
+    };
+    e.modals.set_editor_menu(None);
+    if saving {
+        e.modals
+            .set_editor_modal(Some(Modal::Encoding(EncodingDialog::new(
+                e.format,
+                std::sync::Arc::from([]),
+                false,
+                true,
+                false,
+            ))));
+    } else if let Some(path) = e.path.clone() {
+        e.reopen_position = e.buffer.as_ref().map(|b| (b.row(), b.column()));
+        e.worker = Some(
+            e.requests
+                .spawn("dn-editor-encoding", move |cancel| {
+                    Reply::EncodingBytes(storage::encoding_bytes_cancelled(&path, &cancel))
+                })
+                .map_err(|e| e.to_string())?,
+        );
+    } else {
+        return Err("Save the document before reopening it with another encoding.".into());
+    }
+    Ok(())
+}
+fn encoding_action(app: &mut App, command: EditorAction) -> Result<(), String> {
+    let e = app.desktop.active_editor_mut().ok_or("Editor closed")?;
+    if let EditorAction::EncodingChoice(i) = command {
+        if let Some(Modal::Encoding(d)) = e.modals.editor_modal_mut() {
+            if i == 7 && d.saving && d.format.encoding.unicode() {
+                d.format.bom = !d.format.bom;
+            } else {
+                d.choose(i);
+            }
+            d.focus = i;
+        }
+        return Ok(());
+    }
+    let Some(Modal::Encoding(d)) = e.modals.editor_modal() else {
+        return Ok(());
+    };
+    if let Some(error) = &d.error {
+        return Err(error.clone());
+    }
+    let format = d.format;
+    if d.saving {
+        if let Some(buffer) = &e.buffer {
+            format.encode(&buffer.text)?;
+        }
+        e.save_format = Some(format);
+        e.modals.set_editor_modal(None);
+        action(app, EditorAction::Save);
+    } else {
+        let path = e.path.clone().ok_or("No file to reopen")?;
+        e.reopen_position = e.buffer.as_ref().map(|b| (b.row(), b.column()));
+        e.worker = Some(
+            e.requests
+                .spawn("dn-editor-reopen", move |cancel| {
+                    Reply::Loaded(
+                        path.clone(),
+                        storage::load_format_cancelled(&path, Some(format), &cancel),
+                    )
+                })
+                .map_err(|e| e.to_string())?,
+        );
+        e.modals.set_editor_modal(None);
+    }
+    Ok(())
+}
 pub fn action(app: &mut App, command: EditorAction) {
+    if matches!(
+        command,
+        EditorAction::Encoding | EditorAction::MarkdownPreview
+    ) && app
+        .desktop
+        .active_editor()
+        .is_none_or(|e| !crate::commands::editor_available(e, command))
+    {
+        return;
+    }
+    if matches!(command, EditorAction::Encoding | EditorAction::SaveEncoding) {
+        if app.desktop.active_editor().is_none_or(Editor::busy) {
+            return;
+        }
+        if command == EditorAction::Encoding
+            && app.desktop.active_editor().is_some_and(Editor::dirty)
+        {
+            request_action(app, PendingAction::ReopenEncoding);
+        } else if let Err(error) = open_encoding(app, command == EditorAction::SaveEncoding) {
+            app.error(error);
+        }
+        return;
+    }
+    if matches!(
+        command,
+        EditorAction::EncodingAccept | EditorAction::EncodingChoice(_)
+    ) {
+        if let Err(error) = encoding_action(app, command) {
+            app.error(error);
+        }
+        return;
+    }
     if command == EditorAction::MarkdownPreview {
         crate::viewer::markdown::preview_editor(app);
         return;
@@ -625,6 +804,15 @@ pub fn action(app: &mut App, command: EditorAction) {
         finish_file(app, outcome);
         return;
     }
+    if command == A::Cancel
+        && app.desktop.active_editor().is_some_and(|e| {
+            e.buffer.is_none() && matches!(e.modals.editor_modal(), Some(Modal::Encoding(_)))
+        })
+    {
+        let id = app.desktop.target();
+        app.retire_document(id);
+        return;
+    }
     if command == A::Cancel && app.native_help().is_some() {
         app.pop_dialog();
         return;
@@ -637,6 +825,7 @@ pub fn action(app: &mut App, command: EditorAction) {
             crate::commands::help::CLASSIC_EDITOR
         });
         let message=format!("{base}\n{}",language.text("F5 previews the current unsaved buffer as Markdown. F5 or Esc returns from preview; F6 toggles formatted Markdown/source. Links and image paths are displayed only; HTML is literal."));
+        let message = format!("{message}\n{}", language.text("F8 chooses the reading encoding. File → Save with encoding converts the file; F2 preserves its current encoding, BOM and line endings. Unrepresentable characters stop saving."));
         app.push_dialog(crate::dialog::Dialog {
             title: " Editor Help ",
             message,
@@ -661,6 +850,9 @@ pub fn action(app: &mut App, command: EditorAction) {
                 e.modals.set_editor_modal(None);
             }
             if let Err(error) = prepare_save(app, path, false) {
+                if let Some(e) = app.desktop.active_editor_mut() {
+                    e.save_format = None;
+                }
                 app.error(error);
             }
             return;
@@ -739,7 +931,11 @@ fn apply(app: &mut App, command: EditorAction) -> Result<(), String> {
         return search_controls::decision(editor, command);
     }
     match command {
-        A::MarkdownPreview => {}
+        A::MarkdownPreview
+        | A::Encoding
+        | A::SaveEncoding
+        | A::EncodingChoice(_)
+        | A::EncodingAccept => {}
         A::PromptField => {
             if let Some(Modal::Prompt { focus, .. }) = editor.modals.editor_modal_mut() {
                 *focus = 0;
@@ -747,6 +943,7 @@ fn apply(app: &mut App, command: EditorAction) -> Result<(), String> {
         }
         A::CancelMenu => editor.modals.set_editor_menu(None),
         A::Cancel => {
+            editor.save_format = None;
             let quit = matches!(
                 editor.modals.editor_modal(),
                 Some(Modal::ConfirmClose { .. })
@@ -891,7 +1088,8 @@ mod save_outcome_tests {
         paste(&mut app, "new");
         let e = app.desktop.active_editor_mut().unwrap();
         let text = e.buffer.as_ref().unwrap().text.clone();
-        let mut outcome = storage::save(&path, &text, false, e.original.as_ref()).unwrap();
+        let format = crate::text_encoding::TextEncoding::Utf16Le.default_format();
+        let mut outcome = storage::save(&path, &text, format, e.original.as_ref()).unwrap();
         outcome.warning = Some("injected sync failure".into());
         #[cfg(unix)]
         let ino = {
@@ -901,10 +1099,9 @@ mod save_outcome_tests {
         e.closing = Some(PendingAction::Quit);
         e.saving = true;
         let dest = path.clone();
-        e.worker = Some(
-            e.requests
-                .spawn("dn-editor-save", move |_| Reply::Saved(Ok((dest, outcome))))?,
-        );
+        e.worker = Some(e.requests.spawn("dn-editor-save", move |_| {
+            Reply::Saved(Ok((dest, outcome, format)))
+        })?);
         while app.desktop.active_editor().unwrap().busy() {
             app.poll();
             assert!(std::time::Instant::now() < until);
@@ -914,6 +1111,7 @@ mod save_outcome_tests {
         let e = app.desktop.active_editor().unwrap();
         assert!(e.dirty());
         assert!(e.durability_pending.is_some());
+        assert_eq!(e.format, format);
         assert!(e.closing.is_none());
         assert_eq!(e.buffer.as_ref().unwrap().text, text);
         app.clear_dialogs();

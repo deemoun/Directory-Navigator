@@ -137,6 +137,7 @@ pub(crate) enum Event<'a> {
 }
 pub(crate) enum Effect {
     ApkPreview {
+        unicode: bool,
         label: String,
         data: Vec<u8>,
     },

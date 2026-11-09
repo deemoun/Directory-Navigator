@@ -1997,3 +1997,73 @@ fn apk_workshop_inspect_project_patch_export_and_terminal_restoration() -> io::R
     );
     s.finish()
 }
+
+#[test]
+fn encoding_choices_conversion_and_cancel_restore_terminal() -> io::Result<()> {
+    use dn::text_encoding::TextEncoding as C;
+    let mut s = Session::new("text-encodings")?;
+    s.wait("manager ready", |s| s.command_prompt_active())?;
+    let path = s.root.join("item-000.txt");
+    let bytes = C::Windows1251
+        .default_format()
+        .encode("Привет\r\nстрока\n")
+        .unwrap();
+    fs::write(&path, &bytes)?;
+    s.select_file("item-000.txt")?;
+    s.send(b"\x1bOR", "viewer encoding picker", |s| {
+        s.text().contains("Open with encoding")
+    })?;
+    s.send(b"\x1b[B", "Windows-1251 preview", |s| {
+        s.text().contains("Привет")
+    })?;
+    s.send(b"\r", "decoded viewer", |s| {
+        s.text().contains("Windows-1251") && !s.text().contains("Open with encoding")
+    })?;
+    s.send(b"\x1b[19~", "viewer F8", |s| {
+        s.text().contains("Open with encoding")
+    })?;
+    s.send(b"\x1b", "cancel reinterpretation", |s| {
+        !s.text().contains("Open with encoding")
+    })?;
+    s.send(b"\x1b", "close viewer", |s| s.command_prompt_active())?;
+    s.send(b"\x1bOS", "editor encoding picker", |s| {
+        s.text().contains("Open with encoding")
+    })?;
+    s.send(b"\x1b[B", "editor Windows-1251 preview", |s| {
+        s.text().contains("Привет")
+    })?;
+    s.send(b"\r", "decoded editor", |s| {
+        s.text().contains("F2 Save")
+            && s.text().contains("Windows-1251")
+            && !s.text().contains("Open with encoding")
+    })?;
+    s.send(b"\x1b[21~", "editor File menu", |s| {
+        s.text().contains("Save with encodin")
+    })?;
+    s.send(b"g", "save encoding picker", |s| {
+        s.text().contains("Save with encoding") && s.text().contains("Write BOM")
+    })?;
+    s.send(b"\x1b[A\x1b[A\x1b[A", "choose UTF-16 LE", |s| {
+        s.text().contains("Write BOM")
+    })?;
+    s.send(b"\r", "converted editor", |s| {
+        s.text().contains("UTF-16 LE + BOM") && !s.text().contains("Save with encoding")
+    })?;
+    assert_eq!(
+        fs::read(&path)?,
+        C::Utf16Le
+            .default_format()
+            .encode("Привет\r\nстрока\n")
+            .unwrap()
+    );
+    s.resize(100, 32)?;
+    s.wait("converted editor resize committed", |s| {
+        fs::read_to_string(s.root.join("settings/dn/diagnostics.txt"))
+            .is_ok_and(|state| state.contains("viewport=(100, 32)"))
+            && s.text().contains("UTF-16 LE + BOM")
+    })?;
+    s.send(b"\x1b", "close converted editor", |s| {
+        s.command_prompt_active()
+    })?;
+    s.finish()
+}

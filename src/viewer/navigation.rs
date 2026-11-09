@@ -40,6 +40,10 @@ pub struct VisualRow {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Action {
     Help,
+    Encoding,
+    EncodingChoice(usize),
+    EncodingAccept,
+    EncodingHex,
     ToggleMarkdown,
     BackToEditor,
     GoTo,
@@ -321,7 +325,7 @@ impl Viewer {
 }
 pub fn action(app: &mut App, action: Action) {
     if action == Action::Help {
-        app.push_dialog(crate::dialog::Dialog {title:" Viewer Help ",message:app.config.language.text("F6 toggles Markdown/source for .md and .markdown files. Search uses displayed text; Go to uses source line numbers. F5 returns from an editor preview. Links and images do not open automatically.").into()});
+        app.push_dialog(crate::dialog::Dialog {title:" Viewer Help ",message:format!("{}\n{}", app.config.language.text("F6 toggles Markdown/source for .md and .markdown files. Search uses displayed text; Go to uses source line numbers. F5 returns from an editor preview. Links and images do not open automatically."), app.config.language.text("F8 chooses the reading encoding. File → Save with encoding converts the file; F2 preserves its current encoding, BOM and line endings. Unrepresentable characters stop saving."))});
         return;
     }
 
@@ -349,6 +353,30 @@ pub fn action(app: &mut App, action: Action) {
     let Some(viewer) = app.desktop.active_viewer_mut() else {
         return;
     };
+    if viewer.modals.viewer_encoding().is_some() {
+        match action {
+            Action::Cancel => {
+                viewer.modals.set_viewer_encoding(None);
+            }
+            Action::EncodingChoice(i) => {
+                if let Some(d) = viewer.modals.viewer_encoding_mut() {
+                    d.choose(i);
+                    d.focus = i;
+                }
+            }
+            Action::EncodingAccept | Action::EncodingHex => {
+                let d = viewer.modals.take_viewer_encoding().unwrap();
+                if let Err(error) =
+                    viewer.apply_encoding((action == Action::EncodingAccept).then_some(d.format))
+                {
+                    viewer.notice = error;
+                    viewer.modals.set_viewer_encoding(Some(d));
+                }
+            }
+            _ => {}
+        }
+        return;
+    }
     if viewer.modals.viewer_goto().is_some() {
         match action {
             Action::Cancel => viewer.modals.set_viewer_goto(None),
@@ -365,6 +393,24 @@ pub fn action(app: &mut App, action: Action) {
         return;
     }
     match action {
+        Action::Encoding => {
+            if let Some(c) = &viewer.contents {
+                if let Some(raw) = &c.raw {
+                    viewer.modals.set_viewer_encoding(Some(
+                        crate::text_encoding::EncodingDialog::new(
+                            c.format.unwrap_or(
+                                crate::text_encoding::TextEncoding::Cp866.default_format(),
+                            ),
+                            raw.clone(),
+                            c.raw_truncated,
+                            false,
+                            true,
+                        ),
+                    ));
+                }
+            }
+        }
+        Action::EncodingChoice(_) | Action::EncodingAccept | Action::EncodingHex => {}
         Action::Help => {}
         Action::ToggleMarkdown => viewer.toggle_markdown(),
         Action::BackToEditor => {}
@@ -437,6 +483,42 @@ pub fn paste(app: &mut App, text: &str) {
     }
 }
 pub fn key(app: &mut App, key: KeyEvent) {
+    if key.code == KeyCode::Esc {
+        if let Some(v) = app
+            .desktop
+            .active_viewer_mut()
+            .filter(|v| v.encoding_pending.is_some())
+        {
+            v.encoding_pending = None;
+            v.notice.clear();
+            return;
+        }
+    }
+    if app
+        .desktop
+        .active_viewer()
+        .is_some_and(|v| v.modals.viewer_encoding().is_some())
+        && matches!(key.code, KeyCode::Up | KeyCode::Down)
+    {
+        let d = app
+            .desktop
+            .active_viewer_mut()
+            .unwrap()
+            .modals
+            .viewer_encoding_mut()
+            .unwrap();
+        let index = crate::text_encoding::TextEncoding::ALL
+            .iter()
+            .position(|e| *e == d.format.encoding)
+            .unwrap_or(0);
+        d.choose(crate::control_focus::cycle(
+            index,
+            7,
+            key.code == KeyCode::Up,
+        ));
+        return;
+    }
+
     let proposal = {
         let spec = crate::ui::viewer_search_spec(app, crate::turbo::dialog_spec::input_area(app));
         spec.and_then(|spec| {
@@ -462,6 +544,9 @@ pub fn key(app: &mut App, key: KeyEvent) {
     let Some(viewer) = app.desktop.active_viewer_mut() else {
         return;
     };
+    if viewer.modals.viewer_encoding().is_some() {
+        return;
+    }
     if let Some(dialog) = viewer.modals.viewer_goto_mut() {
         if dialog.focus == 0 {
             if key.code == KeyCode::Char('a')
