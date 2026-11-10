@@ -69,3 +69,23 @@ strip = true
 [dev-dependencies]
 sevenz-rust2 = { version = "=0.25.0", default-features = false, features = ["compress"] }
 
+# Used only by scripts/package_deb.py; does not affect normal Cargo builds.
+[package.metadata.deb]
+name = "directory-navigator"
+copyright = "2026 Dmitry Yarygin"
+license-file = ["packaging/debian/copyright", "0"]
+depends = "$auto"
+suggests = "gpm, openssh-client, xdg-utils"
+section = "utils"
+priority = "optional"
+extended-description = "A terminal file manager with two file panes, movable windows, text editing and viewing, archives, music playback, and remote connections."
+assets = [
+    ["target/release/dn", "usr/bin/dn", "755"],
+    ["README.md", "usr/share/doc/directory-navigator/README.md", "644"],
+    ["README.ru.md", "usr/share/doc/directory-navigator/README.ru.md", "644"],
+    ["docs/USER_GUIDE.md", "usr/share/doc/directory-navigator/USER_GUIDE.md", "644"],
+    ["LICENSE", "usr/share/doc/directory-navigator/LICENSE", "644"],
+    ["THIRD_PARTY_NOTICES.md", "usr/share/doc/directory-navigator/THIRD_PARTY_NOTICES.md", "644"],
+    ["packaging/debian/dn.1", "usr/share/man/man1/dn.1", "644"],
+    ["target/debian/.metadata/changelog.Debian.gz", "usr/share/doc/directory-navigator/changelog.Debian.gz", "644"],
+]

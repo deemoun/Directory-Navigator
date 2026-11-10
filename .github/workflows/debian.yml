@@ -1,0 +1,123 @@
+name: Build Debian packages
+run-name: Debian packages ${{ inputs.version || 'from Cargo.toml' }} (revision ${{ inputs.revision }})
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Optional DN version without v; leave empty to use Cargo.toml'
+        required: false
+        default: ''
+        type: string
+      revision:
+        description: 'Debian packaging revision (positive integer)'
+        required: true
+        default: '1'
+        type: string
+      maintainer:
+        description: 'Package maintainer: Your Name <your-email@example.org>'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deb-packages-${{ github.repository }}-${{ github.ref }}-${{ inputs.version }}-${{ inputs.revision }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  CARGO_TERM_COLOR: always
+  RELEASE_VERSION: ${{ inputs.version }}
+  DEB_REVISION: ${{ inputs.revision }}
+  DEB_MAINTAINER: ${{ inputs.maintainer }}
+
+jobs:
+  build:
+    name: DEB ${{ matrix.arch }} (Ubuntu 24.04)
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            arch: amd64
+            target: x86_64-unknown-linux-gnu
+            artifact: x86_64
+          - os: ubuntu-24.04-arm
+            arch: arm64
+            target: aarch64-unknown-linux-gnu
+            artifact: arm64
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Validate inputs and prepare local build version
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          import sys
+          sys.path.insert(0, 'scripts')
+          import package_deb
+          import release
+          root = Path.cwd()
+          version = os.environ['RELEASE_VERSION'] or package_deb.metadata(root)
+          package_deb.maintainer(os.environ['DEB_MAINTAINER'])
+          package_deb.deb_version(version, os.environ['DEB_REVISION'])
+          if os.environ['RELEASE_VERSION']:
+              release.prepare(root, version)
+          PY
+          echo "SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)" >> "$GITHUB_ENV"
+      - name: Test release and packaging helpers
+        run: python3 -m unittest discover -s scripts -p 'test_*.py'
+      - name: Install Debian build and validation tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config libasound2-dev dpkg-dev lintian
+          docker version
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+          components: rustfmt, clippy
+      - name: Install cargo-deb
+        run: cargo install cargo-deb --version 3.8.0 --locked
+      - name: Check formatting
+        run: cargo fmt --check
+      - name: Clippy
+        run: cargo clippy --locked --all-targets --target ${{ matrix.target }} -- -D warnings
+      - name: Test application
+        run: cargo test --locked --target ${{ matrix.target }}
+      - name: Test without audio
+        run: cargo test --locked --no-default-features --target ${{ matrix.target }} --test mp3_player --test plugin_settings
+      - name: Build and test Debian package
+        env:
+          DEB_ARCH: ${{ matrix.arch }}
+        run: |
+          python3 scripts/package_deb.py \
+            --arch "$DEB_ARCH" \
+            --maintainer "$DEB_MAINTAINER" \
+            --revision "$DEB_REVISION" \
+            --smoke-test ubuntu:24.04
+      - name: Verify package checksum
+        working-directory: target/debian
+        run: sha256sum --check -- *.deb.sha256
+      - name: Upload Debian artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: dn-deb-${{ matrix.artifact }}
+          path: |
+            target/debian/*.deb
+            target/debian/*.deb.sha256
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0

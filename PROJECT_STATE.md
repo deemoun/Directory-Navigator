@@ -1,30 +1,38 @@
 # Directory Navigator
 
-## Release preparation — 1.1.10 (not yet published)
+## Current status — stable 1.1.10
 
-The manifest and lockfile now target 1.1.10. Publication remains manual and has
-not been performed for this version.
+Directory Navigator 1.1.10 was published on **10 November 2026** and is available
+on [crates.io](https://crates.io/crates/directory-navigator/1.1.10). The crate is
+`directory-navigator`; the installed executable remains `dn`. macOS, Linux and
+Windows remain supported. Version 1.1.9 was the first stable release.
+
+See the [English README](README.md), [Russian README](README.ru.md) and
+[user guide](docs/USER_GUIDE.md) for installation, controls, safeguards and limits.
+
+### Networking in 1.1.10
 
 Network/interface snapshots have their own Utilities → Network Information
 window, with an interface selector and live download/upload rates. Rates use local
 interface byte counters; metadata is refreshed explicitly. Important-path snapshots
-remain in System Information. A Remote connections plugin supplies independent SFTP/FTP/explicit
-FTPS panes, bounded previews, private-copy editing, queued uploads/downloads and
-confirmed remote file management. Profiles contain no saved secrets. Interactive
+remain in System Information. A Remote connections plugin supplies independent
+SFTP, FTP and explicit FTPS panes, bounded previews, private-copy editing, queued
+uploads/downloads and confirmed remote file management. Profiles contain no saved secrets. Interactive
 SSH hands off to installed OpenSSH. FTP publication is server-dependent; SFTP
 replacement requires atomic rename support. Direct server-to-server copying and
-remote session restoration remain outside this implementation. These additions
-are not part of the published 1.1.9 crate. See the current README and guide for
-controls and boundaries; validation for this work is reported separately from the
-historical release evidence below.
+remote session restoration remain outside this implementation. Saved profiles
+support selection, editing/renaming and confirmed deletion. These capabilities
+are included in the published 1.1.10 crate.
 
-## Latest published release — stable 1.1.9
+### Directory-tree analysis in 1.1.10
 
-Directory Navigator 1.1.9 is the first stable release and is published on
-[crates.io](https://crates.io/crates/directory-navigator/1.1.9). It supports macOS,
-Linux and Windows. See the [English README](README.md),
-[Russian README](README.ru.md) and [user guide](docs/USER_GUIDE.md) for current
-installation instructions, controls, safeguards and feature-specific limits.
+- Directory tree now offers explicit background apparent-size analysis, separate
+  volume capacity, per-directory bars and Name/Size sibling ordering. Hidden files
+  count, directory links are not followed, and other filesystems are excluded.
+  Cancellation/limits retain partial results; refresh marks intersecting snapshots
+  stale. Results are tree-session-only and bounded to 20,000 directory records.
+
+### Established stable workflows
 
 - Multiple editor/viewer documents, movable/resizable windows, Tile and Cascade,
   shared controls and custom palette editing are implemented.
@@ -53,7 +61,40 @@ installation instructions, controls, safeguards and feature-specific limits.
   Linux virtual-console support includes GPM input, console-compatible colors
   and locale/font diagnostics; manual system setup can still be required.
 
-### Release and validation evidence
+### 1.1.10 publication and local validation
+
+- `cargo publish --locked` completed successfully; the crates.io API confirmed
+  version 1.1.10 is published and not yanked. Publication did not push Git changes
+  or trigger CI.
+- Package review verified required source, embedded fixtures, locales, guides and
+  license notices, with no generated test archives or build artifacts. The
+  release executable reported 1.1.10, and the publish dry run compiled the package.
+- Local release preparation included a complete native test run. Subsequent
+  test-only CI corrections for recovery startup and paged Linux Unicode
+  diagnostics were checked with deterministic regressions and their affected
+  suites. Tests retain the checkpoint and console-detection assertions.
+- Formatting, diff checks, release helpers, workflow policy, native all-target
+  Clippy and no-default-features checks passed. Linux ARM64/x86_64 and Windows
+  x86_64 MSVC all-target Clippy checks provide compilation evidence.
+- Runtime and terminal-restoration checks were performed locally on macOS ARM64,
+  including network selection, live loopback rates and System Information.
+  Linux ARM64 runtime execution of the corrected PTY case was unavailable locally.
+  These local results do not establish a successful five-platform 1.1.10 CI run.
+
+### Local Debian packaging tooling (after publication)
+
+`scripts/package_deb.py` wraps cargo-deb for native Debian/Ubuntu amd64 and arm64
+builds, with locked Cargo builds, dependency/asset checks, Lintian and optional
+Docker install/upgrade/remove tests. Packages and checksums stay local; no APT
+repository, signing or package publication is performed automatically.
+A separate dispatch-only `.github/workflows/debian.yml` builds and tests native
+Ubuntu 24.04 amd64/arm64 packages, with Docker install/upgrade/remove checks,
+and uploads only package/checksum Actions artifacts. It cannot create releases,
+drafts or tags; adding the workflow does not execute it. This
+repository tooling was added after the 1.1.10 crate publication; see the
+[packaging guide](docs/DEBIAN_PACKAGING.md) for requirements and runtime validation.
+
+### Historical 1.1.9 release evidence
 
 - The [1.1.9 release CI run](https://github.com/deemoun/Directory-Navigator/actions/runs/42739122883)
   succeeded for commit `b02a0ee4e756857e1aaf424d429d859bba54ef8f`. Its test/build
@@ -68,18 +109,7 @@ installation instructions, controls, safeguards and feature-specific limits.
 - The user separately reported testing the platform binaries. That report is
   distinct from automated CI and the locally exercised runtime scenarios.
 - Counts and platform exclusions in the historical notes below describe their
-  individual development stages, not a fresh 1.1.9 validation run.
-
-### Unreleased working-tree addition
-
-The checkout adds the following capability after the published 1.1.9 release;
-the package version has not been bumped and this addition has not been published.
-
-- Directory tree now offers explicit background apparent-size analysis, separate
-  volume capacity, per-directory bars and Name/Size sibling ordering. Hidden files
-  count, directory links are not followed, and other filesystems are excluded.
-  Cancellation/limits retain partial results; refresh marks intersecting snapshots
-  stale. Results are tree-session-only and bounded to 20,000 directory records.
+  individual development stages, not a fresh 1.1.10 validation run.
 
 ## Historical implementation and validation notes
 

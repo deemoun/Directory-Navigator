@@ -8,6 +8,10 @@
 /dn.exe
 /dist/
 /release/
+*.deb
+*.ddeb
+*.deb.sha256
+*.ddeb.sha256
 *.dSYM/
 *.pdb
 

@@ -437,6 +437,19 @@ Before manually publishing, review `cargo package --list`, run
 locales, test fixtures, README files, documentation images, `LICENSE` and
 `THIRD_PARTY_NOTICES.md` in the package. A dry run does not upload the crate.
 
+### Debian packages
+
+For downloadable `.deb` files or your own APT repository, use
+`scripts/package_deb.py` in a native Debian/Ubuntu `amd64` or `arm64` environment.
+It builds with audio, resolves runtime dependencies, checks the package and
+writes a SHA-256 checksum under `target/debian/`. An optional Docker smoke test
+checks installation, upgrades and removal without installing on the host.
+Nothing is uploaded automatically. See the [Debian packaging guide](docs/DEBIAN_PACKAGING.md)
+for tools, maintainer contact, commands and distribution compatibility.
+The manual **Actions → Build Debian packages** workflow builds/tests both native
+architectures and provides `dn-deb-x86_64` and `dn-deb-arm64` artifacts containing
+`.deb` packages and checksums. It does not create a GitHub release or draft.
+
 ### Unified releases
 
 After pushing the workflow to the default branch, open **Actions → Build unified

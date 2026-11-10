@@ -342,3 +342,135 @@ fn release_gate_compiles_without_cargo_dependencies() -> io::Result<()> {
     );
     Ok(())
 }
+
+fn assert_debian_artifacts_policy(text: &str) {
+    let text = text.replace("\r\n", "\n");
+    let events = text
+        .split_once("\non:\n")
+        .expect("Explicit events mapping")
+        .1
+        .split_once("\npermissions:\n")
+        .expect("Restricted permissions")
+        .0;
+    let events = events
+        .lines()
+        .filter(|line| line.starts_with("  ") && !line.starts_with("   "))
+        .collect::<Vec<_>>();
+    assert_eq!(events, ["  workflow_dispatch:"]);
+    for (prefix, expected) in [
+        ("os: ", ["ubuntu-24.04", "ubuntu-24.04-arm"]),
+        ("arch: ", ["amd64", "arm64"]),
+        (
+            "target: ",
+            ["x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu"],
+        ),
+        ("artifact: ", ["x86_64", "arm64"]),
+    ] {
+        let values = text
+            .lines()
+            .filter_map(|line| {
+                line.trim()
+                    .strip_prefix("- ")
+                    .unwrap_or(line.trim())
+                    .strip_prefix(prefix)
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(values, expected, "Native Debian matrix: {prefix}");
+    }
+    for required in [
+        "contents: read",
+        "persist-credentials: false",
+        "ref: ${{ github.sha }}",
+        "runs-on: ${{ matrix.os }}",
+        "cancel-in-progress: false",
+        "DEB_MAINTAINER: ${{ inputs.maintainer }}",
+        "DEB_REVISION: ${{ inputs.revision }}",
+        "RELEASE_VERSION: ${{ inputs.version }}",
+        "package_deb.maintainer(",
+        "package_deb.deb_version(",
+        "release.prepare(root, version)",
+        "SOURCE_DATE_EPOCH=",
+        "scripts/package_deb.py",
+        "dpkg-dev lintian",
+        "libasound2-dev",
+        "docker version",
+        "cargo install cargo-deb --version 3.8.0 --locked",
+        "cargo fmt --check",
+        "cargo clippy --locked --all-targets",
+        "cargo test --locked --target",
+        "cargo test --locked --no-default-features",
+        "--arch \"$DEB_ARCH\"",
+        "--maintainer \"$DEB_MAINTAINER\"",
+        "--revision \"$DEB_REVISION\"",
+        "--smoke-test ubuntu:24.04",
+        "sha256sum --check -- *.deb.sha256",
+        "actions/upload-artifact@",
+        "name: dn-deb-${{ matrix.artifact }}",
+        "target/debian/*.deb\n",
+        "target/debian/*.deb.sha256\n",
+        "if-no-files-found: error",
+        "retention-days: 30",
+    ] {
+        assert!(
+            text.contains(required),
+            "Missing Debian workflow requirement: {required}"
+        );
+    }
+    for forbidden in [
+        "contents: write",
+        "write-all",
+        "persist-credentials: true",
+        "git push",
+        "git tag",
+        "gh release",
+        "cargo publish",
+        "softprops/action-gh-release",
+        "ncipollo/release-action",
+        "workflow_call:",
+        "workflow_run:",
+        "pull_request",
+        "schedule:",
+        "secrets.",
+        "--install",
+        "dist/",
+        "needs:",
+    ] {
+        assert!(
+            !text.contains(forbidden),
+            "Unexpected Debian workflow capability: {forbidden}"
+        );
+    }
+}
+
+#[test]
+fn debian_workflow_builds_native_packages_without_creating_releases() -> io::Result<()> {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(".github/workflows/debian.yml");
+    for text in line_ending_variants(&fs::read_to_string(path)?.replace("\r\n", "\n")) {
+        assert_debian_artifacts_policy(&text);
+    }
+    Ok(())
+}
+
+#[test]
+fn debian_policy_rejects_publication_automatic_triggers_and_missing_package_tests() -> io::Result<()>
+{
+    let text = fs::read_to_string(
+        Path::new(env!("CARGO_MANIFEST_DIR")).join(".github/workflows/debian.yml"),
+    )?
+    .replace("\r\n", "\n");
+    for mutation in [
+        text.replacen("contents: read", "contents: write", 1),
+        text.replacen("  workflow_dispatch:", "  push:\n  workflow_dispatch:", 1),
+        text.replace("--smoke-test ubuntu:24.04", ""),
+        text.replace("target/debian/*.deb.sha256", "target/debian/*"),
+        text.replace("artifact: x86_64", "artifact: arm64"),
+        text.replace("ubuntu-24.04-arm", "ubuntu-24.04"),
+        format!("{text}\n  release:\n    run: gh release create version --draft\n"),
+    ] {
+        assert_ne!(mutation, text);
+        for variant in line_ending_variants(&mutation) {
+            assert!(std::panic::catch_unwind(|| assert_debian_artifacts_policy(&variant)).is_err());
+        }
+    }
+    Ok(())
+}

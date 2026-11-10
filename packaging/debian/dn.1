@@ -1,0 +1,35 @@
+.TH DN 1 "" "Directory Navigator" "User Commands"
+.SH NAME
+dn \- terminal file manager inspired by DOS Navigator
+.SH SYNOPSIS
+.B dn
+.RB [ \-\-no-session ]
+.br
+.B dn
+.RB [ \-h | \-\-help | \-V | \-\-version ]
+.SH DESCRIPTION
+Directory Navigator provides two file panes, movable windows, text viewers and
+editors, archive browsing, remote connections, and music playback.
+Run it from the directory you want to browse in a terminal of at least 80 columns
+and 25 rows. Press F1 for the built-in help.
+.SH OPTIONS
+.TP
+.B \-\-no-session
+Start in the launch directory without restoring the previous session.
+.TP
+.BR \-h ", " \-\-help
+Print command-line help and exit.
+.TP
+.BR \-V ", " \-\-version
+Print the version and exit.
+.SH FILES
+.TP
+.I $XDG_CONFIG_HOME/dn
+Configuration and persistent application data. Defaults to
+.I ~/.config/dn
+when XDG_CONFIG_HOME is unset.
+.SH DOCUMENTATION
+The user guide and third-party notices are installed in
+.IR /usr/share/doc/directory-navigator/ .
+.SH AUTHORS
+Dmitry Yarygin and contributors.
