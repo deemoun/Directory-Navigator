@@ -1,4 +1,4 @@
-# Directory Navigator — beta
+# Directory Navigator
 
 ## Help expand/restore control
 

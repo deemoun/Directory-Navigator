@@ -294,10 +294,10 @@ requires confirmation. Detected changes to queued entries or their parent
 directories stop the operation. Cancellation or failure retains completed work;
 multi-file operations have no automatic rollback.
 
-This is a **beta**. ZIP panes support confirmed updates; other archive formats are read-only. Text viewing/editing uses the
-limits below. Test important workflows on copies and report problems with your
-OS, terminal and reproduction steps. For detailed shortcuts, limits and user-menu
-configuration, see the [user guide](docs/USER_GUIDE.md).
+ZIP panes support confirmed updates; other archive formats are read-only. Text
+viewing/editing uses the limits below. Test important workflows on copies and
+report problems with your OS, terminal and reproduction steps. For detailed
+shortcuts, limits and user-menu configuration, see the [user guide](docs/USER_GUIDE.md).
 
 ### Errors and warnings
 
