@@ -40,6 +40,23 @@ impl Drop for Temp {
     }
 }
 
+fn defaults_with_panel_session(root: &std::path::Path) -> Config {
+    Config {
+        session: Some(dn::session::Snapshot {
+            panels: std::array::from_fn(|_| dn::session::PanelRecord {
+                path: root.to_path_buf(),
+                cursor: None,
+                filter: String::new(),
+                offset: 0,
+            }),
+            active_panel: 0,
+            documents: Vec::new(),
+            active_document: None,
+        }),
+        ..Config::default()
+    }
+}
+
 #[cfg(windows)]
 #[test]
 fn windows_settings_use_the_new_directory_without_importing_old_preferences() -> io::Result<()> {
@@ -58,10 +75,12 @@ fn windows_settings_use_the_new_directory_without_importing_old_preferences() ->
         assert!(app.welcome.modals.welcome().is_some());
         assert_eq!(app.config, Config::default());
         assert!(app.save_settings_on_exit());
-        assert_eq!(Config::read(&expected)?, Config::default());
+        let saved = defaults_with_panel_session(&root);
+        assert_eq!(Config::read(&expected)?, saved);
+        assert_eq!(app.config, saved);
         app.config.show_clock = false;
         app.load_config();
-        assert!(app.config.show_clock);
+        assert_eq!(app.config, saved);
         return Ok(());
     }
 
@@ -92,6 +111,21 @@ fn windows_settings_use_the_new_directory_without_importing_old_preferences() ->
     );
     assert_eq!(fs::read(old_path)?, old_bytes);
     assert!(root.join("Directory Navigator/config.conf").is_file());
+    Ok(())
+}
+
+#[test]
+fn first_app_exit_saves_default_preferences_with_panel_session() -> io::Result<()> {
+    let t = Temp::new()?;
+    let mut app = t.app()?;
+    assert_eq!(app.config, Config::default());
+    assert!(app.save_settings_on_exit());
+    let saved = defaults_with_panel_session(&t.0);
+    assert_eq!(Config::read(&t.path())?, saved);
+    assert_eq!(app.config, saved);
+    app.config.show_clock = false;
+    app.load_config();
+    assert_eq!(app.config, saved);
     Ok(())
 }
 
