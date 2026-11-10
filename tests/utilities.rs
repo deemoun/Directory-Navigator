@@ -1168,3 +1168,99 @@ fn network_missing_counters_keep_their_reason_when_reselecting_the_adapter() -> 
     }
     Ok(())
 }
+
+#[test]
+fn system_unicode_and_console_diagnostics_remain_reachable_across_pages() -> io::Result<()> {
+    let t = Temp::new()?;
+    let mut app = t.app()?;
+    utilities::open(&mut app, Kind::System);
+    wait(&mut app, |a| {
+        a.utility_state()
+            .information
+            .as_ref()
+            .is_some_and(|i| !i.loading())
+    });
+    // Reproduce the Linux snapshot on every host, including the system paths
+    // added between Unicode diagnostics and the terminal/GPM status fields.
+    let mut fields = (0..14)
+        .map(|i| (format!("Metadata {i}"), "fixture".into()))
+        .collect::<Vec<_>>();
+    fields.extend(
+        [
+            ("DN text output", "UTF-8"),
+            ("Console display decoding", "Not verified"),
+            ("Cyrillic sample", "Привет, Ёжик! / Test 123"),
+            ("Keyboard mode", "Not applicable outside a virtual console"),
+            (
+                "Russian alphabet mappings",
+                "Not applicable outside a virtual console",
+            ),
+            (
+                "Console frame mappings",
+                "Not applicable outside a virtual console",
+            ),
+            ("Terminal size", "80 × 25"),
+            ("Configured shell", "fixture"),
+            ("Active directory", "fixture"),
+            ("Home directory", "fixture"),
+            ("Executable path", "fixture"),
+            ("Temporary directory", "fixture"),
+            ("Configuration file", "fixture"),
+            ("Recovery directory", "fixture"),
+            ("Temp Drive directory", "fixture"),
+            ("Terminal mode", "No virtual console detected"),
+            ("Color output", "Extended colors (indexed / RGB)"),
+            ("Mouse input", "Terminal"),
+            ("GPM status", "Not a Linux virtual console"),
+        ]
+        .into_iter()
+        .map(|(k, v)| (k.into(), v.into())),
+    );
+    app.utility_state_mut().information.as_mut().unwrap().fields = fields;
+    for language in [
+        dn::localization::Language::English,
+        dn::localization::Language::Russian,
+    ] {
+        app.config.language = language;
+        for palette in [
+            dn::palette::PaletteProfile::ClassicDn,
+            dn::palette::PaletteProfile::Custom(
+                dn::palette::theme::DEFAULTS.map(|color| color ^ 1),
+            ),
+        ] {
+            app.config.palette = palette;
+            for (width, height) in [(80, 25), (100, 32), (80, 25)] {
+                draw(&mut app, width, height)?;
+                key(&mut app, KeyCode::End, KeyModifiers::NONE);
+                let bottom = draw(&mut app, width, height)?;
+                assert!(bottom.contains(language.text("No virtual console detected")));
+                assert!(bottom.contains(language.text("Extended colors (indexed / RGB)")));
+                assert!(bottom.contains(language.text("Not applicable outside a virtual console")));
+                if height == 25 {
+                    assert!(!bottom.contains(language.text("Not verified")));
+                }
+                for _ in 0..3 {
+                    assert_eq!(bottom, draw(&mut app, width, height)?);
+                }
+                key(&mut app, KeyCode::PageUp, KeyModifiers::NONE);
+                let unicode = draw(&mut app, width, height)?;
+                assert!(unicode.contains(&format!("{}: UTF-8", language.text("DN text output"))));
+                assert!(unicode.contains(&format!(
+                    "{}: {}",
+                    language.text("Console display decoding"),
+                    language.text("Not verified")
+                )));
+                assert!(unicode.contains("Привет, Ёжик! / Test 123"));
+                assert!(unicode.contains(&format!(
+                    "{}: {}",
+                    language.text("Keyboard mode"),
+                    language.text("Not applicable outside a virtual console")
+                )));
+                for _ in 0..3 {
+                    assert_eq!(unicode, draw(&mut app, width, height)?);
+                }
+            }
+        }
+    }
+    Ok(())
+}

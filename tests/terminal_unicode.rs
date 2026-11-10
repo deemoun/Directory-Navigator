@@ -14,20 +14,30 @@ fn linux_pty_unicode_diagnostics_do_not_treat_linux_term_as_a_console() -> io::R
     s.send(b"\x1buy", "System Information", |s| {
         s.text().contains("System Information") && s.text().contains("Architecture")
     })?;
-    s.send(b"\x1b[F", "Unicode and console diagnostics", |s| {
-        s.text().contains("No virtual console detected")
-            && s.text().contains("Extended colors (indexed / RGB)")
-            && s.text()
-                .contains("Not applicable outside a virtual console")
-            && s.text().contains("Not verified")
-    })?;
+    // System paths separate the terminal/GPM fields from the Unicode fields.
+    // Check both pages instead of assuming they fit in one 80×25 viewport.
+    fn check_diagnostics(s: &mut Session) -> io::Result<()> {
+        s.send(b"\x1b[F", "PTY console and font diagnostics", |s| {
+            s.text().contains("No virtual console detected")
+                && s.text().contains("Extended colors (indexed / RGB)")
+                && s.text()
+                    .contains("Not applicable outside a virtual console")
+        })?;
+        s.send(b"\x1b[5~", "Unicode output and decoder diagnostics", |s| {
+            s.text().contains("DN text output: UTF-8")
+                && s.text().contains("Console display decoding: Not verified")
+                && s.text()
+                    .contains("Keyboard mode: Not applicable outside a virtual console")
+                && s.text().contains("Привет, Ёжик! / Test 123")
+        })
+    }
+    check_diagnostics(&mut s)?;
     s.send(b"\x1b[15~", "refresh read-only diagnostics", |s| {
-        s.text().contains("Architecture") && !s.text().contains("Loading native information")
+        s.text().contains("Application")
+            && s.text().contains("Architecture")
+            && !s.text().contains("Loading native information")
     })?;
-    s.send(b"\x1b[F", "repeat PTY font status", |s| {
-        s.text()
-            .contains("Not applicable outside a virtual console")
-    })?;
+    check_diagnostics(&mut s)?;
     s.send(b"\x1b", "close diagnostics", |s| s.command_prompt_active())?;
     s.finish()
 }

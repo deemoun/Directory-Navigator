@@ -341,6 +341,33 @@ fn recovery_refuses_links_and_public_directories_without_touching_targets() -> i
     Ok(())
 }
 
+fn open_checkpoint_child_editor(app: &mut App, text: &str) {
+    // Recovery initialization can finish before the initial panel scans. Editor
+    // opening deliberately ignores input while the active panel is loading.
+    support::wait(app);
+    editor::open(app, true);
+    editor::paste(app, text);
+}
+
+#[test]
+fn checkpoint_child_setup_waits_for_initial_directory_scan() -> io::Result<()> {
+    let f = support::Fixture::new("checkpoint-child-readiness")?.canonicalized()?;
+    let mut app = App::new(f.0.clone())?;
+    assert!(app.panels.iter().all(|panel| panel.loading));
+    open_checkpoint_child_editor(&mut app, "checkpoint readiness 界\n");
+    let editor = app
+        .desktop
+        .active_editor()
+        .expect("checkpoint child must open its editor after initial directory loading");
+    assert!(app.panels.iter().all(|panel| !panel.loading));
+    assert!(editor.dirty());
+    assert_eq!(
+        editor.buffer.as_ref().unwrap().text,
+        "checkpoint readiness 界\n"
+    );
+    Ok(())
+}
+
 #[test]
 fn checkpoint_child_exits_without_destructors() -> io::Result<()> {
     let Some(base) = std::env::var_os("DN_RECOVERY_TEST_ROOT").map(PathBuf::from) else {
@@ -351,13 +378,19 @@ fn checkpoint_child_exits_without_destructors() -> io::Result<()> {
     a.config.save_on_exit = false;
     recovery::start(&mut a, root.clone());
     settled(&mut a);
-    editor::open(&mut a, true);
-    editor::paste(&mut a, "survive forced exit 界\n");
+    open_checkpoint_child_editor(&mut a, "survive forced exit 界\n");
     tick(&mut a);
     // Leave an interrupted sibling write beside the completed checkpoint.
     use std::io::Write;
-    let target = files(&root).pop().unwrap();
-    let mut partial = dn::publication::StagedFile::create(&target)?;
+    let checkpoints = files(&root);
+    assert_eq!(
+        checkpoints.len(),
+        1,
+        "child must publish one complete checkpoint before exiting"
+    );
+    let target = &checkpoints[0];
+    assert_eq!(store::read(target)?.text, "survive forced exit 界\n");
+    let mut partial = dn::publication::StagedFile::create(target)?;
     partial.file.write_all(b"partial new checkpoint")?;
     partial.file.sync_all()?;
     std::process::exit(86);

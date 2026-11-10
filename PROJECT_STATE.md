@@ -1,9 +1,14 @@
 # Directory Navigator
 
-## Unreleased networking work after 1.1.9
+## Release preparation — 1.1.10 (not yet published)
+
+The manifest and lockfile now target 1.1.10. Publication remains manual and has
+not been performed for this version.
 
 Network/interface snapshots have their own Utilities → Network Information
-window. Important-path snapshots remain in System Information. A Remote connections plugin supplies independent SFTP/FTP/explicit
+window, with an interface selector and live download/upload rates. Rates use local
+interface byte counters; metadata is refreshed explicitly. Important-path snapshots
+remain in System Information. A Remote connections plugin supplies independent SFTP/FTP/explicit
 FTPS panes, bounded previews, private-copy editing, queued uploads/downloads and
 confirmed remote file management. Profiles contain no saved secrets. Interactive
 SSH hands off to installed OpenSSH. FTP publication is server-dependent; SFTP
@@ -13,7 +18,7 @@ are not part of the published 1.1.9 crate. See the current README and guide for
 controls and boundaries; validation for this work is reported separately from the
 historical release evidence below.
 
-## Current status — stable 1.1.9
+## Latest published release — stable 1.1.9
 
 Directory Navigator 1.1.9 is the first stable release and is published on
 [crates.io](https://crates.io/crates/directory-navigator/1.1.9). It supports macOS,
