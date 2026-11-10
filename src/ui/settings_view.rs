@@ -80,8 +80,25 @@ pub(crate) fn settings_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
         spec.control(control);
     }
     if settings.kind == SettingsKind::System {
-        spec.caption(Paragraph::new(app.config.language.text("Existing destinations are always refused.\nTrash and permanent deletion require confirmation.")).style(dos(theme::TEXT)), Rect::new(rect.x + 3, rect.y + 7, width - 6, 2));
+        let index = settings.rows().len();
+        spec.caption(
+            Paragraph::new(app.config.language.text("Restore previous session"))
+                .style(dos(theme::TEXT)),
+            Rect::new(rect.x + 3, rect.y + 6, width - 6, 1),
+        );
+        spec.control(Control::new(
+            index,
+            Rect::new(rect.x + 3, rect.y + 7, width - 6, 1),
+            ControlKind::Button(
+                app.config
+                    .language
+                    .text(settings.draft.restore_session.label())
+                    .into(),
+            ),
+            Target::OpenSettingsChoice(index),
+        ));
     }
+
     spec.caption(
         Paragraph::new(
             app.config

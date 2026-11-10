@@ -100,6 +100,21 @@ pub(super) fn draw_viewer(frame: &mut impl Frame, app: &App, area: Rect) {
     if let Some(contents) = &viewer.contents {
         draw_text(frame, viewer, regions[1], profile, app.config.language);
         let line = viewer.source_line() + 1;
+        let stream_status = contents.stream.as_ref().map(|window| {
+            format!(
+                " {} · {} {} · {} {} · {} · {}",
+                app.config.language.text("Streaming"),
+                app.config.language.text("Line"),
+                line,
+                window.source.bytes,
+                app.config.language.text("bytes"),
+                contents
+                    .format
+                    .map(|format| format.to_string())
+                    .unwrap_or_else(|| "Hex".into()),
+                app.config.language.text(&viewer.notice)
+            )
+        });
         let pdf_status = contents.pdf.as_ref().map(|pdf| {
             if pdf.locked {
                 return format!(
@@ -116,7 +131,7 @@ pub(super) fn draw_viewer(frame: &mut impl Frame, app: &App, area: Rect) {
             )
         });
         frame.render_widget(
-            Paragraph::new(pdf_status.unwrap_or_else(|| {
+            Paragraph::new(stream_status.or(pdf_status).unwrap_or_else(|| {
                 format!(
                     " {} │ {line}/{} lines{} · {} · {}",
                     if viewer.markdown.rendered {

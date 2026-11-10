@@ -122,6 +122,22 @@ impl Session {
                 },
             )?;
         }
+        Self::spawn(root, terminal, false)
+    }
+    /// Reopen an already-finished private session without replacing its settings.
+    pub fn restart(mut self, no_session: bool) -> io::Result<Self> {
+        if self.child.try_wait()?.is_none() {
+            return Err(io::Error::other("Finish the session before restarting"));
+        }
+        match fs::remove_file(self.root.join("settings/dn/diagnostics.txt")) {
+            Ok(()) => {}
+            Err(e) if e.kind() == io::ErrorKind::NotFound => {}
+            Err(e) => return Err(e),
+        }
+        let root = std::mem::take(&mut self.root);
+        Self::spawn(root, "xterm-256color", no_session)
+    }
+    fn spawn(root: PathBuf, terminal: &str, no_session: bool) -> io::Result<Self> {
         let (mut master, mut slave) = (0, 0);
         let size = libc::winsize {
             ws_row: 25,
@@ -167,10 +183,24 @@ impl Session {
         let binary =
             std::env::var_os("DN_WALK_BINARY").unwrap_or_else(|| env!("CARGO_BIN_EXE_dn").into());
         let mut command = Command::new("/bin/sh");
-        command.args(["-c", "\"$1\"; dn_result=$?; printf '\\nDN_STATUS:%s\\n' \"$dn_result\"; IFS= read -r token; printf '\\nDN_INPUT:%s\\n' \"$token\"; exit \"$dn_result\"", "dn-walk"]).arg(binary)
-            .current_dir(&root).env("TERM",terminal).env("XDG_CONFIG_HOME",root.join("settings"))
-            .env("DN_TEST_DIAGNOSTICS", root.join("settings/dn/diagnostics.txt"))
-            .stdin(Stdio::from(slave.try_clone()?)).stdout(Stdio::from(slave.try_clone()?)).stderr(Stdio::from(slave.try_clone()?));
+        let script = if no_session {
+            "\"$1\" --no-session; dn_result=$?; printf '\\nDN_STATUS:%s\\n' \"$dn_result\"; IFS= read -r token; printf '\\nDN_INPUT:%s\\n' \"$token\"; exit \"$dn_result\""
+        } else {
+            "\"$1\"; dn_result=$?; printf '\\nDN_STATUS:%s\\n' \"$dn_result\"; IFS= read -r token; printf '\\nDN_INPUT:%s\\n' \"$token\"; exit \"$dn_result\""
+        };
+        command
+            .args(["-c", script, "dn-walk"])
+            .arg(binary)
+            .current_dir(&root)
+            .env("TERM", terminal)
+            .env("XDG_CONFIG_HOME", root.join("settings"))
+            .env(
+                "DN_TEST_DIAGNOSTICS",
+                root.join("settings/dn/diagnostics.txt"),
+            )
+            .stdin(Stdio::from(slave.try_clone()?))
+            .stdout(Stdio::from(slave.try_clone()?))
+            .stderr(Stdio::from(slave.try_clone()?));
         // SAFETY: only async-signal-safe calls are made between fork and exec.
         unsafe {
             command.pre_exec(|| {

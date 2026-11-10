@@ -136,7 +136,7 @@ pub(crate) fn prompt_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
                 Paragraph::new(
                     app.config
                         .language
-                        .text("Existing destinations are refused."),
+                        .text("Existing files require confirmation before replacement."),
                 )
                 .style(dos(theme::TEXT)),
                 Rect::new(rect.x + 2, rect.y + 3, rect.width - 4, 1),

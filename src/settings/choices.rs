@@ -3,6 +3,7 @@
 use crate::{config::Config, localization::Language, regional::DateOrder, shortcuts::Profile};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ChoiceValue {
+    Session(crate::session::RestoreLevel),
     Profile(Profile),
     Language(Language),
     DateOrder(DateOrder),
@@ -12,6 +13,7 @@ pub enum ChoiceValue {
 impl ChoiceValue {
     fn label(self, language: Language) -> String {
         match self {
+            Self::Session(v) => language.text(v.label()).into(),
             Self::Profile(p) => language.text(p.name()).into(),
             Self::Language(l) => l.name().into(),
             Self::DateOrder(order) => language
@@ -28,6 +30,7 @@ impl ChoiceValue {
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ChoiceId {
+    Session,
     Profile,
     Language,
     DateOrder,
@@ -35,6 +38,7 @@ pub enum ChoiceId {
     TimeFormat,
     TimeSeparator,
 }
+pub const SYSTEM: &[ChoiceId] = &[ChoiceId::Session];
 pub const KEYBOARD: &[ChoiceId] = &[ChoiceId::Profile];
 pub const REGIONAL: &[ChoiceId] = &[
     ChoiceId::Language,
@@ -54,6 +58,21 @@ impl ChoiceId {
     pub fn definition(self) -> ChoiceSpec {
         use ChoiceValue as V;
         match self {
+            Self::Session => ChoiceSpec {
+                caption: "Restore previous session",
+                values: &[
+                    V::Session(crate::session::RestoreLevel::Off),
+                    V::Session(crate::session::RestoreLevel::Panels),
+                    V::Session(crate::session::RestoreLevel::Documents),
+                ],
+                read: |c| V::Session(c.restore_session),
+                write: |c, v| {
+                    if let V::Session(v) = v {
+                        c.restore_session = v
+                    }
+                },
+                fallback: 1,
+            },
             Self::Profile => ChoiceSpec {
                 caption: "Profile",
                 values: &[

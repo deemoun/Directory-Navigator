@@ -104,6 +104,12 @@ pub(crate) fn handle_ui_at(app: &mut App, event: MouseEvent, now: Instant) {
     }
 }
 pub fn handle(app: &mut App, event: MouseEvent) {
+    if matches!(
+        event.kind,
+        MouseEventKind::Down(_) | MouseEventKind::ScrollUp | MouseEventKind::ScrollDown
+    ) {
+        crate::session::interaction(app);
+    }
     if app.output_visible {
         return;
     }

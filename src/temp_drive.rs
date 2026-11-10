@@ -109,7 +109,7 @@ pub(crate) fn copy(app: &mut App) {
     }
     if app.panels[app.active].targets().is_empty() && app.panels[app.active].extraction().is_none()
     {
-        app.prompt_operation(Kind::Copy, false);
+        app.prompt_native_copy();
         return;
     }
     let root = match Root::locate(app, true) {
@@ -121,7 +121,7 @@ pub(crate) fn copy(app: &mut App) {
         }
     };
     crate::windowing::activate(app, WindowId::MANAGER);
-    app.prompt_operation(Kind::Copy, false);
+    app.prompt_native_copy();
     if let Some(prompt) = app.modals.prompt_mut() {
         prompt.base = root.path.clone();
         prompt.field = crate::filesystem::display_name(&root.path.to_string_lossy());

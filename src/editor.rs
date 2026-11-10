@@ -18,7 +18,7 @@ pub use controls::{
     action, open, open_path, open_path_background, open_smartpad, paste, poll, request_close,
     EditorAction,
 };
-pub(crate) use controls::{file_key, file_mouse};
+pub(crate) use controls::{file_key, file_mouse, open_path_with_focus};
 use highlight::{Cache, Language};
 pub use keys::key;
 use std::{path::PathBuf, sync::mpsc};
@@ -84,6 +84,12 @@ enum Reply {
     Loaded(PathBuf, Result<(Buffer, Snapshot, TextFormat), String>),
     Saved(Result<(PathBuf, storage::SaveOutcome, TextFormat), String>),
     EncodingBytes(Result<Vec<u8>, String>),
+    ArchiveSaved {
+        path: PathBuf,
+        cache: storage::SaveOutcome,
+        format: TextFormat,
+        result: Result<Option<String>, String>,
+    },
 }
 struct SaveDestination {
     path: PathBuf,
@@ -95,6 +101,7 @@ pub struct Editor {
     pub(crate) requests: crate::requests::RequestScope,
     pub modals: crate::modals::ModalStack,
     smartpad: bool,
+    pub(crate) archive_origin: Option<std::sync::Arc<crate::archive::edit::Origin>>,
     smartpad_return: Option<crate::desktop::WindowId>,
     pub path: Option<PathBuf>,
     pub base: PathBuf,
@@ -160,6 +167,7 @@ impl Editor {
             requests: Default::default(),
             modals: Default::default(),
             smartpad: false,
+            archive_origin: None,
             smartpad_return: None,
             path: None,
             base,
@@ -255,9 +263,33 @@ impl Editor {
         let format = self.save_format.unwrap_or(self.format);
         let confirm =
             !save_as && format == self.format && self.durability_pending == Some(buffer.revision());
+        let archive_origin = (!save_as).then(|| self.archive_origin.clone()).flatten();
         let receive = self
             .requests
-            .spawn("dn-editor-save", move |_| {
+            .spawn("dn-editor-save", move |cancel| {
+                if let Some(origin) = archive_origin {
+                    let cache = if confirm {
+                        storage::confirm_durability(
+                            &path,
+                            original.as_ref().expect("published snapshot"),
+                        )
+                    } else {
+                        storage::save(&path, &text, format, original.as_ref())
+                    };
+                    return match cache {
+                        Ok(cache) => Reply::ArchiveSaved {
+                            path,
+                            cache,
+                            format,
+                            result: if confirm {
+                                origin.confirm_durability()
+                            } else {
+                                origin.save(&cancel)
+                            },
+                        },
+                        Err(error) => Reply::Saved(Err(error)),
+                    };
+                }
                 Reply::Saved(
                     (if confirm {
                         storage::confirm_durability(
@@ -323,5 +355,28 @@ impl Editor {
                 self.scroll_column = col + 1 - self.columns;
             }
         }
+    }
+}
+
+impl Editor {
+    pub(crate) fn session_document(
+        path: PathBuf,
+        loaded: (Buffer, Snapshot, TextFormat),
+        preferences: Preferences,
+    ) -> Result<Self, String> {
+        let mut editor = Self::new(
+            path.parent()
+                .ok_or("Missing document directory")?
+                .to_owned(),
+        )?;
+        let (buffer, snapshot, format) = loaded;
+        editor.highlight = Cache::new(Language::for_path(Some(&path)));
+        editor.path = Some(path);
+        editor.buffer = Some(buffer);
+        editor.original = Some(snapshot);
+        editor.format = format;
+        editor.apply_preferences(preferences);
+        editor.notice.clear();
+        Ok(editor)
     }
 }

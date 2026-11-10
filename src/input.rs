@@ -18,6 +18,7 @@ pub(crate) fn handle_ui_at(app: &mut App, key: KeyEvent, now: std::time::Instant
 }
 
 pub fn handle(app: &mut App, mut key: KeyEvent) {
+    crate::session::interaction(app);
     app.sync_modals();
     if key.code == KeyCode::Tab && key.modifiers.contains(KeyModifiers::SHIFT) {
         key.code = KeyCode::BackTab;
@@ -280,6 +281,7 @@ fn handle_key(app: &mut App, key: KeyEvent) {
 
 /// Paste uses the same topmost recipient as keyboard and mouse input.
 pub fn paste(app: &mut App, text: &str) {
+    crate::session::interaction(app);
     if app.desktop.native().manipulating() || crate::button_feedback::busy(app) {
         return;
     }

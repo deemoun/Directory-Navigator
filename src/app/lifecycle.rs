@@ -19,6 +19,8 @@ impl App {
         if let Some(m) = &mut self.editor_recovery {
             m.resume();
         }
+        self.session.quit_layout = None;
+        self.session.quit_active = None;
         self.quit_review = None;
         for id in self
             .desktop
@@ -35,6 +37,7 @@ impl App {
         self.sync_modals();
         self.modals.set_window_list(None);
         if self.quit_review.is_none() {
+            crate::session::remember_quit(self);
             self.quit_review = Some(QuitReview {
                 approved: Default::default(),
             });

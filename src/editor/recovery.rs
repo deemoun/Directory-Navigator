@@ -272,8 +272,15 @@ pub fn poll(app: &mut App, now: Instant) -> bool {
                                     s.path(*id),
                                     Record {
                                         text: b.text.clone(),
-                                        path: e.path.clone().or_else(|| e.recovery_source.clone()),
-                                        base: e.base.clone(),
+                                        path: if e.archive_origin.is_some() {
+                                            None
+                                        } else {
+                                            e.path.clone().or_else(|| e.recovery_source.clone())
+                                        },
+                                        base: e
+                                            .archive_origin
+                                            .as_ref()
+                                            .map_or_else(|| e.base.clone(), |o| o.base.clone()),
                                         cursor: b.cursor,
                                         anchor: b.anchor,
                                         bom: e.format.bom,

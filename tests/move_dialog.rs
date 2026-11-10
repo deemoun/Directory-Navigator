@@ -233,7 +233,12 @@ fn move_children_share_history_restore_draft_and_reject_retired_receipts() -> io
     key(&mut app, K::Enter);
     copy_dialog::action(&mut app, Action::Verify);
     key(&mut app, K::F(1));
-    assert!(draw(&mut app, 80, 25)?.contains("Native no-replace"));
+    assert!(draw(&mut app, 80, 25)?.contains("Ask before replacing is the default"));
+    assert!(app
+        .last_dialog()
+        .unwrap()
+        .message
+        .contains("Native exclusive rename"));
     key(&mut app, K::Esc);
     assert_eq!(copy_dialog::parent(&app), Some(owner));
     copy_dialog::action(&mut app, Action::Tree);

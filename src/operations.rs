@@ -99,7 +99,9 @@ pub struct OperationFailure {
 }
 impl std::fmt::Display for OperationFailure {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f,"{}\nAt: {}\n\nCompleted items are retained. Partial destinations may remain.\nMove sources are removed only after copying succeeds.",self.message,self.progress.path.display())
+        use crate::error_report::{Outcome, Report};
+        let cancelled = self.kind == io::ErrorKind::Interrupted;
+        f.write_str(&Report::new(if cancelled {"Operation cancelled."}else{"File operation did not finish."},&self.message,"Review completed items before retrying. Refresh the panels and check the source and destination.").path("At",&self.progress.path).outcome(if cancelled {Outcome::Cancelled}else{Outcome::Partial}).render(crate::localization::Language::English))
     }
 }
 impl std::error::Error for OperationFailure {}

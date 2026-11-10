@@ -43,6 +43,7 @@ pub(crate) fn document_bytes(
         let bytes: Arc<[u8]> = bytes.into();
         match extract_shared(bytes.clone(), None, cancel) {
             Err(error) if error.kind() == io::ErrorKind::PermissionDenied => Ok(Contents {
+                stream: None,
                 pdf: Some(Arc::new(Info {
                     page_lines: Vec::new(),
                     empty: false,

@@ -102,6 +102,10 @@ pub fn open_smartpad(app: &mut App) {
     }
 }
 pub fn open(app: &mut App, new: bool) {
+    if app.panels[app.active].is_archive() && !new {
+        crate::archive::edit::open(app);
+        return;
+    }
     if !crate::archive::require_native(app) {
         return;
     }
@@ -278,7 +282,7 @@ pub fn poll(app: &mut App) -> bool {
                 e.closing = None;
             }
             app.abort_quit();
-            app.error(error);
+            app.error(crate::error_report::Report::new("Cannot prepare the save.",error,"Keep the document open. Use Save As for another destination or encoding; UTF-8 can represent all text characters.").outcome(crate::error_report::Outcome::BufferRetained).render(app.config.language));
             return true;
         }
         return true;
@@ -290,7 +294,7 @@ pub fn poll(app: &mut App) -> bool {
         .and_then(|worker| match worker.try_recv() {
             Ok(reply) => Some(reply),
             Err(mpsc::TryRecvError::Disconnected) => Some(Reply::Saved(Err(
-                "Editor worker stopped; unsaved text is retained.".into(),
+                "Editor file access worker stopped.".into(),
             ))),
             Err(mpsc::TryRecvError::Empty) => None,
         });
@@ -298,12 +302,47 @@ pub fn poll(app: &mut App) -> bool {
         return false;
     };
     let mut error = None;
+    let reading = matches!(&reply, Reply::Loaded(..) | Reply::EncodingBytes(..))
+        || app.desktop.active_editor().is_some_and(|e| !e.saving);
+    let attempted = match &reply {
+        Reply::Loaded(path, ..) => Some(path.clone()),
+        _ => None,
+    };
+    let mut warning_reported = false;
     let mut saved = false;
     if let Some(editor) = app.desktop.active_editor_mut() {
         editor.worker = None;
         editor.saving = false;
+        let reply = match reply {
+            Reply::ArchiveSaved {
+                path,
+                mut cache,
+                format,
+                result,
+            } => {
+                // A failed ZIP commit must retain the dirty buffer while allowing
+                // a retry against the successfully written private working copy.
+                editor.original = Some(cache.snapshot.clone());
+                match result {
+                    Ok(warning) => {
+                        cache.warning = warning.or(cache.warning);
+                        Reply::Saved(Ok((path, cache, format)))
+                    }
+                    Err(error) => Reply::Saved(Err(error)),
+                }
+            }
+            other => other,
+        };
         match reply {
+            Reply::ArchiveSaved { .. } => unreachable!(),
             Reply::Loaded(path, Ok((mut buffer, snapshot, format))) => {
+                if editor
+                    .archive_origin
+                    .as_ref()
+                    .is_some_and(|origin| origin.path != path)
+                {
+                    editor.archive_origin = None;
+                }
                 editor.recovery_generation = editor
                     .recovery_generation
                     .checked_add(1)
@@ -316,9 +355,14 @@ pub fn poll(app: &mut App) -> bool {
                     .parent()
                     .map(PathBuf::from)
                     .unwrap_or_else(|| editor.base.clone());
-                app.file_tools
-                    .histories
-                    .record(crate::file_tools::history::HistoryKind::Edit, path.clone());
+                if editor.archive_origin.is_none() {
+                    app.file_tools
+                        .histories
+                        .record(crate::file_tools::history::HistoryKind::Edit, path.clone());
+                }
+                if let Some(origin) = &editor.archive_origin {
+                    editor.base = origin.base.clone();
+                }
                 editor.path = Some(path);
                 editor.highlight = Cache::new(Language::for_path(editor.path.as_deref()));
                 editor.scroll_row = 0;
@@ -339,14 +383,24 @@ pub fn poll(app: &mut App) -> bool {
                 }
             }
             Reply::Saved(Ok((path, outcome, format))) => {
+                if editor
+                    .archive_origin
+                    .as_ref()
+                    .is_some_and(|origin| origin.path != path)
+                {
+                    editor.archive_origin = None;
+                }
                 editor.base = path
                     .parent()
                     .map(PathBuf::from)
                     .unwrap_or_else(|| editor.base.clone());
-                if editor.path.as_ref() != Some(&path) {
+                if editor.archive_origin.is_none() && editor.path.as_ref() != Some(&path) {
                     app.file_tools
                         .histories
                         .record(crate::file_tools::history::HistoryKind::Edit, path.clone());
+                }
+                if let Some(origin) = &editor.archive_origin {
+                    editor.base = origin.base.clone();
                 }
                 editor.path = Some(path);
                 editor.original = Some(outcome.snapshot);
@@ -364,7 +418,15 @@ pub fn poll(app: &mut App) -> bool {
                 if let Some(warning) = outcome.warning {
                     editor.closing = None;
                     editor.notice = "Written — durability unconfirmed; retry Save".into();
-                    error = Some(format!("{} {warning}\n\n{}", app.config.language.text("File was written, but durability could not be confirmed:"),app.config.language.text("Your buffer is retained and recovery checkpointing continues. Retry Save to confirm it without rewriting unchanged text.")));
+                    let mut report=crate::error_report::Report::new(if editor.archive_origin.is_some(){"ZIP was updated; follow-up checks reported a warning."}else{"File was written, but durability could not be confirmed:"},warning,if editor.archive_origin.is_some(){"Keep the editor open. Review the cause before saving again; reopen the archive or export with Save As if its catalog cannot be refreshed."}else{"Your buffer is retained and recovery checkpointing continues. Retry Save to confirm it without rewriting unchanged text."}).outcome(crate::error_report::Outcome::Published);
+                    if let Some(origin) = &editor.archive_origin {
+                        report = report.text("Document", &origin.label);
+                        editor.notice = "ZIP updated — follow-up warning".into();
+                    } else if let Some(path) = &editor.path {
+                        report = report.path("File", path);
+                    }
+                    error = Some(report.render(app.config.language));
+                    warning_reported = true;
                 }
                 editor.recolor();
                 saved = true;
@@ -429,6 +491,13 @@ pub fn poll(app: &mut App) -> bool {
         }
     }
     if saved {
+        if app
+            .desktop
+            .editor(id)
+            .is_some_and(|e| e.archive_origin.is_some())
+        {
+            app.refresh();
+        }
         let key = app
             .desktop
             .editor_mut(id)
@@ -440,8 +509,45 @@ pub fn poll(app: &mut App) -> bool {
         app.desktop.release_reservations(id);
     }
     if let Some(error) = error {
+        let error = if warning_reported {
+            error
+        } else {
+            let mut report = crate::error_report::Report::new(
+                if reading {
+                    "Cannot open the file."
+                } else {
+                    "Cannot save the file."
+                },
+                error,
+                if reading {
+                    "Check the path and access permissions. Choose a reading encoding, or use F3 Hex for binary data."
+                } else {
+                    "Keep the document open. Use Save As for another destination or encoding; UTF-8 can represent all text characters."
+                },
+            );
+            if let Some(e) = app.desktop.editor(id) {
+                if e.buffer.is_some() {
+                    report = report.outcome(crate::error_report::Outcome::BufferRetained);
+                }
+                if let Some(origin) = &e.archive_origin {
+                    report = report.text("Document", &origin.label);
+                } else if let Some(path) = attempted
+                    .as_ref()
+                    .or(e.save_identity.as_ref())
+                    .or(e.path.as_ref())
+                {
+                    report = report.path("File", path);
+                }
+            }
+            report.render(app.config.language)
+        };
         app.abort_quit();
-        if app
+        if warning_reported {
+            app.push_dialog(crate::dialog::Dialog {
+                title: " Save warning ",
+                message: error,
+            });
+        } else if app
             .desktop
             .editor(id)
             .is_some_and(|editor| editor.buffer.is_none())
@@ -770,6 +876,29 @@ fn encoding_action(app: &mut App, command: EditorAction) -> Result<(), String> {
     }
     Ok(())
 }
+fn present_access_error(app: &mut App, summary: &'static str, cause: String, writing: bool) {
+    use crate::error_report::{Outcome, Report};
+    let mut report = Report::new(
+        summary,
+        cause,
+        if writing {
+            "Keep the document open. Use Save As for another destination or encoding; UTF-8 can represent all text characters."
+        } else {
+            "Check the path and access permissions. Choose a reading encoding, or use F3 Hex for binary data."
+        },
+    );
+    if let Some(e) = app.desktop.active_editor() {
+        if e.buffer.is_some() {
+            report = report.outcome(Outcome::BufferRetained);
+        }
+        if let Some(origin) = &e.archive_origin {
+            report = report.text("Document", &origin.label);
+        } else if let Some(path) = e.path.as_ref().or(e.save_identity.as_ref()) {
+            report = report.path("File", path);
+        }
+    }
+    app.error(report.render(app.config.language));
+}
 pub fn action(app: &mut App, command: EditorAction) {
     if matches!(
         command,
@@ -790,7 +919,12 @@ pub fn action(app: &mut App, command: EditorAction) {
         {
             request_action(app, PendingAction::ReopenEncoding);
         } else if let Err(error) = open_encoding(app, command == EditorAction::SaveEncoding) {
-            app.error(error);
+            present_access_error(
+                app,
+                "Cannot choose the text encoding.",
+                error,
+                command == EditorAction::SaveEncoding,
+            );
         }
         return;
     }
@@ -798,8 +932,20 @@ pub fn action(app: &mut App, command: EditorAction) {
         command,
         EditorAction::EncodingAccept | EditorAction::EncodingChoice(_)
     ) {
+        let writing = app.desktop.active_editor().is_some_and(
+            |e| matches!(e.modals.editor_modal(),Some(Modal::Encoding(d)) if d.saving),
+        );
         if let Err(error) = encoding_action(app, command) {
-            app.error(error);
+            present_access_error(
+                app,
+                if writing {
+                    "Cannot save the file."
+                } else {
+                    "Cannot open the file."
+                },
+                error,
+                writing,
+            );
         }
         return;
     }
@@ -1177,6 +1323,11 @@ mod save_outcome_tests {
         assert_eq!(e.format, format);
         assert!(e.closing.is_none());
         assert_eq!(e.buffer.as_ref().unwrap().text, text);
+        let warning = app.last_dialog().unwrap();
+        assert_eq!(warning.title, " Save warning ");
+        assert!(warning.message.contains("file was published"));
+        assert!(warning.message.contains("injected sync failure"));
+        assert!(!warning.message.contains("did not publish"));
         app.clear_dialogs();
         action(&mut app, EditorAction::Save);
         while app.desktop.active_editor().unwrap().busy() {
@@ -1191,6 +1342,45 @@ mod save_outcome_tests {
             use std::os::unix::fs::MetadataExt;
             assert_eq!(std::fs::metadata(&path)?.ino(), ino);
         }
+        Ok(())
+    }
+    #[test]
+    fn stopped_loading_worker_reports_opening_rather_than_saving() -> std::io::Result<()> {
+        let root =
+            std::env::temp_dir().join(format!("dn-editor-stopped-load-{}", std::process::id()));
+        std::fs::create_dir(&root)?;
+        struct Temp(PathBuf);
+        impl Drop for Temp {
+            fn drop(&mut self) {
+                let _ = std::fs::remove_dir_all(&self.0);
+            }
+        }
+        let _temp = Temp(root.clone());
+        let path = root.join("source.txt");
+        std::fs::write(&path, "original")?;
+        let mut app = App::new(root.clone())?;
+        app.config.save_on_exit = false;
+        let mut editor = Editor::new(root).map_err(std::io::Error::other)?;
+        editor.path = Some(path.clone());
+        editor.buffer = None;
+        app.show_editor(editor);
+        let e = app.desktop.active_editor_mut().unwrap();
+        let file = path.clone();
+        e.worker = Some(e.requests.spawn("dn-editor-load", move |_| {
+            Reply::Loaded(file, Err("retired reply".into()))
+        })?);
+        e.requests.start("dn-editor-load");
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while app.last_dialog().is_none() {
+            app.poll();
+            assert!(std::time::Instant::now() < deadline);
+            std::thread::sleep(std::time::Duration::from_millis(1));
+        }
+        let message = &app.last_dialog().unwrap().message;
+        assert!(message.contains("Cannot open the file."));
+        assert!(!message.contains("Cannot save the file."));
+        assert!(message.contains("Editor file access worker stopped."));
+        assert_eq!(std::fs::read_to_string(&path)?, "original");
         Ok(())
     }
 }

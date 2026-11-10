@@ -36,10 +36,10 @@ pub struct Buffer {
 impl Buffer {
     pub fn new(text: String) -> Result<Self, String> {
         if text.len() > MAX_BYTES {
-            return Err("Editor limit is 16 MiB. Use F3 for a bounded preview.".into());
+            return Err("Editor limit is 64 MiB. Use F3 for a bounded preview.".into());
         }
         if count_lines(text.bytes()) > MAX_LINES {
-            return Err("Editor limit is 250,000 lines. Use F3.".into());
+            return Err("Editor limit is 1,000,000 lines. Use F3.".into());
         }
         if text
             .chars()
@@ -222,7 +222,7 @@ impl Buffer {
             last + 1
         };
         if self.lines.len() - (through - first) + lines.len() > MAX_LINES {
-            return Err("Editor limit is 250,000 lines; change was not applied.".into());
+            return Err("Editor limit is 1,000,000 lines; change was not applied.".into());
         }
         let following = first + lines.len();
         let removed = range.len();
@@ -328,7 +328,7 @@ impl Buffer {
             return Err("Invalid text boundary".into());
         }
         if self.text.len() - range.len() + text.len() > MAX_BYTES {
-            return Err("Editor limit is 16 MiB; change was not applied.".into());
+            return Err("Editor limit is 64 MiB; change was not applied.".into());
         }
         if self.text[range.clone()] == *text {
             self.move_to(range.start + text.len(), false);

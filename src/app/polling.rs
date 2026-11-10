@@ -71,6 +71,7 @@ impl App {
         changed |= self.poll_operation();
         changed |= crate::tool_windows::poll(self);
         self.sync_modals();
+        changed |= crate::session::poll(self);
         changed
             | crate::windowing::poll(self)
             | crate::button_feedback::poll(self, std::time::Instant::now())
@@ -84,7 +85,8 @@ impl App {
         if let Some(wait) = crate::plugins::host::next_wake(self, now) {
             return wait.min(Duration::from_millis(50));
         }
-        let pending = self.editor_recovery.as_ref().is_some_and(|m| m.busy())
+        let pending = self.session.busy()
+            || self.editor_recovery.as_ref().is_some_and(|m| m.busy())
             || self
                 .desktop
                 .windows()
@@ -99,10 +101,10 @@ impl App {
             || self.directory_tree().is_some_and(|t| t.loading())
             || crate::user_menu::pending(&self.user_menu)
             || self.associations.busy()
-            || self
-                .panels
-                .iter()
-                .any(|p| p.archive().is_some_and(|a| a.preview.is_some()))
+            || self.panels.iter().any(|p| {
+                p.archive()
+                    .is_some_and(|a| a.preview.is_some() || a.edit_pending.is_some())
+            })
             || self.launcher.loading()
             || self.job.is_some()
             || self.transfers.pending_io()
@@ -132,7 +134,7 @@ impl App {
                         || self
                             .desktop
                             .viewer(*id)
-                            .is_some_and(|v| v.contents.is_none() || v.markdown.pending())
+                            .is_some_and(|v| v.contents.is_none() || v.pending_work())
                 })
             || self.file_info().is_some_and(|i| i.contents.is_none())
             || self
@@ -222,6 +224,12 @@ impl App {
                         }
                     }
                     Err(message) => {
+                        let path = self.desktop.viewer(id).map(|v| v.path.clone());
+                        let mut report=crate::error_report::Report::new("Cannot open the file.",message,"Refresh and check file access. Use As Text or As Hex for raw bytes, or an external viewer for unsupported formats.");
+                        if let Some(path) = path {
+                            report = report.path("File", path);
+                        }
+                        let message = report.render(self.config.language);
                         if self.desktop.active().id == id {
                             self.retire_document(id);
                             self.error(message);
@@ -271,7 +279,7 @@ impl App {
                 changed = true;
                 panel_errors.push(Dialog {
                     title: " Directory error ",
-                    message,
+                    message: crate::error_report::Report::new("Directory access reported a problem.",message,"Check the directory path and permissions. Refresh or choose an accessible folder.").path("Current directory",&panel.path).render(self.config.language),
                 });
             }
             changed |= loading != panel.loading || revision != panel.revision;
@@ -367,7 +375,12 @@ impl App {
                         }
                     }
                 }
-                Err(message) => self.error(message.to_string()),
+                Err(message) => {
+                    let report=crate::error_report::Report::new("File operation did not finish.",message.message.clone(),"Review completed items before retrying. Refresh the panels and check the source and destination.")
+                        .path("At",&message.progress.path)
+                        .outcome(if message.kind==std::io::ErrorKind::Interrupted {crate::error_report::Outcome::Cancelled}else{crate::error_report::Outcome::Partial});
+                    self.error(report.render(self.config.language));
+                }
             }
             self.refresh();
             if self.exit_pending {

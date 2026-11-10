@@ -332,6 +332,27 @@ pub(super) fn parse(bytes: &[u8]) -> io::Result<Config> {
         }
         config.highlight_groups.validate()?;
     }
+    if let Some(value) = root.get("session") {
+        if let Some(table) = value.as_table() {
+            match table
+                .get("restore")
+                .and_then(Value::as_str)
+                .and_then(crate::session::RestoreLevel::parse)
+            {
+                Some(level) => config.restore_session = level,
+                None if !table.contains_key("restore") => {}
+                _ => config.invalid_session = true,
+            }
+            if let Some(snapshot) = table.get("snapshot") {
+                match crate::session::decode(snapshot) {
+                    Ok(snapshot) => config.session = Some(snapshot),
+                    Err(_) => config.invalid_session = true,
+                }
+            }
+        } else {
+            config.invalid_session = true;
+        }
+    }
     Ok(config)
 }
 pub(super) fn encode(config: &Config, previous: Option<&[u8]>) -> io::Result<Vec<u8>> {
@@ -343,6 +364,26 @@ pub(super) fn encode(config: &Config, previous: Option<&[u8]>) -> io::Result<Vec
         None => Table::new(),
     };
     root.insert("config_version".into(), Value::Integer(2));
+    if root.get("session").is_some_and(|v| !v.is_table()) {
+        root.remove("session");
+    }
+    set(
+        &mut root,
+        "session",
+        "restore".into(),
+        Value::String(config.restore_session.key().into()),
+    )?;
+    if let Some(snapshot) = &config.session {
+        set(
+            &mut root,
+            "session",
+            "snapshot".into(),
+            crate::session::encode(snapshot)?,
+        )?;
+    } else if let Some(table) = root.get_mut("session").and_then(Value::as_table_mut) {
+        table.remove("snapshot");
+    }
+
     if let Some(table) = root.get_mut("bookmarks").and_then(Value::as_table_mut) {
         for slot in 1..=9 {
             table.remove(&slot.to_string());
@@ -413,5 +454,9 @@ pub(super) fn encode(config: &Config, previous: Option<&[u8]>) -> io::Result<Vec
     root.entry("bookmarks".to_owned())
         .or_insert_with(|| Value::Table(Table::new()));
     let text = toml::to_string_pretty(&root).map_err(|e| invalid(e.to_string()))?;
-    Ok(format!("# Directory Navigator preferences\n# Saved on normal exit; Options > Save desktop saves now.\n{text}").into_bytes())
+    let bytes = format!("# Directory Navigator preferences\n# Saved on normal exit; Options > Save desktop saves now.\n{text}").into_bytes();
+    if bytes.len() > super::store::MAX_CONFIG_BYTES as usize {
+        return Err(invalid("Configuration exceeds 1 MiB"));
+    }
+    Ok(bytes)
 }

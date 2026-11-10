@@ -43,12 +43,16 @@ impl Settings {
     }
     pub(crate) fn choice_fields(&self) -> &'static [choices::ChoiceId] {
         match self.kind {
+            SettingsKind::System => choices::SYSTEM,
             SettingsKind::Keyboard => choices::KEYBOARD,
             SettingsKind::Regional => choices::REGIONAL,
             _ => &[],
         }
     }
     pub fn control_count(&self) -> usize {
+        if self.kind == SettingsKind::System {
+            return self.rows().len() + 1;
+        }
         if self.kind == SettingsKind::Highlight {
             self.draft.highlight_groups.0.len() * 3 + 2
         } else if self.kind == SettingsKind::Plugins {
@@ -83,8 +87,16 @@ impl Settings {
             self.cycle_choice(index, reverse);
         }
     }
-    fn cycle_choice(&mut self, index: usize, reverse: bool) {
-        if let Some(choice) = self.choice_fields().get(index) {
+    pub(crate) fn choice_id(&self, index: usize) -> Option<choices::ChoiceId> {
+        let index = if self.kind == SettingsKind::System {
+            index.checked_sub(self.rows().len())?
+        } else {
+            index
+        };
+        self.choice_fields().get(index).copied()
+    }
+    pub(crate) fn cycle_choice(&mut self, index: usize, reverse: bool) {
+        if let Some(choice) = self.choice_id(index) {
             self.cursor = index;
             choice.definition().cycle(&mut self.draft, reverse);
         }
@@ -232,12 +244,9 @@ pub fn choice_items(
     row: usize,
     language: crate::localization::Language,
 ) -> Vec<String> {
-    settings
-        .choice_fields()
-        .get(row)
-        .map_or_else(Vec::new, |choice| {
-            choice.definition().items(&settings.draft, language)
-        })
+    settings.choice_id(row).map_or_else(Vec::new, |choice| {
+        choice.definition().items(&settings.draft, language)
+    })
 }
 
 pub fn open_choice(app: &mut App, row: usize) {

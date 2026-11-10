@@ -83,6 +83,7 @@ pub struct Entry {
     pub status: Status,
     pub progress: Progress,
     pub error: Option<String>,
+    error_kind: Option<io::ErrorKind>,
     origin: Origin,
     prepared: Option<operations::transfer::Prepared>,
     root: Option<crate::temp_drive::Root>,
@@ -90,6 +91,39 @@ pub struct Entry {
     ended: Option<Instant>,
 }
 impl Entry {
+    fn error_report(&self) -> Option<crate::error_report::Report> {
+        use crate::error_report::{Outcome, Report};
+        let cause = self.error.as_ref()?;
+        let cancelled = self.status == Status::Cancelled;
+        let summary = if cancelled {
+            "Operation cancelled."
+        } else if self.extracting {
+            "Archive extraction did not finish."
+        } else if self.packing {
+            "ZIP creation or update did not finish."
+        } else if self.plan.kind == operations::Kind::Move {
+            "Move did not finish."
+        } else {
+            "File operation did not finish."
+        };
+        let mut report=Report::new(summary,cause.clone(),"Review Transfer Center before retrying. Refresh the panels and check the destination, access permissions and free space.");
+        if !cancelled {
+            if let Some(kind) = self.error_kind {
+                report = report.io(kind);
+            }
+        }
+        report = report.outcome(if cancelled {
+            Outcome::Cancelled
+        } else if self.started.is_none() {
+            Outcome::Unchanged
+        } else {
+            Outcome::Partial
+        });
+        if let Some(source) = self.plan.sources.first() {
+            report = report.path("Source", source);
+        }
+        Some(report.path("Destination", &self.plan.destination))
+    }
     pub fn source_summary(&self) -> String {
         if let Some(summary) = &self.archive_summary {
             return summary.clone();
@@ -401,6 +435,7 @@ fn submit_request(
         },
         progress,
         error: None,
+        error_kind: None,
         origin,
         prepared: None,
         root,
@@ -413,7 +448,7 @@ fn submit_request(
     open(app);
     Ok(id)
 }
-fn fail(app: &mut App, id: TransferId, error: String, now: Instant) {
+fn fail(app: &mut App, id: TransferId, error: io::Error, now: Instant) {
     if let Some(e) = app
         .transfers
         .entries
@@ -421,9 +456,11 @@ fn fail(app: &mut App, id: TransferId, error: String, now: Instant) {
         .find(|e| e.id == id && !e.status.terminal())
     {
         e.status = Status::Failed;
-        e.error = Some(error.clone());
+        e.error_kind = Some(error.kind());
+        e.error = Some(error.to_string());
         e.ended = Some(now);
-        e.progress.detail(e.progress.path.clone(), error);
+        e.progress
+            .detail(e.progress.path.clone(), error.to_string());
         e.retire_payload();
         app.transfers.paused = true;
     }
@@ -484,7 +521,7 @@ fn start_next(app: &mut App, now: Instant) {
             app.transfers.active = Some(id);
             app.job = Some(job);
         }
-        Err(error) => fail(app, id, error.to_string(), now),
+        Err(error) => fail(app, id, error, now),
     }
 }
 fn prepare_queued(app: &mut App, now: Instant) -> bool {
@@ -511,7 +548,7 @@ fn prepare_queued(app: &mut App, now: Instant) -> bool {
                         e.status = Status::Queued;
                     }
                 }
-                Err(error) => fail(app, id, error.to_string(), now),
+                Err(error) => fail(app, id, error, now),
             }
         }
     }
@@ -539,7 +576,7 @@ fn prepare_queued(app: &mut App, now: Instant) -> bool {
                     Ok(prepared)
                 }) {
                 Ok(task) => app.transfers.preparation = Some((id, task)),
-                Err(error) => fail(app, id, error.to_string(), now),
+                Err(error) => fail(app, id, error, now),
             }
         }
     }
@@ -620,6 +657,7 @@ pub(crate) fn poll(app: &mut App, now: Instant) -> bool {
                         } else {
                             Status::Failed
                         };
+                        e.error_kind = Some(error.kind);
                         e.error = Some(error.message.clone());
                         e.progress = *error.progress;
                         e.progress.detail(e.progress.path.clone(), error.message);
@@ -636,6 +674,14 @@ pub(crate) fn poll(app: &mut App, now: Instant) -> bool {
                     .filter_map(|p| p.file_name().map(OsString::from))
                     .collect::<BTreeSet<_>>();
                 for panel in &mut app.panels {
+                    if success
+                        && matches!(e.request, Request::Create(_))
+                        && panel
+                            .archive()
+                            .is_some_and(|a| a.path == e.plan.destination)
+                    {
+                        panel.refresh(app.config.show_hidden);
+                    }
                     if success
                         && matches!(e.request, Request::Filesystem)
                         && panel.scope.owner() == e.origin.owner
@@ -724,7 +770,7 @@ pub fn action(app: &mut App, action: Action) {
     }
     app.transfers.trim();
 }
-const HELP: &str = "Copy and Move run one at a time. Closing this window keeps transfers running. Cancel stops the selected request; completed items remain. Failure or cancellation pauses the queue. Resume queue starts waiting requests, without retrying failed work. Totals and remaining time are estimates. Existing files require confirmation by default. Existing folders are merged; unrelated contents are kept.";
+const HELP: &str = "Copy and Move run one at a time. Closing this window keeps transfers running. Cancel stops the selected request; completed items remain. Failure or cancellation pauses the queue. Resume queue starts waiting requests, without retrying failed work. Totals and remaining time are estimates. Existing files require confirmation by default. Ask merges existing folders and keeps unrelated contents. Explicit Refuse rejects existing top-level destinations; explicit Skip skips them without merging.";
 fn cancel_selected(app: &mut App, now: Instant) {
     let Some(id) = app.transfers.selected else {
         return;
@@ -825,8 +871,8 @@ fn show_details(app: &mut App) {
         lang.text("Skipped"),
         e.progress.skipped
     );
-    if let Some(error) = &e.error {
-        text.push_str(&lang.message(error));
+    if let Some(report) = e.error_report() {
+        text.push_str(&report.render(lang));
         text.push('\n');
     }
     for detail in &e.progress.details {
@@ -843,7 +889,15 @@ fn show_details(app: &mut App) {
             e.progress.omitted_details
         ));
     }
-    text.push_str(lang.text("Completed items are retained. Partial destinations may remain."));
+    if e.error.is_none() {
+        text.push_str(lang.text(match e.status {
+            Status::Completed => {
+                "Transfer completed. Review the recorded details before repeating it."
+            }
+            Status::Cancelled => "The operation was cancelled. Completed items are retained.",
+            _ => "This request is queued or running; the displayed totals are provisional.",
+        }));
+    }
     app.push_dialog(crate::dialog::Dialog {
         title: " Transfer details Help ",
         message: text,
@@ -1138,6 +1192,7 @@ mod tests {
                 status: Status::Completed,
                 progress: Progress::default(),
                 error: None,
+                error_kind: None,
                 origin: origin.clone(),
                 prepared: None,
                 root: None,
@@ -1195,5 +1250,97 @@ mod tests {
         assert!(app.transfers.paused);
         assert_eq!(app.desktop.active().id, crate::desktop::WindowId::MANAGER);
         assert!(app.dialogs().is_empty());
+    }
+    #[test]
+    fn error_details_distinguish_preparation_partial_publication_and_cancellation() {
+        let (_temp, mut app, id, _) = fixture();
+        fail(
+            &mut app,
+            id,
+            io::Error::new(io::ErrorKind::StorageFull, "injected no space"),
+            Instant::now(),
+        );
+        let first = app
+            .transfers
+            .entries
+            .iter()
+            .find(|e| e.id == id)
+            .unwrap()
+            .error_report()
+            .unwrap()
+            .render(crate::localization::Language::English);
+        assert!(first.contains("did not publish"));
+        assert!(first.contains("Free space"));
+        let e = app
+            .transfers
+            .entries
+            .iter_mut()
+            .find(|e| e.id == id)
+            .unwrap();
+        e.started = Some(Instant::now());
+        e.progress.files = 1;
+        let partial = e
+            .error_report()
+            .unwrap()
+            .render(crate::localization::Language::English);
+        assert!(partial.contains("Some destinations"));
+        assert!(!partial.contains("did not publish"));
+        // Finished entries retire their request payload (including credentials),
+        // but retain their operation identity for accurate historical messages.
+        assert!(matches!(e.request, Request::Filesystem));
+        e.extracting = true;
+        assert!(e
+            .error_report()
+            .unwrap()
+            .render(crate::localization::Language::English)
+            .starts_with("Archive extraction did not finish."));
+        e.extracting = false;
+        e.packing = true;
+        assert!(e
+            .error_report()
+            .unwrap()
+            .render(crate::localization::Language::English)
+            .starts_with("ZIP creation or update did not finish."));
+        e.status = Status::Cancelled;
+        let cancelled = e
+            .error_report()
+            .unwrap()
+            .render(crate::localization::Language::Russian);
+        assert!(cancelled.contains("отменена"));
+        assert!(!cancelled.contains("не завершена"));
+        assert_eq!(e.progress.files, 1);
+    }
+    #[test]
+    fn failed_transfer_shows_summary_cause_and_advice_inside_its_five_rows() -> io::Result<()> {
+        use crate::{
+            localization::Language,
+            testing::{backend::TestBackend, Terminal},
+        };
+        let (_temp, mut app, id, _) = fixture();
+        fail(
+            &mut app,
+            id,
+            io::Error::new(io::ErrorKind::StorageFull, "injected no space"),
+            Instant::now(),
+        );
+        app.transfers.selected = Some(id);
+        open(&mut app);
+        for language in [Language::English, Language::Russian] {
+            app.config.language = language;
+            let mut terminal = Terminal::new(TestBackend::new(80, 25))?;
+            terminal.draw(|f| crate::ui::draw(f, &mut app))?;
+            let buffer = terminal.backend().buffer();
+            let text = buffer
+                .content
+                .iter()
+                .map(|c| c.symbol())
+                .collect::<String>();
+            assert!(text.contains(language.text("File operation did not finish.")));
+            assert!(text.contains(language.text("Cause")));
+            assert!(text.contains("injected no space"));
+            assert!(text
+                .contains(language.text("Free space on the destination filesystem, then retry.")));
+        }
+        Ok(())
     }
 }

@@ -2,6 +2,7 @@ pub(crate) mod markdown;
 mod navigation;
 pub mod pdf;
 mod search_controller;
+pub mod streaming;
 use crate::filesystem::open_regular;
 pub use navigation::{
     action, key, paste, Action, GoToDialog, Match, SearchDialog, SearchMemory, VisualRow,
@@ -24,6 +25,7 @@ pub enum ViewMode {
 
 #[derive(Clone)]
 pub struct Contents {
+    pub stream: Option<std::sync::Arc<streaming::Window>>,
     pub pdf: Option<std::sync::Arc<pdf::Info>>,
     pub source: Option<std::sync::Arc<str>>,
     pub raw: Option<std::sync::Arc<[u8]>>,
@@ -58,6 +60,12 @@ fn load_mode_cancelled(
         path.to_owned()
     };
     let input = open_regular(&resolved)?;
+    if resolve_link
+        && input.metadata()?.len() > MAX_BYTES as u64
+        && !(mode == ViewMode::Auto && pdf::is_path(path))
+    {
+        return streaming::Source::open(&resolved, mode, cancel);
+    }
     let mut bytes = Vec::new();
     let mut input = input.take(MAX_BYTES as u64 + 1);
     let mut chunk = [0u8; 64 * 1024];
@@ -151,6 +159,7 @@ pub(crate) fn from_bytes_cancelled(
         bytes.len()
     };
     Ok(Contents {
+        stream: None,
         pdf: None,
         raw_truncated,
         raw: Some(bytes.into()),
@@ -225,6 +234,7 @@ fn text_contents_cancelled(text: &str, cancel: &crate::task::Cancellation) -> io
         lines.push(String::new());
     }
     Ok(Contents {
+        stream: None,
         pdf: None,
         source: Some(std::sync::Arc::from(text)),
         raw: None,
@@ -239,6 +249,7 @@ fn text_contents_cancelled(text: &str, cancel: &crate::task::Cancellation) -> io
 }
 
 pub struct Viewer {
+    session_deferred_prompts: bool,
     pub(crate) requests: crate::requests::RequestScope,
     pub modals: crate::modals::ModalStack,
     pub requested_mode: ViewMode,
@@ -260,6 +271,7 @@ pub struct Viewer {
     reveal_line: Option<usize>,
     encoding_pending: Option<crate::task::Task<Result<Contents, String>>>,
     encoding_anchor: usize,
+    stream_pending: Option<crate::task::Task<Result<Contents, String>>>,
 }
 
 impl Viewer {
@@ -333,14 +345,25 @@ impl Viewer {
             current: None,
             last_search: SearchMemory::default(),
             notice: String::new(),
+            session_deferred_prompts: false,
             pending,
             reveal_line: None,
             encoding_pending: None,
             encoding_anchor: 0,
+            stream_pending: None,
         }
     }
 
+    pub(crate) fn pending_work(&self) -> bool {
+        self.pending.is_some()
+            || self.stream_pending.is_some()
+            || self.encoding_pending.is_some()
+            || self.markdown.pending()
+    }
     pub fn poll(&mut self) -> Option<Result<(), String>> {
+        if self.poll_stream() {
+            return Some(Ok(()));
+        }
         if self.poll_pdf_password() {
             return Some(Ok(()));
         }
@@ -380,6 +403,9 @@ impl Viewer {
                 if contents.pdf.is_some() {
                     self.markdown.hint = false;
                 }
+                if contents.stream.is_some() {
+                    self.markdown.hint = false;
+                }
                 self.contents = Some(contents);
                 self.offer_encoding();
                 self.layout_width = 0;
@@ -390,6 +416,9 @@ impl Viewer {
     }
 
     fn offer_encoding(&mut self) {
+        if self.session_deferred_prompts {
+            return;
+        }
         if let Some(c) = &self.contents {
             if let Some(pdf) = &c.pdf {
                 if pdf.locked && self.modals.viewer_pdf_password().is_none() {
@@ -440,6 +469,10 @@ impl Viewer {
                 "PDF text uses its embedded fonts; a text encoding cannot be selected.".into(),
             );
         }
+        if let Some(window) = &c.stream {
+            let source = window.source.with_format(format);
+            return self.stream_request(source, streaming::Request::Line(0));
+        }
         let bytes = c
             .raw
             .clone()
@@ -466,6 +499,30 @@ impl Viewer {
         Ok(())
     }
     pub fn step(&mut self, amount: isize) {
+        if let Some(window) = self.contents.as_ref().and_then(|c| c.stream.clone()) {
+            let local = self.anchor().0;
+            let total = self.contents.as_ref().unwrap().lines.len();
+            let request = if amount == isize::MAX {
+                Some(streaming::Request::End)
+            } else if amount < 0 && self.offset < amount.unsigned_abs() && window.first > 0 {
+                Some(streaming::Request::Line(
+                    (window.first + local).saturating_add_signed(amount),
+                ))
+            } else if amount > 0
+                && self.offset.saturating_add(amount as usize) >= self.rows.len().max(total)
+                && !window.eof
+            {
+                Some(streaming::Request::Line(window.first + total))
+            } else {
+                None
+            };
+            if let Some(request) = request {
+                if let Err(error) = self.stream_request(window.source.clone(), request) {
+                    self.notice = error;
+                }
+                return;
+            }
+        }
         let last = if self.rows.is_empty() {
             self.contents
                 .as_ref()
@@ -475,5 +532,87 @@ impl Viewer {
             self.rows.len().saturating_sub(1)
         };
         self.offset = self.offset.saturating_add_signed(amount).min(last);
+    }
+}
+
+pub(crate) fn session_load(
+    path: &Path,
+    mode: ViewMode,
+    format: Option<crate::text_encoding::TextFormat>,
+    cancel: &crate::task::Cancellation,
+) -> io::Result<Contents> {
+    let mut contents = load_mode_cancelled(path, mode, cancel, true)?;
+    if let Some(format) = format.filter(|_| !contents.binary && contents.pdf.is_none()) {
+        if let Some(window) = &contents.stream {
+            contents = window
+                .source
+                .with_format(Some(format))
+                .load(streaming::Request::Line(0), cancel)?;
+        } else if let Some(raw) = &contents.raw {
+            contents = from_encoded_bytes(raw.clone(), format, contents.raw_truncated)
+                .map_err(io::Error::other)?;
+        }
+    }
+    Ok(contents)
+}
+impl Viewer {
+    pub(crate) fn session_document(
+        path: PathBuf,
+        contents: Contents,
+        record: &crate::session::DocumentRecord,
+    ) -> Self {
+        let mut viewer = Self::empty(path, None);
+        viewer.requested_mode = record.mode;
+        viewer.markdown.hint = viewer
+            .path
+            .extension()
+            .and_then(|s| s.to_str())
+            .is_some_and(|s| s.eq_ignore_ascii_case("md") || s.eq_ignore_ascii_case("markdown"));
+        viewer.markdown.hint &=
+            contents.stream.is_none() && contents.pdf.is_none() && !contents.binary;
+        viewer.markdown.requested = record.markdown;
+        viewer.wrap = record.wrap;
+        viewer.contents = Some(contents);
+        viewer.session_deferred_prompts = true;
+        viewer
+    }
+    pub(crate) fn session_release_prompts(&mut self) -> bool {
+        if !self.session_deferred_prompts {
+            return false;
+        }
+        self.session_deferred_prompts = false;
+        if self
+            .contents
+            .as_ref()
+            .is_some_and(|c| c.pdf.is_some() || c.format.is_none())
+        {
+            self.offer_encoding();
+        }
+        true
+    }
+    pub(crate) fn session_position(&mut self, record: &crate::session::DocumentRecord) {
+        let Some(c) = &self.contents else {
+            return;
+        };
+        let position = if let Some(pdf) = &c.pdf {
+            record.position.min(pdf.page_lines.len().saturating_sub(1)) + 1
+        } else if c.binary {
+            record.position.min(
+                c.stream
+                    .as_ref()
+                    .map_or(c.loaded_bytes as u64, |w| w.source.bytes)
+                    .saturating_sub(1) as usize,
+            )
+        } else if c.stream.is_some() {
+            record.position.saturating_add(1)
+        } else {
+            record
+                .position
+                .min(self.source_line_count().saturating_sub(1))
+                + 1
+        };
+        let _ = self.go_to(&position.to_string());
+        self.horizontal = record.horizontal;
+        self.wrap = record.wrap;
     }
 }

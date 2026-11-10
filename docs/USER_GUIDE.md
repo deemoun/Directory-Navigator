@@ -275,12 +275,13 @@ relative to that base unless absolute. A single item can use a new destination
 name; multiple items require an existing destination directory. Copy and
 Move/rename use DN's expanded dialog with these supported choices:
 
-- **Refuse existing destinations** (default): reject the batch before writing if
-  any top-level destination already exists.
-- **Skip all existing files**: leave existing files, directories and broken links
-  untouched, copying/moving only the remaining items. Transfer Center records
-  any skips. Existing directories are skipped as a whole; their contents are never
-  merged. Skipped sources are retained.
+- **Ask before replacing** (default): merge existing directories and ask about
+  conflicting files. Choose Replace, Skip, Replace all, Skip all or Cancel; the
+  “all” choices apply only to this transfer. Skip is initially focused.
+- **Refuse existing destinations**: reject existing top-level destinations before
+  publication. Existing folders are not merged under this explicit policy.
+- **Skip all existing files**: skip existing top-level files and folders as a whole,
+  without merging. Transfer Center records skips; skipped sources remain.
 - **Check free disk space**: estimate regular-file lengths before writing. This is
   advisory: filesystem overhead and later space changes can still cause errors.
   An unavailable space reading stops the operation before writing.
@@ -292,9 +293,10 @@ Move/rename use DN's expanded dialog with these supported choices:
   or **F4** recalls up to 16 attempted destinations for this session. **F1/Help**
   explains the options. Child dialogs return to the current draft.
 
-Overwrite, append, refresh and description copying are displayed disabled.
-Nothing replaces an existing destination, including a destination created after
-preflight. Move/rename defaults to Refuse and offers the same explicit Skip choice.
+Append, refresh and description copying remain unavailable. Replacement requires
+explicit confirmation under Ask; Refuse/Skip never replace existing destinations.
+Links, file/directory mismatches and changed destinations are refused. Move/rename
+also defaults to Ask and offers explicit Refuse/Skip policies.
 Its **Remove source files** box is checked and locked, so the operation stays a
 move. **F6** uses the other panel's directory; **Shift+F6** uses the active panel's
 directory for renaming. Both dialogs share destination history, as in DN.
@@ -365,14 +367,15 @@ White directories, green executables, cyan source, magenta archives, red media,
 blue links and yellow marks use the DOS-derived palette. Actual ANSI shades
 follow terminal preferences; high background intensity is steady, not blinking.
 
-The viewer loads at most 64 MiB / 1,000,000 lines, clips very long lines and labels
-bounded previews. Binary files display in hex. Arrows/page keys scroll; Esc or
+The viewer uses bounded previews up to 64 MiB / 1,000,000 lines and streams
+larger regular disk files through bounded windows. Very long lines are clipped;
+binary files display in hex. Arrows/page keys scroll; Esc or
 the Close button returns to panels. Preferences save automatically on normal exit by default.
 Options → Save desktop saves immediately; Options → Configuration → System Setup
 can disable saving on exit. Save desktop also stores this opt-out. This saves
-preferences, editor options, bookmarks and panel layouts/sorts, not open documents,
-current directories, filters or session histories. Cancelled dialogs do not save
-their draft changes.
+preferences, editor options, bookmarks, panel layouts/sorts and the selected
+session snapshot (see below). Histories are not persisted. Cancelled dialogs do
+not save their draft changes.
 Options → Load desktop reloads those preferences. Options → Configuration
 contains System Setup, Interface and the read-only Confirmation policy. Options → File
 Manager contains Setup and Highlight Groups. Enter applies setup changes;
@@ -620,8 +623,8 @@ be portable Unicode, with no conflicting case-folded names. The destination must
 be outside selected folders and must not already exist. Creation runs through
 Transfer Center, continues while navigating, and supports cancellation. Only a
 complete ZIP is published; cancelled or failed staging is cleaned up. Limits are
-10,000 entries, 256 MiB of source file data and the existing browser metadata limits.
-Updating archives, removing originals, split volumes and TAR creation are unavailable.
+100,000 entries, 64 GiB of source file data and the existing browser metadata limits.
+ZIP updates are described below. Removing originals, split volumes and TAR creation are unavailable.
 
 A blank password creates an ordinary ZIP; a nonempty password encrypts file
 contents with AES-256. Filenames remain visible. AES ZIP requires a compatible
@@ -632,15 +635,14 @@ Credentials are remembered only for that archive pane until close or refresh;
 accepted extraction jobs retain their own in-memory credentials until finished.
 Nothing stores passwords in configuration, destination history or diagnostics.
 Encrypted contents are authenticated before preview text or extracted files are
-published. Password checking is cancellable and limited to 256 MiB per selection.
+published. Password checking is cancellable and limited to 64 GiB per selection.
 The viewer still retains only its bounded preview, even when authentication reads
 an entire encrypted member. Both AES ZIP and legacy ZipCrypto reads are supported;
 new archives always use AES. No external archiver is required on any platform.
 
-Archives remain read-only: extract before editing or running commands on members.
-Move, deletion, mkdir, copying into archives, source removal,
-links/special-file extraction and nested archive browsing are
-unsupported. Unsupported or unsafe selected trees and incomplete catalogs are
+TAR/TGZ, RAR and 7z remain read-only. ZIP supports the updates described below.
+Moving members, mkdir, source removal, links/special-file extraction and nested
+archive browsing remain unsupported. Extract members before running native commands. Unsupported or unsafe selected trees and incomplete catalogs are
 rejected before extraction. Portable output names exclude Windows device names,
 case-folding collisions and names invalid on Windows. No archive ownership or
 privileged permission bits are restored. Available times and ordinary permissions
@@ -649,16 +651,56 @@ checksums and source identity are checked before guarded publication with confir
 Cancellation removes owned staging; already published items remain if a later
 publication fails. Previewed members stay in memory and do not enter file history.
 
-Limits remain 512 MiB per archive source; 10,000 members; 20,000 virtual nodes;
-16 MiB tree metadata; 64 path levels/4 KiB paths. TAR traversal/decompression is
-limited to 256 MiB. Indexing/preview reads have ten-second work budgets; full
-extraction streams separately with cancellation and a one-hour worker read budget.
-ZIP indexing validates the central directory within a 64 MiB read budget; full
-payload reads are separately bounded by the accepted source size. Preview remains
-limited to 64 MiB/1,000,000 lines, while extraction can read full members. ZIP supports
-Stored and Deflate; ZIP64, multi-volume/self-extracting layouts and duplicate ZIP
-names are unsupported. ZIP timestamps use local time; TAR timestamps use UTC.
-The native codecs use the existing `zip`, `tar` and `flate2` dependencies.
+Limits are 64 GiB per source; 100,000 members; 200,000 virtual nodes;
+64 MiB tree metadata; 64 path levels/4 KiB paths. TAR traversal/decompression and
+ZIP creation input are bounded to 64 GiB. ZIP indexing validates ZIP32/ZIP64
+central-directory offsets, counts and metadata before library indexing. Indexing
+and ZIP/TAR preview reads have 60-second budgets; extraction has a one-hour read
+budget. Archive previews stay bounded to 64 MiB/1,000,000 lines. ZIP supports
+Stored and Deflate; multi-volume/self-extracting layouts and duplicate names are
+refused. RAR and 7z use internal Rust decoders; encrypted headers can ask for a
+password before listing. RAR multi-volume sets are refused. 7z header sizes and
+unpacked totals are checked, and decoder dictionaries/models use a 256 MiB limit
+per structure. These limits do not guarantee a fixed total process memory bound
+inside third-party parsers. Solid archives may need earlier entries decoded to
+reach a selected member. Cancellation remains available.
+
+## ZIP member updates
+
+Open a ZIP in one pane, select disk files/folders in the other and press F5.
+**Update ZIP** captures those sources and the ZIP's current internal directory.
+Click Update (or choose it with Tab/Shift+Tab and Enter) to explicitly approve
+replacement of matching files. Existing folders merge inside the archive;
+unrelated members remain unchanged. Cancel is initially selected. Ordinary F5
+extraction and Copy to Temp Drive keep their existing filesystem destinations
+and conflict rules. Copying disk files with a non-ZIP archive in the other pane
+still asks for an explicit filesystem destination.
+
+F8 inside a ZIP opens a separate confirmation for permanent member removal,
+including selected folder descendants. Cancel is initially selected; system Trash
+does not apply to entries inside ZIP files. The ZIP container remains.
+
+F4 opens a regular ZIP text member (up to the editor limit) in a private working
+copy. It uses the ordinary encoding chooser, editing, undo and dirty-close guards.
+F2 writes back through a complete staged ZIP rebuild; Save As exports a regular
+file. Failed archive saves retain dirty text and allow retry. The archive's source
+identity is checked before publication; external changes require reopening or
+exporting the draft with Save As. Unrelated compressed members and archive
+comments are retained, including encrypted members. Additions to encrypted ZIPs
+require the correct password and use AES-256. Archive passwords never enter
+configuration or recovery. Recovery of an archive editor is an untitled text
+snapshot, so it cannot silently overwrite an archive on recovery. Private working
+copies and recovery snapshots contain plaintext member content. Archive editors
+retain their own in-memory password until closed; refreshing a pane can forget
+its password independently. Closing removes owned editor working copies through
+the normal cleanup path.
+
+Updates run in Transfer Center; editor saves use the existing owned editor worker.
+Both stage beside the archive, recheck source/destination identities and publish
+only completed output. Failed/cancelled work removes owned staging and retains
+the old ZIP. A post-publication durability warning is reported separately. Other
+panes showing the changed ZIP refresh after completion. Updates require enough
+free space for the replacement archive; they do not modify a ZIP in place.
 
 
 Menu scope: ≡, File, Utilities, Panel, Manager and Options. Directory tree lives
@@ -1212,8 +1254,8 @@ matches structurally. Mismatched nesting leaves the cursor unchanged.
 Viewer **Ctrl+G / Alt+G** (Mac prefix: Ctrl+O, then G), or its **Go to** function-bar
 button, opens an owned navigation dialog. Text mode accepts 1-based line numbers;
 Hex mode accepts 0-based decimal byte offsets or `0x` hexadecimal addresses and
-highlights the destination byte. Addresses must lie within the loaded preview;
-the command does not read beyond its bounds. Invalid input retains the draft and
+highlights the destination byte. Bounded previews accept addresses only within
+their loaded contents; streaming disk viewers read the requested window. Invalid input retains the draft and
 position. Enter applies, Esc cancels, and Tab/Shift+Tab traverse field/buttons.
 
 ## Editor crash recovery and save outcomes
@@ -1413,9 +1455,10 @@ Characters that cannot be represented stop saving without changing the file;
 choose UTF-8 instead. No replacement characters or Unicode normalization are used.
 Failed conversion does not change the document's current encoding or undo history.
 
-The viewer reads at most 64 MiB of original bytes and bounds decoded text to
-192 MiB and 1,000,000 lines. Its existing long-line clipping remains. The editor limits both
-its Unicode buffer and encoded output to 16 MiB and permits at most 250,000 lines.
+Bounded viewer sources (archive members, snapshots and formatted documents) read
+at most 64 MiB of original bytes and bound decoded text to 192 MiB and 1,000,000
+lines. Larger regular disk files use the streaming reader described below. Its existing long-line clipping remains. The editor limits both
+its Unicode buffer and encoded output to 64 MiB and permits at most 1,000,000 lines.
 It refuses oversized documents without silently truncating them. Recovery retains the output encoding and BOM;
 old checkpoints remain UTF-8. Encoding choices are document-local, not global or
 persisted per filename. Markdown formatting/search operate on decoded text.
@@ -1523,6 +1566,92 @@ history. DN rechecks the approved destination before publishing the staged file.
 Files owned or reserved by another editor, links and directory destinations remain
 protected. Ordinary F2 saves retain their external-change checks. Large editable
 documents keep the existing bounded undo budget and use compatible recovery records.
+
+## Understanding errors and warnings
+
+Core file dialogs identify the failed action and relevant file/archive/configuration
+path, followed by the known outcome and a suggested next step. **Cause** retains
+original system/library details; those details can use the operating system's
+language. DN's explanation and advice follow the selected English/Russian UI.
+Long messages use the existing scrollable dialogs; paths are displayed safely.
+
+A preparation failure can say that no changes were published. A running transfer
+may have completed some work: review Transfer Center before retrying. Completed
+publications remain; cancelled transfers are distinct from failures. Source cleanup
+can also be partial, so do not assume all Move sources remain after an error.
+
+A save failure keeps available editor text and its existing recovery safeguards.
+A **written / durability unconfirmed** warning occurs after publication: keep the
+document open and follow its advice rather than assuming the old file is intact.
+ZIP follow-up warnings distinguish a published update from a failed preparation.
+Configuration-save errors retain preferences in the running instance; an exit-save
+failure cancels exit. DN does not automatically retry or switch applications.
+
+Archive/password dialogs keep their original cause available through existing
+F1/Help alongside localized advice. Session-restoration problems remain nonblocking
+notices; use System Setup to select restoration, or reopen unavailable files from
+panels. Advice to refresh, choose Save As/UTF-8, free space or retry a password does
+not bypass confirmations, external-change checks or publication safeguards.
+
+## Session restoration
+
+System Setup → **Restore previous session** offers **Off**, **Panels only**
+(default), and **Panels and documents**. The shared choice opens with a click/F4;
+Left/Right or Space cycles it. OK applies the draft; Cancel/Esc discards it.
+
+Both panels restore their directories, active side, filename cursor, filter and
+scroll against freshly scanned contents. Marks are always cleared. Archive panes
+restore their outer disk folder with the archive highlighted. Missing directories
+fall back to an accessible ancestor, then the launch directory. Saved locations
+normally take precedence over the launch directory; `dn --no-session` bypasses
+session restoration for one invocation, while retaining normal saving rules.
+
+Document mode reopens current native disk files in their viewer/editor, restoring
+window order, active document, geometry/maximization, cursor/scroll, encoding,
+wrapping and Text/Hex/Markdown mode. Source lines, byte offsets and PDF pages are
+used, with positions clamped to current contents. Geometry is clamped to the current
+terminal. Slow completions do not take focus after user input. Password-protected
+PDFs remain locked until explicit activation/input opens their owned prompt.
+
+Untitled/recovered text, SmartPad, archive members, generated previews, tools,
+plugins, histories, transfers, passwords, audio state and undo history are excluded.
+Dirty editors retain normal Save/Discard/Cancel and crash-recovery behavior; the
+session file never contains their text. Save As updates the saved file reference.
+
+**Save desktop** captures the current session; successful normal exit captures it
+only when **Save settings on exit** is enabled. Off clears the old snapshot on the
+next successful save. **Load desktop** changes preferences only, without restoring
+windows or navigating panels. Quit reviews preserve the pre-review layout; cancelled
+quit does not publish it. Existing concurrent-instance and atomic-save guards cover
+preferences and snapshot together. No autosave of session snapshots is performed.
+
+The optional `[session]` section uses `restore = "off"`, `"panels"` or `"documents"`
+and a typed `snapshot`. Configuration version remains 2. Invalid session data does
+not invalidate other preferences. Unavailable items produce one summary notice.
+Snapshots permit at most 128 documents within the existing 1 MiB configuration
+limit; an oversized save reports an error and preserves the previous file.
+
+## Streaming large disk files
+
+F3 automatically switches regular disk files above 64 MiB to a windowed text/hex
+reader. It retains at most 4,096 lines / approximately 4 MiB of displayed text per
+window, a 16 KiB encoding sample, and a bounded sparse line index. It does not load
+the whole source into memory. Arrow/Page keys cross window boundaries; Home/End,
+Go to and forward/backward search reach the full file. Search and distant seeks
+run in owned background jobs. Esc cancels pending work before closing the viewer;
+inactive completions do not activate documents. The status bar says Streaming.
+
+All supported text encodings and mixed CR/LF/CRLF are supported. F8 reinterprets
+the unchanged source using the stored encoding sample; identity/size/mtime checks
+refuse a changed source rather than mixing versions. Hex uses original bytes and
+absolute offsets. Long lines retain the existing display clipping; text search
+uses that displayed representation. Sparse-index checkpoints are capped, so very
+large seeks may scan from an earlier checkpoint. Source changes require reopening.
+
+Formatted Markdown and PDF remain bounded; large disk Markdown uses source text.
+Archive-member and generated/editor-snapshot previews retain their existing memory
+limits. Editor buffers and encoded output are bounded to 64 MiB / 1,000,000 lines;
+undo retains its existing memory budget, and saves never truncate oversized text.
 
 ## PDF text viewing
 

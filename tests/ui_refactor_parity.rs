@@ -5,7 +5,8 @@
 //! status, the encoding commands and their context-dependent availability.
 //! Plugin preferences and editor frames include the approved music-opening and
 //! Markdown-preview controls. Russian tool footers preserve every shortcut and
-//! the full Close caption, including at 80 columns.
+//! the full Close caption, including at 80 columns. System Setup includes the
+//! approved session restoration selector; other frame expectations are unchanged.
 mod support;
 use dn::{
     editor::{self, EditorAction as A},
@@ -140,6 +141,27 @@ fn shared_logic_preserves_native_frames() -> io::Result<()> {
                                 footer.contains(&format!("Esc {}", language.text("Close"))),
                                 "{footer}"
                             );
+                        }
+                        if case == 11 {
+                            let message = &a.last_dialog().expect("editor help").message;
+                            assert!(message.contains("64"));
+                            assert!(message.contains("1,000,000") || message.contains("1 000 000"));
+                            assert!(!message.contains("16 MiB") && !message.contains("16 МиБ"));
+                            assert!(message.contains("F8"));
+                        }
+                        if case == 0 {
+                            let buffer = Buffer::rendered(ui::render(&a, &snapshot));
+                            let text = buffer
+                                .content
+                                .iter()
+                                .map(|c| c.symbol())
+                                .collect::<String>();
+                            assert!(text.contains(language.text("Restore previous session")));
+                            assert!(text.contains(language.text("Panels only")));
+                            assert!(result
+                                .hit_regions()
+                                .iter()
+                                .any(|(_, t)| *t == dn::mouse::Target::OpenSettingsChoice(2)));
                         }
                         if case == 2 {
                             let buffer = Buffer::rendered(ui::render(&a, &snapshot));

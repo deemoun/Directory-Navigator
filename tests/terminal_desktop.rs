@@ -986,7 +986,7 @@ fn temp_drive_real_copy_cancel_clear_and_terminal_restoration() -> io::Result<()
         s.text().contains("Completed") && root.join("item-001.txt").exists()
     })?;
     s.send(b"\x1b", "hide ordinary transfer", |s| {
-        s.command_prompt_active()
+        s.command_prompt_active() && s.text().contains("Transfers 0/0")
     })?;
     s.send(b"\x1bud", "clear confirmation", |s| {
         s.text().contains("Clear Temp Drive") && s.text().contains("This cannot be undone.")
@@ -1001,6 +1001,7 @@ fn temp_drive_real_copy_cancel_clear_and_terminal_restoration() -> io::Result<()
     })?;
     s.send(b"\x1b[Z\r", "confirm clear", |s| {
         s.command_prompt_active()
+            && s.text().contains("Transfers 0/0")
             && fs::read_dir(&root).is_ok_and(|mut entries| entries.next().is_none())
     })?;
     assert!(root.is_dir());
@@ -1197,6 +1198,214 @@ fn txt_preference_settings_enter_cancel_and_terminal_restoration() -> io::Result
     s.send(b"\x1b", "close unchanged editor", |s| {
         s.command_prompt_active() && !s.text().contains("F2 Save")
     })?;
+    assert_eq!(fs::read(s.root.join("item-000.txt"))?, b"fixture\n");
+    s.finish()
+}
+
+#[test]
+fn zip_updates_edit_add_remove_cancel_and_terminal_restoration() -> io::Result<()> {
+    use std::io::{Read, Write};
+    fn member(path: &std::path::Path, name: &str) -> Option<String> {
+        let mut zip = zip::ZipArchive::new(fs::File::open(path).ok()?).ok()?;
+        let mut value = String::new();
+        zip.by_name(name).ok()?.read_to_string(&mut value).ok()?;
+        Some(value)
+    }
+    let mut s = Session::new("zip-updates")?;
+    s.wait("manager ready", |s| {
+        s.command_prompt_active() && s.text().contains("item-000.")
+    })?;
+    let path = s.root.join("fixture.zip");
+    let mut zip = zip::ZipWriter::new(fs::File::create(&path)?);
+    for (name, text) in [("root.txt", "original"), ("keep.txt", "keep")] {
+        zip.start_file(name, zip::write::SimpleFileOptions::default())?;
+        zip.write_all(text.as_bytes())?;
+    }
+    zip.finish()?;
+    fs::write(s.root.join("add.txt"), "added")?;
+    s.send(b"\x12", "refresh ZIP fixture", |s| {
+        s.command_prompt_active()
+    })?;
+    s.select_file("fixture.zip")?;
+    s.send(b"\r", "archive pane", |s| {
+        s.text().contains("root.txt") && s.text().contains(":: /")
+    })?;
+    s.select_file("root.txt")?;
+    s.send(b"\x1b[14~", "ZIP member editor", |s| {
+        s.text().contains("F2 Save") && s.text().contains("original")
+    })?;
+    s.paste("edited ", "ZIP draft", |s| {
+        s.text().contains("edited original")
+    })?;
+    s.send(b"\x1b[12~", "save ZIP member", |_| {
+        member(&path, "root.txt").as_deref() == Some("edited original")
+    })?;
+    s.send(b"\x1b", "close saved ZIP editor", |s| {
+        s.command_prompt_active()
+    })?;
+    s.send(b"\t", "switch to disk pane", |s| s.command_prompt_active())?;
+    s.select_file("add.txt")?;
+    s.send(b"\x1b[15~", "ZIP update confirmation", |s| {
+        s.text().contains("Update ZIP") && s.text().contains("Matching files")
+    })?;
+    s.send(b"\r", "safe default cancels ZIP update", |s| {
+        s.command_prompt_active() && !s.text().contains("Update ZIP")
+    })?;
+    assert!(member(&path, "add.txt").is_none());
+    s.send(b"\x1b[15~", "ZIP update again", |s| {
+        s.text().contains("Update ZIP")
+    })?;
+    s.send(b"\x1b[Z\r", "confirm ZIP update", |_| {
+        member(&path, "add.txt").as_deref() == Some("added")
+    })?;
+    s.send(b"\x1b", "close ZIP transfer", |s| {
+        s.command_prompt_active() && s.text().contains("Transfers 0/0")
+    })?;
+    s.send(b"\t", "return to ZIP pane", |s| s.command_prompt_active())?;
+    s.select_file("add.txt")?;
+    s.send(b"\x1b[19~", "ZIP removal confirmation", |s| {
+        s.text().contains("Remove ZIP members")
+    })?;
+    s.send(b"\r", "safe default cancels ZIP removal", |s| {
+        s.command_prompt_active()
+    })?;
+    assert_eq!(member(&path, "add.txt").as_deref(), Some("added"));
+    s.send(b"\x1b[19~", "ZIP removal again", |s| {
+        s.text().contains("Remove ZIP members")
+    })?;
+    s.send(b"\x1b[Z\r", "confirm ZIP removal", |_| {
+        member(&path, "add.txt").is_none()
+    })?;
+    s.send(b"\x1b", "close removal transfer", |s| {
+        // Publication precedes the worker completion. Wait for the host to
+        // acknowledge completion before asking it to quit.
+        s.command_prompt_active() && s.text().contains("Transfers 0/0")
+    })?;
+    assert_eq!(member(&path, "keep.txt").as_deref(), Some("keep"));
+    assert_eq!(fs::read_to_string(s.root.join("add.txt"))?, "added");
+    s.finish()
+}
+
+#[test]
+fn streaming_viewer_reaches_bytes_beyond_preview_limit_and_restores_terminal() -> io::Result<()> {
+    use std::io::{Seek, SeekFrom, Write};
+    let mut s = Session::new("streaming-viewer")?;
+    s.wait("manager ready", |s| {
+        s.command_prompt_active() && s.text().contains("item-000.")
+    })?;
+    let mut file = fs::File::create(s.root.join("large.bin"))?;
+    let offset = 65 * 1024 * 1024u64;
+    file.seek(SeekFrom::Start(offset))?;
+    file.write_all(b"STREAM-END")?;
+    drop(file);
+    s.send(b"\x12", "refresh large fixture", |s| {
+        s.command_prompt_active()
+    })?;
+    s.select_file("large.bin")?;
+    s.send(b"\x1b[13~", "streaming F3", |s| {
+        s.text().contains("Streaming") && s.text().contains("00000000")
+    })?;
+    s.send(b"\x07", "streaming byte Go to", |s| {
+        s.text().contains("Go to")
+    })?;
+    s.send(
+        format!("{offset}\r").as_bytes(),
+        "read beyond old preview limit",
+        |s| s.text().contains("STREAM-END"),
+    )?;
+    s.resize(100, 32)?;
+    s.send(b"\x1b[H", "streaming Home", |s| {
+        s.text().contains("00000000") && !s.text().contains("STREAM-END")
+    })?;
+    s.send(b"\x1b[F", "streaming End", |s| {
+        s.text().contains("STREAM-END")
+    })?;
+    s.send(b"\x1b", "close streaming viewer", |s| {
+        s.command_prompt_active()
+    })?;
+    s.finish()
+}
+
+#[test]
+fn session_save_restart_documents_and_no_session_restore_terminal() -> io::Result<()> {
+    let mut s = Session::with_preferences("session-restart", "[session]\nrestore='documents'\n")?;
+    s.wait("manager ready", |s| {
+        s.manager_document_ready() && s.text().contains("item-000.")
+    })?;
+    s.select_file("inside")?;
+    s.send(b"\r", "enter remembered folder", |s| {
+        s.command_prompt_active() && s.text().contains("child.txt")
+    })?;
+    s.select_file("child.txt")?;
+    s.send(b"\x1b[14~", "open remembered editor", |s| {
+        s.text().contains("F2 Save") && s.text().contains("1 child")
+    })?;
+    let config = s.root.join("settings/dn/config.conf");
+    s.send(b"\x1bo", "editor Options menu", |s| {
+        s.text().contains("Autoindent") && s.text().contains("Tab width")
+    })?;
+    s.send(b"s", "save desktop session", |_| {
+        dn::config::Config::read(&config)
+            .is_ok_and(|c| c.session.is_some_and(|s| s.documents.len() == 1))
+    })?;
+    s.send(b"\x1b", "close editor after explicit snapshot", |s| {
+        s.command_prompt_active()
+    })?;
+    s.finish()?;
+    let mut s = s.restart(false)?;
+    s.wait("restore editor and panes", |s| {
+        s.text().contains("child")
+            && s.text().contains("F2 Save")
+            && fs::read_to_string(s.root.join("settings/dn/diagnostics.txt"))
+                .is_ok_and(|v| v.contains("focus=Editor"))
+    })?;
+    s.resize(100, 32)?;
+    s.send(b"\x1b", "close restored editor", |s| {
+        s.command_prompt_active() && s.text().contains("/inside")
+    })?;
+    s.finish()?;
+    let mut s = s.restart(true)?;
+    s.wait("fresh launch bypasses saved session", |s| {
+        s.manager_document_ready() && s.text().contains("item-000.")
+    })?;
+    assert!(!s.text().contains("F2 Save"));
+    assert!(!s.text().contains("/inside"));
+    s.finish()
+}
+
+#[test]
+fn accurate_copy_help_and_corrupt_archive_error_restore_terminal() -> io::Result<()> {
+    let mut s = Session::new("help-errors")?;
+    s.wait("manager ready", |s| {
+        s.manager_document_ready() && s.text().contains("item-000.")
+    })?;
+    s.select_file("item-000.txt")?;
+    s.send(b"\x1b[15~", "copy dialog", |s| {
+        s.text().contains("Copy file")
+    })?;
+    s.send(b"\x1bOP", "current copy help", |s| {
+        s.text().contains("Ask before replacing is the default")
+    })?;
+    s.send(b"\x1b", "return to copy draft", |s| {
+        s.text().contains("Copy file") && !s.text().contains("Ask before replacing is the default")
+    })?;
+    s.send(b"\x1b", "cancel copy", |s| s.command_prompt_active())?;
+    fs::write(s.root.join("broken.zip"), b"not a zip")?;
+    s.send(b"\x12", "refresh corrupt fixture", |s| {
+        s.command_prompt_active()
+    })?;
+    s.select_file("broken.zip")?;
+    s.send(b"\r", "archive error explains action", |s| {
+        s.text().contains("Cannot read the archive.")
+    })?;
+    s.send(b"\x1b[F", "scroll to original cause", |s| {
+        s.text().contains("Cause")
+    })?;
+    s.resize(100, 32)?;
+    s.send(b"\x1b", "dismiss owned archive error", |s| {
+        s.command_prompt_active()
+    })?;
+    assert_eq!(fs::read(s.root.join("broken.zip"))?, b"not a zip");
     assert_eq!(fs::read(s.root.join("item-000.txt"))?, b"fixture\n");
     s.finish()
 }

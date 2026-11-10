@@ -235,6 +235,16 @@ impl Shell {
         self.window.set_bounds(tv(r));
         self.surface.bounds = rect(self.window.bounds());
     }
+    pub(crate) fn session_restore(&mut self, value: crate::session::Geometry, size: (u16, u16)) {
+        self.rollback(
+            Saved {
+                bounds: value.bounds,
+                preferred: value.bounds,
+                maximized: value.maximized,
+            },
+            size,
+        );
+    }
     pub fn save(&self) -> Saved {
         Saved {
             bounds: self.surface.bounds,

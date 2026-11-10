@@ -11,16 +11,18 @@ use std::{
     path::{Path, PathBuf},
     time::{Duration, Instant},
 };
-pub const MAX_ENTRIES: usize = 10_000;
-pub const MAX_NODES: usize = 20_000;
-pub const MAX_METADATA: usize = 16 * 1024 * 1024;
-pub const MAX_STREAM: u64 = 256 * 1024 * 1024;
-const MAX_SOURCE: u64 = 512 * 1024 * 1024;
+pub const MAX_ENTRIES: usize = 100_000;
+pub const MAX_NODES: usize = 200_000;
+pub const MAX_METADATA: usize = 64 * 1024 * 1024;
+pub const MAX_STREAM: u64 = 64 * 1024 * 1024 * 1024;
+const MAX_SOURCE: u64 = 64 * 1024 * 1024 * 1024;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Format {
     Zip,
     Tar,
     TarGz,
+    SevenZ,
+    Rar,
 }
 impl Format {
     pub fn detect(path: &Path) -> Option<Self> {
@@ -31,6 +33,10 @@ impl Format {
             Some(Self::Tar)
         } else if name.ends_with(".zip") {
             Some(Self::Zip)
+        } else if name.ends_with(".7z") {
+            Some(Self::SevenZ)
+        } else if name.ends_with(".rar") {
+            Some(Self::Rar)
         } else {
             None
         }
@@ -199,7 +205,7 @@ impl Catalog {
         }
         Ok(())
     }
-    fn add(&mut self, member: Member) {
+    pub(super) fn add(&mut self, member: Member) {
         if let Err(e) = self.insert(member) {
             self.skipped += 1;
             if self.note.is_none() {
@@ -225,7 +231,7 @@ impl Catalog {
     }
 }
 /// Check cancellation, elapsed work and bytes on every bounded read.
-struct Guard<R> {
+pub(super) struct Guard<R> {
     inner: R,
     cancel: Cancellation,
     remaining: u64,
@@ -237,15 +243,15 @@ impl<R> Guard<R> {
             inner,
             cancel: cancel.clone(),
             remaining: limit,
-            deadline: Instant::now() + Duration::from_secs(10),
+            deadline: Instant::now() + Duration::from_secs(60),
         }
     }
 }
 impl<R: Read> Read for Guard<R> {
     fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
-        self.cancel.check()?;
+        self.cancel.check().map_err(io::Error::other)?;
         if Instant::now() > self.deadline {
-            return Err(io::Error::other("Archive work exceeded 10 seconds"));
+            return Err(io::Error::other("Archive work exceeded 60 seconds"));
         }
         if buffer.is_empty() {
             return Ok(0);
@@ -261,7 +267,7 @@ impl<R: Read> Read for Guard<R> {
 }
 impl<R: Seek> Seek for Guard<R> {
     fn seek(&mut self, position: SeekFrom) -> io::Result<u64> {
-        self.cancel.check()?;
+        self.cancel.check().map_err(io::Error::other)?;
         self.inner.seek(position)
     }
 }
@@ -269,7 +275,7 @@ fn source(path: &Path) -> io::Result<(File, Metadata)> {
     let file = open_regular(path)?;
     let metadata = file.metadata()?;
     if metadata.len() > MAX_SOURCE {
-        return Err(io::Error::other("Archive exceeds the 512 MiB source limit"));
+        return Err(io::Error::other("Archive exceeds the 64 GiB source limit"));
     }
     Ok((file, metadata))
 }
@@ -292,33 +298,77 @@ fn zip_guard(input: &mut Guard<File>, length: u64) -> io::Result<usize> {
                 && *i + 22 + usize::from(u16_at(&tail, *i + 20)) == tail.len()
         })
         .ok_or_else(|| io::Error::other("Missing ZIP central directory"))?;
-    let count = u16_at(&tail, end + 10);
-    let size = u32_at(&tail, end + 12);
-    let offset = u32_at(&tail, end + 16);
+    let classic_count = u16_at(&tail, end + 10);
+    let classic_size = u32_at(&tail, end + 12);
+    let classic_offset = u32_at(&tail, end + 16);
     let absolute = length - tail_len as u64 + end as u64;
     if u16_at(&tail, end + 4) != 0
         || u16_at(&tail, end + 6) != 0
-        || u16_at(&tail, end + 8) != count
-        || count == u16::MAX
-        || size == u32::MAX
-        || offset == u32::MAX
-        || count as usize > MAX_ENTRIES
-        || size as usize > MAX_METADATA
-        || u64::from(offset) + u64::from(size) != absolute
+        || u16_at(&tail, end + 8) != classic_count
     {
-        return Err(io::Error::other(
-            "ZIP is oversized, ZIP64, multi-volume or has an unsupported directory layout",
-        ));
+        return Err(io::Error::other("Multi-volume ZIP is not supported"));
     }
+    let mut directory_end = absolute;
+    let mut values = (
+        u64::from(classic_count),
+        u64::from(classic_size),
+        u64::from(classic_offset),
+    );
+    let mut zip64 = false;
     if absolute >= 20 {
         input.seek(SeekFrom::Start(absolute - 20))?;
-        let mut signature = [0; 4];
-        input.read_exact(&mut signature)?;
-        if signature == *b"PK\x06\x07" {
-            return Err(io::Error::other("ZIP64 is not supported in this browser"));
+        let mut locator = [0; 20];
+        input.read_exact(&mut locator)?;
+        if locator.starts_with(b"PK\x06\x07") {
+            zip64 = true;
+            let at = |bytes: &[u8], i| u64::from_le_bytes(bytes[i..i + 8].try_into().unwrap());
+            let offset = at(&locator, 8);
+            if u32_at(&locator, 4) != 0
+                || u32_at(&locator, 16) != 1
+                || offset.checked_add(56).is_none_or(|n| n > absolute - 20)
+            {
+                return Err(io::Error::other("Invalid ZIP64 locator"));
+            }
+            input.seek(SeekFrom::Start(offset))?;
+            let mut record = [0; 56];
+            input.read_exact(&mut record)?;
+            if !record.starts_with(b"PK\x06\x06")
+                || at(&record, 4) < 44
+                || offset
+                    .checked_add(12)
+                    .and_then(|n| n.checked_add(at(&record, 4)))
+                    != Some(absolute - 20)
+                || u32_at(&record, 16) != 0
+                || u32_at(&record, 20) != 0
+                || at(&record, 24) != at(&record, 32)
+            {
+                return Err(io::Error::other("Invalid or multi-volume ZIP64 directory"));
+            }
+            values = (at(&record, 32), at(&record, 40), at(&record, 48));
+            for (small, sentinel, actual) in [
+                (u64::from(classic_count), u64::from(u16::MAX), values.0),
+                (u64::from(classic_size), u64::from(u32::MAX), values.1),
+                (u64::from(classic_offset), u64::from(u32::MAX), values.2),
+            ] {
+                if small != sentinel && small != actual {
+                    return Err(io::Error::other("ZIP64 and classic directory disagree"));
+                }
+            }
+            directory_end = offset;
         }
     }
-    input.seek(SeekFrom::Start(u64::from(offset)))?;
+    let (count, size, offset) = values;
+    if (!zip64
+        && (classic_count == u16::MAX || classic_size == u32::MAX || classic_offset == u32::MAX))
+        || count > MAX_ENTRIES as u64
+        || size > MAX_METADATA as u64
+        || offset.checked_add(size) != Some(directory_end)
+    {
+        return Err(io::Error::other(
+            "ZIP directory exceeds limits or has an invalid layout",
+        ));
+    }
+    input.seek(SeekFrom::Start(offset))?;
     let mut consumed = 0u64;
     for _ in 0..count {
         let mut header = [0; 46];
@@ -331,18 +381,18 @@ fn zip_guard(input: &mut Guard<File>, length: u64) -> io::Result<usize> {
         let comment = u16_at(&header, 32);
         let record = 46 + u64::from(name) + u64::from(extra) + u64::from(comment);
         consumed += record;
-        if name > 4096 || consumed > u64::from(size) {
+        if name > 4096 || consumed > size {
             return Err(io::Error::other(
                 "ZIP metadata limit or invalid directory length",
             ));
         }
         input.seek(SeekFrom::Current((record - 46) as i64))?;
     }
-    if consumed != u64::from(size) {
+    if consumed != size {
         return Err(io::Error::other("ZIP directory count/size mismatch"));
     }
     input.seek(SeekFrom::Start(0))?;
-    Ok(usize::from(count))
+    Ok(count as usize)
 }
 fn zip_open(
     file: File,
@@ -351,7 +401,7 @@ fn zip_open(
 ) -> io::Result<zip::ZipArchive<Guard<File>>> {
     zip_open_for(file, metadata, cancel, false)
 }
-fn zip_open_for(
+pub(super) fn zip_open_for(
     file: File,
     metadata: &Metadata,
     cancel: &Cancellation,
@@ -360,7 +410,7 @@ fn zip_open_for(
     let limit = if extract {
         MAX_SOURCE + 64 * 1024 * 1024
     } else {
-        64 * 1024 * 1024
+        2 * MAX_METADATA as u64 + 65_557
     };
     zip_open_bounded(file, metadata, cancel, limit, extract)
 }
@@ -406,14 +456,29 @@ fn tar_input(file: File, format: Format, cancel: &Cancellation) -> Box<dyn Read>
 }
 pub fn list(path: PathBuf, cancel: &Cancellation) -> io::Result<Catalog> {
     cancel.check()?;
-    let format = Format::detect(&path)
-        .ok_or_else(|| io::Error::other("Supported formats: ZIP, TAR, TAR.GZ and TGZ"))?;
-    list_format(path, format, cancel)
+    let format = Format::detect(&path).ok_or_else(|| {
+        io::Error::other("Supported formats: ZIP, ZIP64, TAR, TAR.GZ, TGZ, 7z and RAR")
+    })?;
+    list_format(path, format, None, cancel)
 }
 pub(crate) fn list_zip(path: PathBuf, cancel: &Cancellation) -> io::Result<Catalog> {
-    list_format(path, Format::Zip, cancel)
+    list_format(path, Format::Zip, None, cancel)
 }
-fn list_format(path: PathBuf, format: Format, cancel: &Cancellation) -> io::Result<Catalog> {
+pub(crate) fn list_with_password(
+    path: PathBuf,
+    password: &super::Password,
+    cancel: &Cancellation,
+) -> io::Result<Catalog> {
+    let format =
+        Format::detect(&path).ok_or_else(|| io::Error::other("Unsupported archive format"))?;
+    list_format(path, format, Some(password), cancel)
+}
+fn list_format(
+    path: PathBuf,
+    format: Format,
+    password: Option<&super::Password>,
+    cancel: &Cancellation,
+) -> io::Result<Catalog> {
     cancel.check()?;
     let (file, metadata) = source(&path)?;
     let source_identity = crate::platform_fs::entry_identity(&path)?;
@@ -421,7 +486,9 @@ fn list_format(path: PathBuf, format: Format, cancel: &Cancellation) -> io::Resu
         return Err(io::Error::other("Archive source changed during open"));
     }
     let mut result = Catalog::new(path, format, metadata, source_identity);
-    if format == Format::Zip {
+    if matches!(format, Format::SevenZ | Format::Rar) {
+        super::extended::list(&mut result, file, password, cancel)?;
+    } else if format == Format::Zip {
         let archive = zip_open(file, &result.identity, cancel)?;
         for index in 0..archive.len() {
             cancel.check()?;
@@ -469,7 +536,7 @@ fn list_format(path: PathBuf, format: Format, cancel: &Cancellation) -> io::Resu
         for (index, item) in archive.entries()?.enumerate() {
             cancel.check()?;
             if index >= MAX_ENTRIES {
-                result.note = Some("Partial listing: 10,000 member limit".into());
+                result.note = Some("Partial listing: 100,000 member limit".into());
                 break;
             }
             let entry = match item {
@@ -582,6 +649,9 @@ pub fn preview_with_mode(
         .source
         .ok_or_else(|| io::Error::other("Member has no data"))?;
     let pdf_hint = viewer::pdf::is_path(Path::new(String::from_utf8_lossy(&node.path).as_ref()));
+    if matches!(catalog.format, Format::SevenZ | Format::Rar) {
+        return super::extended::preview(catalog, id, password, mode, cancel);
+    }
     let (file, metadata) = catalog.checked_source()?;
     if catalog.format == Format::Zip {
         let mut archive = zip_open_bounded(
@@ -600,7 +670,7 @@ pub fn preview_with_mode(
             // part beyond the viewer limit, before any text is exposed.
             if node.size > MAX_STREAM {
                 return Err(io::Error::other(
-                    "Encrypted preview exceeds the 256 MiB authentication limit",
+                    "Encrypted preview exceeds the 64 GiB authentication limit",
                 ));
             }
             let mut bytes = Vec::new();
@@ -647,6 +717,19 @@ pub fn preview_with_mode(
 /// Stream full members into an already private, preflighted staging tree.
 /// This deliberately does not use the bounded viewer buffer.
 pub(crate) fn extract_to(
+    catalog: &Catalog,
+    files: &[(usize, PathBuf)],
+    password: Option<&super::Password>,
+    cancel: &Cancellation,
+    progress: impl FnMut(usize, u64),
+) -> io::Result<()> {
+    let result = extract_to_inner(catalog, files, password, cancel, progress);
+    if result.is_err() {
+        cancel.check()?;
+    }
+    result
+}
+fn extract_to_inner(
     catalog: &Catalog,
     files: &[(usize, PathBuf)],
     password: Option<&super::Password>,
@@ -705,6 +788,9 @@ pub(crate) fn extract_to(
             output.set_times(std::fs::FileTimes::new().set_modified(time))?;
         }
         output.sync_all()
+    }
+    if matches!(catalog.format, Format::SevenZ | Format::Rar) {
+        return super::extended::extract(catalog, files, password, cancel, progress);
     }
     catalog.validate()?;
     let (file, metadata) = catalog.checked_source()?;
@@ -799,7 +885,7 @@ pub(crate) fn extract_to(
     catalog.validate()
 }
 impl Catalog {
-    fn checked_source(&self) -> io::Result<(File, Metadata)> {
+    pub(super) fn checked_source(&self) -> io::Result<(File, Metadata)> {
         let (file, m) = source(&self.path)?;
         if crate::platform_fs::entry_identity(&self.path)? != self.source_identity
             || !crate::platform_fs::owns_file(&self.path, &file)
@@ -861,6 +947,9 @@ pub(crate) fn check_password(
     password: &super::Password,
     cancel: &Cancellation,
 ) -> io::Result<()> {
+    if matches!(catalog.format, Format::SevenZ | Format::Rar) {
+        return super::extended::authenticate(catalog, ids, password, cancel);
+    }
     let (file, metadata) = catalog.checked_source()?;
     let mut archive = zip_open_for(file, &metadata, cancel, true)?;
     let mut total = 0u64;
@@ -875,7 +964,7 @@ pub(crate) fn check_password(
             .checked_add(node.size)
             .filter(|n| *n <= MAX_STREAM)
             .ok_or_else(|| {
-                io::Error::other("Encrypted selection exceeds the 256 MiB authentication limit")
+                io::Error::other("Encrypted selection exceeds the 64 GiB authentication limit")
             })?;
         let mut entry = zip_entry(
             &mut archive,
@@ -967,7 +1056,7 @@ mod tests {
         token.cancel();
         assert_eq!(
             input.read(&mut bytes).unwrap_err().kind(),
-            io::ErrorKind::Interrupted
+            io::ErrorKind::Other
         );
         let mut input = Guard::new(&b"abc"[..], &Cancellation::default(), 10);
         input.deadline = Instant::now() - Duration::from_secs(1);
@@ -975,6 +1064,72 @@ mod tests {
             .read(&mut bytes)
             .unwrap_err()
             .to_string()
-            .contains("10 seconds"));
+            .contains("60 seconds"));
+    }
+}
+
+#[cfg(test)]
+mod zip64_tests {
+    use super::*;
+    use crate::archive::test_support::Temp;
+    #[cfg(unix)]
+    use std::io::Write;
+    #[test]
+    fn zip64_catalog_accepts_more_than_legacy_entry_count() -> io::Result<()> {
+        let t = Temp::new()?;
+        let path = t.0.join("many.zip");
+        let mut writer = zip::ZipWriter::new(File::create(&path)?);
+        for n in 0..65536 {
+            writer.start_file(format!("{n}.txt"), zip::write::SimpleFileOptions::default())?;
+        }
+        writer.finish()?;
+        let c = list(path, &Cancellation::default())?;
+        assert_eq!(c.nodes.len(), 65537);
+        assert_eq!(c.skipped, 0);
+        Ok(())
+    }
+    #[test]
+    fn zip64_locator_overflow_and_multi_disk_are_refused() -> io::Result<()> {
+        let t = Temp::new()?;
+        let path = t.0.join("bad.zip");
+        let mut bytes = vec![0; 42];
+        bytes[..4].copy_from_slice(b"PK\x06\x07");
+        bytes[8..16].copy_from_slice(&u64::MAX.to_le_bytes());
+        bytes[16..20].copy_from_slice(&1u32.to_le_bytes());
+        bytes[20..24].copy_from_slice(b"PK\x05\x06");
+        bytes[30..32].copy_from_slice(&u16::MAX.to_le_bytes());
+        std::fs::write(&path, &bytes)?;
+        assert!(list(path, &Cancellation::default()).is_err());
+        Ok(())
+    }
+    #[cfg(unix)]
+    #[test]
+    fn sparse_archive_above_old_source_limit_can_be_indexed_without_reading_payload(
+    ) -> io::Result<()> {
+        let t = Temp::new()?;
+        let path = t.0.join("large.zip");
+        let offset = 513 * 1024 * 1024u64;
+        let mut file = File::create(&path)?;
+        file.seek(SeekFrom::Start(offset))?;
+        let mut end64 = vec![0; 56];
+        end64[..4].copy_from_slice(b"PK\x06\x06");
+        end64[4..12].copy_from_slice(&44u64.to_le_bytes());
+        end64[12..14].copy_from_slice(&45u16.to_le_bytes());
+        end64[14..16].copy_from_slice(&45u16.to_le_bytes());
+        end64[48..56].copy_from_slice(&offset.to_le_bytes());
+        file.write_all(&end64)?;
+        let mut locator = vec![0; 20];
+        locator[..4].copy_from_slice(b"PK\x06\x07");
+        locator[8..16].copy_from_slice(&offset.to_le_bytes());
+        locator[16..20].copy_from_slice(&1u32.to_le_bytes());
+        file.write_all(&locator)?;
+        let mut end = vec![0; 22];
+        end[..4].copy_from_slice(b"PK\x05\x06");
+        end[16..20].copy_from_slice(&u32::MAX.to_le_bytes());
+        file.write_all(&end)?;
+        drop(file);
+        let c = list(path, &Cancellation::default())?;
+        assert_eq!(c.nodes.len(), 1);
+        Ok(())
     }
 }

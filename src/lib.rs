@@ -111,3 +111,8 @@ pub(crate) mod eligibility;
 pub(crate) mod retirement;
 
 pub mod highlight_groups;
+
+pub mod session;
+
+pub(crate) mod error_report;
+pub(crate) mod help_text;

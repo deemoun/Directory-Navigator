@@ -59,6 +59,35 @@ pub enum Action {
 }
 impl Viewer {
     pub fn go_to(&mut self, field: &str) -> Result<(), String> {
+        if let Some(window) = self.contents.as_ref().and_then(|c| c.stream.clone()) {
+            let target = if window.source.format.is_none() {
+                let value = field.trim();
+                let byte = if let Some(hex) = value
+                    .strip_prefix("0x")
+                    .or_else(|| value.strip_prefix("0X"))
+                {
+                    u64::from_str_radix(hex, 16)
+                } else {
+                    value.parse::<u64>()
+                }
+                .map_err(|_| "Enter a byte offset")?;
+                if byte >= window.source.bytes {
+                    return Err("Offset is outside the file".into());
+                }
+                (byte / 16) as usize
+            } else {
+                field
+                    .trim()
+                    .parse::<usize>()
+                    .ok()
+                    .and_then(|n| n.checked_sub(1))
+                    .ok_or("Enter a line number starting at 1")?
+            };
+            return self.stream_request(
+                window.source.clone(),
+                super::streaming::Request::Line(target),
+            );
+        }
         let contents = self.contents.as_ref().ok_or("Wait for the file to load.")?;
         let field = field.trim();
         let value = if contents.binary {
@@ -113,6 +142,15 @@ impl Viewer {
         Ok(())
     }
     pub fn go_to_line(&mut self, line: usize) {
+        if let Some(window) = self.contents.as_ref().and_then(|c| c.stream.clone()) {
+            if let Err(error) = self.stream_request(
+                window.source.clone(),
+                super::streaming::Request::Line(line.saturating_sub(1)),
+            ) {
+                self.notice = error;
+            }
+            return;
+        }
         self.reveal_line = Some(self.display_line_for_source(line.saturating_sub(1)));
         self.layout_width = 0;
     }
@@ -244,6 +282,31 @@ impl Viewer {
         if memory.query.is_empty() {
             return Err("Enter text to find.".into());
         }
+        if let Some(window) = self.contents.as_ref().and_then(|c| c.stream.clone()) {
+            let mut origin = (window.first + self.anchor().0, self.anchor().1);
+            if repeat && self.last_search == *memory {
+                if let Some(found) = &self.current {
+                    origin = (
+                        window.first + found.line,
+                        if backward {
+                            found.range.start
+                        } else {
+                            found.range.end
+                        },
+                    );
+                }
+            }
+            self.last_search = memory.clone();
+            self.stream_request(
+                window.source.clone(),
+                super::streaming::Request::Search {
+                    memory: memory.clone(),
+                    backward,
+                    origin,
+                },
+            )?;
+            return Ok(false);
+        }
         if self.rows.is_empty() {
             self.layout(self.layout_width.max(80) as u16);
         }
@@ -351,7 +414,14 @@ pub fn action(app: &mut App, action: Action) {
             app.push_dialog(crate::dialog::Dialog { title: " Viewer Help ", message: app.config.language.text("PDF text view: F2 wraps, F7 searches, Shift+F7 finds the next match. Go to accepts a page number. Page separators mark the original PDF pages. F8 encoding is unavailable because PDF fonts define the text encoding. Scanned pages need OCR; graphics are not supported. Encrypted PDFs ask for a password. Enter in the file pane still opens your system application.").into() });
             return;
         }
-        app.push_dialog(crate::dialog::Dialog {title:" Viewer Help ",message:format!("{}\n{}", app.config.language.text("F6 toggles Markdown/source for .md and .markdown files. Search uses displayed text; Go to uses source line numbers. F5 returns from an editor preview. Links and images do not open automatically."), app.config.language.text("F8 chooses the reading encoding. File → Save with encoding converts the file; F2 preserves its current encoding, BOM and line endings. Unrepresentable characters stop saving."))});
+        app.push_dialog(crate::dialog::Dialog {
+            title: " Viewer Help ",
+            message: format!(
+                "{}\n{}",
+                app.config.language.text(crate::help_text::VIEWING),
+                app.config.language.text(crate::help_text::SAVE_FORMAT)
+            ),
+        });
         return;
     }
 
@@ -524,6 +594,15 @@ pub fn key(app: &mut App, key: KeyEvent) {
         if let Some(v) = app
             .desktop
             .active_viewer_mut()
+            .filter(|v| v.stream_pending.is_some())
+        {
+            v.stream_pending = None;
+            v.notice.clear();
+            return;
+        }
+        if let Some(v) = app
+            .desktop
+            .active_viewer_mut()
             .filter(|v| v.encoding_pending.is_some())
         {
             v.encoding_pending = None;
@@ -630,7 +709,11 @@ pub fn key(app: &mut App, key: KeyEvent) {
             None
         }
         KeyCode::Home => {
-            viewer.offset = 0;
+            if viewer.contents.as_ref().is_some_and(|c| c.stream.is_some()) {
+                viewer.go_to_line(1);
+            } else {
+                viewer.offset = 0;
+            }
             None
         }
         KeyCode::End => {

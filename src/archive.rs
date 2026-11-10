@@ -2,9 +2,13 @@
 //! (RIT Research Labs). Archive members never become native operation paths.
 pub mod create;
 pub mod dialogs;
+pub(crate) mod edit;
+mod extended;
 pub mod extract;
 mod password;
 pub mod reader;
+#[cfg(test)]
+mod test_support;
 use crate::{app::App, panel::archive::MemberId};
 pub use password::Password;
 use std::{path::PathBuf, sync::Arc};
@@ -15,7 +19,7 @@ pub struct Extraction {
     pub members: Vec<MemberId>,
     pub password: Option<Password>,
 }
-pub const HELP: &str = "ZIP / TAR / TAR.GZ / TGZ in the file pane.\nEnter: folder or read-only preview · F3: preview\nInsert / Space / Ctrl+click: mark · + / -: group\nF5: extract marked items, or the current item\nFolders include descendants and empty directories.\nBackspace / ..: parent; at root returns to disk\nCtrl+PgUp: exit archive from any folder\nEsc: cancel indexing or preview · Ctrl+R: refresh\nBoth panes can browse archives independently.\nChoose a disk destination when both show archives.\nArchives are read-only; extract before editing.\nExisting files ask Replace / Skip / Cancel; folders merge.";
+pub const HELP: &str = "ZIP / ZIP64 / TAR / TAR.GZ / TGZ / 7z / RAR in either pane.\nEnter: folder or read-only preview · F3: preview\nInsert / Space / Ctrl+click: mark · + / -: group\nF5: extract marked items, or the current item\nFolders include descendants and empty directories.\nBackspace / ..: parent; Ctrl+PgUp: exit archive\nEsc: cancel loading · Ctrl+R: refresh\nZIP: F4 edits a regular text member; F2 saves back safely.\nF5 from a disk pane adds files to the ZIP in the other pane.\nF8 removes selected ZIP members after confirmation.\nTAR, TGZ, RAR and 7z remain read-only.\nNested and multi-volume archives are not supported.";
 pub const EXTRACT_FIRST: &str = "Extract archive members to disk first (F5).";
 pub fn require_native(app: &mut App) -> bool {
     if app.panels[app.active].is_archive() {
@@ -33,8 +37,8 @@ pub fn open(app: &mut App, path: PathBuf) {
     }
     crate::windowing::activate(app, crate::desktop::WindowId::MANAGER);
     app.quick_view = None;
-    if let Err(e) = app.panels[app.active].open_archive(path) {
-        app.error(e.to_string());
+    if let Err(e) = app.panels[app.active].open_archive(path.clone()) {
+        app.error(crate::error_report::Report::new("Cannot read the archive.",e.to_string(),"Check file access and archive integrity. Use a supported archive format; refresh or reopen after external changes.").path("Archive",path).io(e.kind()).render(app.config.language));
     }
 }
 pub fn open_current(app: &mut App) {
@@ -100,6 +104,7 @@ pub fn view_mode(app: &mut App, mode: crate::viewer::ViewMode) {
 pub fn poll(app: &mut App) -> bool {
     let mut changed = dialogs::poll(app);
     for index in 0..app.panels.len() {
+        changed |= edit::poll(app, index);
         let reply = app.panels[index]
             .archive_mut()
             .and_then(|a| crate::task::take_reply(&mut a.index));
@@ -119,11 +124,20 @@ pub fn poll(app: &mut App) -> bool {
                     a.catalog = Some(Arc::new(c));
                     app.panels[index].archive_entries();
                 }
+                Ok(Err(error))
+                    if error.kind() == std::io::ErrorKind::PermissionDenied
+                        && index == app.active
+                        && app.modal_top().is_none() =>
+                {
+                    dialogs::password_for_open(app, index);
+                }
                 other => {
                     let message = match other {
                         Ok(Err(e)) => e.to_string(),
                         _ => "Archive worker stopped".into(),
                     };
+                    let path = app.panels[index].archive().unwrap().path.clone();
+                    let message=crate::error_report::Report::new("Cannot read the archive.",message,"Check file access and archive integrity. Use a supported archive format; refresh or reopen after external changes.").path("Archive",path).render(app.config.language);
                     app.panels[index].leave_archive(app.config.show_hidden);
                     report(app, index, message);
                 }
@@ -159,10 +173,15 @@ pub fn poll(app: &mut App) -> bool {
                     }
                 }
                 Ok(Err(e)) => {
+                    let archive = app.panels[index].archive().unwrap();
+                    let report_value=crate::error_report::Report::new(if e.kind()==std::io::ErrorKind::Interrupted {"Operation cancelled."}else{"Cannot preview the archive member."},e.to_string(),"Check the password and archive integrity. Extract supported members with F5 before opening them in another application.").path("Archive",&archive.path).text("Member",&archive.preview_title.to_string_lossy());
                     if preview_foreground(app, index) {
-                        report(app, index, e.to_string());
+                        report(app, index, report_value.render(app.config.language));
                     } else {
-                        app.notice = e.to_string();
+                        // Retain the original cause without interrupting another document.
+                        app.notice = report_value
+                            .render(app.config.language)
+                            .replace('\n', " · ");
                     }
                 }
                 _ => {}

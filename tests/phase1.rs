@@ -417,7 +417,8 @@ fn viewer_text_hex_bounds_and_mouse_close() -> io::Result<()> {
     assert!(binary.lines[0].contains("00 FF 41"));
     fs::write(temp.0.join("large"), vec![b'a'; dn::viewer::MAX_BYTES + 1])?;
     let large = dn::viewer::load(&temp.0.join("large"))?;
-    assert!(large.truncated);
+    assert!(large.stream.is_some());
+    assert!(!large.truncated);
     assert!(!large.binary);
     assert!(large.lines[0].len() < 4200);
     assert!(dn::viewer::load(&temp.0).is_err());

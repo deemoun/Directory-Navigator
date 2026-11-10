@@ -57,7 +57,7 @@ fn read_cancelled(
     let metadata = file.metadata()?;
     if metadata.len() > MAX_BYTES as u64 {
         return Err(io::Error::other(
-            "Editor limit is 16 MiB. Use F3 for a bounded preview.",
+            "Editor limit is 64 MiB. Use F3 for a bounded preview.",
         ));
     }
     let mut bytes = Vec::new();
@@ -73,7 +73,7 @@ fn read_cancelled(
     }
     if bytes.len() > MAX_BYTES {
         return Err(io::Error::other(
-            "File grew beyond the 16 MiB editor limit.",
+            "File grew beyond the 64 MiB editor limit.",
         ));
     }
     let after = file.metadata()?;
@@ -217,7 +217,7 @@ fn save_prepared_with(
     let prepare = || -> io::Result<_> {
         if text.len() > MAX_BYTES || bytes.len() > MAX_BYTES {
             return Err(io::Error::other(
-                "Saved file exceeds the 16 MiB editor limit.",
+                "Saved file exceeds the 64 MiB editor limit.",
             ));
         }
         if let Some(original) = original {

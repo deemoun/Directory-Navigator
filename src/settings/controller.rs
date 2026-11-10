@@ -41,9 +41,7 @@ pub(super) fn command(target: Target) -> Option<Action> {
 pub(super) fn reduce(state: &mut Settings, action: Action, language: Language) -> Effect {
     match action {
         Action::OpenChoice(row) => {
-            if !matches!(state.kind, SettingsKind::Keyboard | SettingsKind::Regional)
-                || row >= state.control_count()
-            {
+            if state.choice_id(row).is_none() {
                 return Effect::None;
             }
             return Effect::Choice(ChoiceDialog {
@@ -94,6 +92,13 @@ pub(super) fn key(state: &mut Settings, code: K) -> Key {
             return Key::Handled;
         }
     }
+    if state.kind == SettingsKind::System
+        && state.choice_id(state.cursor).is_some()
+        && matches!(code, K::Left | K::Right | K::Char(' '))
+    {
+        state.cycle_choice(state.cursor, code == K::Left);
+        return Key::Handled;
+    }
     if code == K::F(4) {
         return Key::Choice(state.cursor);
     }
@@ -138,7 +143,7 @@ pub(super) fn apply_choice(state: &mut Settings, choice: ChoiceDialog) {
         if state.kind == SettingsKind::Keyboard {
             state.keyboard_choice(false);
         } else {
-            state.regional_choice(choice.row, false);
+            state.cycle_choice(choice.row, false);
         }
     }
     state.cursor = choice.row;

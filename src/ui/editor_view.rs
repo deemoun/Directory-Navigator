@@ -17,10 +17,16 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
         return;
     };
     let path = editor
-        .path
+        .archive_origin
         .as_ref()
-        .map(|path| display_name(&path.to_string_lossy()))
-        .unwrap_or_else(|| app.config.language.text("[New file]").into());
+        .map(|origin| display_name(&origin.label))
+        .unwrap_or_else(|| {
+            editor
+                .path
+                .as_ref()
+                .map(|path| display_name(&path.to_string_lossy()))
+                .unwrap_or_else(|| app.config.language.text("[New file]").into())
+        });
     let shortcut = if editor.is_smartpad() { "Alt+Q" } else { "F4" };
     let title = format!(
         " {} {} {} │ {}",

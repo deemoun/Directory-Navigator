@@ -13,6 +13,7 @@ mod modals;
 mod polling;
 
 pub struct App {
+    pub(crate) session: crate::session::Runtime,
     #[cfg(target_os = "linux")]
     pub(crate) console_mouse: crate::terminal::gpm::Snapshot,
     pub transfers: crate::transfers::State,
@@ -71,6 +72,7 @@ impl App {
         let mut app = Self {
             #[cfg(target_os = "linux")]
             console_mouse: Default::default(),
+            session: Default::default(),
             transfers: Default::default(),
             button_feedback: Default::default(),
             modals: Default::default(),
@@ -143,6 +145,12 @@ impl App {
     }
 
     pub fn prompt_operation(&mut self, kind: Kind, rename_here: bool) {
+        self.prompt_operation_impl(kind, rename_here, true);
+    }
+    pub(crate) fn prompt_native_copy(&mut self) {
+        self.prompt_operation_impl(Kind::Copy, false, false);
+    }
+    fn prompt_operation_impl(&mut self, kind: Kind, rename_here: bool, archive_destination: bool) {
         let kind = if kind == Kind::Delete && self.config.use_trash {
             Kind::Trash
         } else {
@@ -152,6 +160,21 @@ impl App {
             || self.job.as_ref().is_some_and(|j| j.transfer.is_none())
             || (!matches!(kind, Kind::Copy | Kind::Move) && self.transfers.has_work())
         {
+            return;
+        }
+        if self.panels[self.active].is_archive() && matches!(kind, Kind::Delete | Kind::Trash) {
+            crate::archive::dialogs::remove(self);
+            return;
+        }
+        if !self.panels[self.active].is_archive()
+            && kind == Kind::Copy
+            && archive_destination
+            && self.panels[self.active ^ 1]
+                .archive()
+                .and_then(|a| a.catalog.as_ref())
+                .is_some_and(|c| c.format == crate::archive::reader::Format::Zip)
+        {
+            crate::archive::dialogs::add_to_zip(self, self.active ^ 1);
             return;
         }
         let archive = self.panels[self.active].is_archive();

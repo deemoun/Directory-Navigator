@@ -20,6 +20,12 @@ impl State {
     }
 }
 impl Viewer {
+    pub(crate) fn session_ready(&self) -> bool {
+        !self.pending_work()
+            && (!self.markdown.hint
+                || self.markdown.started
+                || self.contents.as_ref().is_some_and(|c| c.binary))
+    }
     pub fn markdown_available(&self) -> bool {
         self.markdown.document.is_some()
     }
@@ -55,6 +61,11 @@ impl Viewer {
     }
     pub fn source_line(&self) -> usize {
         self.source_anchor().0
+            + self
+                .contents
+                .as_ref()
+                .and_then(|c| c.stream.as_ref())
+                .map_or(0, |w| w.first)
     }
     fn rendered_anchor(&self, line: usize, byte: usize) -> (usize, usize) {
         let Some(doc) = &self.markdown.document else {
@@ -85,7 +96,14 @@ impl Viewer {
     }
     pub fn source_line_count(&self) -> usize {
         self.markdown.document.as_ref().map_or_else(
-            || self.contents.as_ref().map_or(0, |c| c.lines.len()),
+            || {
+                self.contents.as_ref().map_or(0, |c| {
+                    c.stream
+                        .as_ref()
+                        .and_then(|w| w.source.total_lines())
+                        .unwrap_or(c.lines.len())
+                })
+            },
             |d| d.source_lines,
         )
     }
@@ -139,6 +157,7 @@ impl Viewer {
             self.markdown.source_wrap = self.wrap;
             let document = self.markdown.document.as_ref().unwrap();
             self.contents = Some(Contents {
+                stream: None,
                 pdf: None,
                 raw: source.raw,
                 format: source.format,

@@ -16,8 +16,8 @@ fn files_above_old_beta_limit_are_viewable_and_editable() {
 #[test]
 fn raised_limits_are_consistent() {
     assert_eq!(viewer::MAX_BYTES, 64 * 1024 * 1024);
-    assert_eq!(dn::editor::buffer::MAX_BYTES, 16 * 1024 * 1024);
-    assert_eq!(dn::editor::buffer::MAX_LINES, 250_000);
+    assert_eq!(dn::editor::buffer::MAX_BYTES, 64 * 1024 * 1024);
+    assert_eq!(dn::editor::buffer::MAX_LINES, 1_000_000);
 }
 
 #[test]

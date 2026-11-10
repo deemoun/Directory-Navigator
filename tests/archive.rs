@@ -623,7 +623,7 @@ fn selected_extraction_keeps_relative_hierarchy_and_streams_large_files() -> io:
     Ok(())
 }
 #[test]
-fn two_archive_panes_require_native_destination_and_read_only_commands_are_guarded(
+fn two_archive_panes_require_native_destination_and_unsupported_commands_are_guarded(
 ) -> io::Result<()> {
     let t = Temp::new()?;
     let path = t.0.join("clean.zip");
@@ -650,11 +650,7 @@ fn two_archive_panes_require_native_destination_and_read_only_commands_are_guard
     assert!(!a.transfers.has_work());
     assert!(!a.dialogs().is_empty());
     a.clear_dialogs();
-    for kind in [
-        dn::operations::Kind::Move,
-        dn::operations::Kind::Delete,
-        dn::operations::Kind::Mkdir,
-    ] {
+    for kind in [dn::operations::Kind::Move, dn::operations::Kind::Mkdir] {
         a.prompt_operation(kind, false);
         assert!(a.modals.prompt().is_none());
         assert!(!a.dialogs().is_empty());
@@ -662,9 +658,6 @@ fn two_archive_panes_require_native_destination_and_read_only_commands_are_guard
     }
     dn::menu::execute(&mut a, dn::menu::Action::CreateArchive);
     assert!(a.modals.archive_dialog().is_none());
-    dn::editor::open(&mut a, false);
-    assert!(a.desktop.active_editor().is_none());
-    a.clear_dialogs();
     let out = t.0.join("out");
     fs::create_dir(&out)?;
     extract(&mut a, &out, false);
@@ -1512,5 +1505,62 @@ fn extraction_ask_merges_existing_folders_and_confirms_file_replacement() -> io:
     assert_ne!(fs::read(out.join("docs/a.txt"))?, b"old");
     assert!(out.join("docs/b.txt").is_file());
     assert_eq!(fs::read(out.join("docs/keep.txt"))?, b"unrelated");
+    Ok(())
+}
+
+#[test]
+fn zip_update_and_removal_dialogs_keep_cancel_default_localization_and_immutable_frames(
+) -> io::Result<()> {
+    let t = Temp::new()?;
+    let path = t.0.join("edit.zip");
+    clean_zip(&path, false)?;
+    let original = fs::read(&path)?;
+    fs::write(t.0.join("add.txt"), "add")?;
+    let mut a = t.app()?;
+    archive::open(&mut a, path.clone());
+    finish(&mut a);
+    select(&mut a, "root.txt");
+    for language in [
+        dn::localization::Language::English,
+        dn::localization::Language::Russian,
+    ] {
+        a.config.language = language;
+        for palette in [
+            dn::palette::PaletteProfile::ClassicDn,
+            dn::palette::PaletteProfile::Custom([0x3f; dn::palette::theme::COUNT]),
+        ] {
+            a.config.palette = palette;
+            a.prompt_operation(dn::operations::Kind::Delete, false);
+            assert!(a.modals.archive_dialog().is_some());
+            for (w, h) in [(80, 25), (132, 40), (40, 12), (80, 25)] {
+                let before = draw(&mut a, w, h)?;
+                let hits = a.mouse.regions.clone();
+                for _ in 0..3 {
+                    assert_eq!(before, draw(&mut a, w, h)?);
+                    assert_eq!(hits, a.mouse.regions);
+                }
+                for (rect, _) in &hits {
+                    assert!(rect.right() <= w && rect.bottom() <= h);
+                }
+            }
+            key(&mut a, KeyCode::Enter);
+            assert!(a.modals.archive_dialog().is_none());
+            assert!(!a.transfers.has_work());
+            assert_eq!(original, fs::read(&path)?);
+            a.active = 1;
+            a.panels[1].refresh(false);
+            wait(&mut a, |a| !a.panels[1].loading);
+            select(&mut a, "add.txt");
+            a.prompt_operation(dn::operations::Kind::Copy, false);
+            assert!(a.modals.archive_dialog().is_some());
+            let first = draw(&mut a, 80, 25)?;
+            assert_eq!(first, draw(&mut a, 80, 25)?);
+            assert_eq!(first, draw(&mut a, 80, 25)?);
+            key(&mut a, KeyCode::Enter);
+            assert!(!a.transfers.has_work());
+            assert_eq!(original, fs::read(&path)?);
+            a.active = 0;
+        }
+    }
     Ok(())
 }

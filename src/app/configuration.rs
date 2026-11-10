@@ -5,6 +5,10 @@ use crate::config::Config;
 impl App {
     pub fn apply_config(&mut self, config: Config) {
         self.shortcuts.clear();
+        if self.config.restore_session != config.restore_session {
+            self.session.cancel_restore();
+        }
+
         let hidden_changed = self.config.show_hidden != config.show_hidden;
         self.config = config;
         crate::plugins::host::apply_enabled(self);
@@ -46,11 +50,17 @@ impl App {
     }
 
     pub fn load_initial_config(&mut self) {
+        self.load_initial_config_with_session(false);
+    }
+    pub fn load_initial_config_with_session(&mut self, bypass: bool) {
         if std::mem::replace(&mut self.welcome.startup_checked, true) {
             return;
         }
-        if self.read_config() && self.config_store.is_new_installation() {
-            crate::welcome::open(self);
+        if self.read_config() {
+            crate::session::begin(self, bypass);
+            if self.config_store.is_new_installation() {
+                crate::welcome::open(self);
+            }
         }
     }
 
@@ -63,21 +73,52 @@ impl App {
                 true
             }
             Err(error) => {
-                self.error(format!("Cannot load settings: {error}"));
+                self.error(self.settings_error("Cannot load settings.", &error, false));
                 false
             }
         }
     }
 
+    fn settings_error(
+        &self,
+        summary: &'static str,
+        error: &std::io::Error,
+        exiting: bool,
+    ) -> String {
+        use crate::error_report::{Outcome, Report};
+        let advice = if exiting {
+            "Exit cancelled. Retry Save desktop, or turn off Save settings on exit in System Setup to exit without saving."
+        } else {
+            "Check the configuration path and access permissions. If another DN instance changed settings, use Load desktop before saving again."
+        };
+        let mut report =
+            Report::new(summary, error.to_string(), advice).outcome(Outcome::PreferencesRetained);
+        if !exiting && error.kind() == std::io::ErrorKind::StorageFull {
+            report = report.io(error.kind());
+        }
+        if let Ok(path) = self.config_store.path() {
+            report = report.path("Configuration", path);
+        }
+        report.render(self.config.language)
+    }
+    fn save_session_config(&mut self, force: bool) -> std::io::Result<bool> {
+        let mut config = self.config.clone();
+        config.session = crate::session::capture(self)?;
+        config.invalid_session = false;
+        let changed = self.config_store.save(&config, force)?;
+        self.config.session = config.session;
+        self.config.invalid_session = false;
+        Ok(changed)
+    }
     pub fn save_config(&mut self) {
         self.config.sorts = [self.panels[0].sort, self.panels[1].sort];
-        match self.config_store.save(&self.config, true) {
+        match self.save_session_config(true) {
             Ok(_) => {
                 if let Ok(path) = self.config_store.path() {
                     self.notice = format!("Settings saved to {}", path.display());
                 }
             }
-            Err(error) => self.error(format!("Cannot save settings: {error}")),
+            Err(error) => self.error(self.settings_error("Cannot save settings.", &error, false)),
         }
     }
 
@@ -87,11 +128,11 @@ impl App {
             return true;
         }
         self.config.sorts = [self.panels[0].sort, self.panels[1].sort];
-        match self.config_store.save(&self.config, false) {
+        match self.save_session_config(false) {
             Ok(_) => true,
             Err(error) => {
                 self.abort_quit();
-                self.error(format!("Cannot save settings: {error}\n\nExit cancelled; your preferences remain in this session.\nRetry Save desktop, or turn off Save settings on exit\nin System Setup to exit without saving."));
+                self.error(self.settings_error("Cannot save settings.", &error, true));
                 false
             }
         }

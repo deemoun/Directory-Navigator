@@ -566,6 +566,22 @@ impl NativeDesktop {
         }
         surfaces
     }
+    pub(crate) fn session_geometry(&self, id: WindowId) -> Option<crate::session::Geometry> {
+        let mut h = self.0.borrow_mut();
+        let shell = h.shell_mut(SurfaceKey::Document(id))?;
+        Some(crate::session::Geometry {
+            bounds: shell.preferred,
+            maximized: shell.surface.maximized,
+        })
+    }
+    pub(crate) fn restore_session_geometry(&self, id: WindowId, value: crate::session::Geometry) {
+        let mut h = self.0.borrow_mut();
+        let size = (h.bounds.width() as u16, h.bounds.height() as u16);
+        if let Some(shell) = h.shell_mut(SurfaceKey::Document(id)) {
+            shell.session_restore(value, size);
+            h.interaction.revision += 1;
+        }
+    }
     pub(crate) fn surface(&self, key: SurfaceKey) -> Option<Surface> {
         let mut h = self.0.borrow_mut();
         h.shell_mut(key).map(|s| s.surface)

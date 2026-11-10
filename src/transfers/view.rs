@@ -120,7 +120,7 @@ pub(crate) fn spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
         let eta = e
             .remaining(now)
             .map_or_else(|| "—".into(), |d| format!("{} s", d.as_secs()));
-        let text = format!(
+        let mut text = format!(
             "{} · {} · {} {}\n{}: {} · {}: {} · {}: {}\n{}: {} · {}: {} · {}: {}\n{}\n{}",
             lang.text(e.status.caption()),
             lang.text(e.progress.phase.caption()),
@@ -151,13 +151,27 @@ pub(crate) fn spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
                 ),
                 w
             ),
-            e.error
-                .as_ref()
-                .map(|s| lang.message(s))
+            e.error_report()
+                .map(|report| report.inline(lang, w))
                 .unwrap_or_else(|| lang
                     .text("Enter: details · F1: Help · Esc: close window")
                     .into())
         );
+        if let Some(report) = e.error_report() {
+            text = format!(
+                "{} · {} · {}\n{}: {} · {}: {} · {}: {}\n{}",
+                lang.text(e.status.caption()),
+                lang.text(e.progress.phase.caption()),
+                percent,
+                lang.text("Items"),
+                e.progress.files,
+                lang.text("Skipped"),
+                e.progress.skipped,
+                lang.text("Bytes"),
+                e.progress.bytes,
+                report.inline(lang, w)
+            );
+        }
         s.caption(
             Paragraph::new(text).style(style(theme::TEXT)),
             Rect::new(x, r.bottom().saturating_sub(8), w, 5),

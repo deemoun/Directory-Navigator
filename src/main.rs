@@ -5,6 +5,7 @@ use std::io;
 mod diagnostics;
 
 fn run() -> io::Result<()> {
+    let mut bypass_session = false;
     let mut args = std::env::args_os().skip(1);
     if let Some(arg) = args.next() {
         if arg == "--version" || arg == "-V" {
@@ -13,19 +14,23 @@ fn run() -> io::Result<()> {
         }
         if arg == "--help" || arg == "-h" {
             println!(
-                "{} {}\n\nUsage: dn [--help | --version]\n  -h, --help     Show help\n  -V, --version  Show version\nRun from the directory to browse. F1 shows keyboard help.",
+                "{} {}\n\nUsage: dn [--help | --version | --no-session]\n  -h, --help     Show help\n  -V, --version  Show version\n      --no-session Start from the launch directory without restoring a session\nRun from the directory to browse. F1 shows keyboard help.",
                 dn::APPLICATION_NAME,
                 dn::DISPLAY_VERSION
             );
             return Ok(());
         }
-        return Err(io::Error::other(
-            "Unknown argument. Usage: dn [--help | --version]",
-        ));
+        if arg == "--no-session" && args.next().is_none() {
+            bypass_session = true;
+        } else {
+            return Err(io::Error::other(
+                "Unknown argument. Usage: dn [--help | --version | --no-session]",
+            ));
+        }
     }
     let mut app = App::new(std::env::current_dir()?)?;
     let mut diagnostics = diagnostics::Recorder::from_env();
-    app.load_initial_config();
+    app.load_initial_config_with_session(bypass_session);
     match app
         .config_store
         .path()
@@ -114,6 +119,11 @@ fn run() -> io::Result<()> {
         }
         if let Some(event) = event {
             diagnostics.event(&event);
+            if matches!(&event, Event::Key(_) | Event::Paste(_))
+                || matches!(&event,Event::Mouse(e) if matches!(e.kind,MouseEventKind::Down(_)|MouseEventKind::ScrollUp|MouseEventKind::ScrollDown))
+            {
+                dn::session::user_interaction(&mut app);
+            }
             if showing_output {
                 dn::terminal_output::event(&mut app, &event);
                 continue;

@@ -283,19 +283,27 @@ fn pane(
         );
     }
     if let Some(a) = panel.archive() {
-        let text = a
-            .catalog
-            .as_ref()
-            .and_then(|c| c.note.as_deref())
-            .map_or_else(
-                || {
-                    config
-                        .language
-                        .text("Read-only archive · F5 extracts")
-                        .to_owned()
-                },
-                |note| format!("{}: {}", config.language.text("Partial archive"), note),
-            );
+        let text =
+            a.catalog
+                .as_ref()
+                .and_then(|c| c.note.as_deref())
+                .map_or_else(
+                    || {
+                        config
+                            .language
+                            .text(
+                                if a.catalog.as_ref().is_some_and(|c| {
+                                    c.format == crate::archive::reader::Format::Zip
+                                }) {
+                                    "ZIP · F4 edits · F5 extracts · F8 removes"
+                                } else {
+                                    "Read-only archive · F5 extracts"
+                                },
+                            )
+                            .to_owned()
+                    },
+                    |note| format!("{}: {}", config.language.text("Partial archive"), note),
+                );
         plain(s, g.space, &formatting::tail(&text, g.space.width), 0x8b);
         return;
     }

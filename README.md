@@ -39,7 +39,7 @@ and modern filesystem handling.
 - Preview text or hex, edit Unicode and legacy-encoded text files, and search or replace text.
 - Read formatted Markdown with F3, edit highlighted source with F4, and preview unsaved text with F5.
 - Keep multiple editors and viewers open, and switch between them with **Alt+0**.
-- Browse ZIP, TAR and TAR.GZ/TGZ directly in either file pane; extract selected files and folders with F5.
+- Browse ZIP/ZIP64, TAR, TAR.GZ/TGZ, 7z and RAR directly in either file pane; extract selected files and folders with F5.
 - Create ZIP archives from selected files and folders, optionally with an AES-256 password; preview and extract encrypted ZIPs in DN.
 - Type shell commands directly into the bottom command prompt.
 - Customize the layout, clock and screensaver; edit component colors in a DN-style foreground/background selector with Color, B/W and Mono presets. Settings save on exit.
@@ -242,7 +242,7 @@ keeps its own edits, undo history, search and scroll position. F4 opens the
 highlighted file; reopening a file activates its existing document. Close and quit
 check unsaved changes across the relevant editors. Editors and viewers open maximized,
 can be moved or resized, and support **Tile** and **Cascade** through the Manager
-menu or window list. Window geometry lasts for the session.
+menu or window list. File-document geometry can be restored with the optional session settings.
 
 Copy and Move use a switchable **Transfer Center**: continue browsing or editing
 while one transfer runs and others wait in its queue. **Manager → Transfers…**
@@ -294,16 +294,43 @@ requires confirmation. Detected changes to queued entries or their parent
 directories stop the operation. Cancellation or failure retains completed work;
 multi-file operations have no automatic rollback.
 
-This is a **beta**. Archive panes are read-only, and text viewing/editing uses the
+This is a **beta**. ZIP panes support confirmed updates; other archive formats are read-only. Text viewing/editing uses the
 limits below. Test important workflows on copies and report problems with your
 OS, terminal and reproduction steps. For detailed shortcuts, limits and user-menu
 configuration, see the [user guide](docs/USER_GUIDE.md).
 
+### Errors and warnings
+
+Core file errors explain the failed action, affected path, known outcome and next
+step. **Cause** retains original system/library details. Transfer failures can
+leave completed work; review Transfer Center before retrying. A save warning after
+publication means the file was written: keep the editor open and follow the advice.
+DN does not automatically retry, weaken confirmations or launch another application.
+
+### Session restoration
+
+**Options → Configuration → System Setup → Restore previous session** offers
+**Off / Panels only / Panels and documents**. Panels only is the default: DN
+remembers both directories, cursor, filter, scroll and the active pane; marks are
+cleared. Archive panes return to their containing disk folders.
+
+Document mode also reopens disk-file viewers/editors at their saved positions and
+window layout, reading current disk contents. Unsaved text stays under the normal
+save/discard and crash-recovery safeguards. Passwords, utility windows, archive
+members, previews, transfers and music state are not saved.
+
+**Save desktop** captures a snapshot; normal exit does so only with **Save settings
+on exit** enabled. **Load desktop** reloads preferences without replacing open
+work. Run `dn --no-session` to start from the launch directory for one run. Missing
+items are skipped with a summary. Snapshots share the existing guarded configuration
+file and are limited to 128 documents and its 1 MiB total size.
+
 ### Larger files and replacing existing files
 
-F3 reads up to 64 MiB of source bytes, with limits of 192 MiB of decoded text and
-1,000,000 lines. Larger files use a clearly labelled bounded preview. F4 supports
-up to 16 MiB for both the Unicode buffer and encoded output, and 250,000 lines;
+F3 streams large regular disk files through bounded windows, with scrolling,
+Go to, End and whole-file search. Archive previews, PDF and formatted Markdown
+retain their documented bounds; large disk Markdown files use source text.
+F4 supports up to 64 MiB for both the Unicode buffer and encoded output, and 1,000,000 lines;
 oversized documents or saves are refused without truncating content.
 
 Copy, Move and archive extraction ask before replacing files by default:
@@ -313,6 +340,23 @@ remains. Existing folders merge recursively, preserving unrelated contents.
 Explicit Refuse and Skip policies remain available. File/directory mismatches,
 links and special destinations are refused. **Save As** asks **Replace / Cancel**,
 with Cancel selected initially; ordinary F2 retains external-change checks.
+
+### Working with larger archives and ZIP members
+
+Archives can be up to 64 GiB, with 100,000 members and bounded metadata. ZIP64 is
+supported; ZIP creation accepts up to 64 GiB of input. RAR and 7z browsing,
+preview and selected extraction run internally, including password prompts.
+No external archive application is required. Multi-volume and nested browsing
+remain unsupported.
+
+To add files, open a ZIP in one pane and press F5 on disk files in the other.
+The **Update ZIP** dialog requires explicit confirmation before replacing matching
+members. F8 inside a ZIP confirms deletion of selected files/folder trees. Both
+dialogs default to Cancel. F4 opens a ZIP text member in an owned private workspace;
+F2 saves back through a staged ZIP rebuild, while Save As exports a disk file.
+Unrelated members remain intact, and failures retain the original ZIP and dirty
+editor text. ZIP updates need space for a replacement archive. Other formats
+remain read-only. See [archive workflows](docs/USER_GUIDE.md#zip-member-updates).
 
 ### Text encodings
 

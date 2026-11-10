@@ -31,12 +31,15 @@ crossterm = "0.28"
 unicode-segmentation = "1"
 unicode-width = "0.2.0"
 encoding_rs = "0.8"
+crc32fast = "1"
 pdf-extract = "=0.12.1"
 zip = { version = "9", default-features = false, features = ["deflate-flate2", "aes-crypto"] }
 zeroize = "1"
 pulldown-cmark = { version = "=0.13.6", default-features = false }
 tar = { version = "0.4", default-features = false }
 flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
+sevenz-rust2 = { version = "=0.25.0", default-features = false, features = ["aes256", "bzip2", "ppmd", "deflate"] }
+unrar-rs = { version = "=0.15.3", default-features = false, features = ["crypto-rust"] }
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 
 [target.'cfg(unix)'.dependencies]
@@ -55,4 +58,7 @@ windows = { version = "0.62", features = ["Win32_Storage_FileSystem", "Win32_Sys
 [profile.release]
 lto = "thin"
 strip = true
+
+[dev-dependencies]
+sevenz-rust2 = { version = "=0.25.0", default-features = false, features = ["compress"] }
 

@@ -67,6 +67,10 @@ pub struct Creation {
     parents: Vec<(PathBuf, crate::platform_fs::EntryIdentity)>,
     receipt: Destination,
     password: Option<Password>,
+    existing: Option<std::sync::Arc<reader::Catalog>>,
+    removed: BTreeSet<usize>,
+    prefix: String,
+    member_mode: Option<u32>,
 }
 impl Creation {
     pub fn capture(
@@ -74,12 +78,71 @@ impl Creation {
         destination: PathBuf,
         password: Option<Password>,
     ) -> io::Result<Self> {
-        if sources.is_empty() || reader::Format::detect(&destination) != Some(reader::Format::Zip) {
+        Self::capture_impl(
+            sources,
+            destination,
+            password,
+            None,
+            BTreeSet::new(),
+            String::new(),
+        )
+    }
+    pub fn update(
+        catalog: std::sync::Arc<reader::Catalog>,
+        sources: Vec<PathBuf>,
+        directory: usize,
+        removed: BTreeSet<usize>,
+        password: Option<Password>,
+    ) -> io::Result<Self> {
+        if catalog.format != reader::Format::Zip || catalog.note.is_some() || catalog.skipped != 0 {
+            return Err(io::Error::other(
+                "Only complete ZIP catalogs can be updated",
+            ));
+        }
+        catalog.validate()?;
+        let node = catalog
+            .nodes
+            .get(directory)
+            .filter(|n| n.kind == reader::Kind::Directory)
+            .ok_or_else(|| io::Error::other("Missing ZIP directory"))?;
+        let prefix = std::str::from_utf8(&node.path)
+            .map_err(io::Error::other)?
+            .to_string();
+        if removed
+            .iter()
+            .any(|id| *id == 0 || *id >= catalog.nodes.len())
+        {
+            return Err(io::Error::other("Invalid ZIP removal selection"));
+        }
+        Self::capture_impl(
+            sources,
+            catalog.path.clone(),
+            password,
+            Some(catalog),
+            removed,
+            prefix,
+        )
+    }
+    pub(crate) fn preserving_member_mode(mut self, mode: Option<u32>) -> Self {
+        self.member_mode = mode;
+        self
+    }
+    fn capture_impl(
+        sources: Vec<PathBuf>,
+        destination: PathBuf,
+        password: Option<Password>,
+        existing: Option<std::sync::Arc<reader::Catalog>>,
+        removed: BTreeSet<usize>,
+        prefix: String,
+    ) -> io::Result<Self> {
+        if (sources.is_empty() && existing.is_none())
+            || reader::Format::detect(&destination) != Some(reader::Format::Zip)
+        {
             return Err(io::Error::other(
                 "Select files and choose a .zip archive path",
             ));
         }
-        if fs::symlink_metadata(&destination).is_ok() {
+        if existing.is_none() && fs::symlink_metadata(&destination).is_ok() {
             return Err(io::Error::new(
                 io::ErrorKind::AlreadyExists,
                 "Archive destination already exists",
@@ -101,6 +164,11 @@ impl Creation {
             .collect::<io::Result<Vec<_>>>()?;
         let mut parents = Vec::new();
         for root in &roots {
+            if existing.is_some()
+                && crate::platform_fs::entry_identity(&destination)? == root.identity
+            {
+                return Err(io::Error::other("A ZIP cannot be added to itself"));
+            }
             if !root.path.is_absolute()
                 || root
                     .path
@@ -134,10 +202,17 @@ impl Creation {
             parents,
             receipt,
             password,
+            existing,
+            removed,
+            prefix,
+            member_mode: None,
         })
     }
     fn validate(&self) -> io::Result<()> {
         self.receipt.validate()?;
+        if let Some(catalog) = &self.existing {
+            catalog.validate()?;
+        }
         for (path, identity) in &self.parents {
             if crate::platform_fs::entry_identity(path)? != *identity
                 || redirected(&fs::symlink_metadata(path)?)
@@ -153,6 +228,17 @@ impl Creation {
     pub(crate) fn run(
         &self,
         cancel: &Cancellation,
+        notify: impl FnMut(&Progress),
+    ) -> io::Result<Progress> {
+        let result = self.run_inner(cancel, notify);
+        if result.is_err() {
+            cancel.check()?;
+        }
+        result
+    }
+    fn run_inner(
+        &self,
+        cancel: &Cancellation,
         mut notify: impl FnMut(&Progress),
     ) -> io::Result<Progress> {
         self.validate()?;
@@ -164,7 +250,14 @@ impl Creation {
                 .file_name()
                 .and_then(|s| s.to_str())
                 .ok_or_else(|| io::Error::other("Archive names must be Unicode"))?;
-            stack.push((root.path.clone(), name.to_string()));
+            stack.push((
+                root.path.clone(),
+                if self.prefix.is_empty() {
+                    name.to_string()
+                } else {
+                    format!("{}/{name}", self.prefix)
+                },
+            ));
         }
         let mut keys = BTreeSet::new();
         let mut total = 0u64;
@@ -172,7 +265,7 @@ impl Creation {
         while let Some((path, name)) = stack.pop() {
             cancel.check()?;
             if entries.len() >= reader::MAX_ENTRIES {
-                return Err(io::Error::other("Archive exceeds 10,000 entries"));
+                return Err(io::Error::other("Archive exceeds 100,000 entries"));
             }
             reader::normalize(name.as_bytes())?;
             for part in name.split('/') {
@@ -191,7 +284,7 @@ impl Creation {
                 for entry in fs::read_dir(&path)? {
                     cancel.check()?;
                     if children.len() + entries.len() + stack.len() >= reader::MAX_ENTRIES {
-                        return Err(io::Error::other("Archive exceeds 10,000 entries"));
+                        return Err(io::Error::other("Archive exceeds 100,000 entries"));
                     }
                     let e = entry?;
                     let leaf = e
@@ -207,18 +300,109 @@ impl Creation {
                     .checked_add(snapshot.size)
                     .filter(|n| *n <= reader::MAX_STREAM)
                     .ok_or_else(|| {
-                        io::Error::other("Archive input exceeds the 256 MiB extraction limit")
+                        io::Error::other("Archive input exceeds the 64 GiB creation limit")
                     })?;
             }
             entries.push((snapshot, name));
         }
         self.validate()?;
         let parent = self.destination.parent().unwrap();
-        if crate::volume_space::read(parent)?.available < u128::from(total) + 2 * 1024 * 1024 {
+        if crate::volume_space::read(parent)?.available
+            < u128::from(total)
+                + self.existing.as_ref().map_or(0, |c| {
+                    fs::metadata(&c.path).map_or(0, |m| u128::from(m.len()))
+                })
+                + 2 * 1024 * 1024
+        {
             return Err(io::Error::other("Insufficient space for archive creation"));
+        }
+        let replacement = self
+            .existing
+            .as_ref()
+            .map(|_| {
+                crate::operations::conflict::Approved::capture(
+                    &self.destination,
+                    fs::symlink_metadata(&self.destination)?,
+                )
+            })
+            .transpose()?;
+        let mut retained = Vec::new();
+        let mut existing_names = BTreeSet::new();
+        if let Some(catalog) = &self.existing {
+            if catalog.nodes.iter().any(|n| n.locked) && !entries.is_empty() {
+                let password = self.password.as_ref().ok_or_else(|| {
+                    io::Error::new(
+                        io::ErrorKind::PermissionDenied,
+                        "Enter the archive password before updating encrypted ZIP contents",
+                    )
+                })?;
+                let ids = catalog
+                    .nodes
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, n)| n.locked && n.kind == reader::Kind::File)
+                    .take(1)
+                    .map(|(id, _)| id)
+                    .collect::<Vec<_>>();
+                reader::check_password(catalog, &ids, password, cancel)?;
+            }
+            let added = entries
+                .iter()
+                .map(|(snapshot, name)| (name.to_lowercase(), (name.as_str(), snapshot.directory)))
+                .collect::<std::collections::HashMap<_, _>>();
+            for (id, node) in catalog.nodes.iter().enumerate().skip(1) {
+                let deleted = self.removed.iter().any(|root| {
+                    id == *root
+                        || node
+                            .path
+                            .starts_with(&[catalog.nodes[*root].path.as_slice(), b"/"].concat())
+                });
+                if deleted {
+                    continue;
+                }
+                let key = std::str::from_utf8(&node.path)
+                    .map_err(io::Error::other)?
+                    .to_lowercase();
+                if !existing_names.insert(key.clone()) {
+                    return Err(io::Error::other(
+                        "ZIP member names collide across platforms",
+                    ));
+                }
+                if let Some((name, directory)) = added.get(&key) {
+                    if name.as_bytes() != node.path {
+                        return Err(io::Error::other(
+                            "ZIP member names differ only in case; use the original spelling",
+                        ));
+                    }
+                    if !matches!(node.kind, reader::Kind::File | reader::Kind::Directory) {
+                        return Err(io::Error::other(
+                            "Replacing ZIP links or special members is not supported",
+                        ));
+                    }
+                    if *directory != (node.kind == reader::Kind::Directory) {
+                        return Err(io::Error::other("ZIP file/directory conflict"));
+                    }
+                    continue;
+                }
+                if let Some(index) = node.source {
+                    retained.push(index);
+                }
+            }
+            if retained.len() + entries.len() > reader::MAX_ENTRIES {
+                return Err(io::Error::other("Updated ZIP exceeds 100,000 entries"));
+            }
         }
         let stage = crate::publication::StagedFile::create(&self.destination)?;
         let mut writer = zip::ZipWriter::new(stage.file.try_clone()?);
+        if let Some(catalog) = &self.existing {
+            let (file, metadata) = catalog.checked_source()?;
+            let mut archive = reader::zip_open_for(file, &metadata, cancel, true)?;
+            writer.set_raw_comment(archive.comment().to_vec().into())?;
+            for index in retained {
+                cancel.check()?;
+                writer.raw_copy_file(archive.by_index_raw(index)?)?;
+            }
+        }
         let mut progress = Progress {
             path: self.destination.clone(),
             total_bytes: Some(total),
@@ -230,13 +414,17 @@ impl Creation {
             cancel.check()?;
             snapshot.validate()?;
             let mut options = zip::write::SimpleFileOptions::default()
-                .compression_method(zip::CompressionMethod::Deflated);
+                .compression_method(zip::CompressionMethod::Deflated)
+                .large_file(snapshot.size >= u64::from(u32::MAX));
             #[cfg(unix)]
             {
                 use std::os::unix::fs::PermissionsExt;
                 options = options.unix_permissions(
                     fs::symlink_metadata(&snapshot.path)?.permissions().mode() & 0o777,
                 );
+            }
+            if let Some(mode) = self.member_mode {
+                options = options.unix_permissions(mode & 0o777);
             }
             if let Some(time) = snapshot.modified {
                 use chrono::{Datelike, Timelike};
@@ -291,9 +479,17 @@ impl Creation {
             }
         }
         writer.finish()?.sync_all()?;
-        if stage.file.metadata()?.len() > 512 * 1024 * 1024 {
+        if stage.file.metadata()?.len() > 64 * 1024 * 1024 * 1024 {
             return Err(io::Error::other(
-                "Created archive exceeds the 512 MiB browser limit",
+                "Created archive exceeds the 64 GiB browser limit",
+            ));
+        }
+        // Validate the complete generated catalog before making the new name
+        // visible; combined old/new metadata can exceed a limit independently.
+        let prepared = reader::list_zip(stage.path().to_path_buf(), cancel)?;
+        if prepared.note.is_some() || prepared.skipped != 0 {
+            return Err(io::Error::other(
+                "Updated ZIP has an incomplete or unsafe catalog",
             ));
         }
         cancel.check()?;
@@ -303,7 +499,23 @@ impl Creation {
             snapshot.validate()?;
         }
         self.receipt.validate()?;
-        stage.publish_unsynced(&self.destination)?;
+        if let Some(catalog) = &self.existing {
+            let (source, _) = catalog.checked_source()?;
+            crate::platform_fs::copy_extended_metadata(&source, &stage.file)?;
+            stage
+                .file
+                .set_permissions(source.metadata()?.permissions())?;
+            stage.file.sync_all()?;
+        }
+        if let Some(approved) = &replacement {
+            approved.verify(&self.destination)?;
+            if !crate::platform_fs::owns_file(stage.path(), &stage.file) {
+                return Err(io::Error::other("Staging file changed"));
+            }
+            std::fs::rename(stage.path(), &self.destination)?;
+        } else {
+            stage.publish_unsynced(&self.destination)?;
+        }
         progress.member = None;
         // Publication has succeeded. A durability warning must not claim that
         // the archive was never created or invite an unsafe retry.
@@ -564,6 +776,187 @@ mod tests {
             )
             .is_err());
         assert!(fs::read_dir(t.0.join("out"))?.next().is_none());
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod upgrade_tests {
+    use super::*;
+    use crate::archive::test_support::{self, Temp};
+    use std::sync::Arc;
+    #[test]
+    fn update_replaces_adds_and_removes_without_changing_unrelated_members() -> io::Result<()> {
+        let t = Temp::new()?;
+        let path = t.0.join("fixture.zip");
+        test_support::zip(
+            &path,
+            &[
+                ("a.txt", b"old"),
+                ("keep.txt", b"keep"),
+                ("docs/old.txt", b"remove"),
+            ],
+            None,
+        )?;
+        let catalog = Arc::new(reader::list(path.clone(), &Cancellation::default())?);
+        let id = catalog
+            .nodes
+            .iter()
+            .position(|n| n.path == b"docs")
+            .unwrap();
+        fs::write(t.0.join("a.txt"), "new Ёжик")?;
+        fs::create_dir(t.0.join("empty"))?;
+        let update = Creation::update(
+            catalog,
+            vec![t.0.join("a.txt"), t.0.join("empty")],
+            0,
+            BTreeSet::from([id]),
+            None,
+        )?;
+        update.run(&Cancellation::default(), |_| {})?;
+        let catalog = reader::list(path.clone(), &Cancellation::default())?;
+        assert!(!catalog.nodes.iter().any(|n| n.path.starts_with(b"docs")));
+        let id = catalog
+            .nodes
+            .iter()
+            .position(|n| n.path == b"a.txt")
+            .unwrap();
+        assert_eq!(
+            reader::preview(&catalog, id, &Cancellation::default())?
+                .source
+                .as_deref(),
+            Some("new Ёжик")
+        );
+        assert!(catalog.nodes.iter().any(|n| n.path == b"empty"));
+        let mut zip = zip::ZipArchive::new(fs::File::open(path)?)?;
+        assert_eq!(zip.comment(), b"fixture comment");
+        let mut keep = String::new();
+        zip.by_name("keep.txt")?.read_to_string(&mut keep)?;
+        assert_eq!(keep, "keep");
+        Ok(())
+    }
+    #[test]
+    fn folder_merge_keeps_children_and_case_only_conflicts_keep_original() -> io::Result<()> {
+        let t = Temp::new()?;
+        let path = t.0.join("merge.zip");
+        test_support::zip(&path, &[("docs/keep.txt", b"keep")], None)?;
+        fs::create_dir(t.0.join("docs"))?;
+        fs::write(t.0.join("docs/new.txt"), "new")?;
+        let catalog = Arc::new(reader::list(path.clone(), &Cancellation::default())?);
+        Creation::update(catalog, vec![t.0.join("docs")], 0, Default::default(), None)?
+            .run(&Cancellation::default(), |_| {})?;
+        let catalog = Arc::new(reader::list(path.clone(), &Cancellation::default())?);
+        assert!(catalog.nodes.iter().any(|n| n.path == b"docs/keep.txt"));
+        assert!(catalog.nodes.iter().any(|n| n.path == b"docs/new.txt"));
+        fs::create_dir(t.0.join("case"))?;
+        fs::create_dir(t.0.join("case/Docs"))?;
+        let bytes = fs::read(&path)?;
+        assert!(Creation::update(
+            catalog,
+            vec![t.0.join("case/Docs")],
+            0,
+            Default::default(),
+            None
+        )?
+        .run(&Cancellation::default(), |_| {})
+        .is_err());
+        assert_eq!(bytes, fs::read(path)?);
+        Ok(())
+    }
+    #[test]
+    fn cancelled_or_stale_update_keeps_original_and_cleans_staging() -> io::Result<()> {
+        let t = Temp::new()?;
+        let path = t.0.join("fixture.zip");
+        test_support::zip(&path, &[("a.txt", b"old")], None)?;
+        let bytes = fs::read(&path)?;
+        let catalog = Arc::new(reader::list(path.clone(), &Cancellation::default())?);
+        fs::write(t.0.join("a.txt"), "new")?;
+        let update = Creation::update(
+            catalog,
+            vec![t.0.join("a.txt")],
+            0,
+            Default::default(),
+            None,
+        )?;
+        let token = Cancellation::default();
+        token.cancel();
+        assert!(update.run(&token, |_| {}).is_err());
+        assert_eq!(fs::read(&path)?, bytes);
+        test_support::zip(&path, &[("a.txt", b"external change")], None)?;
+        let changed = fs::read(&path)?;
+        assert!(update.run(&Cancellation::default(), |_| {}).is_err());
+        assert_eq!(fs::read(&path)?, changed);
+        assert!(!fs::read_dir(&t.0)?.any(|e| e
+            .unwrap()
+            .file_name()
+            .to_string_lossy()
+            .starts_with(".dn-part")));
+        Ok(())
+    }
+    #[test]
+    fn removal_keeps_encrypted_members_raw_and_addition_requires_correct_password() -> io::Result<()>
+    {
+        let t = Temp::new()?;
+        let path = t.0.join("locked.zip");
+        test_support::zip(
+            &path,
+            &[("keep.txt", b"secret"), ("remove.txt", b"old")],
+            Some("fixture"),
+        )?;
+        let catalog = Arc::new(reader::list(path.clone(), &Cancellation::default())?);
+        let id = catalog
+            .nodes
+            .iter()
+            .position(|n| n.path == b"remove.txt")
+            .unwrap();
+        Creation::update(catalog, Vec::new(), 0, BTreeSet::from([id]), None)?
+            .run(&Cancellation::default(), |_| {})?;
+        let catalog = Arc::new(reader::list(path.clone(), &Cancellation::default())?);
+        let id = catalog
+            .nodes
+            .iter()
+            .position(|n| n.path == b"keep.txt")
+            .unwrap();
+        assert!(catalog.nodes[id].locked);
+        assert_eq!(
+            reader::preview_with_password(
+                &catalog,
+                id,
+                Some(&Password::new("fixture")),
+                &Cancellation::default()
+            )?
+            .source
+            .as_deref(),
+            Some("secret")
+        );
+        fs::write(t.0.join("new.txt"), "new")?;
+        let before = fs::read(&path)?;
+        assert!(Creation::update(
+            catalog.clone(),
+            vec![t.0.join("new.txt")],
+            0,
+            Default::default(),
+            Some(Password::new("wrong"))
+        )?
+        .run(&Cancellation::default(), |_| {})
+        .is_err());
+        assert_eq!(before, fs::read(&path)?);
+        Creation::update(
+            catalog,
+            vec![t.0.join("new.txt")],
+            0,
+            Default::default(),
+            Some(Password::new("fixture")),
+        )?
+        .run(&Cancellation::default(), |_| {})?;
+        assert!(
+            reader::list(path, &Cancellation::default())?
+                .nodes
+                .iter()
+                .find(|n| n.path == b"new.txt")
+                .unwrap()
+                .locked
+        );
         Ok(())
     }
 }

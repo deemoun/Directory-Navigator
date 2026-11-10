@@ -34,6 +34,9 @@ impl Mp3Preferences {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Config {
+    pub restore_session: crate::session::RestoreLevel,
+    pub session: Option<crate::session::Snapshot>,
+    pub invalid_session: bool,
     pub mp3: Mp3Preferences,
     pub disabled_plugins: std::collections::BTreeSet<String>,
     pub enabled_plugins: std::collections::BTreeSet<String>,
@@ -65,6 +68,9 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
+            restore_session: Default::default(),
+            session: None,
+            invalid_session: false,
             mp3: Mp3Preferences::default(),
             disabled_plugins: Default::default(),
             enabled_plugins: Default::default(),
