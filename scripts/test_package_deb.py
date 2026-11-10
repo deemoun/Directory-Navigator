@@ -241,5 +241,88 @@ class PipelineTests(DebianFixture, unittest.TestCase):
                         with self.assertRaises(ValueError):
                             deb.validate(work / "package.deb",self.root,work,"amd64","1.1.10-1",self.identity,"1.1.10")
 
+class LibgccRegressionTests(DebianFixture, unittest.TestCase):
+    def test_cargo_deb_libgcc_omission_is_restored_and_final_package_revalidated(self):
+        from contextlib import contextmanager
+        @contextmanager
+        def fake_archive(*args):
+            yield []
+        for arch, outcome in ((arch, outcome) for arch in deb.ARCHES
+                              for outcome in ("success", "build failure", "still missing")):
+            with tempfile.TemporaryDirectory(dir=self.root) as temporary:
+                work = Path(temporary)
+                package = work / "package.deb"
+                package.write_bytes(b"private packaging-command fixture, not a real deb")
+                expected = "libasound2t64 (>= 1.0.29), libc6 (>= 2.39), libgcc-s1 (>= 4.2)"
+                fields = {"Package":deb.NAME, "Version":"1.1.10-1", "Architecture":arch,
+                          "Maintainer":self.identity, "Depends":"libasound2t64 (>= 1.0.29), libc6 (>= 2.39)"}
+                calls = []
+                def command(args, cwd=None):
+                    calls.append(args)
+                    if args[:2] == ["dpkg-deb", "--field"]:
+                        return fields[args[-1]]
+                    if args[:2] == ["dpkg-deb", "--raw-extract"]:
+                        control = Path(args[-1]) / "DEBIAN/control"
+                        control.parent.mkdir(parents=True, exist_ok=True)
+                        control.write_text("Package: directory-navigator\nVersion: 1.1.10-1\nDepends: libasound2t64 (>= 1.0.29),\n libc6 (>= 2.39)\nDescription: keep this\n continuation stays\n")
+                    elif args[:2] == ["dpkg-deb", "--build"]:
+                        if outcome == "build failure":
+                            raise ValueError("rebuild failed")
+                        control = (Path(args[-2]) / "DEBIAN/control").read_text()
+                        self.assertIn("Description: keep this\n continuation stays\n", control)
+                        repaired = next(line.removeprefix("Depends: ") for line in control.splitlines() if line.startswith("Depends: "))
+                        self.assertEqual(deb.dependencies(repaired), deb.dependencies(expected))
+                        if outcome != "still missing":
+                            fields["Depends"] = repaired
+                        Path(args[-1]).write_bytes(b"repacked fixture")
+                    elif args[0] == "dpkg-shlibdeps":
+                        self.assertNotIn("--ignore-missing-info", args)
+                        return "shlibs:Depends=" + expected
+                    elif args[0] != "lintian":
+                        return "Directory Navigator 1.1.10"
+                    return ""
+                with patch.object(deb,"archive",fake_archive), patch.object(deb,"payload"), patch.object(deb,"elf"), patch.object(deb,"run",side_effect=command):
+                    if outcome == "success":
+                        deb.validate(package,self.root,work,arch,"1.1.10-1",self.identity,"1.1.10")
+                    else:
+                        with self.assertRaisesRegex(ValueError, "rebuild failed|Runtime dependencies"):
+                            deb.validate(package,self.root,work,arch,"1.1.10-1",self.identity,"1.1.10")
+                self.assertEqual(sum(args[0]=="dpkg-shlibdeps" for args in calls), 1 if outcome == "build failure" else 2)
+                self.assertEqual(sum(args[0]=="lintian" for args in calls), int(outcome == "success"))
+                self.assertEqual(sum(args[:2]==["dpkg-deb", "--build"] for args in calls), 1)
+                if outcome == "build failure":
+                    self.assertEqual(package.read_bytes(), b"private packaging-command fixture, not a real deb")
+                else:
+                    self.assertEqual(package.read_bytes(), b"repacked fixture")
+
+    def test_repair_is_limited_to_missing_libgcc_s1(self):
+        base = "libasound2t64 (>= 1.0.29), libc6 (>= 2.39)"
+        self.assertTrue(deb.omitted_libgcc(base + ", libgcc-s1 (>= 4.2)", base))
+        for actual, recorded in [
+            (base + ", libstdc++6", base),
+            (base + ", libgcc-s1, libstdc++6", base),
+            (base + ", libgcc-other", base),
+            (base + ", libgcc-s1 (>= 4.2)", base + ", libgcc-s1 (>= 3.0)"),
+            (base + ", libgcc-s1", base + ", libgcc-s1:any"),
+            (base + ", libgcc-s1", base + ", unexpected"),
+            (base, base),
+        ]:
+            with self.subTest(actual=actual, recorded=recorded):
+                self.assertFalse(deb.omitted_libgcc(actual, recorded))
+
+    def test_control_rewrite_preserves_other_fields_and_rejects_ambiguity(self):
+        for newline in ("\n", "\r\n"):
+            before = newline.join(["Package: dn", "Depends: libc6,", " libasound2", "Description: text", " continuation", ""])
+            result = deb.replace_depends(before, "libc6, libasound2, libgcc-s1")
+            self.assertIn("Description: text" + newline + " continuation" + newline, result)
+            self.assertIn("Depends: libc6, libasound2, libgcc-s1\n", result)
+        for control, value in [("Package: dn\n", "libgcc-s1"),
+                               ("Depends: a\nDepends: b\n", "libgcc-s1"),
+                               ("Depends: a\n", "libgcc-s1\nInjected: yes"),
+                               ("Depends: a\n", "")]:
+            with self.assertRaises(ValueError):
+                deb.replace_depends(control, value)
+
+
 if __name__ == "__main__":
     unittest.main()

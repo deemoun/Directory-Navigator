@@ -168,7 +168,31 @@ def dependencies(value):
     return {" ".join(item.split()) for item in value.split(",") if item.strip()}
 
 
-def validate(package, root, work, arch, version, identity, app_version):
+def omitted_libgcc(actual, recorded):
+    """Only repair cargo-deb's intentional omission, never other mismatches."""
+    required, packaged = dependencies(actual), dependencies(recorded)
+    missing = required - packaged
+    return (packaged < required and len(missing) == 1
+            and all(re.fullmatch(r"libgcc-s1(?: \(>= [0-9][A-Za-z0-9.+:~\-]*\))?", item)
+                    for item in missing)
+            and not any(re.match(r"libgcc-s1(?:\s|:|$)", item) for item in packaged))
+
+
+def replace_depends(control, value):
+    if not value or any(char in value for char in "\r\n\0"):
+        raise ValueError("Invalid replacement Depends field")
+    lines = control.splitlines(keepends=True)
+    starts = [i for i, line in enumerate(lines) if line.lower().startswith("depends:")]
+    if len(starts) != 1:
+        raise ValueError("Expected exactly one Depends control field")
+    start = starts[0]
+    end = start + 1
+    while end < len(lines) and lines[end].startswith((" ", "\t")):
+        end += 1
+    return "".join(lines[:start] + [f"Depends: {value}\n"] + lines[end:])
+
+
+def validate(package, root, work, arch, version, identity, app_version, repair=True):
     expected = {"Package": NAME, "Version": version, "Architecture": arch, "Maintainer": identity}
     for field, value in expected.items():
         if run(["dpkg-deb", "--field", package, field]) != value:
@@ -178,19 +202,35 @@ def validate(package, root, work, arch, version, identity, app_version):
             name = member_name(member)
             if name not in {".", "control", "md5sums"}:
                 raise ValueError(f"Unexpected control entry/maintainer script: {name}")
-    binary = work / "dn"
+    binary = work / "debian" / NAME / "usr/bin/dn"
+    binary.parent.mkdir(parents=True)
     with archive(package, "--fsys-tarfile") as contents:
         payload(contents, root, binary)
     elf(binary, arch)
     if run([binary, "--version"], cwd=work) != f"Directory Navigator {app_version}":
         raise ValueError("Packaged executable version does not match Cargo.toml")
     source = work / "debian"
-    source.mkdir()
+    source.mkdir(exist_ok=True)
     (source / "control").write_text(f"Source: {NAME}\nSection: utils\nPriority: optional\nMaintainer: {identity}\nStandards-Version: 4.7.0\n\nPackage: {NAME}\nArchitecture: any\nDescription: Terminal file manager\n")
     resolved = run(["dpkg-shlibdeps", "-O", "-e" + str(binary)], cwd=work)
     actual = next((line.split("=", 1)[1] for line in resolved.splitlines() if line.startswith("shlibs:Depends=")), "")
     recorded = run(["dpkg-deb", "--field", package, "Depends"])
     if not actual or dependencies(actual) != dependencies(recorded):
+        if repair and omitted_libgcc(actual, recorded):
+            # Both tar archives have passed the strict path/type/asset checks.
+            # Repair only the private staged package, then validate it anew.
+            with tempfile.TemporaryDirectory(prefix="libgcc-", dir=work) as temporary:
+                staging = Path(temporary)
+                tree = staging / "package"
+                run(["dpkg-deb", "--raw-extract", package, tree])
+                control = tree / "DEBIAN/control"
+                control.write_text(replace_depends(control.read_text(), actual))
+                rebuilt = staging / "rebuilt.deb"
+                run(["dpkg-deb", "--build", "--root-owner-group", tree, rebuilt])
+                os.replace(rebuilt, package)
+                checked = staging / "checked"
+                checked.mkdir()
+                return validate(package, root, checked, arch, version, identity, app_version, repair=False)
         raise ValueError(f"Runtime dependencies unresolved or mismatched: expected {actual!r}, packaged {recorded!r}")
     if not any(re.match(r"libasound2(?:t64)?(?:\s|$)", item) for item in dependencies(recorded)):
         raise ValueError("Default audio build must declare its ALSA runtime dependency")

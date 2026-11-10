@@ -91,7 +91,10 @@ Before exposing the output files, the script checks control metadata, package
 paths/ownership/permissions, required documents against their source, ELF
 architecture, and `dn --version`. It reruns `dpkg-shlibdeps` without ignoring
 missing dependency information and compares the result with the package's
-`Depends`. Unresolved dependencies or a missing default-audio ALSA dependency
+`Depends`. Since cargo-deb omits `libgcc-s1`, the script restores that exact
+native-scanner requirement when it is the only discrepancy, rebuilds the private
+package control metadata, and repeats all validation on the final package. Other
+dependency mismatches remain errors. Unresolved dependencies or a missing default-audio ALSA dependency
 are failures. Lintian errors fail the build; warnings remain visible and should
 be reviewed before distribution. Publication to the local output directory
 refuses replacement and writes a SHA-256 checksum.
