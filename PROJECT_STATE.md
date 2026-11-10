@@ -1,6 +1,64 @@
 # Directory Navigator
 
-## Help expand/restore control
+## Current status — stable 1.1.9
+
+Directory Navigator 1.1.9 is the first stable release and is published on
+[crates.io](https://crates.io/crates/directory-navigator/1.1.9). It supports macOS,
+Linux and Windows. See the [English README](README.md),
+[Russian README](README.ru.md) and [user guide](docs/USER_GUIDE.md) for current
+installation instructions, controls, safeguards and feature-specific limits.
+
+- Multiple editor/viewer documents, movable/resizable windows, Tile and Cascade,
+  shared controls and custom palette editing are implemented.
+- Session restoration offers Off, Panels only (default), or Panels and documents.
+  Save desktop captures the session; normal exit saves it when Save settings on
+  exit is enabled. `dn --no-session` bypasses restoration for one launch. Disk
+  documents reopen current contents; snapshots exclude unsaved text, passwords,
+  archive-member documents, utilities, transfers and music state. Crash recovery
+  separately protects dirty editor buffers.
+- Large regular disk files use a streaming viewer with bounded windows, navigation
+  and whole-file search. Bounded text previews retain up to 64 MiB of source,
+  192 MiB of decoded text and 1,000,000 lines. The editor supports a 64 MiB Unicode
+  buffer and encoded output, with 1,000,000 lines. UTF-8, UTF-16 LE/BE, CP866,
+  Windows-1251, KOI8-R and Windows-1252 are supported. Formatted Markdown and PDF
+  text viewing retain separate documented limits.
+- Both panes browse ZIP/ZIP64, TAR/TGZ, RAR and 7z. Selected extraction and
+  password prompts are implemented; RAR/7z use internal decoders. ZIP creation,
+  confirmed additions/replacements, member deletion and text-member editing are
+  supported through guarded staged rebuilds. Other archive formats are read-only.
+- Copy, Move and extraction default to Ask before replacing. Ask supports folder
+  merging and per-transfer Replace all/Skip all; explicit Refuse and Skip retain
+  their non-merging rules. Save As asks before replacing. Errors distinguish
+  cancellation, partial completion, retained edits and post-publication warnings.
+- Parameterized F2 actions, terminal output recall, internal clipboard sharing,
+  persistent Temp Drive and music playback on all three platforms are available.
+  Linux virtual-console support includes GPM input, console-compatible colors
+  and locale/font diagnostics; manual system setup can still be required.
+
+### Release and validation evidence
+
+- The [1.1.9 release CI run](https://github.com/deemoun/Directory-Navigator/actions/runs/42739122883)
+  succeeded for commit `b02a0ee4e756857e1aaf424d429d859bba54ef8f`. Its test/build
+  jobs passed on macOS ARM64/Intel, Linux ARM64/x86_64 and Windows x86_64.
+  This establishes CI coverage, not verification of physical audio devices,
+  real Linux virtual consoles or every desktop environment.
+- Pre-publication local checks included the locked publish dry run, package
+  contents/metadata, release helpers, workflow policy, formatting and targeted
+  configuration/session regressions. The release executable reported 1.1.9.
+  Local runtime and terminal-restoration testing was performed on macOS ARM64;
+  earlier Windows/Linux cross-compilation checks were compile-time evidence.
+- The user separately reported testing the platform binaries. That report is
+  distinct from automated CI and the locally exercised runtime scenarios.
+- Counts and platform exclusions in the historical notes below describe their
+  individual development stages, not a fresh 1.1.9 validation run.
+
+## Historical implementation and validation notes
+
+The following notes preserve the development record. References to deferred
+features, older limits, platform exclusions and test counts were accurate for
+those stages and can be superseded by the current status and guide above.
+
+### Help expand/restore control
 
 - Removed the HelpWindow's independent native zoom glyph. DN's shared desktop
   chrome supplies the sole painted control and mouse target; maximized Help no
@@ -19,7 +77,7 @@
   All 15 debug/release terminal tests passed. Windows/Linux validation skipped.
 
 
-## Editor recovery and explicit save outcomes
+### Editor recovery and explicit save outcomes
 
 - Added private, versioned/checksummed crash checkpoints for all dirty editors,
   including untitled and inactive documents. The workspace-owned background
@@ -60,7 +118,7 @@
   documentation checks passed. Windows/Linux validation remains skipped.
 
 
-## DN selection and editor/viewer commands
+### DN selection and editor/viewer commands
 
 - Panel → Selection groups wildcard/all/invert actions with new select/unselect
   peers by extension or configured highlight-group identity. Group identity is
@@ -100,7 +158,7 @@
   passed; all 13 debug and release terminal tests passed. Windows/Linux skipped.
 
 
-## Advanced Find, parameterized F2 actions and highlight groups
+### Advanced Find, parameterized F2 actions and highlight groups
 
 - Find adds literal UTF-8 content with optional case matching, metadata type,
   inclusive size bounds and inclusive UTC date bounds. Searches stay with their
@@ -137,7 +195,7 @@
   release terminal tests passed. The existing held-button walkthrough now waits
   for the populated initial directory listing before sending its first command.
 
-## Typed tool state and shared window policy
+### Typed tool state and shared window policy
 
 - Independent tools now store their controller payloads in dedicated typed
   document state. Modal stacks contain blocking forms/children only; tool roots
@@ -165,7 +223,7 @@
   denied, release build, no-default-features and doc checks passed. All 11
   release terminal tests passed; all 320 existing appearance captures matched.
 
-## Independent tools and consistent window switching
+### Independent tools and consistent window switching
 
 - Added session-owned tool documents with stable WindowIds, typed tool kinds,
   captured panel/directory contexts, native shells and ID-targeted state access.
@@ -200,7 +258,7 @@
   terminal tests passed, including menu access from Tree, Calculator switching,
   overlapping documents, resizing, shell handoff and terminal restoration.
 
-## Visible button presses
+### Visible button presses
 
 - Shared push buttons now follow DN DIALOGS.PAS DrawState: the face shifts one
   column right, arrows disappear and the shadow clears while held. Mouse release
@@ -219,7 +277,7 @@
   Trash test ignored. Formatting, all-target Clippy, release, no-default-features,
   doc tests and all ten release PTY checks pass. Windows/Linux skipped.
 
-## Per-plugin defaults and explicit enable overrides
+### Per-plugin defaults and explicit enable overrides
 
 - MP3 Player is now disabled by default and absent from Utilities until enabled
   in Options → Configuration → Plugins. Calculator and Tetris keep their enabled
@@ -238,7 +296,7 @@
   doc tests and all six release terminal walkthroughs pass. Windows/Linux skipped.
 
 
-## MP3 Player UI prototype
+### MP3 Player UI prototype
 
 - Added a third built-in plugin, MP3 Player, to Utilities and the existing Plugins
   configuration list. It is disabled by default, opens as a singleton document and
@@ -268,7 +326,7 @@
   THIRD_PARTY_NOTICES.md; no original CD/hardware implementation was ported.
 
 
-## Temporary drag highlighting
+### Temporary drag highlighting
 
 - Following VIEWS.PAS TFrame's sfDragging palette, the captured window's frame
   and title turn white on green while dragging, resizing or using Size/Move.
@@ -284,7 +342,7 @@
   the five optimized-release walkthroughs pass. Windows/Linux remain skipped.
 
 
-## Tile and Cascade
+### Tile and Cascade
 
 - Manager menu and the shared Alt+0 window list expose Tile and Cascade for
   documents, including fixed-size Tetris. File panels and modal windows retain
@@ -318,7 +376,7 @@
   real-PTY walkthroughs pass. Windows/Linux validation remains skipped.
 
 
-## DN-style color editor
+### DN-style color editor
 
 - Replaced the Classic/Terminal picker with native group/item lists, 4×4
   foreground/background selectors, sample text, DN defaults and Color/B/W/Mono
@@ -341,7 +399,7 @@
   three optimized-release PTY walkthroughs pass. Windows/Linux remain skipped.
 
 
-## Controller extraction and regression stabilization
+### Controller extraction and regression stabilization
 
 - Copy/Move draft option changes and child requests, editor Find/Replace input,
   viewer search drafts and group-selection input use narrow state controllers.
@@ -361,7 +419,7 @@
   PTY walkthroughs also pass against the optimized release binary.
   Windows/Linux validation remains skipped.
 
-## Ownership and controller boundaries
+### Ownership and controller boundaries
 
 - Guarded document closes use one App retirement coordinator. Desktop removals
   emit the same lifecycle notification for internal alias coalescing. Reconciliation
@@ -379,7 +437,7 @@
   checks and release PTYs for floating windows, settings drafts, Unicode prompts,
   cancellation, submission and terminal restoration pass. Windows/Linux skipped.
 
-## Stabilization: presentation, task pressure and App workflows
+### Stabilization: presentation, task pressure and App workflows
 
 - A shared internal placement adapter handles cells, cursor, hit regions and
   pointer coordinates for root frames, floating documents, plugins and composed
@@ -394,7 +452,7 @@
   release/no-default-features checks and release PTY walkthrough pass.
   Windows/Linux validation remains skipped.
 
-## Floating desktop (macOS)
+### Floating desktop (macOS)
 
 - Native Window shells retain geometry for editor/viewer documents, the game,
   owned modals and plugin pages. The manager remains the fixed background.
@@ -417,7 +475,7 @@
   resize, output handoff and terminal restoration.
 
 
-## Architecture
+### Architecture
 - Native Rust `dn`: Turbo Vision/Crossterm/Chrono, Unicode segmentation, Unix libc;
   owned presentation geometry/styles/text and native headless test captures;
   macOS native Trash via `trash`, Windows native shell APIs; minimal ZIP/TAR/gzip
@@ -436,7 +494,7 @@
 - Shared iterative traversal sends bounded Find/size updates. Dedicated discovery
   state owns session dialogs/options/results; quick view owns debounced reads.
 
-## Implemented
+### Implemented
 
 - Compact dialog buttons reserve both DN focus arrows using translated Unicode
   caption widths. Import/common prompts, Copy/Move, archive and game rows share
@@ -1001,7 +1059,7 @@ older increment entries below also record earlier migration stages.
   and Screensaver. Manager retains Swap panels without redundant Activate left/right
   entries. Keyboard/mouse navigation uses the reduced menu set.
 
-## Validation
+### Validation
 - Document-dialog shared controls: 506 tests pass on macOS ARM64 (one opt-in
   native Trash test ignored). The 144 document-dialog captures match pre-refactor
   cells, styles, hits and cursor positions in both palettes/languages at two sizes;
@@ -1183,34 +1241,54 @@ older increment entries below also record earlier migration stages.
   checksums; these two existing workflows do not create releases or sign builds.
   Linux/Windows remain untested locally.
 
-## Limitations and next steps
-- Multiple documents and movable/resizable windows are implemented. Cascade/Tile,
-  shared-buffer views and workspace persistence remain deferred. Command-routing redesign, panel-source abstraction and
-  large-file storage are outside this foundation.
+## Current limitations and next steps
+
+- There is no transfer restart/resume journal or atomic publication of an entire
+  directory tree. Crashes can leave staging files or completed portions of a
+  transfer. Cancellation retains completed work rather than rolling it back.
 - Ancestor/entry snapshots detect replacements between operation stages, but
   path-based recursion still has check-to-use races; full descriptor-relative
   traversal remains future hardening. Nesting beyond 512 in discovery is
   reported as skipped. Kernel I/O cannot be force-cancelled.
-- No restart-resume journal or atomic directory-tree publication. Crashes can
-  leave identifiable staging files or completed portions of operations.
-- User menus retain DN's structure, not DOS batch syntax; parameter prompts,
-  legacy macros, persistent command history and output windows remain deferred. External
-  programs run with the user's permissions. Windows interruption is unverified.
-- Archive browsing is bounded (512 MiB sources/10k entries/20k virtual nodes,
-  16 MiB metadata/256 MiB TAR stream/10-second read jobs). ZIP64, multi-volume,
-  SFX, passwords and nested browsing are deferred; ZIP Stored/Deflate only.
-  Truncated previews do not verify unseen data. Kernel I/O cannot be interrupted.
-- Viewer is a bounded preview; editor is UTF-8 only, 2 MiB/100k lines, with linear
-  suffix shifts. Size totals are snapshots; no content search or filesystem watcher.
+- Archives remain bounded: 64 GiB sources, 100,000 members, 200,000 virtual nodes,
+  64 MiB tree metadata, 64 path levels and 4 KiB paths. TAR traversal and ZIP
+  creation input are bounded to 64 GiB. ZIP supports Stored/Deflate and ZIP64;
+  multi-volume/self-extracting layouts and duplicate names are refused. Nested
+  browsing, moving members and link/special-file extraction are unsupported.
+  RAR/7z solid archives may require decoding earlier entries, and library memory
+  use is not a fixed total bound. Preview limits do not imply full validation of
+  unseen data; authenticated encrypted ZIP reads have additional checks.
+- Streaming viewing applies to regular disk files. Archive previews, PDF text
+  extraction and formatted Markdown remain bounded; large disk Markdown uses
+  source text. Editing is bounded in memory, not unlimited streaming. Unsupported
+  encodings and unrepresentable output are rejected rather than guessed/replaced.
+- Session snapshots cover panels and supported disk-file documents, not the
+  entire running desktop. They are limited to 128 documents and share the 1 MiB
+  configuration bound. Unsaved text is handled by save/discard guards and crash
+  recovery, not session snapshots. Recovery does not restore undo history or
+  guarantee every final keystroke.
+- Permission/attribute editing, persistent command history and operating-system
+  clipboard integration remain unimplemented. Command history and DN's internal
+  clipboard are session-only. External commands run with the user's permissions;
+  user menus do not emulate DOS batch syntax.
 - Linux Trash supports the home volume only. macOS Trash refuses undecodable
   names; Finder Put Back is not guaranteed. Restore through the desktop manager.
   Linux external opening needs xdg-utils and a desktop session.
-- Feature priorities: safe archive extraction, output recall, then disk
-  information/permission editing. Platform validation, traversal/recovery hardening
-  and streaming viewing remain important.
-  Tree mutations/persistent cache, archive extraction/modification, persistent command history, OS clipboard,
-  macros and custom palette editing remain deferred.
+- Suggested follow-up work: transfer interruption/recovery hardening, actionable
+  bug-report diagnostics, permission editing, persistent command history and OS
+  clipboard integration. These are candidates, not committed release promises.
 
-Build: cargo build --release; run ./target/release/dn.
-Host: RUSTUP_HOME=/private/tmp/dn-rustup, CARGO_HOME=/private/tmp/dn-cargo;
-add its bin directory to PATH. The release binary runs independently of Rust.
+## Build and run
+
+Use the configured Rust toolchain and platform prerequisites from the README:
+
+```sh
+cargo build --release --locked
+./target/release/dn --version
+./target/release/dn
+```
+
+On Windows, use `target\release\dn.exe --version` and `target\release\dn.exe`.
+If Cargo uses a custom target directory or explicit target triple, use its actual
+release output path. Running a prebuilt binary does not require Rust; platform
+runtime libraries and setup requirements still apply.
