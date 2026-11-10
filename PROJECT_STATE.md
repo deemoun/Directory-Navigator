@@ -1,5 +1,18 @@
 # Directory Navigator
 
+## Unreleased networking work after 1.1.9
+
+Network/interface snapshots have their own Utilities → Network Information
+window. Important-path snapshots remain in System Information. A Remote connections plugin supplies independent SFTP/FTP/explicit
+FTPS panes, bounded previews, private-copy editing, queued uploads/downloads and
+confirmed remote file management. Profiles contain no saved secrets. Interactive
+SSH hands off to installed OpenSSH. FTP publication is server-dependent; SFTP
+replacement requires atomic rename support. Direct server-to-server copying and
+remote session restoration remain outside this implementation. These additions
+are not part of the published 1.1.9 crate. See the current README and guide for
+controls and boundaries; validation for this work is reported separately from the
+historical release evidence below.
+
 ## Current status — stable 1.1.9
 
 Directory Navigator 1.1.9 is the first stable release and is published on
@@ -51,6 +64,17 @@ installation instructions, controls, safeguards and feature-specific limits.
   distinct from automated CI and the locally exercised runtime scenarios.
 - Counts and platform exclusions in the historical notes below describe their
   individual development stages, not a fresh 1.1.9 validation run.
+
+### Unreleased working-tree addition
+
+The checkout adds the following capability after the published 1.1.9 release;
+the package version has not been bumped and this addition has not been published.
+
+- Directory tree now offers explicit background apparent-size analysis, separate
+  volume capacity, per-directory bars and Name/Size sibling ordering. Hidden files
+  count, directory links are not followed, and other filesystems are excluded.
+  Cancellation/limits retain partial results; refresh marks intersecting snapshots
+  stale. Results are tree-session-only and bounded to 20,000 directory records.
 
 ## Historical implementation and validation notes
 

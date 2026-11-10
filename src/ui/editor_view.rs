@@ -20,6 +20,12 @@ pub(super) fn draw(frame: &mut impl Frame, app: &App, area: Rect) {
         .archive_origin
         .as_ref()
         .map(|origin| display_name(&origin.label))
+        .or_else(|| {
+            editor
+                .remote_origin
+                .as_ref()
+                .map(|origin| display_name(&origin.label))
+        })
         .unwrap_or_else(|| {
             editor
                 .path

@@ -368,3 +368,75 @@ impl Job {
         })
     }
 }
+
+impl Job {
+    pub(crate) fn start_remote(
+        id: crate::transfers::TransferId,
+        request: crate::network::transfer::Transfer,
+        options: CopyOptions,
+        root: Option<crate::temp_drive::Root>,
+    ) -> io::Result<Self> {
+        let kind = match &request {
+            crate::network::transfer::Transfer::Mutation(m) => m.kind,
+            _ => Kind::Copy,
+        };
+        let requests = crate::requests::RequestScope::new(crate::requests::Owner::Workspace);
+        let token = requests.start("file-operation");
+        let (sender, events) = mpsc::sync_channel(8);
+        let cancel = Arc::new(AtomicBool::new(false));
+        let worker_cancel = cancel.clone();
+        let conflicts = conflict::Mailbox::default();
+        let mailbox = conflicts.clone();
+        thread::Builder::new()
+            .name("dn-remote-transfer".into())
+            .spawn(move || {
+                let mut latest = Progress {
+                    transfer: Some(id),
+                    ..Default::default()
+                };
+                let mut last = Instant::now() - Duration::from_secs(1);
+                let result = root
+                    .as_ref()
+                    .map_or(Ok(()), |r| r.validate())
+                    .and_then(|()| {
+                        request.run(
+                            options,
+                            &worker_cancel,
+                            |p| {
+                                latest = p.clone();
+                                latest.transfer = Some(id);
+                                if last.elapsed() >= Duration::from_millis(80) {
+                                    let _ = sender.try_send(Event::Progress(latest.clone()));
+                                    last = Instant::now();
+                                }
+                            },
+                            &mut |c| mailbox.ask(c, &worker_cancel),
+                        )
+                    })
+                    .map(|mut p| {
+                        p.transfer = Some(id);
+                        p
+                    })
+                    .map_err(|e| OperationFailure {
+                        kind: e.kind(),
+                        progress: Box::new(latest),
+                        message: e.to_string(),
+                    });
+                let _ = sender.send(Event::Done(result));
+            })?;
+        Ok(Self {
+            transfer: Some(id),
+            conflicts,
+            requests,
+            token,
+            events,
+            cancel,
+            progress: Progress {
+                transfer: Some(id),
+                ..Default::default()
+            },
+            kind,
+            focus: None,
+        })
+    }
+}

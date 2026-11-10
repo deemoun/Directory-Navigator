@@ -192,6 +192,7 @@ fn shared_logic_preserves_native_frames() -> io::Result<()> {
                                 .iter()
                                 .map(|c| c.symbol())
                                 .collect::<String>();
+                            assert!(text.contains(language.text("Remote connections")), "{text}");
                             assert!(
                                 text.contains(language.text("Play music files in internal player")),
                                 "{text}"

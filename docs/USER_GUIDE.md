@@ -423,7 +423,8 @@ Directory comparison uses visible cached file metadata, never file contents or r
 List export refuses existing destinations and paths that cannot be represented as UTF-8 lines.
 Like saving a new editor file, complete list publication requires filesystem hard-link support.
 
-Utilities also provides System Information. Information dialogs are read-only snapshots;
+Utilities also provides separate System Information and Network Information windows.
+Information dialogs are read-only snapshots;
 Refresh updates them. Unsupported or denied native fields display their errors.
 Calculator and character-table Copy use DN's internal editor clipboard (Ctrl+V).
 
@@ -506,6 +507,8 @@ The marker tracks the highlighted entry, like original DN. Click arrows to move,
 click the track to page, or drag the marker; the wheel moves three entries.
 
 
+### Directory tree and disk usage
+
 Directory tree: Ctrl+T, Manager → Directory tree.
 Arrow keys navigate; Right/+ expands, Left/− collapses or selects the parent,
 and Space toggles a branch. Enter or double-click opens the selected folder in
@@ -519,7 +522,36 @@ browser: one-level background reads, native volume roots and paths, bounded
 10,000-directory branches/20,000 cached children, and cancellation on close.
 Directory links are leaves; Enter follows one explicitly. Initial location resolves
 path aliases. Errors stay visible and can be retried. The tree is session-only;
-no disk-wide cache, recursive expansion, mutations or drive selector is added.
+no persisted disk-wide cache, recursive expansion, mutations or drive selector is added.
+
+The header shows **Volume available / total** for the selected directory, read in
+background independently of folder analysis. An unavailable capacity query does
+not prevent browsing. This is filesystem capacity, not a calculated folder size.
+
+**Analyze / F5** explicitly scans the selected real directory. Hidden files count
+regardless of Ctrl+H. Each directory row gains an apparent size and a bar relative
+to its parent's measured total; the summary includes direct files/links that have
+no directory row. Hard links count separately. Link metadata contributes its own
+length; directory links and Windows directory reparse points are never followed.
+Other filesystems are excluded, so a scan of `/` does not silently scan mounted
+external or network volumes. Skipped entries and excluded mounts are separate
+counts; partial totals are lower bounds, not allocated or reclaimable space.
+
+**Order: Name / Size (F6)** sorts siblings while preserving hierarchy and the
+highlighted path. Size ordering is applied after completion or cancellation,
+not on each progress event. While scanning, Analyze becomes **Stop**. Esc stops
+the scan first; a subsequent Esc, Ctrl+F4 or the title close control closes the
+tree. Completed/partial results survive navigation inside the open tree; Enter
+still opens the selected folder in the originating panel. Starting a new analysis
+replaces the previous snapshot. Refresh marks intersecting snapshots stale;
+visibility and ordering changes do not launch another analysis. A `~` before a
+row size means partial or stale. F1 shows analysis help and any first error.
+
+Analysis retains at most 20,000 directory records, traverses at most 512 levels
+and uses bounded event batches. Record exhaustion stops the scan; depth/access
+failures and exclusions propagate partial status to ancestors. Cancellation
+checks occur between entries; an operating-system I/O call may still take time
+to return. Results are session-only snapshots, not a live filesystem watcher.
 
 
 User menu: F2 or Utilities → User menu. Like original DN, `dn.mnu` uses
@@ -1690,3 +1722,98 @@ PDF input is limited to 64 MiB and must be complete. Text output is limited to
 error rather than parsing a truncated file. Processing runs in the existing bounded
 background task pool; cancellation is checked between pages and while emitting text.
 These limits bound input/output, not every allocation inside the PDF parser.
+
+## Remote connections
+
+Open **Utilities → Remote connections…** (the plugin can be disabled under Plugins
+settings). Choose SFTP, explicit FTPS on port 21, or plain FTP. Enter a profile
+name, host, port, username and an absolute POSIX remote directory. For SFTP you
+can supply a regular private-key file; the secret field is its passphrase or the
+account password. Agent forwarding and SSH-config import are not implemented.
+
+**Connect** runs in the background. **Cancel** stops the request. For a new SSH
+host, compare the displayed SHA-256 fingerprint with a trusted source, then choose
+**Trust once** or **Trust and save**; Cancel is initially selected. No password is
+sent before acceptance. Saved-key changes are refused. **Save profile** writes
+metadata to `remote-connections.conf` beside the actual configuration file;
+passwords and passphrases remain session-only. **Profiles** opens a selectable saved-profile
+list. Use arrows, Home/End or PageUp/PageDown, the mouse wheel, or click a row.
+**Select** (Enter or double-click) loads the profile and focuses the secret field;
+it does not connect automatically. **Edit** (F2) loads it for editing; **Save profile**
+applies changes, including renaming the same record. **New** starts a blank connection
+draft. **Delete** (Del) asks for confirmation with Cancel selected. It only removes
+saved connection metadata; open connections, remote files and local files remain intact.
+Closing the list preserves the current connection draft. Removing a profile keeps
+the nearest remaining row selected. Concurrent changes to the edited/deleted profile are rejected; reopen Profiles
+to refresh before editing again. Unknown metadata and other profiles are
+preserved by locked, atomic updates. Duplicate names are refused.
+Do not put passwords in profile names or host fields. FTPS uses public certificate
+roots; self-signed certificates are rejected. Plain FTP requires an extra Connect
+confirmation and sends both credentials and content unencrypted. FTP/FTPS servers
+must support MLSD listings and UTF-8 names; legacy LIST-only servers and legacy
+remote filename encodings are not supported.
+
+Each pane has independent remote navigation, marks, sorting, filtering and quick
+search. Enter opens a directory or previews a regular file; F3 opens a bounded
+read-only preview, including encoding and Markdown handling. F4 downloads a private
+working copy; F2 compares the original remote bytes before uploading changes.
+Errors retain the editor text. Save As exports to a local path. Remote working
+copies are excluded from session restoration and disk-file history. Connections and
+passwords are not saved in session snapshots or recovery files. Crash recovery
+may retain unsaved text as an untitled local buffer, without a remote path or
+permission to write back automatically.
+
+F5 transfers marked items, or the current item. Remote-to-disk uses the other local
+pane by default. If both panes are remote, choose an explicit local destination.
+Disk-to-remote uploads to the other remote pane; its destination field is a remote
+absolute path; the local Tree/history pickers and local disk-space/write-verification
+options are disabled for uploads. Copy to Temp Drive
+uses the same download path. Jobs appear in Transfer Center and continue when you
+navigate away. Cancellation leaves completed items intact and cleans owned staging
+where the server remains reachable. Closing a pane does not cancel accepted jobs.
+
+Ask merges directories and prompts for conflicting regular files; Refuse and Skip
+retain their existing rules. Downloads publish through the normal native-file
+engine. Uploads use a private server directory before publication and recheck
+source and destination metadata. SFTP replacement requires the server's
+`posix-rename@openssh.com` extension. FTP/FTPS rename and replacement guarantees are
+server-dependent; DN does not delete the old file in preparation. Remote servers do
+not provide DN's local identity/locking or durability guarantees. A disconnection
+may make the last server operation's outcome uncertain; refresh before retrying.
+
+F7 creates a remote directory, rename changes one name, and F8 permanently deletes
+a selection recursively after confirmation (no remote Trash). Links and special
+files cannot be transferred or edited; directory links are never followed.
+Native-only actions ask you to download first. Remote Move between panes is not
+supported. Ctrl+PgUp, or `..` at the remote root, disconnects and returns to the
+original disk directory. Esc while a pane is loading cancels that connection.
+
+Directory listings are bounded to 10,000 entries and 8 MiB of names per directory;
+recursive transfers/deletion to 100,000 items and 512 levels; individual transfers
+to 64 GiB. Eight dedicated network workers are available. A busy connection reports
+that it is in use rather than allowing unbounded queued requests. Network calls
+have finite timeouts; cancellation can wait for the current call to return.
+
+**SSH terminal** uses the installed OpenSSH `ssh` program with literal arguments,
+not a constructed shell command. Its authentication and known-hosts store are
+OpenSSH's own. DN suspends terminal ownership and restores it after exit. SFTP,
+FTP and FTPS browsing do not require external command-line clients.
+
+**Utilities → Network Information** collects local interface state, MAC, IPv4/IPv6,
+default gateway, DNS and MTU in its own window. Home, executable, configuration,
+recovery, Temp Drive and system temporary paths remain in System Information.
+The interface dropdown initially selects the default-route adapter, or the first
+available interface. Select another adapter with the mouse or Tab and Enter; use
+arrows and Enter to apply, or Esc to cancel. Refresh requests a new background
+snapshot and retains the selected interface when still available. Link state is not
+proof of Internet connectivity; DN does not send a public connectivity probe.
+
+Download and upload rates update automatically about once per second for the
+selected adapter, including traffic from other applications, local networks,
+loopback or VPNs as reported by that adapter. Values use bytes per second (B/s,
+KiB/s, MiB/s and larger units), not bits per second or an Internet speed test.
+Two counter samples are needed initially and after switching or refreshing;
+Measuring is shown until a valid interval is available. Counter resets and long
+gaps restart measurement. Unavailable counters are labelled explicitly, with
+the reason in the scrollable details; sampling retries in the background.
+Metadata still uses the Refresh snapshot. Closing the window stops sampling.

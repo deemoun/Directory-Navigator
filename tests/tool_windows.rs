@@ -120,6 +120,7 @@ fn utilities_coexist_and_calculator_is_a_document() -> io::Result<()> {
         dn::utilities::Kind::Characters,
         dn::utilities::Kind::System,
         dn::utilities::Kind::Memory,
+        dn::utilities::Kind::Network,
         dn::utilities::Kind::Calculator,
     ] {
         dn::utilities::open(&mut a, kind);
@@ -139,7 +140,7 @@ fn utilities_coexist_and_calculator_is_a_document() -> io::Result<()> {
     assert_eq!(a.desktop.active().id, ids[0]);
     a.poll();
     assert_eq!(a.desktop.active().id, ids[0]);
-    assert_eq!(a.desktop.windows().count(), 5);
+    assert_eq!(a.desktop.windows().count(), 6);
     Ok(())
 }
 #[test]

@@ -370,7 +370,7 @@ pub fn pending(state: &State) -> bool {
     state.task.is_some()
 }
 fn selected(panel: &crate::panel::Panel) -> io::Result<Vec<PathBuf>> {
-    if panel.is_archive() {
+    if panel.is_virtual() {
         return Err(io::Error::other(crate::archive::EXTRACT_FIRST));
     }
     if panel.only_filtered_marks() {

@@ -232,6 +232,14 @@ fn handle_key(app: &mut App, key: KeyEvent) {
         crate::viewer::key(app, key);
         return;
     }
+    if focus == Focus::Manager
+        && key.code == KeyCode::Esc
+        && app.panels[app.active].is_remote()
+        && app.panels[app.active].loading
+    {
+        app.panels[app.active].leave_remote(app.config.show_hidden);
+        return;
+    }
     if focus == Focus::Manager && key.code == KeyCode::Esc && app.panels[app.active].is_archive() {
         if !app.command_line.text.is_empty() {
             if let Some(a) = app.panels[app.active].archive_mut() {

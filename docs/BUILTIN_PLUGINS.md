@@ -238,3 +238,25 @@ Projects are explicit persistent user directories, not DN settings or system-tem
 workspaces. SDK path edits and the last device/export are session-only. The
 existing configuration mechanism stores only the plugin's enabled override.
 See the user guide for supported binary structures and editing restrictions.
+
+## Remote connections
+
+`remote_connections` is a default-enabled, owned blocking connection dialog.
+The plugin only edits drafts and connection profiles and emits typed
+`RemoteConnected` or `RemoteTerminal` effects. The host validates the emitting
+plugin, owns pane installation and terminal handoff, and keeps remote paths
+separate from native filesystem paths. Credentials are never serialized.
+
+Protocol workers use a separate eight-slot bounded task budget with request
+leases. Listings and previews are tied to the pane generation. A connection that
+finishes while inactive waits for activation; it cannot replace another pane or
+steal document focus. File operations use typed remote requests in Transfer Center;
+no fabricated native paths enter the native operation planner. Remote editor
+working copies have private cleanup ownership and are excluded from history,
+session snapshots; recovery retains only untitled text without a remote path. Interactive terminal sessions delegate to installed
+OpenSSH through the existing literal-argument command runner.
+
+The saved-profile list and its Cancel-default deletion confirmation are owned pages
+of the connection dialog. Page transitions retire their action targets. Edit/Delete
+capture profile metadata and reject concurrent changes before atomic publication;
+profile removal does not retire active remote connections or transfers.

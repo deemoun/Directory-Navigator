@@ -81,7 +81,7 @@ fn system_information_refresh_scroll_resize_and_terminal_restoration() -> io::Re
     })?;
     s.resize(100, 32)?;
     s.send(b"\x1b[F", "last diagnostic rows", |s| {
-        s.text().contains("Active directory")
+        s.text().contains("Temp Drive directory")
     })?;
     s.send(b"\x1b[15~", "refresh diagnostics", |s| {
         s.text().contains("Application")
@@ -1408,4 +1408,505 @@ fn accurate_copy_help_and_corrupt_archive_error_restore_terminal() -> io::Result
     assert_eq!(fs::read(s.root.join("broken.zip"))?, b"not a zip");
     assert_eq!(fs::read(s.root.join("item-000.txt"))?, b"fixture\n");
     s.finish()
+}
+
+#[test]
+fn tree_usage_analysis_stop_order_navigation_and_terminal_restoration() -> io::Result<()> {
+    let mut s = Session::new("tree-usage")?;
+    let root = s.root.join("usage-dir");
+    for (name, size) in [("large", 8192), ("small", 1024), (".hidden", 256)] {
+        fs::create_dir_all(root.join(name))?;
+        fs::write(root.join(name).join("data"), vec![b'x'; size])?;
+    }
+    fs::write(root.join("direct"), vec![b'x'; 512])?;
+    for i in 0..2000 {
+        fs::create_dir_all(root.join("cancel-set").join(format!("d{i:04}")))?;
+    }
+    s.wait("manager ready", |s| {
+        s.manager_document_ready() && s.text().contains("item-000.")
+    })?;
+    s.send(b"\x12", "refresh analysis fixture", |s| {
+        s.manager_document_ready()
+    })?;
+    s.select_file("usage-dir")?;
+    s.send(b"\r", "enter analysis root", |s| {
+        s.manager_document_ready() && s.text().contains("large")
+    })?;
+    s.send(b"\x14", "tree with volume capacity", |s| {
+        // Analyze is painted before Locate has established a selected row.
+        // Wait for the tree's completed branch-loading hint before sending F5.
+        s.text().contains("Directory tree")
+            && s.text().contains("Analyze")
+            && s.text().contains("Right/+ expand")
+    })?;
+    s.send(b"\x1b[15~", "start recursive analysis", |s| {
+        s.text().contains("Directory tree")
+            && (s.text().contains("Stop") || s.text().contains("Complete"))
+    })?;
+    s.send(b"\x1b", "stop or close completed analysis", |s| {
+        s.text().contains("Stopped — partial") || s.manager_document_ready()
+    })?;
+    if s.manager_document_ready() {
+        // Esc closes a scan that completed before the key was dispatched.
+        // Closing retires the tree session and its cache; a fresh tree has no
+        // snapshot. Active-job cancellation is checked by the controller test.
+        s.send(b"\x14", "reopen tree after completed scan", |s| {
+            s.text().contains("Directory tree")
+                && s.text().contains("No size snapshot for this directory")
+                && s.text().contains("Analyze")
+                && s.text().contains("Right/+ expand")
+        })?;
+    }
+    s.send(b"\x1b[15~", "complete recursive analysis", |s| {
+        s.text().contains("Complete") && s.text().contains("9.7 KiB")
+    })?;
+    s.send(b"\x1b[17~", "largest-first ordering", |s| {
+        s.text().contains("Order: Size")
+    })?;
+    s.resize(100, 32)?;
+    s.wait("analysis survives resize", |s| {
+        s.text().contains("Order: Size") && s.text().contains("Volume available / total")
+    })?;
+    s.send(b"\x1b[C", "select largest child", |s| {
+        s.text().contains("Apparent size: 8.0 KiB")
+    })?;
+    s.send(b"\r", "open result in originating panel", |s| {
+        s.manager_document_ready()
+    })?;
+    // Reopening activates the retained tree and its measured selection.
+    s.send(b"\x14", "retained analysis", |s| {
+        s.text().contains("Directory tree") && s.text().contains("8.0 KiB")
+    })?;
+    s.send(b"\x1b", "close tree", |s| s.manager_document_ready())?;
+    assert_eq!(fs::metadata(root.join("large/data"))?.len(), 8192);
+    assert_eq!(fs::metadata(root.join(".hidden/data"))?.len(), 256);
+    s.finish()
+}
+
+#[test]
+fn remote_connection_dialog_help_resize_and_cancel_restore_terminal() -> io::Result<()> {
+    use dn::localization::Language;
+    for language in [Language::English, Language::Russian] {
+        let preferences = format!("[regional]\nlanguage='{}'\n", language.key());
+        let mut s = Session::with_preferences("remote-connections", &preferences)?;
+        s.wait("manager ready", |s| {
+            s.command_prompt_active() && s.text().contains("item-000.")
+        })?;
+        s.send(b"\x1bun", "remote connection dialog", |s| {
+            s.text().contains(language.text("Remote connections"))
+                && s.text().contains(language.text("Host"))
+        })?;
+        s.send(b"\x1bOP", "remote connection help", |s| {
+            s.text()
+                .contains(language.text(" Remote connection help ").trim())
+        })?;
+        s.send(b"\x1b", "return from connection help", |s| {
+            s.text().contains(language.text("Profile name"))
+                && !s
+                    .text()
+                    .contains(language.text(" Remote connection help ").trim())
+        })?;
+        s.resize(100, 32)?;
+        s.wait("connection resize", |s| {
+            s.text().contains(language.text("Save profile"))
+        })?;
+        s.resize(40, 12)?;
+        s.resize(80, 25)?;
+        s.wait("connection restored", |s| {
+            s.text().contains(language.text("Remote connections"))
+                && s.text().contains(language.text("SSH terminal"))
+        })?;
+        s.send(b"\x1b", "cancel connection", |s| {
+            s.command_prompt_active() && !s.text().contains(language.text("Remote connections"))
+        })?;
+        s.finish()?;
+    }
+    Ok(())
+}
+
+#[test]
+fn ftp_pane_preview_download_disconnect_and_terminal_restoration() -> io::Result<()> {
+    use std::{
+        io::{BufRead, Write},
+        net::{Ipv4Addr, TcpListener},
+        time::{Duration, Instant},
+    };
+    let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0))?;
+    listener.set_nonblocking(true)?;
+    let port = listener.local_addr()?.port();
+    let server = std::thread::spawn(move || -> io::Result<()> {
+        let deadline = Instant::now() + Duration::from_secs(10);
+        let (mut control, _) = loop {
+            match listener.accept() {
+                Ok(v) => break v,
+                Err(e) if e.kind() == io::ErrorKind::WouldBlock && Instant::now() < deadline => {
+                    std::thread::sleep(Duration::from_millis(5))
+                }
+                Err(e) => return Err(e),
+            }
+        };
+        // macOS can inherit O_NONBLOCK from the accepting listener.
+        control.set_nonblocking(false)?;
+        control.set_read_timeout(Some(Duration::from_secs(10)))?;
+        let mut input = std::io::BufReader::new(control.try_clone()?);
+        control.write_all(b"220 DN private terminal fixture\r\n")?;
+        let mut passive = None;
+        loop {
+            let mut line = String::new();
+            if input.read_line(&mut line)? == 0 {
+                break;
+            }
+            let line = line.trim_end();
+            if line.starts_with("USER ") {
+                control.write_all(b"331 Password\r\n")?;
+            } else if line == "PASS" || line.starts_with("PASS ") {
+                control.write_all(b"230 Accepted\r\n")?;
+            } else if line == "TYPE I" {
+                control.write_all(b"200 Binary\r\n")?;
+            } else if line == "PASV" {
+                let data = TcpListener::bind((Ipv4Addr::LOCALHOST, 0))?;
+                let p = data.local_addr()?.port();
+                write!(
+                    control,
+                    "227 Passive (127,0,0,1,{},{})\r\n",
+                    p / 256,
+                    p % 256
+                )?;
+                passive = Some(data);
+            } else if line.starts_with("MLSD") || line.starts_with("RETR ") {
+                control.write_all(b"150 Data\r\n")?;
+                let (mut data, _) = passive
+                    .take()
+                    .ok_or_else(|| io::Error::other("PASV required"))?
+                    .accept()?;
+                if line.starts_with("MLSD") {
+                    data.write_all(b"type=file;size=20; remote.txt\r\n")?;
+                } else {
+                    assert_eq!(line, "RETR /remote.txt");
+                    data.write_all(b"remote text fixture\n")?;
+                }
+                drop(data);
+                control.write_all(b"226 Done\r\n")?;
+            } else if line == "QUIT" {
+                control.write_all(b"221 Bye\r\n")?;
+                break;
+            } else {
+                control.write_all(b"502 Unsupported\r\n")?;
+            }
+        }
+        Ok(())
+    });
+    let mut s = Session::new("remote-ftp-pane")?;
+    fs::write(s.root.join("settings/dn/remote-connections.conf"),format!("[[connections]]\nname='Private fixture'\nprotocol='FTP'\nhost='127.0.0.1'\nport={port}\nuser='tester'\ndirectory='/'\n"))?;
+    s.wait("manager ready", |s| {
+        s.command_prompt_active() && s.text().contains("item-000.")
+    })?;
+    s.send(b"\x1bun", "remote FTP dialog", |s| {
+        s.text().contains("Private fixture") && s.text().contains("Remote connections")
+    })?;
+    s.send(b"\r", "plain FTP confirmation", |s| {
+        s.text().contains("without encryption")
+    })?;
+    s.send(b"\r", "FTP pane listing", |s| {
+        s.command_prompt_active() && s.text().contains("ftp://") && s.text().contains("remote.txt")
+    })?;
+    s.send(b"\x1b[B\x1bOR", "remote F3 preview", |s| {
+        s.text().contains("remote text fixture")
+    })?;
+    s.send(b"\x1b", "return to remote pane", |s| {
+        s.command_prompt_active() && s.text().contains("ftp://")
+    })?;
+    s.send(b"\x1b[15~", "remote download dialog", |s| {
+        s.text().contains("Copy") && s.text().contains("remote.txt")
+    })?;
+    s.send(b"\r", "remote download completed", |s| {
+        s.text().contains("Completed")
+            && fs::read(s.root.join("remote.txt")).is_ok_and(|b| b == b"remote text fixture\n")
+    })?;
+    s.send(b"\x1b", "return from Transfer Center", |s| {
+        s.command_prompt_active()
+    })?;
+    s.send(b"\x1b[5;5~", "disconnect remote pane", |s| {
+        s.command_prompt_active() && !s.text().contains("ftp://")
+    })?;
+    assert_eq!(
+        fs::read(s.root.join("remote.txt"))?,
+        b"remote text fixture\n"
+    );
+    s.finish()?;
+    server.join().unwrap()?;
+    Ok(())
+}
+
+#[test]
+fn network_information_menu_refresh_resize_and_close_restore_terminal() -> io::Result<()> {
+    use dn::localization::Language;
+    for language in [Language::English, Language::Russian] {
+        let preferences = format!("[regional]\nlanguage='{}'\n", language.key());
+        let mut s = Session::with_preferences("network-information", &preferences)?;
+        s.wait("manager ready", |s| {
+            s.command_prompt_active() && s.text().contains("item-000.")
+        })?;
+        s.send(b"\x1bui", "network information menu", |s| {
+            s.text().contains(language.text("Network Information"))
+                && s.text().contains(language.text("Internet reachability"))
+        })?;
+        s.send(b"\x1b[Z\r", "open interface dropdown", |s| {
+            s.text().contains(language.text("Network interface"))
+                && !s.text().contains(language.text("Internet reachability"))
+        })?;
+        s.send(b"\x1b", "cancel interface dropdown", |s| {
+            s.text().contains(language.text("Internet reachability"))
+                && s.text().contains(language.text("Network Information"))
+        })?;
+        s.send(b"\r", "reopen interface dropdown", |s| {
+            !s.text().contains(language.text("Internet reachability"))
+        })?;
+        s.send(b"\x1b[F\r", "select last interface", |s| {
+            s.text().contains(language.text("Internet reachability"))
+        })?;
+        s.send(b"\x1b[F", "network details", |s| s.text().contains("MTU"))?;
+        s.send(b"\x1b[15~", "network refresh", |s| {
+            s.text().contains(language.text("Internet reachability"))
+        })?;
+        s.resize(100, 32)?;
+        s.resize(40, 12)?;
+        s.resize(80, 25)?;
+        s.wait("network window restored", |s| {
+            s.text().contains(language.text("Network Information"))
+        })?;
+        s.send(b"\x1b", "close network information", |s| {
+            s.command_prompt_active() && !s.text().contains(language.text("Network Information"))
+        })?;
+        s.finish()?;
+    }
+    Ok(())
+}
+
+#[test]
+fn saved_profiles_select_edit_rename_cancel_delete_and_restore_terminal() -> io::Result<()> {
+    use dn::localization::Language;
+    fn click_text(
+        s: &mut Session,
+        label: &str,
+        stage: &str,
+        ready: impl Fn(&Session) -> bool,
+    ) -> io::Result<()> {
+        let text = s.text();
+        let (row, line) = text
+            .lines()
+            .enumerate()
+            .find(|(_, line)| line.contains(label))
+            .ok_or_else(|| io::Error::other(format!("Missing button {label}")))?;
+        let byte = line.find(label).unwrap();
+        let column = unicode_width::UnicodeWidthStr::width(&line[..byte]);
+        let input = format!(
+            "\x1b[<0;{};{}M\x1b[<0;{};{}m",
+            column + 1,
+            row + 1,
+            column + 1,
+            row + 1
+        );
+        s.send(input.as_bytes(), stage, ready)
+    }
+    for language in [Language::English, Language::Russian] {
+        let preferences = format!("[regional]\nlanguage='{}'\n", language.key());
+        let mut s = Session::with_preferences("saved-profiles", &preferences)?;
+        let path = s.root.join("settings/dn/remote-connections.conf");
+        let text=[("Alpha","alpha.invalid"),("Beta","beta.invalid"),("Гамма 世界","gamma.invalid")].into_iter().map(|(name,host)|format!("[[connections]]\nname='{name}'\nprotocol='SFTP'\nhost='{host}'\nport=22\nuser='fixture'\ndirectory='/'\n")).collect::<String>();
+        fs::write(&path, text)?;
+        s.wait("manager ready", |s| {
+            s.command_prompt_active() && s.text().contains("item-000.")
+        })?;
+        s.send(b"\x1bun", "connection form", |s| {
+            s.text().contains(language.text("Remote connections"))
+                && s.text().contains("alpha.invalid")
+        })?;
+        click_text(
+            &mut s,
+            language.text("Profiles"),
+            "saved profile list",
+            |s| {
+                s.text()
+                    .contains(language.text("Saved connection profiles"))
+                    && s.text().contains("Beta")
+            },
+        )?;
+        click_text(&mut s, "Beta", "select Beta row", |s| {
+            s.text().contains("beta.invalid")
+        })?;
+        click_text(
+            &mut s,
+            language.text("Edit"),
+            "edit selected profile",
+            |s| {
+                s.text().contains(language.text("Profile name"))
+                    && s.text().contains("beta.invalid")
+                    && !s
+                        .text()
+                        .contains(language.text("Saved connection profiles"))
+            },
+        )?;
+        s.send(
+            b"\x1b[H\x1b[3~\x1b[3~\x1b[3~\x1b[3~Renamed",
+            "rename draft",
+            |s| s.text().contains("Renamed"),
+        )?;
+        click_text(
+            &mut s,
+            language.text("Save profile"),
+            "save renamed profile",
+            |s| {
+                s.text()
+                    .contains(language.text("Connection profile saved without passwords"))
+            },
+        )?;
+        let records: toml::Table = fs::read_to_string(&path)?
+            .parse()
+            .map_err(io::Error::other)?;
+        assert_eq!(records["connections"].as_array().unwrap().len(), 3);
+        assert!(records["connections"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|v| v["name"].as_str() == Some("Renamed")));
+        assert!(!records["connections"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|v| v["name"].as_str() == Some("Beta")));
+        click_text(
+            &mut s,
+            language.text("Profiles"),
+            "profile list after save",
+            |s| {
+                s.text()
+                    .contains(language.text("Saved connection profiles"))
+                    && s.text().contains("Renamed")
+            },
+        )?;
+        s.resize(100, 32)?;
+        s.resize(40, 12)?;
+        s.resize(80, 25)?;
+        s.wait("profile list resized", |s| {
+            s.text()
+                .contains(language.text("Saved connection profiles"))
+                && s.text().contains("Renamed")
+        })?;
+        click_text(
+            &mut s,
+            language.text("Delete"),
+            "confirm profile removal",
+            |s| s.text().contains(language.text("Delete saved profile")),
+        )?;
+        s.send(b"\r", "Cancel is the safe default", |s| {
+            s.text()
+                .contains(language.text("Saved connection profiles"))
+                && !s.text().contains(language.text("Delete saved profile"))
+        })?;
+        let records: toml::Table = fs::read_to_string(&path)?.parse().unwrap();
+        assert_eq!(records["connections"].as_array().unwrap().len(), 3);
+        click_text(
+            &mut s,
+            language.text("Delete"),
+            "reopen deletion confirmation",
+            |s| s.text().contains(language.text("Delete saved profile")),
+        )?;
+        // Choose the button row, rather than the word in the confirmation title.
+        s.send(b"\t\r", "delete saved profile", |s| {
+            s.text()
+                .contains(language.text("Saved profile deleted. Open connections are unchanged."))
+        })?;
+        let records: toml::Table = fs::read_to_string(&path)?.parse().unwrap();
+        let records = records["connections"].as_array().unwrap();
+        assert_eq!(records.len(), 2);
+        assert!(records
+            .iter()
+            .all(|v| v["name"].as_str() != Some("Renamed")));
+        s.send(b"\x1b", "return from profiles", |s| {
+            s.text().contains(language.text("Profile name"))
+                && !s
+                    .text()
+                    .contains(language.text("Saved connection profiles"))
+        })?;
+        s.send(b"\x1b", "close connection form", |s| {
+            s.command_prompt_active()
+        })?;
+        s.finish()?;
+    }
+    Ok(())
+}
+
+#[test]
+fn network_live_loopback_rates_and_switching_restore_terminal() -> io::Result<()> {
+    use dn::localization::Language;
+    use std::net::UdpSocket;
+    let snapshot = dn::network::information::snapshot();
+    let loopback_name = if cfg!(target_os = "macos") {
+        "lo0"
+    } else {
+        "lo"
+    };
+    let index = snapshot
+        .adapters
+        .iter()
+        .position(|adapter| adapter.key.name == loopback_name)
+        .ok_or_else(|| io::Error::other("Loopback interface missing from local snapshot"))?;
+    let receiver = UdpSocket::bind("127.0.0.1:0")?;
+    let sender = UdpSocket::bind("127.0.0.1:0")?;
+    receiver.set_read_timeout(Some(std::time::Duration::from_secs(2)))?;
+    for language in [Language::English, Language::Russian] {
+        let preferences = format!("[regional]\nlanguage='{}'\n", language.key());
+        let mut s = Session::with_preferences("network-live-rates", &preferences)?;
+        s.wait("manager ready", |s| {
+            s.command_prompt_active() && s.text().contains("item-000.")
+        })?;
+        s.send(b"\x1bui", "network information", |s| {
+            s.text().contains(language.text("Internet reachability"))
+        })?;
+        s.send(b"\x1b[Z\r", "interface dropdown", |s| {
+            !s.text().contains(language.text("Internet reachability"))
+        })?;
+        let mut selection = b"\x1b[H".to_vec();
+        for _ in 0..index {
+            selection.extend_from_slice(b"\x1b[B");
+        }
+        selection.push(b'\r');
+        s.send(&selection, "measure loopback baseline", |s| {
+            s.text().contains(language.text("Download"))
+                && s.text().contains("B/s")
+                && s.text().contains(loopback_name)
+        })?;
+        let mut received = [0u8; 4096];
+        for _ in 0..256 {
+            sender.send_to(&[0x55u8; 4096], receiver.local_addr()?)?;
+            let (len, _) = receiver.recv_from(&mut received)?;
+            assert_eq!(len, 4096);
+        }
+        s.wait("live received and sent traffic", |s| {
+            let text = s.text();
+            let Some(line) = text
+                .lines()
+                .find(|line| line.contains(language.text("Download")))
+            else {
+                return false;
+            };
+            let Some((download, upload)) = line.split_once(language.text("Upload")) else {
+                return false;
+            };
+            let scaled = |value: &str| {
+                ["KiB/s", "MiB/s", "GiB/s"]
+                    .iter()
+                    .any(|unit| value.contains(unit))
+            };
+            scaled(download) && scaled(upload)
+        })?;
+        s.send(b"\x1b[15~", "refresh restarts rates", |s| {
+            s.text().contains(language.text("Internet reachability"))
+                && s.text().contains(loopback_name)
+        })?;
+        s.send(b"\x1b", "close live rates", |s| s.command_prompt_active())?;
+        s.finish()?;
+    }
+    Ok(())
 }

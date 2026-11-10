@@ -101,6 +101,7 @@ pub struct Editor {
     pub(crate) requests: crate::requests::RequestScope,
     pub modals: crate::modals::ModalStack,
     smartpad: bool,
+    pub(crate) remote_origin: Option<std::sync::Arc<crate::network::editor::Origin>>,
     pub(crate) archive_origin: Option<std::sync::Arc<crate::archive::edit::Origin>>,
     smartpad_return: Option<crate::desktop::WindowId>,
     pub path: Option<PathBuf>,
@@ -168,6 +169,7 @@ impl Editor {
             modals: Default::default(),
             smartpad: false,
             archive_origin: None,
+            remote_origin: None,
             smartpad_return: None,
             path: None,
             base,
@@ -264,9 +266,22 @@ impl Editor {
         let confirm =
             !save_as && format == self.format && self.durability_pending == Some(buffer.revision());
         let archive_origin = (!save_as).then(|| self.archive_origin.clone()).flatten();
+        let remote_origin = (!save_as).then(|| self.remote_origin.clone()).flatten();
         let receive = self
             .requests
             .spawn("dn-editor-save", move |cancel| {
+                if let Some(origin) = remote_origin {
+                    let cache = storage::save(&path, &text, format, original.as_ref());
+                    return match cache {
+                        Ok(cache) => Reply::ArchiveSaved {
+                            path,
+                            cache,
+                            format,
+                            result: origin.save(&cancel),
+                        },
+                        Err(error) => Reply::Saved(Err(error)),
+                    };
+                }
                 if let Some(origin) = archive_origin {
                     let cache = if confirm {
                         storage::confirm_durability(

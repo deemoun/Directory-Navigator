@@ -22,12 +22,14 @@ pub enum EntryIdentity {
     Native(PathBuf),
     Member(MemberId),
     Parent(u64, usize),
+    Remote(u64, u64, crate::network::remote::RemotePath),
 }
 #[derive(Default)]
 pub enum Location {
     #[default]
     Filesystem,
     Archive(Box<Archive>),
+    Remote(Box<super::remote::Remote>),
 }
 pub struct Archive {
     pub path: PathBuf,
@@ -78,10 +80,16 @@ impl Panel {
         self.archive().is_some()
     }
     pub fn location_key(&self) -> (u64, usize) {
+        if let Some(r) = self.remote() {
+            return (r.generation, r.revision as usize);
+        }
         self.archive()
             .map_or((0, 0), |a| (a.generation, a.directory))
     }
     pub fn heading(&self) -> String {
+        if let Some(r) = self.remote() {
+            return r.connection.label(&r.directory);
+        }
         self.archive().map_or_else(
             || self.path.to_string_lossy().into_owned(),
             |a| {
@@ -95,6 +103,12 @@ impl Panel {
         )
     }
     pub fn identity(&self, entry: &Entry) -> EntryIdentity {
+        if let Some(r) = self.remote() {
+            return r.members.get(&entry.name).map_or(
+                EntryIdentity::Parent(r.generation, r.revision as usize),
+                |m| EntryIdentity::Remote(r.generation, r.revision, m.path.clone()),
+            );
+        }
         if let Some(a) = self.archive() {
             if let Some(id) = self.member(entry) {
                 EntryIdentity::Member(id)

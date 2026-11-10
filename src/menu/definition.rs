@@ -74,6 +74,11 @@ pub const ROOTS: &[Root] = &[
         entries: &[
             item("~U~ser menu", "F2", UserMenu),
             item("Smart~P~ad", "Alt+Q", SmartPad),
+            item(
+                "Remote co~n~nections...",
+                "",
+                Plugin(crate::plugins::REMOTE_CONNECTIONS),
+            ),
             item("~T~emp Drive", "", TempDrive),
             item("Clear Temp ~D~rive...", "", ClearTempDrive),
             item(
@@ -85,6 +90,11 @@ pub const ROOTS: &[Root] = &[
                 "S~y~stem Information",
                 "",
                 Utility(crate::utilities::Kind::System),
+            ),
+            item(
+                "Network ~I~nformation",
+                "",
+                Utility(crate::utilities::Kind::Network),
             ),
             line(),
             item("~C~alculator", "Ctrl+K", Plugin(crate::plugins::CALCULATOR)),

@@ -16,6 +16,7 @@ pub struct App {
     pub(crate) session: crate::session::Runtime,
     #[cfg(target_os = "linux")]
     pub(crate) console_mouse: crate::terminal::gpm::Snapshot,
+    pub(crate) network: crate::network::State,
     pub transfers: crate::transfers::State,
     pub(crate) button_feedback: crate::button_feedback::State,
     pub modals: crate::modals::ModalStack,
@@ -74,6 +75,7 @@ impl App {
             console_mouse: Default::default(),
             session: Default::default(),
             transfers: Default::default(),
+            network: Default::default(),
             button_feedback: Default::default(),
             modals: Default::default(),
             welcome: Default::default(),
@@ -145,6 +147,24 @@ impl App {
     }
 
     pub fn prompt_operation(&mut self, kind: Kind, rename_here: bool) {
+        if kind == Kind::Move
+            && !rename_here
+            && !self.panels[self.active].is_remote()
+            && self.panels[self.active ^ 1].is_remote()
+        {
+            self.error("Use Copy to upload files; remote transfers do not remove sources.");
+            return;
+        }
+        if self.panels[self.active].is_remote()
+            || self.panels[self.active ^ 1].is_remote() && kind == Kind::Copy
+        {
+            if kind == Kind::Copy {
+                crate::network::prompt_copy(self, None);
+            } else {
+                crate::network::prompt_mutation(self, kind, rename_here);
+            }
+            return;
+        }
         self.prompt_operation_impl(kind, rename_here, true);
     }
     pub(crate) fn prompt_native_copy(&mut self) {
@@ -289,6 +309,10 @@ impl App {
         let Some(prompt) = self.modals.take_prompt() else {
             return;
         };
+        if prompt.copy.as_ref().is_some_and(|c| c.remote.is_some()) {
+            crate::network::submit_copy(self, prompt);
+            return;
+        }
         if matches!(prompt.kind, PromptKind::Operation(Kind::Mkdir)) && prompt.field.is_empty() {
             self.error("Enter a new directory name.");
             return;
@@ -316,6 +340,9 @@ impl App {
             prompt.base.join(&prompt.field)
         };
         match prompt.kind {
+            PromptKind::Remote(mutation) => {
+                crate::network::controller::submit_mutation(self, mutation, &prompt.field)
+            }
             PromptKind::ClearTempDrive(clear) => match clear.start(self, prompt.sources) {
                 Ok(job) => self.job = Some(job),
                 Err(error) => self.error(error.to_string()),

@@ -289,9 +289,10 @@ fn keyboard_paging_buttons_help_and_resize() -> io::Result<()> {
     assert_eq!(focus::current(&a), Focus::Message);
     key(&mut a, KeyCode::Esc);
     assert_eq!(focus::current(&a), Focus::Tree);
-    for _ in 0..4 {
+    for _ in 0..6 {
         key(&mut a, KeyCode::Tab);
     }
+    assert_eq!(a.directory_tree().unwrap().focus, 4);
     key(&mut a, KeyCode::Enter);
     assert!(a.directory_tree().is_none());
     Ok(())
@@ -341,8 +342,10 @@ fn mouse_double_click_opens_selected_folder() -> io::Result<()> {
     select(&mut a, &child);
     draw(&mut a, 80, 25)?;
     let i = a.directory_tree().unwrap().cursor;
+    // Deliver the two presses in the same prepared frame. Painting a whole
+    // terminal between them can exceed the actual double-click interval on CI;
+    // redraw stability and the tracker's exact timing boundaries have separate tests.
     click(&mut a, Target::Tree(Action::Row(i)));
-    draw(&mut a, 80, 25)?;
     click(&mut a, Target::Tree(Action::Row(i)));
     wait(&mut a, |a| !a.panels[0].loading);
     assert!(a.directory_tree().is_none());
@@ -509,5 +512,190 @@ fn background_sibling_loading_keeps_highlight_screen_position() -> io::Result<()
     assert!(scan.limited);
     assert_eq!(scan.children.len(), 1);
     assert_eq!(scan.children[0].path, current);
+    Ok(())
+}
+
+#[test]
+fn usage_is_explicit_includes_hidden_and_sorts_siblings_without_losing_selection() -> io::Result<()>
+{
+    let t = Temp::new()?;
+    for (name, bytes) in [("a-small", 3), ("z-large", 30), (".hidden", 7)] {
+        fs::create_dir(t.0.join(name))?;
+        fs::write(t.0.join(name).join("данные"), vec![b'x'; bytes])?;
+    }
+    fs::create_dir_all(t.0.join("z-large/nested"))?;
+    fs::write(t.0.join("direct"), b"12345")?;
+    let mut app = t.app()?;
+    app.config.show_hidden = false;
+    open(&mut app);
+    assert!(app.directory_tree().unwrap().usage.root.is_none());
+    assert!(!app
+        .directory_tree()
+        .unwrap()
+        .rows
+        .iter()
+        .any(|r| r.path == t.0.join(".hidden")));
+    key(&mut app, KeyCode::F(5));
+    assert!(app.directory_tree().unwrap().usage.running());
+    key(&mut app, KeyCode::F(6)); // Ordering is requested but deferred until completion.
+    assert_eq!(app.directory_tree().unwrap().selected().unwrap().path, t.0);
+    wait(&mut app, |a| !a.directory_tree().unwrap().usage.running());
+    let tree = app.directory_tree().unwrap();
+    let result = &tree.usage.records[&t.0];
+    assert_eq!(
+        (result.bytes, result.direct_bytes, result.files),
+        (45, 5, 4)
+    );
+    assert!(!result.partial);
+    assert_eq!(tree.usage.records[&t.0.join(".hidden")].bytes, 7);
+    let siblings = tree
+        .rows
+        .iter()
+        .filter(|r| r.path.parent() == Some(t.0.as_path()))
+        .map(|r| r.path.file_name().unwrap().to_string_lossy().into_owned())
+        .collect::<Vec<_>>();
+    assert_eq!(siblings, ["z-large", "a-small"]);
+    let selected = tree.selected().unwrap().path.clone();
+    let offset = tree.offset;
+    key(&mut app, KeyCode::F(6));
+    assert_eq!(
+        app.directory_tree().unwrap().selected().unwrap().path,
+        selected
+    );
+    assert_eq!(app.directory_tree().unwrap().offset, offset);
+    key(&mut app, KeyCode::F(6));
+    key(&mut app, KeyCode::Right);
+    assert_eq!(
+        app.directory_tree().unwrap().selected().unwrap().path,
+        t.0.join("z-large")
+    );
+    directory_tree::action(&mut app, Action::Hidden);
+    settle(&mut app);
+    assert_eq!(app.directory_tree().unwrap().usage.records[&t.0].bytes, 45);
+    assert!(!app.directory_tree().unwrap().usage.stale);
+    directory_tree::action(&mut app, Action::Refresh);
+    assert!(app.directory_tree().unwrap().usage.stale);
+    assert!(app
+        .directory_tree()
+        .unwrap()
+        .usage
+        .summary(&t.0, dn::localization::Language::English)
+        .contains("Stale"));
+    key(&mut app, KeyCode::Enter);
+    wait(&mut app, |a| !a.panels[0].loading);
+    assert_eq!(app.panels[0].path, t.0.join("z-large"));
+    assert_eq!(app.panels[1].path, t.0);
+    Ok(())
+}
+
+#[test]
+fn usage_cancel_restart_close_and_failed_capacity_preserve_navigation() -> io::Result<()> {
+    let t = Temp::new()?;
+    for name in ["first", "second"] {
+        fs::create_dir(t.0.join(name))?;
+        fs::write(t.0.join(name).join("file"), name)?;
+    }
+    let mut app = t.app()?;
+    open(&mut app);
+    select(&mut app, &t.0.join("first"));
+    key(&mut app, KeyCode::F(5));
+    key(&mut app, KeyCode::Esc);
+    assert!(app.directory_tree().is_some());
+    assert!(app.directory_tree().unwrap().usage.stopping());
+    wait(&mut app, |a| !a.directory_tree().unwrap().usage.running());
+    assert_eq!(
+        app.directory_tree().unwrap().usage.state,
+        "Stopped — partial"
+    );
+    select(&mut app, &t.0.join("second"));
+    key(&mut app, KeyCode::F(5));
+    let tree_id = app.desktop.active().id;
+    input::handle(&mut app, KeyEvent::new(KeyCode::F(6), KeyModifiers::ALT));
+    wait(&mut app, |a| {
+        !a.desktop
+            .tool(tree_id)
+            .unwrap()
+            .tree()
+            .unwrap()
+            .usage
+            .running()
+    });
+    assert_eq!(app.desktop.active().id, dn::desktop::WindowId::MANAGER);
+    input::handle(&mut app, KeyEvent::new(KeyCode::F(6), KeyModifiers::ALT));
+    assert_eq!(app.desktop.active().id, tree_id);
+    let usage = &app.directory_tree().unwrap().usage;
+    assert_eq!(usage.root.as_deref(), Some(t.0.join("second").as_path()));
+    assert!(!usage.records.contains_key(&t.0.join("first")));
+    app.directory_tree_mut().unwrap().capacity.result = Some(Err("private capacity error".into()));
+    draw(&mut app, 80, 25)?;
+    assert!(app
+        .mouse
+        .regions
+        .iter()
+        .any(|(_, t)| *t == Target::Tree(Action::Open)));
+    key(&mut app, KeyCode::F(5));
+    key(&mut app, KeyCode::Esc);
+    key(&mut app, KeyCode::Esc);
+    assert!(app.directory_tree().is_none());
+    for _ in 0..3 {
+        app.poll();
+    }
+    assert_eq!(app.panels[0].path, t.0);
+    open(&mut app);
+    assert!(app.directory_tree().unwrap().usage.root.is_none());
+    Ok(())
+}
+
+#[test]
+fn usage_controls_localized_mouse_keyboard_custom_colors_resize_and_immutable_frames(
+) -> io::Result<()> {
+    for language in [
+        dn::localization::Language::English,
+        dn::localization::Language::Russian,
+    ] {
+        let t = Temp::new()?;
+        fs::create_dir(t.0.join("Ёж e\u{301} 界"))?;
+        fs::write(t.0.join("Ёж e\u{301} 界/file"), b"data")?;
+        let mut app = t.app()?;
+        app.config.language = language;
+        app.config.palette = dn::palette::PaletteProfile::ClassicDn
+            .with_slot(dn::palette::theme::Slot::DialogText, 0x2e);
+        open(&mut app);
+        draw(&mut app, 80, 25)?;
+        click(&mut app, Target::Tree(Action::Analyze));
+        wait(&mut app, |a| !a.directory_tree().unwrap().usage.running());
+        for (w, h) in [(80, 25), (132, 42), (30, 10), (80, 25)] {
+            let mut terminal = Terminal::new(TestBackend::new(w, h))?;
+            terminal.draw(|f| ui::draw(f, &mut app))?;
+            let first = terminal.backend().buffer().clone();
+            for _ in 0..3 {
+                terminal.draw(|f| ui::draw(f, &mut app))?;
+                assert_eq!(*terminal.backend().buffer(), first);
+            }
+            assert!(app
+                .mouse
+                .regions
+                .iter()
+                .all(|(r, _)| r.right() <= w && r.bottom() <= h));
+            if w >= 80 {
+                let text = first.content.iter().map(|c| c.symbol()).collect::<String>();
+                assert!(text.contains(language.text("Order: Name")));
+                assert!(
+                    text.contains(language.text("Apparent size")),
+                    "{language:?} {w}x{h}: {text}"
+                );
+                assert!(text.contains("4 B"));
+            }
+        }
+        click(&mut app, Target::Tree(Action::Order));
+        assert!(app.directory_tree().unwrap().usage.size_order);
+        key(&mut app, KeyCode::F(1));
+        assert_eq!(focus::current(&app), Focus::Message);
+        key(&mut app, KeyCode::Esc);
+        assert_eq!(focus::current(&app), Focus::Tree);
+        draw(&mut app, 80, 25)?;
+        click(&mut app, Target::Tree(Action::Close));
+        assert!(app.directory_tree().is_none());
+    }
     Ok(())
 }

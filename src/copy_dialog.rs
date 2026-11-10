@@ -18,6 +18,7 @@ impl State {
 pub struct Draft {
     pub options: CopyOptions,
     pub extraction: Option<crate::archive::Extraction>,
+    pub remote: Option<crate::network::transfer::Transfer>,
     pub require_destination: bool,
     pub picked: Option<PathBuf>,
     pub(crate) temp_drive: Option<crate::temp_drive::Root>,
@@ -80,6 +81,16 @@ pub fn pick(app: &mut App, owner: ModalId, path: PathBuf) {
     }
 }
 pub fn action(app: &mut App, action: Action) {
+    if matches!(action, Action::Tree | Action::History)
+        && app
+            .modals
+            .prompt()
+            .and_then(|p| p.copy.as_ref())
+            .and_then(|c| c.remote.as_ref())
+            .is_some_and(|r| r.uploading())
+    {
+        return;
+    }
     let Some(owner) = parent(app) else {
         return;
     };

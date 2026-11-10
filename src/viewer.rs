@@ -90,12 +90,20 @@ pub fn from_bytes(bytes: Vec<u8>, mode: ViewMode) -> Contents {
         .expect("uncancelled preview")
 }
 pub(crate) fn from_bytes_cancelled(
-    mut bytes: Vec<u8>,
+    bytes: Vec<u8>,
     mode: ViewMode,
     cancel: &crate::task::Cancellation,
 ) -> io::Result<Contents> {
+    from_remote_bytes(bytes, mode, false, cancel)
+}
+pub(crate) fn from_remote_bytes(
+    mut bytes: Vec<u8>,
+    mode: ViewMode,
+    source_truncated: bool,
+    cancel: &crate::task::Cancellation,
+) -> io::Result<Contents> {
     cancel.check()?;
-    let mut truncated = bytes.len() > MAX_BYTES;
+    let mut truncated = source_truncated || bytes.len() > MAX_BYTES;
     bytes.truncate(MAX_BYTES);
     let raw_truncated = truncated;
     let detected = crate::text_encoding::detect(&bytes, truncated)

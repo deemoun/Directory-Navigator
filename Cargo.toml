@@ -31,6 +31,13 @@ crossterm = "0.28"
 unicode-segmentation = "1"
 unicode-width = "0.2.0"
 encoding_rs = "0.8"
+netdev = { version = "=0.47.0", default-features = false, features = ["gateway"] }
+russh = { version = "=0.65.1", default-features = false, features = ["ring", "rsa"] }
+russh-sftp = "=3.0.1"
+tokio = { version = "1", features = ["rt", "net", "time", "io-util", "sync"] }
+suppaftp = { version = "=12.2.1", features = ["rustls-ring"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+webpki-roots = "1"
 crc32fast = "1"
 pdf-extract = "=0.12.1"
 zip = { version = "9", default-features = false, features = ["deflate-flate2", "aes-crypto"] }

@@ -59,6 +59,7 @@ pub(crate) fn utility_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
         Kind::Characters => " ASCII / DOS CP437 Table ",
         Kind::System => " System Information ",
         Kind::Memory => " Memory Information ",
+        Kind::Network => " Network Information ",
     };
     let focus = if kind == Kind::Characters {
         app.utility_state().chart.focus
@@ -201,16 +202,73 @@ pub(crate) fn utility_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
                 Action::Close,
             );
         }
-        Kind::System | Kind::Memory => {
+        Kind::System | Kind::Memory | Kind::Network => {
             if let Some(info) = &app.utility_state().information {
                 if info.loading() {
                     text(
                         &mut spec,
                         profile,
-                        Rect::new(x, rect.y + 2, w, 1),
+                        Rect::new(x, rect.y + if kind == Kind::Network { 4 } else { 2 }, w, 1),
                         app.config.language.text("Loading native information…"),
                         false,
                     );
+                }
+                if kind == Kind::Network {
+                    text(
+                        &mut spec,
+                        profile,
+                        Rect::new(x, rect.y + 1, w, 1),
+                        app.config.language.text("Network interface"),
+                        false,
+                    );
+                    let label = info
+                        .network
+                        .as_ref()
+                        .and_then(|n| n.adapters.get(info.selected_interface))
+                        .map_or_else(
+                            || app.config.language.text("Unavailable").to_owned(),
+                            |a| display_name(&a.label),
+                        );
+                    let mut selector = Control::new(
+                        2,
+                        Rect::new(x, rect.y + 2, w, 1),
+                        ControlKind::Choice(vec![label]),
+                        Target::Utility(Action::InterfaceOpen),
+                    );
+                    selector.enabled = info
+                        .network
+                        .as_ref()
+                        .is_some_and(|n| !n.adapters.is_empty());
+                    selector.enter_action = true;
+                    spec.control(selector);
+                    let (download, upload) = match info.traffic.state() {
+                        crate::network::traffic::State::Ready { download, upload } => (
+                            crate::network::traffic::format_rate(*download),
+                            crate::network::traffic::format_rate(*upload),
+                        ),
+                        state => {
+                            let label = app.config.language.text(
+                                if matches!(state, crate::network::traffic::State::Measuring) {
+                                    "Measuring…"
+                                } else {
+                                    "Unavailable"
+                                },
+                            );
+                            (label.to_owned(), label.to_owned())
+                        }
+                    };
+                    let half = w / 2;
+                    for (column, label, value) in
+                        [(x, "Download", download), (x + half, "Upload", upload)]
+                    {
+                        text(
+                            &mut spec,
+                            profile,
+                            Rect::new(column, rect.y + 3, half, 1),
+                            &format!("{}: {}", app.config.language.text(label), value),
+                            false,
+                        );
+                    }
                 }
                 for (index, (name, value)) in info
                     .fields
@@ -232,7 +290,14 @@ pub(crate) fn utility_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
                         ))
                         .scroll((0, info.horizontal))
                         .style(dos(theme::TEXT)),
-                        Rect::new(x, rect.y + 1 + (index - info.offset) as u16, w, 1),
+                        Rect::new(
+                            x,
+                            rect.y
+                                + if kind == Kind::Network { 4 } else { 1 }
+                                + (index - info.offset) as u16,
+                            w,
+                            1,
+                        ),
                     );
                 }
             }
@@ -240,9 +305,11 @@ pub(crate) fn utility_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
                 &mut spec,
                 profile,
                 Rect::new(x, rect.bottom() - 4, w, 1),
-                app.config
-                    .language
-                    .text("Snapshot · R/F5 Refresh · ↑↓ PgUp/PgDn scroll · ←→ pan"),
+                app.config.language.text(if kind == Kind::Network {
+                    "Live traffic · R/F5 Refresh details · ↑↓ scroll · ←→ pan"
+                } else {
+                    "Snapshot · R/F5 Refresh · ↑↓ PgUp/PgDn scroll · ←→ pan"
+                }),
                 false,
             );
             button(
@@ -259,6 +326,50 @@ pub(crate) fn utility_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
                 " [ Close ] ",
                 Action::Close,
             );
+        }
+    }
+    if let Some(info) = &app.utility_state().information {
+        if let (Some(choice), Some(network)) = (info.interface_choice, &info.network) {
+            let rows = usize::from(rect.height.saturating_sub(9))
+                .clamp(1, 8)
+                .min(network.adapters.len());
+            let offset = choice.saturating_sub(rows.saturating_sub(1));
+            let bounds = Rect::new(x, rect.y + 3, w, rows as u16 + 2);
+            for control in &mut spec.controls {
+                control.enabled = false;
+            }
+            spec.native(crate::turbo::widgets::dialog(""), bounds);
+            let list_bounds = Rect::new(x + 1, rect.y + 4, w.saturating_sub(2), rows as u16);
+            let mut list = Control::new(
+                3,
+                list_bounds,
+                ControlKind::List {
+                    items: network
+                        .adapters
+                        .iter()
+                        .map(|a| display_name(&a.label))
+                        .collect(),
+                    cursor: choice,
+                    offset,
+                },
+                Target::Utility(Action::InterfaceAccept),
+            );
+            list.dn_list = true;
+            list.enter_action = true;
+            list.hits = (0..rows)
+                .map(|row| {
+                    (
+                        Rect::new(
+                            list_bounds.x,
+                            list_bounds.y + row as u16,
+                            list_bounds.width,
+                            1,
+                        ),
+                        Target::Utility(Action::InterfacePick(info.interface_epoch, offset + row)),
+                    )
+                })
+                .collect();
+            spec.control(list);
         }
     }
     Some(spec)

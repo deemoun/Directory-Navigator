@@ -10,6 +10,7 @@ pub enum Kind {
     Characters,
     System,
     Memory,
+    Network,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Action {
@@ -21,6 +22,10 @@ pub enum Action {
     Page(Page),
     Cell(u8),
     Refresh,
+    InterfaceOpen,
+    InterfaceAccept,
+    InterfaceCancel,
+    InterfacePick(u64, usize),
     CalculatorHelp,
     CalculatorHistory,
     CalculatorRecall(usize),
@@ -60,6 +65,7 @@ pub fn open(app: &mut App, kind: Kind) {
         Kind::Characters => crate::tool_windows::Kind::Characters,
         Kind::System => crate::tool_windows::Kind::System,
         Kind::Memory => crate::tool_windows::Kind::Memory,
+        Kind::Network => crate::tool_windows::Kind::Network,
         Kind::Calculator => unreachable!(),
     };
     if !crate::tool_windows::open(app, tool, None) {
@@ -75,7 +81,7 @@ pub fn open(app: &mut App, kind: Kind) {
     app.utility_state_mut().notice.clear();
     app.utility_state_mut().focus = 0;
     app.utility_state_mut().chart.focus = 0;
-    if matches!(kind, Kind::System | Kind::Memory) {
+    if matches!(kind, Kind::System | Kind::Memory | Kind::Network) {
         app.utility_state_mut().information = None;
         refresh(app);
     } else {
@@ -94,17 +100,28 @@ fn refresh(app: &mut App) {
     let kind = match app.utility_dialog() {
         Some(Kind::System) => information::Kind::System,
         Some(Kind::Memory) => information::Kind::Memory,
+        Some(Kind::Network) => information::Kind::Network,
         _ => return,
     };
-    match information::Information::open(
+    match information::Information::open_with_config(
         kind,
         app.desktop.tool(app.desktop.target()).map_or_else(
             || app.panels[app.active].path.clone(),
             |t| t.source_directory.clone(),
         ),
         app.utilities.size,
+        app.config_store
+            .path()
+            .ok()
+            .map(std::path::Path::to_path_buf),
     ) {
-        Ok(info) => {
+        Ok(mut info) => {
+            if let Some(previous) = &app.utility_state().information {
+                info.retain_interface(previous);
+            }
+            if kind == information::Kind::Network {
+                app.utility_state_mut().focus = 0;
+            }
             #[cfg(target_os = "linux")]
             let info = {
                 let mut info = info;
@@ -215,12 +232,63 @@ pub fn action(app: &mut App, a: Action) {
             crate::turbo::characters::select(&mut app.utility_state_mut().chart, cell);
             app.utility_state_mut().chart.focus = 0;
         }
+        Action::InterfaceOpen => {
+            if let Some(info) = &mut app.utility_state_mut().information {
+                if info.open_interfaces() {
+                    app.utility_state_mut().focus = 3;
+                }
+            }
+        }
+        Action::InterfaceAccept | Action::InterfacePick(_, _) | Action::InterfaceCancel => {
+            if let Some(info) = &mut app.utility_state_mut().information {
+                if let Some(choice) = info.interface_choice {
+                    if matches!(a, Action::InterfacePick(epoch, _) if epoch != info.interface_epoch)
+                    {
+                        return;
+                    }
+                    if a != Action::InterfaceCancel {
+                        info.choose_interface(if let Action::InterfacePick(_, index) = a {
+                            index
+                        } else {
+                            choice
+                        });
+                    }
+                    info.interface_choice = None;
+                    app.utility_state_mut().focus = 2;
+                }
+            }
+        }
         Action::Refresh => refresh(app),
         _ => {}
     }
 }
 pub const CALCULATOR_HELP: &str = "Enter evaluates · Tab / Shift+Tab move focus\nAlt+P expression · Alt+E evaluate · Alt+C copy\nAlt+L close · F1 / Alt+H help\nUp/Down recall history while editing\nThe arrow button opens session history; Enter recalls\nDEC / HEX / BIN / OCT / EXP choose the copy format\nCtrl+C copies the full value to the internal clipboard\nLong values are shortened on screen, copied in full\nEXP is approximate scientific notation (15 significant digits)\nOperators: + - * / % ^ and parentheses\nFunctions: sqrt(), abs() · Bases: 0x, 0b, 0o\nOnly expressions are evaluated; commands are never run.";
 pub fn key(app: &mut App, key: KeyEvent) {
+    if let Some(info) = &mut app.utility_state_mut().information {
+        if info.interface_choice.is_some() {
+            match key.code {
+                KeyCode::Up => info.step_interface(-1),
+                KeyCode::Down => info.step_interface(1),
+                KeyCode::Home => info.step_interface(isize::MIN),
+                KeyCode::End => info.step_interface(isize::MAX),
+                KeyCode::PageUp => info.step_interface(-6),
+                KeyCode::PageDown => info.step_interface(6),
+                KeyCode::Enter => action(app, Action::InterfaceAccept),
+                KeyCode::Esc | KeyCode::Tab | KeyCode::BackTab => {
+                    action(app, Action::InterfaceCancel)
+                }
+                _ => {}
+            }
+            return;
+        }
+    }
+    if app.utility_dialog() == Some(Kind::Network)
+        && app.utility_state().focus == 2
+        && matches!(key.code, KeyCode::Up | KeyCode::Down)
+    {
+        action(app, Action::InterfaceOpen);
+        return;
+    }
     if crate::dialog_controls::key(app, key, crate::focus::Focus::Utility) {
         return;
     }
@@ -240,7 +308,7 @@ pub fn key(app: &mut App, key: KeyEvent) {
                 _ => {}
             }
         }
-        Some(Kind::System | Kind::Memory) => match key.code {
+        Some(Kind::System | Kind::Memory | Kind::Network) => match key.code {
             KeyCode::Char('r') | KeyCode::F(5) => command = Some(Action::Refresh),
             code => {
                 if let Some(info) = &mut app.utility_state_mut().information {
@@ -268,6 +336,35 @@ pub fn key(app: &mut App, key: KeyEvent) {
     }
 }
 pub fn mouse(app: &mut App, event: MouseEvent, target: Option<crate::mouse::Target>) {
+    if app
+        .utility_state()
+        .information
+        .as_ref()
+        .is_some_and(|i| i.interface_choice.is_some())
+    {
+        match event.kind {
+            MouseEventKind::Down(MouseButton::Left) => {
+                if let Some(crate::mouse::Target::Utility(Action::InterfacePick(epoch, index))) =
+                    target
+                {
+                    action(app, Action::InterfacePick(epoch, index));
+                } else {
+                    action(app, Action::InterfaceCancel);
+                }
+            }
+            MouseEventKind::ScrollUp | MouseEventKind::ScrollDown => {
+                if let Some(info) = &mut app.utility_state_mut().information {
+                    info.step_interface(if event.kind == MouseEventKind::ScrollUp {
+                        -1
+                    } else {
+                        1
+                    });
+                }
+            }
+            _ => {}
+        }
+        return;
+    }
     match event.kind {
         MouseEventKind::Down(MouseButton::Left) => {
             if let Some(crate::mouse::Target::Utility(command)) = target {

@@ -341,6 +341,17 @@ Explicit Refuse and Skip policies remain available. File/directory mismatches,
 links and special destinations are refused. **Save As** asks **Replace / Cancel**,
 with Cancel selected initially; ordinary F2 retains external-change checks.
 
+### Directory tree disk usage
+
+**Ctrl+T → Analyze (F5)** calculates folder sizes in the background; opening the
+tree alone never starts a recursive scan. **F6** switches Name/Size sibling
+ordering after analysis stops. Sizes and bars include hidden files and use
+apparent lengths: hard links count separately and directory links are not followed.
+Other filesystems are excluded. Volume available/total space is shown separately.
+Stop or Esc cancels analysis, retaining labelled partial results; Esc again closes.
+Refresh marks affected snapshots stale. Results last only for this tree session.
+See the [tree guide](docs/USER_GUIDE.md#directory-tree-and-disk-usage).
+
 ### Working with larger archives and ZIP members
 
 Archives can be up to 64 GiB, with 100,000 members and bounded metadata. ZIP64 is
@@ -482,6 +493,38 @@ python3 -m unittest discover -s scripts -p 'test_*.py'
 ```
 
 The Rust application lives in `src/`, with tests in `tests/`.
+
+## Network information and remote files
+
+**Utilities → Network Information** shows local interfaces, MAC addresses, IPv4/IPv6,
+default gateways and DNS servers for one selected adapter. Use the interface dropdown
+to switch adapters; Refresh retains the selection when available. Download and upload
+rates update about once per second in B/s, KiB/s or larger units, using all traffic
+on the selected adapter. These are local interface rates, not an Internet speed test.
+Switching adapters restarts measurement; unavailable counters are reported. This snapshot does not probe Internet connectivity.
+Important DN/system paths remain in **System Information**.
+
+**Utilities → Remote connections…** opens the built-in SFTP, explicit FTPS and FTP
+connection dialog. Browse remote directories in either pane, use F3 to preview,
+F4 to edit and save back, F5 to download/upload, F7 to create directories, and F8
+to permanently delete after confirmation. Rename operates on one remote item.
+Ctrl+PgUp disconnects and restores the original local directory.
+
+Profiles store connection details and approved SSH fingerprints beside DN's
+configuration, never passwords or key passphrases. The Profiles list supports selection,
+editing/renaming and confirmed deletion. Verify a new SSH fingerprint
+before trusting it; changed saved keys are rejected. Prefer SFTP or FTPS: plain
+FTP sends credentials and files without encryption. FTPS validates certificates
+and never falls back to FTP.
+
+Downloads use local staging and DN's normal conflict prompts. Uploads stage on
+the server before rename; FTP publication guarantees depend on that server.
+SFTP replacement requires its atomic rename extension. Remote links are not
+traversed; transfers copy without removing sources. Direct remote-to-remote
+transfers and automatic connection restoration are not supported. **SSH terminal**
+hands the terminal to the installed OpenSSH `ssh` client and restores DN afterward;
+it uses OpenSSH's own host-key checks and credentials. The shell always keeps a
+real local working directory. See the [guide](docs/USER_GUIDE.md#remote-connections).
 
 ## License
 

@@ -1,5 +1,6 @@
 //! Bounded, cancellable directory traversal shared by Find and size snapshots.
 pub mod find;
+pub mod usage;
 use crate::{pattern::Wildcard, task::Cancellation};
 use std::{
     fs, io,
@@ -55,10 +56,12 @@ pub enum Request {
         options: find::Options,
     },
     Sizes(Vec<PathBuf>),
+    Usage(PathBuf),
 }
 pub enum Event {
     Found(Vec<Hit>),
     Size(Size),
+    Usage(usage::Update),
     Progress(Stats),
     Done {
         stats: Stats,
@@ -98,6 +101,21 @@ impl Job {
             requests,
             token,
         })
+    }
+    #[cfg(test)]
+    pub(crate) fn controlled() -> (Self, SyncSender<Event>) {
+        let requests = crate::requests::RequestScope::default();
+        let token = requests.start("traversal");
+        let (send, events) = mpsc::sync_channel(8);
+        (
+            Self {
+                requests,
+                token,
+                events,
+                cancel: Cancellation::default(),
+            },
+            send,
+        )
     }
     pub fn bind(&mut self, owner: crate::requests::Owner) {
         self.requests.bind(owner);
@@ -206,6 +224,10 @@ fn walk(
     }
 }
 fn run(request: Request, cancel: &Cancellation, sender: &SyncSender<Event>) {
+    if let Request::Usage(root) = request {
+        usage::run(root, cancel, sender);
+        return;
+    }
     let mut stats = Stats::default();
     let mut limited = false;
     let mut last = Instant::now();
@@ -331,6 +353,7 @@ fn run(request: Request, cancel: &Cancellation, sender: &SyncSender<Event>) {
                 }
             }
         }
+        Request::Usage(_) => unreachable!("usage has its own bounded aggregation"),
     }
     send(
         sender,

@@ -32,17 +32,23 @@ pub(super) fn reduce(prompt: &mut Prompt, action: Action) -> Effect {
             prompt.focus = 2;
         }
         Action::CheckSpace => {
+            if copy.remote.as_ref().is_some_and(|r| r.uploading()) {
+                return Effect::None;
+            }
             copy.options.check_free_space ^= true;
             prompt.focus = 3;
         }
         Action::Verify => {
+            if copy.remote.as_ref().is_some_and(|r| r.uploading()) {
+                return Effect::None;
+            }
             if !copy.options.remove_sources {
                 copy.options.verify_writes ^= true;
                 prompt.focus = 4;
             }
         }
         Action::RemoveSources => {
-            if moving || copy.extraction.is_some() {
+            if moving || copy.extraction.is_some() || copy.remote.is_some() {
                 return Effect::None;
             }
             copy.options.remove_sources ^= true;

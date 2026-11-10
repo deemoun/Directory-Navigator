@@ -46,6 +46,10 @@ impl App {
     }
 
     pub fn open_viewer_mode(&mut self, mode: crate::viewer::ViewMode) {
+        if self.panels[self.active].is_remote() {
+            crate::network::view(self, false, mode);
+            return;
+        }
         if self.panels[self.active].is_archive() {
             crate::archive::view_mode(self, mode);
             return;
@@ -84,6 +88,22 @@ impl App {
         self.open_current_with(false);
     }
     fn open_current_with(&mut self, browse: bool) {
+        if self.panels[self.active].is_remote() {
+            if !browse {
+                self.error(crate::network::NATIVE_REQUIRED);
+                return;
+            }
+            if self.panels[self.active]
+                .entries
+                .get(self.panels[self.active].cursor)
+                .is_some_and(|e| e.directory || e.parent)
+            {
+                self.panels[self.active].enter(self.config.show_hidden);
+            } else {
+                crate::network::view(self, false, crate::viewer::ViewMode::Auto);
+            }
+            return;
+        }
         if self.panels[self.active].is_archive() {
             if !browse {
                 self.error(crate::archive::EXTRACT_FIRST);

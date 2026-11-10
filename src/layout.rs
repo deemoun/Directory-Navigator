@@ -247,7 +247,7 @@ pub fn prepare_window(
             t.page_rows = usize::from(
                 crate::directory_tree::geometry(area)
                     .height
-                    .saturating_sub(9),
+                    .saturating_sub(10),
             )
             .max(1);
             t.keep_visible();
@@ -278,7 +278,18 @@ pub fn prepare_window(
             d.keep_visible();
         }
         if let Some(info) = &mut app.utility_state_mut().information {
-            info.rows = usize::from(area.height.saturating_sub(4).min(24).saturating_sub(6));
+            let reserved = if info.kind == crate::utilities::information::Kind::Network {
+                9
+            } else {
+                6
+            };
+            info.rows = usize::from(
+                area.height
+                    .saturating_sub(4)
+                    .min(24)
+                    .saturating_sub(reserved),
+            )
+            .max(1);
             info.step(0);
         }
     }

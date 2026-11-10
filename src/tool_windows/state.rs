@@ -40,6 +40,7 @@ impl State {
         let owner = Owner::Document(id);
         if let Some(s) = &mut self.directory_tree {
             s.requests.bind(owner);
+            s.capacity.requests.bind(owner);
         }
         if let Some(s) = &mut self.discovery {
             s.requests.bind(owner);

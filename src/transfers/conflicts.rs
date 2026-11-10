@@ -114,7 +114,12 @@ pub(crate) fn conflict_spec(app: &App, r: Rect) -> Option<DialogSpec<'_>> {
         date(conflict.source_modified),
         lang.text("Destination"),
         crate::formatting::tail(
-            &crate::filesystem::display_name(&conflict.destination.to_string_lossy()),
+            &crate::filesystem::display_name(
+                conflict
+                    .destination_label
+                    .as_deref()
+                    .unwrap_or(&conflict.destination.to_string_lossy())
+            ),
             w
         ),
         conflict.destination_size,

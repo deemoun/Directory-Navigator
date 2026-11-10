@@ -12,6 +12,7 @@ impl App {
         self.sync_modals();
         let associations_changed = crate::associations::poll(self);
         let archive_changed = crate::archive::poll(self);
+        let network_changed = crate::network::poll(self);
         let user_menu_changed = crate::user_menu::poll(self);
         let tree_changed = self.directory_tree_mut().is_some_and(|t| t.poll());
         let discovery_changed = crate::discovery::poll(self);
@@ -33,7 +34,8 @@ impl App {
             | discovery_changed
             | tree_changed
             | user_menu_changed
-            | archive_changed;
+            | archive_changed
+            | network_changed;
         if self.config.show_clock {
             let tick = self.clock.tick_with(self.config.datetime);
             changed |= tick
@@ -105,6 +107,7 @@ impl App {
                 p.archive()
                     .is_some_and(|a| a.preview.is_some() || a.edit_pending.is_some())
             })
+            || self.network.busy()
             || self.launcher.loading()
             || self.job.is_some()
             || self.transfers.pending_io()

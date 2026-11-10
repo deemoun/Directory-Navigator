@@ -181,6 +181,15 @@ fn space_line(space: Space, language: Language, normal: u8, numbers: u8, compact
     ])
 }
 pub fn space(panel: &Panel, config: &Config, width: u16) -> Line {
+    if panel.is_remote() {
+        return Line::from(Span::styled(
+            config
+                .language
+                .text("Remote pane · F3 view · F4 edit · F5 copy · Ctrl+PgUp disconnect")
+                .to_owned(),
+            0x87,
+        ));
+    }
     let language = config.language;
     let normal = 0x87;
     let numbers = 0x8f;

@@ -65,6 +65,7 @@ struct Origin {
 #[derive(Clone)]
 pub enum Request {
     Filesystem,
+    Remote(crate::network::transfer::Transfer),
     Create(crate::archive::create::Creation),
     Archive {
         selection: crate::archive::Extraction,
@@ -76,6 +77,7 @@ pub struct Entry {
     pub extracting: bool,
     pub packing: bool,
     archive_summary: Option<String>,
+    remote_destination: Option<String>,
     pub id: TransferId,
     pub source_count: usize,
     pub plan: Plan,
@@ -119,10 +121,47 @@ impl Entry {
         } else {
             Outcome::Partial
         });
+        if let Some(destination) = &self.remote_destination {
+            return Some(
+                report
+                    .text("Operation", &self.source_summary())
+                    .text("Destination", destination),
+            );
+        }
+        if self.plan.sources.is_empty() {
+            if let Some(source) = &self.archive_summary {
+                report = report.text("Source", source);
+            }
+        }
         if let Some(source) = self.plan.sources.first() {
             report = report.path("Source", source);
         }
         Some(report.path("Destination", &self.plan.destination))
+    }
+    pub fn destination_summary(&self) -> String {
+        self.remote_destination.clone().unwrap_or_else(|| {
+            crate::filesystem::display_name(&self.plan.destination.to_string_lossy())
+        })
+    }
+    pub fn operation_caption(&self) -> &'static str {
+        if self.packing {
+            "Pack"
+        } else if self.extracting {
+            "Extract"
+        } else {
+            match self.plan.kind {
+                operations::Kind::Copy => "Copy",
+                operations::Kind::Move => {
+                    if self.remote_destination.is_some() {
+                        "Rename"
+                    } else {
+                        "Move"
+                    }
+                }
+                operations::Kind::Mkdir => "Make directory",
+                _ => "Delete",
+            }
+        }
     }
     pub fn source_summary(&self) -> String {
         if let Some(summary) = &self.archive_summary {
@@ -356,7 +395,12 @@ fn submit_request(
     if let Some(root) = &root {
         root.validate().map_err(|e| e.to_string())?;
     }
-    if !matches!(plan.kind, operations::Kind::Copy | operations::Kind::Move) {
+    if !matches!(plan.kind, operations::Kind::Copy | operations::Kind::Move)
+        && !matches!(
+            request,
+            Request::Remote(crate::network::transfer::Transfer::Mutation(_))
+        )
+    {
         return Err("Only Copy and Move belong to the Transfer Center".into());
     }
     app.transfers.now = Some(Instant::now());
@@ -397,11 +441,19 @@ fn submit_request(
     };
     let archive = matches!(request, Request::Archive { .. });
     let packing = matches!(request, Request::Create(_));
+    let remote = matches!(request, Request::Remote(_));
     let source_count = match &request {
         Request::Archive { selection, .. } => selection.members.len(),
+        Request::Remote(crate::network::transfer::Transfer::Download { members, .. }) => {
+            members.len()
+        }
+        Request::Remote(crate::network::transfer::Transfer::Upload { sources, .. }) => {
+            sources.len()
+        }
         _ => plan.sources.len(),
     };
     let archive_summary = match &request {
+        Request::Remote(request) => Some(request.summary()),
         Request::Archive { selection, .. } => Some(format!(
             "{} :: {}{}",
             selection
@@ -423,12 +475,24 @@ fn submit_request(
         extracting: archive,
         packing,
         archive_summary,
+        remote_destination: match &request {
+            Request::Remote(crate::network::transfer::Transfer::Upload {
+                connection,
+                directory,
+                ..
+            }) => Some(connection.label(directory)),
+            Request::Remote(crate::network::transfer::Transfer::Mutation(m)) => Some(
+                m.connection
+                    .label(m.target.as_ref().unwrap_or(&m.directory)),
+            ),
+            _ => None,
+        },
         request,
         id,
         source_count,
         plan,
         options,
-        status: if archive || packing {
+        status: if archive || packing || remote {
             Status::Queued
         } else {
             Status::Preparing
@@ -495,6 +559,9 @@ fn start_next(app: &mut App, now: Instant) {
     // retain their earlier asynchronous identity snapshot before execution.
     let id = e.id;
     let result = match &e.request {
+        Request::Remote(request) => {
+            Job::start_remote(id, request.clone(), e.options, e.root.clone())
+        }
         Request::Create(creation) => Job::start_creation(id, creation.clone()),
         Request::Filesystem => Job::start_transfer(
             id,
@@ -950,6 +1017,48 @@ pub(crate) fn command_area(
     area
 }
 
+pub(crate) fn submit_remote(
+    app: &mut App,
+    request: crate::network::transfer::Transfer,
+    options: CopyOptions,
+) -> Result<TransferId, String> {
+    submit_remote_root(app, request, options, None)
+}
+pub(crate) fn submit_remote_root(
+    app: &mut App,
+    request: crate::network::transfer::Transfer,
+    options: CopyOptions,
+    root: Option<crate::temp_drive::Root>,
+) -> Result<TransferId, String> {
+    let (sources, destination) = match &request {
+        crate::network::transfer::Transfer::Mutation(_) => {
+            (vec![], app.panels[app.active].path.clone())
+        }
+        crate::network::transfer::Transfer::Download { destination, .. } => {
+            (vec![], destination.clone())
+        }
+        crate::network::transfer::Transfer::Upload { sources, .. } => (
+            sources.iter().map(|s| s.path.clone()).collect(),
+            app.panels[app.active].path.clone(),
+        ),
+    };
+    let kind = match &request {
+        crate::network::transfer::Transfer::Mutation(m) => m.kind,
+        _ => operations::Kind::Copy,
+    };
+    submit_request(
+        app,
+        Plan {
+            kind,
+            sources,
+            destination,
+        },
+        options,
+        root,
+        Request::Remote(request),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1184,6 +1293,7 @@ mod tests {
                 extracting: false,
                 packing: false,
                 archive_summary: None,
+                remote_destination: None,
                 request: Request::Filesystem,
                 id: TransferId(i),
                 source_count: plan.sources.len(),

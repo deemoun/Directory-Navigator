@@ -27,6 +27,7 @@ use crate::operations::Kind;
 use std::path::PathBuf;
 
 pub enum PromptKind {
+    Remote(crate::network::controller::Mutation),
     ImportDos,
     Operation(Kind),
     ClearTempDrive(crate::temp_drive::Clear),
@@ -60,6 +61,7 @@ impl Prompt {
     }
     pub fn title(&self) -> &'static str {
         match self.kind {
+            PromptKind::Remote(ref m) => m.title(),
             PromptKind::ClearTempDrive(_) => " Clear Temp Drive ",
             PromptKind::Operation(Kind::Copy) => crate::help_text::COPY,
             PromptKind::Operation(Kind::Move) => crate::help_text::MOVE,
@@ -107,6 +109,7 @@ pub fn prompt_help(app: &mut crate::app::App) {
         return;
     };
     let message = match prompt.kind {
+        PromptKind::Remote(_) => crate::network::HELP,
         PromptKind::ClearTempDrive(_) => "Clears every item in Temp Drive, including hidden files and folders. The Temp Drive directory is kept. The confirmation shows whether items go to Trash or are permanently deleted. Cancel leaves everything unchanged.",
         PromptKind::Operation(Kind::Mkdir) => "Enter a directory name or path.\nRelative paths use the active panel directory.\nExisting files and directories are never overwritten.",
         PromptKind::ImportDos => "Choose an original DN.CFG file. A read-only preview shows supported preferences before Apply. DOS paths, commands and desktop windows are not imported.",
@@ -143,6 +146,13 @@ pub fn message_key(app: &mut crate::app::App, code: crossterm::event::KeyCode) {
 
 /// File-manager help is also available from the welcome window.
 pub fn keyboard_help(app: &mut crate::app::App) {
+    if app.panels[app.active].is_remote() {
+        app.push_dialog(Dialog {
+            title: " Remote pane help ",
+            message: crate::network::HELP.into(),
+        });
+        return;
+    }
     if app.panels[app.active].is_archive() {
         app.push_dialog(Dialog {
             title: " Archive pane help ",

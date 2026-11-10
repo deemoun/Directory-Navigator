@@ -484,7 +484,10 @@ pub(crate) fn manager_available(app: &App, action: Action) -> bool {
     {
         return false;
     }
-    if app.panels[app.active].is_archive()
+    if app.panels[app.active].is_archive() && matches!(action, Action::Key(6 | 7)) {
+        return false;
+    }
+    if app.panels[app.active].is_virtual()
         && matches!(
             action,
             Action::OpenExternal
@@ -498,7 +501,6 @@ pub(crate) fn manager_available(app: &App, action: Action) -> bool {
                 | Action::ExportList
                 | Action::FileInfo
                 | Action::AddMp3
-                | Action::Key(6 | 7)
         )
     {
         return false;
@@ -707,7 +709,11 @@ const MANAGER_CONTROL_KEYS: &[Binding<fn(&mut App)>] = &[
         "Ctrl+PageUp",
         None,
         |app| {
-            app.panels[app.active].leave_archive(app.config.show_hidden);
+            if app.panels[app.active].is_remote() {
+                app.panels[app.active].leave_remote(app.config.show_hidden);
+            } else {
+                app.panels[app.active].leave_archive(app.config.show_hidden);
+            }
         },
     ),
     bind(

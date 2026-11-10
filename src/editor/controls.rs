@@ -102,6 +102,10 @@ pub fn open_smartpad(app: &mut App) {
     }
 }
 pub fn open(app: &mut App, new: bool) {
+    if app.panels[app.active].is_remote() && !new {
+        crate::network::view(app, true, crate::viewer::ViewMode::Auto);
+        return;
+    }
     if app.panels[app.active].is_archive() && !new {
         crate::archive::edit::open(app);
         return;
@@ -355,10 +359,20 @@ pub fn poll(app: &mut App) -> bool {
                     .parent()
                     .map(PathBuf::from)
                     .unwrap_or_else(|| editor.base.clone());
-                if editor.archive_origin.is_none() {
+                if editor
+                    .remote_origin
+                    .as_ref()
+                    .is_some_and(|o| o.path != path)
+                {
+                    editor.remote_origin = None;
+                }
+                if editor.archive_origin.is_none() && editor.remote_origin.is_none() {
                     app.file_tools
                         .histories
                         .record(crate::file_tools::history::HistoryKind::Edit, path.clone());
+                }
+                if let Some(origin) = &editor.remote_origin {
+                    editor.base = origin.base.clone();
                 }
                 if let Some(origin) = &editor.archive_origin {
                     editor.base = origin.base.clone();
@@ -394,10 +408,23 @@ pub fn poll(app: &mut App) -> bool {
                     .parent()
                     .map(PathBuf::from)
                     .unwrap_or_else(|| editor.base.clone());
-                if editor.archive_origin.is_none() && editor.path.as_ref() != Some(&path) {
+                if editor
+                    .remote_origin
+                    .as_ref()
+                    .is_some_and(|o| o.path != path)
+                {
+                    editor.remote_origin = None;
+                }
+                if editor.archive_origin.is_none()
+                    && editor.remote_origin.is_none()
+                    && editor.path.as_ref() != Some(&path)
+                {
                     app.file_tools
                         .histories
                         .record(crate::file_tools::history::HistoryKind::Edit, path.clone());
+                }
+                if let Some(origin) = &editor.remote_origin {
+                    editor.base = origin.base.clone();
                 }
                 if let Some(origin) = &editor.archive_origin {
                     editor.base = origin.base.clone();
@@ -530,6 +557,8 @@ pub fn poll(app: &mut App) -> bool {
                     report = report.outcome(crate::error_report::Outcome::BufferRetained);
                 }
                 if let Some(origin) = &e.archive_origin {
+                    report = report.text("Document", &origin.label);
+                } else if let Some(origin) = &e.remote_origin {
                     report = report.text("Document", &origin.label);
                 } else if let Some(path) = attempted
                     .as_ref()
@@ -892,6 +921,8 @@ fn present_access_error(app: &mut App, summary: &'static str, cause: String, wri
             report = report.outcome(Outcome::BufferRetained);
         }
         if let Some(origin) = &e.archive_origin {
+            report = report.text("Document", &origin.label);
+        } else if let Some(origin) = &e.remote_origin {
             report = report.text("Document", &origin.label);
         } else if let Some(path) = e.path.as_ref().or(e.save_identity.as_ref()) {
             report = report.path("File", path);

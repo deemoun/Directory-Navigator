@@ -475,6 +475,7 @@ pub fn poll(app: &mut App) -> bool {
                     m.sizes.push(size);
                     changed = true;
                 }
+                Ok(Event::Usage(_)) => {}
                 Ok(Event::Progress(stats)) => {
                     m.stats = stats;
                     changed = true;

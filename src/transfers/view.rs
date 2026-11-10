@@ -60,21 +60,10 @@ pub(crate) fn spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
             format!(
                 "#{} {} · {} · {} → {}",
                 e.id,
-                lang.text(if e.packing {
-                    "Pack"
-                } else if e.extracting {
-                    "Extract"
-                } else if e.plan.kind == operations::Kind::Copy {
-                    "Copy"
-                } else {
-                    "Move"
-                }),
+                lang.text(e.operation_caption()),
                 lang.text(e.status.caption()),
                 crate::formatting::tail(&e.source_summary(), w.saturating_sub(28) / 2),
-                crate::formatting::tail(
-                    &crate::filesystem::display_name(&e.plan.destination.to_string_lossy()),
-                    w.saturating_sub(28) / 2
-                )
+                crate::formatting::tail(&e.destination_summary(), w.saturating_sub(28) / 2)
             )
         })
         .collect();

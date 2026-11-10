@@ -22,7 +22,10 @@ pub struct Extraction {
 pub const HELP: &str = "ZIP / ZIP64 / TAR / TAR.GZ / TGZ / 7z / RAR in either pane.\nEnter: folder or read-only preview · F3: preview\nInsert / Space / Ctrl+click: mark · + / -: group\nF5: extract marked items, or the current item\nFolders include descendants and empty directories.\nBackspace / ..: parent; Ctrl+PgUp: exit archive\nEsc: cancel loading · Ctrl+R: refresh\nZIP: F4 edits a regular text member; F2 saves back safely.\nF5 from a disk pane adds files to the ZIP in the other pane.\nF8 removes selected ZIP members after confirmation.\nTAR, TGZ, RAR and 7z remain read-only.\nNested and multi-volume archives are not supported.";
 pub const EXTRACT_FIRST: &str = "Extract archive members to disk first (F5).";
 pub fn require_native(app: &mut App) -> bool {
-    if app.panels[app.active].is_archive() {
+    if app.panels[app.active].is_remote() {
+        app.error(crate::network::NATIVE_REQUIRED);
+        false
+    } else if app.panels[app.active].is_archive() {
         app.error(EXTRACT_FIRST);
         false
     } else {

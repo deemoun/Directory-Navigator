@@ -134,7 +134,7 @@ pub(crate) fn open(app: &mut App, id: PluginId) {
     }
     if id == APK_WORKSHOP {
         let panel = &app.panels[app.active];
-        let path = (!panel.is_archive() && !panel.loading)
+        let path = (!panel.is_virtual() && !panel.loading)
             .then(|| panel.entries.get(panel.cursor))
             .flatten()
             .filter(|e| {
@@ -146,7 +146,7 @@ pub(crate) fn open(app: &mut App, id: PluginId) {
             })
             .map(|e| e.path.clone());
         let base = panel.path.clone();
-        let destination = (!app.panels[1 - app.active].is_archive())
+        let destination = (!app.panels[1 - app.active].is_virtual())
             .then(|| app.panels[1 - app.active].path.clone());
         dispatch(
             app,
@@ -221,6 +221,27 @@ fn apply(app: &mut App, b: Binding, effects: Vec<Effect>) {
             continue;
         }
         match effect {
+            Effect::RemoteTerminal(profile) => {
+                if b.plugin != REMOTE_CONNECTIONS {
+                    continue;
+                }
+                if let Err(e) = crate::network::terminal(app, profile) {
+                    app.error(e.to_string());
+                }
+            }
+            Effect::RemoteConnected(connection) => {
+                if b.plugin != REMOTE_CONNECTIONS {
+                    continue;
+                }
+                app.modals.set_plugin_dialog(None);
+                app.sync_modals();
+                if let Err(e) =
+                    app.panels[app.active].open_remote(connection, app.config.show_hidden)
+                {
+                    app.error(e.to_string());
+                }
+                crate::windowing::activate(app, crate::desktop::WindowId::MANAGER);
+            }
             Effect::ApkPreview {
                 label,
                 data,

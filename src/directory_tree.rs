@@ -1,4 +1,5 @@
-//! Session-only directory browser. Branches load on demand, never recursively.
+//! Session-only directory browser. Branches are lazy; usage scans are explicit.
+pub mod usage;
 use crate::{
     app::App,
     task::{Cancellation, Task},
@@ -40,7 +41,7 @@ pub fn scan(
 ) -> io::Result<Scan> {
     cancel.check()?;
     let metadata = fs::symlink_metadata(path)?;
-    if !metadata.is_dir() {
+    if !metadata.is_dir() || crate::platform_fs::directory_link(&metadata) {
         return Err(io::Error::other(
             "Entry is no longer a directory; directory links are not expanded",
         ));
@@ -63,12 +64,14 @@ pub fn scan(
                 return Ok(None);
             }
             let metadata = fs::symlink_metadata(&child)?;
-            if metadata.is_dir() {
+            if metadata.is_dir() && !crate::platform_fs::directory_link(&metadata) {
                 Ok(Some(Child {
                     path: child,
                     link: false,
                 }))
-            } else if metadata.is_symlink() && fs::metadata(&child)?.is_dir() {
+            } else if crate::platform_fs::directory_link(&metadata)
+                && fs::metadata(&child)?.is_dir()
+            {
                 Ok(Some(Child {
                     path: child,
                     link: true,
@@ -129,6 +132,8 @@ pub enum Action {
     Open,
     Refresh,
     Hidden,
+    Analyze,
+    Order,
     Close,
     Row(usize),
     Thumb,
@@ -151,6 +156,8 @@ pub struct Tree {
     pub focus: usize,
     pub hidden: bool,
     pub notice: String,
+    pub usage: usage::Usage,
+    pub capacity: crate::volume_space::Snapshot,
     branches: HashMap<PathBuf, Branch>,
     reveal: Vec<PathBuf>,
     pending: Option<Pending>,
@@ -171,6 +178,8 @@ impl Tree {
             focus: 0,
             hidden,
             notice: "Locating current directory…".into(),
+            usage: Default::default(),
+            capacity: Default::default(),
             branches: HashMap::new(),
             reveal: Vec::new(),
             pending: None,
@@ -303,10 +312,22 @@ impl Tree {
             }
             if !child.link {
                 if let Some(branch) = self.branches.get(&child.path).filter(|b| b.expanded) {
-                    for (index, next) in branch.children.iter().enumerate().rev() {
+                    let mut children = branch.children.iter().collect::<Vec<_>>();
+                    if self.usage.size_order
+                        && !self.usage.running()
+                        && self.usage.records.contains_key(&child.path)
+                    {
+                        children.sort_by(|a, b| {
+                            let av = self.usage.records.get(&a.path).map(|v| v.bytes);
+                            let bv = self.usage.records.get(&b.path).map(|v| v.bytes);
+                            bv.cmp(&av)
+                                .then_with(|| a.path.file_name().cmp(&b.path.file_name()))
+                        });
+                    }
+                    for (index, next) in children.iter().enumerate().rev() {
                         let mut continuation = continuations.clone();
                         continuation.push(index + 1 < branch.children.len());
-                        stack.push((next.clone(), continuation));
+                        stack.push(((*next).clone(), continuation));
                     }
                 }
             }
@@ -337,9 +358,14 @@ impl Tree {
             return;
         }
         let path = row.path.clone();
+        let depth = row.depth;
         let branch = self.branches.entry(path.clone()).or_default();
         if branch.expanded {
-            if let Some(child) = branch.children.first() {
+            if let Some(child) = self
+                .rows
+                .get(self.cursor + 1)
+                .filter(|child| child.depth > depth)
+            {
                 let path = child.path.clone();
                 self.rebuild(Some(path));
             }
@@ -373,6 +399,10 @@ impl Tree {
         self.rebuild(Some(path));
     }
     pub fn refresh(&mut self) {
+        if let Some(path) = self.selected().map(|r| r.path.clone()) {
+            self.usage.invalidate(&path);
+        }
+        self.capacity.refresh();
         self.pending = None;
         let Some(path) = self.selected().map(|r| r.path.clone()) else {
             if let Err(e) = self.locate() {
@@ -404,7 +434,15 @@ impl Tree {
         }
     }
     pub fn poll(&mut self) -> bool {
-        let mut changed = false;
+        let (mut changed, finished) = self.usage.poll();
+        if finished {
+            self.rebuild(self.selected().map(|r| r.path.clone()));
+        }
+        let selected = self
+            .selected()
+            .map(|r| r.path.clone())
+            .unwrap_or_else(|| self.original.clone());
+        changed |= self.capacity.poll(&selected, Instant::now());
         let located = match &self.pending {
             Some(Pending::Locate(task)) => match task.try_recv() {
                 Ok(result) => Some(result),
@@ -513,6 +551,9 @@ impl Tree {
     }
 }
 pub fn open(app: &mut App) {
+    if !crate::archive::require_native(app) {
+        return;
+    }
     if crate::tool_windows::reopen(app, crate::tool_windows::Kind::Tree) {
         return;
     }
@@ -560,6 +601,22 @@ pub fn action(app: &mut App, command: Action) {
         }
         Action::Refresh => tree.refresh(),
         Action::Hidden => tree.toggle_hidden(),
+        Action::Analyze => {
+            if tree.usage.running() {
+                tree.usage.stop();
+            } else if let Some(row) = tree.selected().filter(|r| !r.link) {
+                let path = row.path.clone();
+                if let Err(e) = tree.usage.start(path, tree.requests.owner()) {
+                    tree.notice = e.to_string();
+                }
+            }
+        }
+        Action::Order => {
+            tree.usage.size_order = !tree.usage.size_order;
+            if !tree.usage.running() {
+                tree.rebuild(tree.selected().map(|r| r.path.clone()));
+            }
+        }
         Action::Up => tree.step(-1),
         Action::Down => tree.step(1),
         Action::PageUp => tree.step(-(tree.page_rows as isize)),
@@ -592,6 +649,24 @@ pub fn action(app: &mut App, command: Action) {
     }
 }
 pub fn key(app: &mut App, key: KeyEvent) {
+    let language = app.config.language;
+    if key.code == KeyCode::Esc {
+        if let Some(tree) = app
+            .directory_tree_mut()
+            .filter(|t| t.usage.running() && !t.usage.stopping())
+        {
+            tree.usage.stop();
+            return;
+        }
+    }
+    if key.code == KeyCode::F(5) {
+        action(app, Action::Analyze);
+        return;
+    }
+    if key.code == KeyCode::F(6) {
+        action(app, Action::Order);
+        return;
+    }
     if let Some(tree) = app.directory_tree_mut() {
         tree.last_click = None;
     }
@@ -618,11 +693,36 @@ pub fn key(app: &mut App, key: KeyEvent) {
         tree.keep_visible();
         return;
     }
-    match key.code{
-        KeyCode::Left|KeyCode::Backspace|KeyCode::Char('-')=>tree.left(),KeyCode::Right|KeyCode::Char('+')=>tree.right(),
-        KeyCode::Char(' ') if tree.focus==0=>tree.toggle(),
+    match key.code {
+        KeyCode::Left | KeyCode::Backspace | KeyCode::Char('-') => tree.left(),
+        KeyCode::Right | KeyCode::Char('+') => tree.right(),
+        KeyCode::Char(' ') if tree.focus == 0 => tree.toggle(),
 
-        KeyCode::F(1)=>app.push_dialog(crate::dialog::Dialog{title:" Directory tree help ",message:"Up/Down and Page keys move through visible directories.\nRight/+ expands; Left/− collapses or selects the parent.\nSpace toggles a branch; Enter/double-click opens it.\nCtrl+R refreshes the selected branch; Ctrl+H shows hidden.\nLinks are leaves: Enter follows one explicitly.\nEsc/Ctrl+F4 closes without changing either panel.".into()}),_=>{}
+        KeyCode::F(1) => {
+            let mut message = language.message(HELP);
+            if tree.usage.root.is_some() {
+                message.push_str(&format!("\n\n{}", tree.usage.status(language)));
+                if let Some(cause) = &tree.usage.stats.first_error {
+                    message.push_str(&format!(
+                        "\n{}: {}",
+                        language.text("Cause"),
+                        crate::filesystem::display_name(cause)
+                    ));
+                }
+            }
+            if let Some(Err(cause)) = &tree.capacity.result {
+                message.push_str(&format!(
+                    "\n{}: {}",
+                    language.text("Volume capacity unavailable"),
+                    crate::filesystem::display_name(cause)
+                ));
+            }
+            app.push_dialog(crate::dialog::Dialog {
+                title: " Directory tree help ",
+                message,
+            });
+        }
+        _ => {}
     }
 }
 pub fn mouse(app: &mut App, event: MouseEvent, target: Option<crate::mouse::Target>) {
@@ -651,3 +751,5 @@ pub fn geometry(area: crate::presentation::layout::Rect) -> crate::presentation:
         height,
     )
 }
+
+pub const HELP: &str = "Up/Down and Page keys move through visible directories.\nRight/+ expands; Left/− collapses or selects the parent.\nSpace toggles a branch; Enter/double-click opens it.\nCtrl+R refreshes; Ctrl+H changes visibility.\nF5 Analyze/Stop measures apparent file sizes, including hidden files.\nLinks are not followed; other filesystems are excluded.\nF6 switches Name/Size sibling ordering after the scan stops.\nPartial/stale totals are snapshots, not allocated or reclaimable space.\nEsc stops analysis first; Esc again closes. Ctrl+F4 closes.\nVolume free/total space is separate from folder usage.";

@@ -557,6 +557,7 @@ fn utility_menus_modal_precedence_editor_keys_and_small_terminal() -> io::Result
         Kind::Characters,
         Kind::System,
         Kind::Memory,
+        Kind::Network,
     ] {
         assert!(menu::items(2).iter().any(|i| i.action
             == if kind == Kind::Calculator {
@@ -884,5 +885,286 @@ fn native_character_table_is_read_only_clipped_and_rejects_stale_page_hits() -> 
         179,
         "other page retains its selection"
     );
+    Ok(())
+}
+
+#[test]
+fn system_information_keeps_paths_without_network_interface_details() -> io::Result<()> {
+    let t = Temp::new()?;
+    let mut app = t.app()?;
+    utilities::open(&mut app, Kind::System);
+    wait(&mut app, |a| {
+        a.utility_state()
+            .information
+            .as_ref()
+            .is_some_and(|i| !i.loading())
+    });
+    let fields = &app.utility_state().information.as_ref().unwrap().fields;
+    assert!(fields.iter().any(|(k, _)| k == "Configuration file"));
+    assert!(!fields.iter().any(|(k, _)| matches!(
+        k.as_str(),
+        "Internet reachability" | "Interface" | "MAC address" | "IPv4" | "IPv6" | "DNS servers"
+    )));
+    Ok(())
+}
+
+#[test]
+fn network_information_has_its_own_refreshable_window_and_localized_controls() -> io::Result<()> {
+    let t = Temp::new()?;
+    let mut app = t.app()?;
+    utilities::open(&mut app, Kind::System);
+    let system = app.desktop.active().id;
+    utilities::open(&mut app, Kind::Network);
+    let network = app.desktop.active().id;
+    assert_ne!(system, network);
+    wait(&mut app, |a| {
+        a.utility_state()
+            .information
+            .as_ref()
+            .is_some_and(|i| !i.loading())
+    });
+    let info = app.utility_state().information.as_ref().unwrap();
+    assert_eq!(info.kind, information::Kind::Network);
+    assert!(info
+        .fields
+        .iter()
+        .any(|(k, _)| k == "Internet reachability"));
+    assert!(!info.fields.iter().any(|(k, _)| matches!(
+        k.as_str(),
+        "Application" | "Configuration file" | "GPM status"
+    )));
+    for language in [
+        dn::localization::Language::English,
+        dn::localization::Language::Russian,
+    ] {
+        app.config.language = language;
+        for palette in [
+            dn::palette::PaletteProfile::ClassicDn,
+            dn::palette::PaletteProfile::Terminal,
+        ] {
+            app.config.palette = palette;
+            for (w, h) in [(80, 25), (132, 40), (40, 12), (80, 25)] {
+                let first = draw(&mut app, w, h)?;
+                for _ in 0..3 {
+                    assert_eq!(first, draw(&mut app, w, h)?);
+                }
+                if w >= 80 {
+                    assert!(first.contains(language.text("Network Information")));
+                    assert!(first.contains(language.text("Download")));
+                    assert!(first.contains(language.text("Upload")));
+                }
+            }
+        }
+    }
+    key(&mut app, KeyCode::End, KeyModifiers::NONE);
+    let info = app.utility_state().information.as_ref().unwrap();
+    assert_eq!(info.offset, info.fields.len().saturating_sub(info.rows));
+    let info = app.utility_state_mut().information.as_mut().unwrap();
+    if let Some(last) = info
+        .network
+        .as_ref()
+        .and_then(|n| n.adapters.len().checked_sub(1))
+    {
+        info.choose_interface(last);
+    }
+    let selected = app
+        .utility_state()
+        .information
+        .as_ref()
+        .unwrap()
+        .selected_key();
+    draw(&mut app, 80, 25)?;
+    click(&mut app, Target::Utility(Action::Refresh));
+    wait(&mut app, |a| {
+        a.utility_state()
+            .information
+            .as_ref()
+            .is_some_and(|i| !i.loading())
+    });
+    assert_eq!(app.desktop.active().id, network);
+    if let Some(key) = selected {
+        let info = app.utility_state().information.as_ref().unwrap();
+        if info
+            .network
+            .as_ref()
+            .is_some_and(|n| n.adapters.iter().any(|a| a.key == key))
+        {
+            assert_eq!(info.selected_key(), Some(key));
+        }
+    }
+    key(&mut app, KeyCode::Esc, KeyModifiers::NONE);
+    assert_eq!(app.desktop.active().id, system);
+    wait(&mut app, |a| {
+        a.utility_state()
+            .information
+            .as_ref()
+            .is_some_and(|i| !i.loading())
+    });
+    assert_eq!(
+        app.utility_state().information.as_ref().unwrap().kind,
+        information::Kind::System
+    );
+    Ok(())
+}
+
+#[test]
+fn network_interface_dropdown_selects_one_adapter_and_cancels_without_changes() -> io::Result<()> {
+    use dn::network::information::{Adapter, InterfaceKey, Snapshot};
+    let t = Temp::new()?;
+    let mut app = t.app()?;
+    utilities::open(&mut app, Kind::Network);
+    wait(&mut app, |a| {
+        a.utility_state()
+            .information
+            .as_ref()
+            .is_some_and(|i| !i.loading())
+    });
+    let adapters = (0..20)
+        .map(|index| Adapter {
+            key: InterfaceKey {
+                index,
+                name: format!("eth{index}"),
+            },
+            label: format!("Adapter {index} — Сеть Ёё"),
+            fields: vec![("IPv4".into(), format!("192.0.2.{index}"))],
+        })
+        .collect();
+    let info = app.utility_state_mut().information.as_mut().unwrap();
+    info.network = Some(Snapshot {
+        adapters,
+        notices: vec![],
+    });
+    info.choose_interface(0);
+    for language in [
+        dn::localization::Language::English,
+        dn::localization::Language::Russian,
+    ] {
+        app.config.language = language;
+        for (width, height) in [(80, 25), (132, 40), (40, 12), (80, 25)] {
+            draw(&mut app, width, height)?;
+            utilities::action(&mut app, Action::InterfaceOpen);
+            key(&mut app, KeyCode::End, KeyModifiers::NONE);
+            let first = draw(&mut app, width, height)?;
+            for _ in 0..3 {
+                assert_eq!(first, draw(&mut app, width, height)?);
+            }
+            key(&mut app, KeyCode::Esc, KeyModifiers::NONE);
+            assert_eq!(
+                app.utility_state()
+                    .information
+                    .as_ref()
+                    .unwrap()
+                    .selected_interface,
+                0
+            );
+        }
+    }
+    utilities::action(&mut app, Action::InterfaceOpen);
+    let old_epoch = app
+        .utility_state()
+        .information
+        .as_ref()
+        .unwrap()
+        .interface_epoch;
+    key(&mut app, KeyCode::End, KeyModifiers::NONE);
+    key(&mut app, KeyCode::Enter, KeyModifiers::NONE);
+    let info = app.utility_state().information.as_ref().unwrap();
+    assert_eq!(info.selected_interface, 19);
+    assert_eq!(info.fields, vec![("IPv4".into(), "192.0.2.19".into())]);
+    utilities::action(&mut app, Action::InterfaceOpen);
+    utilities::action(&mut app, Action::InterfacePick(old_epoch, 0));
+    assert_eq!(
+        app.utility_state()
+            .information
+            .as_ref()
+            .unwrap()
+            .selected_interface,
+        19
+    );
+    draw(&mut app, 80, 25)?;
+    let epoch = app
+        .utility_state()
+        .information
+        .as_ref()
+        .unwrap()
+        .interface_epoch;
+    click(&mut app, Target::Utility(Action::InterfacePick(epoch, 19)));
+    assert!(app
+        .utility_state()
+        .information
+        .as_ref()
+        .unwrap()
+        .interface_choice
+        .is_none());
+    let info = app.utility_state_mut().information.as_mut().unwrap();
+    info.network.as_mut().unwrap().adapters.clear();
+    utilities::action(&mut app, Action::InterfaceOpen);
+    assert!(app
+        .utility_state()
+        .information
+        .as_ref()
+        .unwrap()
+        .interface_choice
+        .is_none());
+    Ok(())
+}
+
+#[test]
+fn network_missing_counters_keep_their_reason_when_reselecting_the_adapter() -> io::Result<()> {
+    use dn::network::{
+        information::{Adapter, InterfaceKey, Snapshot},
+        traffic::State,
+    };
+    let t = Temp::new()?;
+    let mut app = t.app()?;
+    utilities::open(&mut app, Kind::Network);
+    wait(&mut app, |a| {
+        a.utility_state()
+            .information
+            .as_ref()
+            .is_some_and(|i| !i.loading())
+    });
+    let info = app.utility_state_mut().information.as_mut().unwrap();
+    info.network = Some(Snapshot {
+        adapters: vec![Adapter {
+            key: InterfaceKey {
+                index: 0,
+                name: "dn-unavailable-fixture".into(),
+            },
+            label: "Unavailable fixture".into(),
+            fields: vec![],
+        }],
+        notices: vec![],
+    });
+    info.choose_interface(0);
+    wait(&mut app, |a| {
+        a.utility_state()
+            .information
+            .as_ref()
+            .is_some_and(|i| matches!(i.traffic.state(), State::Unavailable(_)))
+    });
+    let info = app.utility_state_mut().information.as_mut().unwrap();
+    let fields = info.fields.clone();
+    assert_eq!(
+        fields
+            .iter()
+            .filter(|(key, _)| key == "Traffic counters")
+            .count(),
+        1
+    );
+    info.choose_interface(0);
+    assert_eq!(info.fields, fields);
+    for language in [
+        dn::localization::Language::English,
+        dn::localization::Language::Russian,
+    ] {
+        app.config.language = language;
+        let first = draw(&mut app, 80, 25)?;
+        assert!(first.contains(language.text("Traffic counters")));
+        assert!(first.contains(language.text("Unavailable")));
+        for _ in 0..3 {
+            assert_eq!(first, draw(&mut app, 80, 25)?);
+        }
+    }
     Ok(())
 }

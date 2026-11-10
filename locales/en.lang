@@ -1257,3 +1257,145 @@ Copy uses the inactive disk panel directory for a blank destination. If the othe
 Move/rename uses the inactive disk panel directory; Shift+F6 uses the active directory. Relative paths use that base. A single item may use a new name; multiple items need an existing directory.\nAsk before replacing is the default: directories merge and conflicting files offer Replace, Skip, Replace all, Skip all or Cancel for this transfer only. Skipped sources remain.\nExplicit Refuse rejects existing top-level destinations before changes. Explicit Skip leaves existing top-level files and folders untouched, without merging.\nNative exclusive rename is preferred where possible. Verification uses staged copying and guarded source cleanup. Free-space checking applies when copying is required. Remove source files is selected and locked.\nF4 opens history; Tree chooses a disk directory. Esc cancels; completed moves remain. Append, refresh and description copying are unavailable.	Move/rename uses the inactive disk panel directory; Shift+F6 uses the active directory. Relative paths use that base. A single item may use a new name; multiple items need an existing directory.\nAsk before replacing is the default: directories merge and conflicting files offer Replace, Skip, Replace all, Skip all or Cancel for this transfer only. Skipped sources remain.\nExplicit Refuse rejects existing top-level destinations before changes. Explicit Skip leaves existing top-level files and folders untouched, without merging.\nNative exclusive rename is preferred where possible. Verification uses staged copying and guarded source cleanup. Free-space checking applies when copying is required. Remove source files is selected and locked.\nF4 opens history; Tree chooses a disk directory. Esc cancels; completed moves remain. Append, refresh and description copying are unavailable.
 F2 toggles wrapping; F7 searches and Shift+F7 finds the next match. Go to accepts source lines, or byte offsets in Hex. Regular disk files above 64 MiB stream through bounded windows; long lines are clipped. Archive previews and formatted Markdown remain bounded. F8 selects reading encoding; bounded viewers reinterpret loaded bytes. Editor snapshots have no reading encoding. F6 switches Markdown/source; F5 returns to the source editor preview. Search uses displayed text; Markdown Go to uses source lines. Links and images do not open automatically.	F2 toggles wrapping; F7 searches and Shift+F7 finds the next match. Go to accepts source lines, or byte offsets in Hex. Regular disk files above 64 MiB stream through bounded windows; long lines are clipped. Archive previews and formatted Markdown remain bounded. F8 selects reading encoding; bounded viewers reinterpret loaded bytes. Editor snapshots have no reading encoding. F6 switches Markdown/source; F5 returns to the source editor preview. Search uses displayed text; Markdown Go to uses source lines. Links and images do not open automatically.
 File → Save with encoding in the editor converts on save. F2 preserves encoding, BOM and mixed line endings. Unrepresentable characters block saving; choose UTF-8 to retain them. The editor supports 64 MiB / 1,000,000 lines. Save As asks before replacing an existing file.	File → Save with encoding in the editor converts on save. F2 preserves encoding, BOM and mixed line endings. Unrepresentable characters block saving; choose UTF-8 to retain them. The editor supports 64 MiB / 1,000,000 lines. Save As asks before replacing an existing file.
+Analyze	Analyze
+Order: Size	Order: Size
+Order: Name	Order: Name
+Volume available / total	Volume available / total
+Volume capacity unavailable	Volume capacity unavailable
+Reading volume capacity…	Reading volume capacity…
+Analyzing	Analyzing
+Stopping — partial	Stopping — partial
+Failed — partial	Failed — partial
+Stopped — partial	Stopped — partial
+Limited — partial	Limited — partial
+Complete — partial	Complete — partial
+Stale	Stale
+files	files
+skipped	skipped
+excluded mounts	excluded mounts
+Analyze: apparent sizes, including hidden files	Analyze: apparent sizes, including hidden files
+Apparent size	Apparent size
+Partial apparent size	Partial apparent size
+Direct files/links	Direct files/links
+No size snapshot for this directory	No size snapshot for this directory
+Up/Down and Page keys move through visible directories.\nRight/+ expands; Left/− collapses or selects the parent.\nSpace toggles a branch; Enter/double-click opens it.\nCtrl+R refreshes; Ctrl+H changes visibility.\nF5 Analyze/Stop measures apparent file sizes, including hidden files.\nLinks are not followed; other filesystems are excluded.\nF6 switches Name/Size sibling ordering after the scan stops.\nPartial/stale totals are snapshots, not allocated or reclaimable space.\nEsc stops analysis first; Esc again closes. Ctrl+F4 closes.\nVolume free/total space is separate from folder usage.	Up/Down and Page keys move through visible directories.\nRight/+ expands; Left/− collapses or selects the parent.\nSpace toggles a branch; Enter/double-click opens it.\nCtrl+R refreshes; Ctrl+H changes visibility.\nF5 Analyze/Stop measures apparent file sizes, including hidden files.\nLinks are not followed; other filesystems are excluded.\nF6 switches Name/Size sibling ordering after the scan stops.\nPartial/stale totals are snapshots, not allocated or reclaimable space.\nEsc stops analysis first; Esc again closes. Ctrl+F4 closes.\nVolume free/total space is separate from folder usage.
+
+Remote connections	Remote connections
+Remote co~n~nections...	Remote co~n~nections...
+Profile name	Profile name
+Host	Host
+Port	Port
+Username	Username
+Remote directory	Remote directory
+Private key (optional)	Private key (optional)
+Password / key passphrase	Password / key passphrase
+Profiles	Profiles
+Save profile	Save profile
+SSH terminal	SSH terminal
+Connect	Connect
+Connecting…	Connecting…
+Connection ready	Connection ready
+Trust once	Trust once
+Trust and save	Trust and save
+SSH host fingerprint	SSH host fingerprint
+Remote connection help	Remote connection help
+Verify this SSH host key before trusting it. Credentials have not been sent.	Verify this SSH host key before trusting it. Credentials have not been sent.
+FTP sends passwords and data without encryption. Press Connect again to continue, or choose FTPS/SFTP.	FTP sends passwords and data without encryption. Press Connect again to continue, or choose FTPS/SFTP.
+Connection profile saved without passwords	Connection profile saved without passwords
+Connection cancelled or worker stopped	Connection cancelled or worker stopped
+Configuration path unavailable	Configuration path unavailable
+SSH terminal requires an SFTP/SSH profile	SSH terminal requires an SFTP/SSH profile
+Loading remote file…	Loading remote file…
+Remote download	Remote download
+Download remote items to disk first (F5) before using native-only commands.	Download remote items to disk first (F5) before using native-only commands.
+Use Copy to upload files; remote transfers do not remove sources.	Use Copy to upload files; remote transfers do not remove sources.
+Make remote directory	Make remote directory
+Rename remote item	Rename remote item
+Confirm permanent remote deletion	Confirm permanent remote deletion
+Internet reachability	Internet reachability
+Not probed; interface state is not Internet connectivity	Not probed; interface state is not Internet connectivity
+Network interfaces	Network interfaces
+Unavailable or no interfaces reported	Unavailable or no interfaces reported
+Interface	Interface
+Interface type	Interface type
+Address protocols	Address protocols
+No assigned addresses	No assigned addresses
+Link state	Link state
+Up	Up
+Down or unknown	Down or unknown
+MAC address	MAC address
+Default gateway	Default gateway
+DNS servers	DNS servers
+Home directory	Home directory
+Executable path	Executable path
+Temporary directory	Temporary directory
+Configuration file	Configuration file
+Recovery directory	Recovery directory
+Temp Drive directory	Temp Drive directory
+Operation	Operation
+Remote connections: SFTP over SSH, explicit FTPS, or unencrypted FTP.\nEnter host, port, username, initial absolute remote directory and password or SSH key.\nUnknown SSH host keys require explicit verification before authentication; changed pinned keys are refused. FTPS validates certificates and never falls back to plain FTP.\nSave profile stores connection metadata and trusted fingerprint, never passwords or key passphrases.\nProfiles opens a saved-profile list: Select, Edit, Delete or New. Save profile applies edits and renames. Deleting a profile does not close open connections.\nEach pane can browse a remote directory. Enter navigates, F3 previews, F4 edits a private working copy, F5 transfers selections.\nCtrl+PgUp disconnects; the shell working directory always remains local.\nRemote operations are cancellable and never run during drawing.	Remote connections: SFTP over SSH, explicit FTPS, or unencrypted FTP.\nEnter host, port, username, initial absolute remote directory and password or SSH key.\nUnknown SSH host keys require explicit verification before authentication; changed pinned keys are refused. FTPS validates certificates and never falls back to plain FTP.\nSave profile stores connection metadata and trusted fingerprint, never passwords or key passphrases.\nProfiles opens a saved-profile list: Select, Edit, Delete or New. Save profile applies edits and renames. Deleting a profile does not close open connections.\nEach pane can browse a remote directory. Enter navigates, F3 previews, F4 edits a private working copy, F5 transfers selections.\nCtrl+PgUp disconnects; the shell working directory always remains local.\nRemote operations are cancellable and never run during drawing.
+Remote deletion is permanent; system Trash is unavailable.	Remote deletion is permanent; system Trash is unavailable.
+Remote pane · F3 view · F4 edit · F5 copy · Ctrl+PgUp disconnect	Remote pane · F3 view · F4 edit · F5 copy · Ctrl+PgUp disconnect
+Copy archive members to disk before uploading	Copy archive members to disk before uploading
+Choose an explicit absolute filesystem destination	Choose an explicit absolute filesystem destination
+Enter a remote directory name	Enter a remote directory name
+Enter a remote destination	Enter a remote destination
+Rename one remote item at a time	Rename one remote item at a time
+Remote rename target exists	Remote rename target exists
+Remote selection changed before execution	Remote selection changed before execution
+Remote connection is busy; retry after the current transfer finishes	Remote connection is busy; retry after the current transfer finishes
+Remote connection worker stopped	Remote connection worker stopped
+Enter a profile name without control characters (up to 256 bytes)	Enter a profile name without control characters (up to 256 bytes)
+Enter a host and a port from 1 to 65535	Enter a host and a port from 1 to 65535
+Enter a valid username	Enter a valid username
+Use an absolute remote path without control characters or backslashes	Use an absolute remote path without control characters or backslashes
+SSH host key changed; connection refused	SSH host key changed; connection refused
+SSH authentication failed	SSH authentication failed
+Remote directory exceeds the listing limit	Remote directory exceeds the listing limit
+Remote links and special files cannot be transferred	Remote links and special files cannot be transferred
+Remote output names collide	Remote output names collide
+Remote source changed while queued	Remote source changed while queued
+Remote source changed during download	Remote source changed during download
+Upload source changed while queued	Upload source changed while queued
+Upload contains a link or special file	Upload contains a link or special file
+Remote destination directory already exists	Remote destination directory already exists
+Remote destination has an incompatible type	Remote destination has an incompatible type
+Remote destination is not a regular file	Remote destination is not a regular file
+Remote destination exists	Remote destination exists
+Remote destination changed after confirmation	Remote destination changed after confirmation
+Upload source changed during reading	Upload source changed during reading
+Remote transfer cancelled	Remote transfer cancelled
+Remote operation cancelled	Remote operation cancelled
+Remote deletion cancelled	Remote deletion cancelled
+Remote listing cancelled or worker stopped	Remote listing cancelled or worker stopped
+Remote preview cancelled or worker stopped	Remote preview cancelled or worker stopped
+Network Information	Network Information
+Network information	Network information
+Network ~I~nformation	Network ~I~nformation
+Saved connection profiles	Saved connection profiles
+Delete saved profile	Delete saved profile
+Delete this saved connection profile?	Delete this saved connection profile?
+Open connections and files will not be deleted.	Open connections and files will not be deleted.
+Choose a profile; Enter selects, F2 edits, Del deletes.	Choose a profile; Enter selects, F2 edits, Del deletes.
+No saved connection profiles	No saved connection profiles
+Saved profile deleted. Open connections are unchanged.	Saved profile deleted. Open connections are unchanged.
+Saved profile changed; reopen Profiles and try again.	Saved profile changed; reopen Profiles and try again.
+A saved profile with this name already exists.	A saved profile with this name already exists.
+Invalid remote profile list	Invalid remote profile list
+Duplicate remote profile name	Duplicate remote profile name
+Profile saved; cannot refresh the saved-profile list	Profile saved; cannot refresh the saved-profile list
+Profile deleted; cannot refresh the saved-profile list	Profile deleted; cannot refresh the saved-profile list
+Network interface	Network interface
+Download	Download
+Upload	Upload
+Measuring…	Measuring…
+Traffic counters	Traffic counters
+No network interface selected	No network interface selected
+Network interface changed or disappeared	Network interface changed or disappeared
+Interface traffic counters are unavailable	Interface traffic counters are unavailable
+Traffic sampling worker stopped	Traffic sampling worker stopped
+Invalid interface name	Invalid interface name
+Invalid interface index	Invalid interface index
+Invalid interface counters snapshot size	Invalid interface counters snapshot size
+Interface counters changed while reading	Interface counters changed while reading
+Live traffic · R/F5 Refresh details · ↑↓ scroll · ←→ pan	Live traffic · R/F5 Refresh details · ↑↓ scroll · ←→ pan

@@ -3,16 +3,22 @@ use std::path::PathBuf;
 pub enum Kind {
     System,
     Memory,
+    Network,
 }
 impl Kind {
     pub fn title(self) -> &'static str {
         match self {
             Self::System => " System Information ",
             Self::Memory => " Memory Information ",
+            Self::Network => " Network Information ",
         }
     }
 }
 pub type Fields = Vec<(String, String)>;
+struct Reply {
+    fields: Fields,
+    network: Option<crate::network::information::Snapshot>,
+}
 pub struct Information {
     pub(crate) requests: crate::requests::RequestScope,
     pub kind: Kind,
@@ -22,12 +28,37 @@ pub struct Information {
     pub offset: usize,
     pub horizontal: u16,
     pub rows: usize,
-    pending: Option<crate::task::Task<Fields>>,
+    pub network: Option<crate::network::information::Snapshot>,
+    pub selected_interface: usize,
+    pub interface_choice: Option<usize>,
+    pub interface_epoch: u64,
+    pub traffic: crate::network::traffic::Monitor,
+    preferred_interface: Option<crate::network::information::InterfaceKey>,
+    pending: Option<crate::task::Task<Reply>>,
 }
 impl Information {
     pub fn open(kind: Kind, path: PathBuf, size: (u16, u16)) -> std::io::Result<Self> {
+        Self::open_with_config(kind, path, size, None)
+    }
+    pub(crate) fn open_with_config(
+        kind: Kind,
+        path: PathBuf,
+        size: (u16, u16),
+        config: Option<PathBuf>,
+    ) -> std::io::Result<Self> {
         let requests = crate::requests::RequestScope::default();
-        let receive = requests.spawn("dn-information", move |_| collect(kind, path, size))?;
+        let receive = requests.spawn("dn-information", move |_| {
+            let network = (kind == Kind::Network).then(crate::network::information::snapshot);
+            let mut fields = if let Some(network) = &network {
+                network.details(0)
+            } else {
+                collect(kind, path, size)
+            };
+            if kind == Kind::System {
+                fields.extend(crate::network::information::paths(config.as_deref()));
+            }
+            Reply { fields, network }
+        })?;
         Ok(Self {
             requests,
             kind,
@@ -37,29 +68,106 @@ impl Information {
             offset: 0,
             horizontal: 0,
             rows: 10,
+            network: None,
+            selected_interface: 0,
+            interface_choice: None,
+            interface_epoch: 0,
+            traffic: Default::default(),
+            preferred_interface: None,
             pending: Some(receive),
         })
+    }
+    pub fn open_interfaces(&mut self) -> bool {
+        static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+        if self.network.as_ref().is_none_or(|n| n.adapters.is_empty()) {
+            return false;
+        }
+        self.interface_epoch = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.interface_choice = Some(self.selected_interface);
+        true
+    }
+    pub fn selected_key(&self) -> Option<crate::network::information::InterfaceKey> {
+        self.network
+            .as_ref()?
+            .adapters
+            .get(self.selected_interface)
+            .map(|a| a.key.clone())
+    }
+    pub fn retain_interface(&mut self, previous: &Self) {
+        self.preferred_interface = previous.selected_key();
+    }
+    pub fn choose_interface(&mut self, index: usize) {
+        if let Some(network) = &self.network {
+            if index < network.adapters.len() {
+                self.selected_interface = index;
+                self.fields = network.details(index);
+                self.offset = 0;
+                self.horizontal = 0;
+            }
+        }
+        self.traffic.select(self.selected_key());
+        self.sync_traffic_fields();
+        self.interface_choice = None;
+    }
+    fn sync_traffic_fields(&mut self) {
+        if self.kind != Kind::Network {
+            return;
+        }
+        self.fields.retain(|(name, _)| name != "Traffic counters");
+        if let crate::network::traffic::State::Unavailable(error) = self.traffic.state() {
+            self.fields.push(("Traffic counters".into(), error.clone()));
+        }
+    }
+    pub fn step_interface(&mut self, amount: isize) {
+        if let (Some(choice), Some(network)) = (&mut self.interface_choice, &self.network) {
+            *choice = choice
+                .saturating_add_signed(amount)
+                .min(network.adapters.len().saturating_sub(1));
+        }
     }
     pub fn loading(&self) -> bool {
         self.pending.is_some()
     }
     pub fn poll(&mut self) -> bool {
+        let mut changed = false;
         let reply = crate::task::take_reply(&mut self.pending).map(|reply| {
-            reply.unwrap_or_else(|_| {
-                vec![(
+            reply.unwrap_or_else(|_| Reply {
+                fields: vec![(
                     "Snapshot".into(),
                     "Unavailable: information worker stopped".into(),
-                )]
+                )],
+                network: None,
             })
         });
-        if let Some(fields) = reply {
-            self.fields = fields;
+        if let Some(reply) = reply {
+            self.fields = reply.fields;
+            self.network = reply.network;
+            if let Some(network) = &self.network {
+                self.selected_interface = self
+                    .preferred_interface
+                    .as_ref()
+                    .and_then(|key| {
+                        network
+                            .adapters
+                            .iter()
+                            .position(|adapter| &adapter.key == key)
+                    })
+                    .unwrap_or(0);
+                self.fields = network.details(self.selected_interface);
+                self.traffic.select(self.selected_key());
+            }
             #[cfg(any(target_os = "linux", test))]
             self.fields.extend(self.terminal_fields.clone());
-            true
-        } else {
-            false
+            changed = true;
         }
+        if self.kind == Kind::Network
+            && self.traffic.poll(&self.requests, std::time::Instant::now())
+        {
+            self.sync_traffic_fields();
+            self.step(0);
+            changed = true;
+        }
+        changed
     }
     #[cfg(any(target_os = "linux", test))]
     pub(crate) fn set_terminal_fields(&mut self, fields: Fields) {
@@ -100,6 +208,9 @@ fn environment(key: &str) -> Result<String, String> {
         .ok_or_else(|| format!("{key} is not set"))
 }
 pub fn collect(kind: Kind, path: PathBuf, size: (u16, u16)) -> Fields {
+    if kind == Kind::Network {
+        return crate::network::information::collect();
+    }
     let mut fields = Vec::new();
     if kind == Kind::Memory {
         platform::memory(&mut fields);
@@ -211,7 +322,15 @@ pub(crate) fn display_value(
 ) -> String {
     if matches!(
         name,
-        "Mouse input"
+        "Internet reachability"
+            | "Network interfaces"
+            | "Address protocols"
+            | "Link state"
+            | "MAC address"
+            | "Default gateway"
+            | "MTU"
+            | "Traffic counters"
+            | "Mouse input"
             | "GPM status"
             | "Terminal mode"
             | "Color output"
@@ -299,7 +418,7 @@ mod diagnostics_tests {
     #[test]
     fn live_terminal_fields_survive_worker_completion_without_duplicates_or_memory_dialog_fields(
     ) -> std::io::Result<()> {
-        for kind in [Kind::System, Kind::Memory] {
+        for kind in [Kind::System, Kind::Memory, Kind::Network] {
             let mut info = Information::open(kind, PathBuf::from("diagnostic-fixture"), (80, 25))?;
             let fields = vec![
                 ("Terminal mode".into(), "Linux virtual console".into()),

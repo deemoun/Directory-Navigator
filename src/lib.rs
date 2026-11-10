@@ -116,3 +116,5 @@ pub mod session;
 
 pub(crate) mod error_report;
 pub(crate) mod help_text;
+
+pub mod network;

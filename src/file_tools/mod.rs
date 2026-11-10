@@ -92,7 +92,7 @@ pub fn open_history(app: &mut App, kind: HistoryKind) {
     }));
 }
 pub fn open_compare(app: &mut App) {
-    if app.panels.iter().any(|p| p.is_archive()) {
+    if app.panels.iter().any(|p| p.is_virtual()) {
         app.error(crate::archive::EXTRACT_FIRST);
         return;
     }

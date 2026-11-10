@@ -62,7 +62,9 @@ pub(crate) fn capture(app: &App) -> io::Result<Option<Snapshot>> {
     }
     let panels = std::array::from_fn(|i| {
         let p = &app.panels[i];
-        if let Some(a) = p.archive() {
+        if let Some(record) = p.remote_session_panel() {
+            record
+        } else if let Some(a) = p.archive() {
             PanelRecord {
                 path: a.path.parent().unwrap_or(&p.path).to_owned(),
                 cursor: a.path.file_name().map(PathBuf::from),
@@ -93,7 +95,11 @@ pub(crate) fn capture(app: &App) -> io::Result<Option<Snapshot>> {
     if app.config.restore_session == RestoreLevel::Documents {
         for (id, geometry) in order {
             let record = if let Some(e) = app.desktop.editor(id) {
-                if e.is_smartpad() || e.archive_origin.is_some() || e.recovery_source.is_some() {
+                if e.is_smartpad()
+                    || e.archive_origin.is_some()
+                    || e.remote_origin.is_some()
+                    || e.recovery_source.is_some()
+                {
                     continue;
                 }
                 let (Some(path), Some(b)) = (&e.path, &e.buffer) else {

@@ -207,6 +207,28 @@ pub fn owns(path: &Path, identity: &Metadata) -> bool {
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct EntryIdentity(u64, u64);
+impl EntryIdentity {
+    pub(crate) fn same_volume(self, other: Self) -> bool {
+        self.0 == other.0
+    }
+    #[cfg(test)]
+    pub(crate) fn on_other_volume(self) -> Self {
+        Self(self.0.wrapping_add(1), self.1)
+    }
+}
+
+/// Directory reparse points (including junctions) must remain traversal leaves.
+pub(crate) fn directory_link(metadata: &Metadata) -> bool {
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        metadata.file_attributes() & 0x400 != 0
+    }
+    #[cfg(not(windows))]
+    {
+        metadata.is_symlink()
+    }
+}
 /// A short-lived no-follow identity probe for queued roots. Unlike timestamps,
 /// Windows volume/file indices distinguish replacement entries on NTFS.
 pub(crate) fn entry_identity(path: &Path) -> io::Result<EntryIdentity> {

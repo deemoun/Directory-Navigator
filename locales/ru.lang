@@ -1259,3 +1259,145 @@ Copy uses the inactive disk panel directory for a blank destination. If the othe
 Move/rename uses the inactive disk panel directory; Shift+F6 uses the active directory. Relative paths use that base. A single item may use a new name; multiple items need an existing directory.\nAsk before replacing is the default: directories merge and conflicting files offer Replace, Skip, Replace all, Skip all or Cancel for this transfer only. Skipped sources remain.\nExplicit Refuse rejects existing top-level destinations before changes. Explicit Skip leaves existing top-level files and folders untouched, without merging.\nNative exclusive rename is preferred where possible. Verification uses staged copying and guarded source cleanup. Free-space checking applies when copying is required. Remove source files is selected and locked.\nF4 opens history; Tree chooses a disk directory. Esc cancels; completed moves remain. Append, refresh and description copying are unavailable.	Перемещение использует каталог неактивной дисковой панели; Shift+F6 — активной. Относительные пути отсчитываются от этого каталога. Для одного элемента можно задать новое имя; нескольким нужен существующий каталог.\nAsk — по умолчанию: папки объединяются, а совпадающие файлы предлагают Replace, Skip, Replace all, Skip all или Cancel только для текущей передачи. Пропущенные источники остаются.\nЯвный Refuse отклоняет существующие назначения верхнего уровня до изменений. Явный Skip пропускает такие файлы и папки целиком, без объединения.\nПо возможности используется исключительное переименование. Проверка записи включает подготовленное копирование и защищённое удаление источников. Место проверяется, если требуется копирование. Удаление источников включено и заблокировано.\nF4 открывает историю; Tree выбирает дисковую папку. Esc отменяет работу; завершённые перемещения сохраняются. Дозапись, обновление по дате и копирование описаний недоступны.
 F2 toggles wrapping; F7 searches and Shift+F7 finds the next match. Go to accepts source lines, or byte offsets in Hex. Regular disk files above 64 MiB stream through bounded windows; long lines are clipped. Archive previews and formatted Markdown remain bounded. F8 selects reading encoding; bounded viewers reinterpret loaded bytes. Editor snapshots have no reading encoding. F6 switches Markdown/source; F5 returns to the source editor preview. Search uses displayed text; Markdown Go to uses source lines. Links and images do not open automatically.	F2 переключает перенос; F7 ищет, Shift+F7 повторяет поиск. Go to принимает строки исходника, а в Hex — смещения байтов. Дисковые файлы более 64 МиБ читаются ограниченными окнами; длинные строки обрезаются. Предпросмотр архивов и оформленный Markdown ограничены. F8 выбирает кодировку чтения; ограниченные просмотры переинтерпретируют загруженные байты. У снимков редактора нет кодировки чтения. F6 переключает Markdown/исходник; F5 возвращает из предпросмотра в редактор. Поиск использует показанный текст; Go to в Markdown — строки исходника. Ссылки и изображения сами не открываются.
 File → Save with encoding in the editor converts on save. F2 preserves encoding, BOM and mixed line endings. Unrepresentable characters block saving; choose UTF-8 to retain them. The editor supports 64 MiB / 1,000,000 lines. Save As asks before replacing an existing file.	File → Save with encoding в редакторе преобразует кодировку при сохранении. F2 сохраняет кодировку, BOM и смешанные окончания строк. Непредставимые символы блокируют запись; UTF-8 сохраняет их. Предел редактора — 64 МиБ / 1 000 000 строк. Save As запрашивает подтверждение замены существующего файла.
+Analyze	Анализ
+Order: Size	Порядок: размер
+Order: Name	Порядок: имя
+Volume available / total	Свободно / всего на томе
+Volume capacity unavailable	Место на томе недоступно
+Reading volume capacity…	Чтение сведений о томе…
+Analyzing	Анализ
+Stopping — partial	Остановка — частично
+Failed — partial	Ошибка — частично
+Stopped — partial	Остановлено — частично
+Limited — partial	Предел — частично
+Complete — partial	Завершено — частично
+Stale	Устарело
+files	файлов
+skipped	пропущено
+excluded mounts	исключено томов
+Analyze: apparent sizes, including hidden files	Анализ: размеры файлов, включая скрытые
+Apparent size	Объём файлов
+Partial apparent size	Частичный объём
+Direct files/links	Файлы/ссылки здесь
+No size snapshot for this directory	Нет снимка размера этого каталога
+Up/Down and Page keys move through visible directories.\nRight/+ expands; Left/− collapses or selects the parent.\nSpace toggles a branch; Enter/double-click opens it.\nCtrl+R refreshes; Ctrl+H changes visibility.\nF5 Analyze/Stop measures apparent file sizes, including hidden files.\nLinks are not followed; other filesystems are excluded.\nF6 switches Name/Size sibling ordering after the scan stops.\nPartial/stale totals are snapshots, not allocated or reclaimable space.\nEsc stops analysis first; Esc again closes. Ctrl+F4 closes.\nVolume free/total space is separate from folder usage.	Стрелки и PageUp/PageDown перемещают курсор по каталогам.\nВправо/+ раскрывает; влево/− сворачивает или выбирает родителя.\nПробел переключает ветку; Enter/двойной щелчок открывает каталог.\nCtrl+R обновляет; Ctrl+H меняет видимость скрытых каталогов.\nF5 Анализ/Стоп считает размеры файлов, включая скрытые.\nСсылки не обходятся; другие файловые системы исключаются.\nF6 меняет порядок Имя/Размер после остановки анализа.\nЧастичные и устаревшие итоги — снимок, не занятое или освобождаемое место.\nEsc останавливает анализ; ещё один Esc закрывает. Ctrl+F4 закрывает.\nСвободное/общее место тома показано отдельно от объёма каталогов.
+
+Remote connections	Удалённые соединения
+Remote co~n~nections...	Удалённые соеди~н~ения...
+Profile name	Имя профиля
+Host	Сервер
+Port	Порт
+Username	Имя пользователя
+Remote directory	Удалённый каталог
+Private key (optional)	Закрытый ключ (необязательно)
+Password / key passphrase	Пароль / парольная фраза ключа
+Profiles	Профили
+Save profile	Сохранить профиль
+SSH terminal	Терминал SSH
+Connect	Подключиться
+Connecting…	Подключение…
+Connection ready	Соединение готово
+Trust once	Доверять разово
+Trust and save	Доверять и сохранить
+SSH host fingerprint	Отпечаток ключа SSH
+Remote connection help	Справка по соединениям
+Verify this SSH host key before trusting it. Credentials have not been sent.	Проверьте ключ SSH перед подтверждением. Учётные данные ещё не отправлены.
+FTP sends passwords and data without encryption. Press Connect again to continue, or choose FTPS/SFTP.	FTP передаёт пароли и данные без шифрования. Для продолжения нажмите «Подключиться» ещё раз или выберите FTPS/SFTP.
+Connection profile saved without passwords	Профиль сохранён без паролей
+Connection cancelled or worker stopped	Подключение отменено или обработчик остановлен
+Configuration path unavailable	Путь конфигурации недоступен
+SSH terminal requires an SFTP/SSH profile	Терминалу SSH нужен профиль SFTP/SSH
+Loading remote file…	Загрузка удалённого файла…
+Remote download	Скачивание с сервера
+Download remote items to disk first (F5) before using native-only commands.	Сначала скачайте удалённые файлы на диск (F5), затем используйте локальные команды.
+Use Copy to upload files; remote transfers do not remove sources.	Для загрузки на сервер используйте копирование; удалённые передачи не удаляют исходники.
+Make remote directory	Создание удалённого каталога
+Rename remote item	Переименование на сервере
+Confirm permanent remote deletion	Подтвердите окончательное удаление
+Internet reachability	Доступность Интернета
+Not probed; interface state is not Internet connectivity	Не проверялась; состояние интерфейса не подтверждает доступ в Интернет
+Network interfaces	Сетевые интерфейсы
+Unavailable or no interfaces reported	Недоступны или не обнаружены
+Interface	Интерфейс
+Interface type	Тип интерфейса
+Address protocols	Протоколы адресации
+No assigned addresses	Адреса не назначены
+Link state	Состояние соединения
+Up	Работает
+Down or unknown	Не работает или неизвестно
+MAC address	MAC-адрес
+Default gateway	Основной шлюз
+DNS servers	DNS-серверы
+Home directory	Домашний каталог
+Executable path	Путь программы
+Temporary directory	Временный каталог
+Configuration file	Файл конфигурации
+Recovery directory	Каталог восстановления
+Temp Drive directory	Каталог Temp Drive
+Operation	Операция
+Remote connections: SFTP over SSH, explicit FTPS, or unencrypted FTP.\nEnter host, port, username, initial absolute remote directory and password or SSH key.\nUnknown SSH host keys require explicit verification before authentication; changed pinned keys are refused. FTPS validates certificates and never falls back to plain FTP.\nSave profile stores connection metadata and trusted fingerprint, never passwords or key passphrases.\nProfiles opens a saved-profile list: Select, Edit, Delete or New. Save profile applies edits and renames. Deleting a profile does not close open connections.\nEach pane can browse a remote directory. Enter navigates, F3 previews, F4 edits a private working copy, F5 transfers selections.\nCtrl+PgUp disconnects; the shell working directory always remains local.\nRemote operations are cancellable and never run during drawing.	Удалённые соединения: SFTP через SSH, явный FTPS или незашифрованный FTP.\nУкажите сервер, порт, имя пользователя, абсолютный удалённый каталог и пароль либо ключ SSH.\nНовый ключ SSH нужно проверить до аутентификации; изменившийся сохранённый ключ отклоняется. FTPS проверяет сертификаты и не переключается на FTP.\nПрофиль сохраняет параметры и подтверждённый отпечаток, но не пароли и парольные фразы.\nВ каждой панели можно открыть удалённый каталог. Enter — переход, F3 — просмотр, F4 — правка частной копии, F5 — передача выделенного.\nCtrl+PgUp — отключение; рабочий каталог командной строки всегда локальный.\nУдалённые операции отменяемы и не выполняются при отрисовке.\n«Профили» открывает список: выбор, правка, удаление или создание. «Сохранить профиль» применяет изменения и переименование. Удаление профиля не закрывает соединения.
+Remote deletion is permanent; system Trash is unavailable.	Удаление на сервере окончательное; системная корзина недоступна.
+Remote pane · F3 view · F4 edit · F5 copy · Ctrl+PgUp disconnect	Сервер · F3 просмотр · F4 правка · F5 копия · Ctrl+PgUp выход
+Copy archive members to disk before uploading	Перед загрузкой на сервер извлеките файлы архива на диск
+Choose an explicit absolute filesystem destination	Укажите абсолютный путь назначения на локальном диске
+Enter a remote directory name	Введите имя удалённого каталога
+Enter a remote destination	Введите удалённый путь назначения
+Rename one remote item at a time	Переименовывайте по одному удалённому элементу
+Remote rename target exists	На сервере уже есть элемент с таким именем
+Remote selection changed before execution	Удалённые элементы изменились до начала операции
+Remote connection is busy; retry after the current transfer finishes	Соединение занято; повторите после завершения текущей передачи
+Remote connection worker stopped	Обработчик удалённого соединения остановлен
+Enter a profile name without control characters (up to 256 bytes)	Введите имя профиля без управляющих символов (до 256 байт)
+Enter a host and a port from 1 to 65535	Укажите сервер и порт от 1 до 65535
+Enter a valid username	Введите допустимое имя пользователя
+Use an absolute remote path without control characters or backslashes	Используйте абсолютный удалённый путь без управляющих символов и обратных косых черт
+SSH host key changed; connection refused	Ключ сервера SSH изменился; соединение отклонено
+SSH authentication failed	Ошибка аутентификации SSH
+Remote directory exceeds the listing limit	Удалённый каталог превышает ограничение списка
+Remote links and special files cannot be transferred	Удалённые ссылки и специальные файлы не передаются
+Remote output names collide	Имена загружаемых файлов конфликтуют
+Remote source changed while queued	Удалённый исходник изменился во время ожидания в очереди
+Remote source changed during download	Удалённый исходник изменился во время скачивания
+Upload source changed while queued	Локальный исходник изменился во время ожидания загрузки
+Upload contains a link or special file	Загрузка содержит ссылку или специальный файл
+Remote destination directory already exists	Удалённый каталог назначения уже существует
+Remote destination has an incompatible type	Тип удалённого назначения несовместим с исходником
+Remote destination is not a regular file	Удалённое назначение не является обычным файлом
+Remote destination exists	Удалённое назначение уже существует
+Remote destination changed after confirmation	Удалённое назначение изменилось после подтверждения
+Upload source changed during reading	Исходник загрузки изменился во время чтения
+Remote transfer cancelled	Удалённая передача отменена
+Remote operation cancelled	Удалённая операция отменена
+Remote deletion cancelled	Удаление на сервере отменено
+Remote listing cancelled or worker stopped	Загрузка списка отменена или обработчик остановлен
+Remote preview cancelled or worker stopped	Предпросмотр отменён или обработчик остановлен
+Network Information	Сетевая информация
+Network information	Сетевая информация
+Network ~I~nformation	С~е~тевая информация
+Saved connection profiles	Сохранённые соединения
+Delete saved profile	Удаление профиля
+Delete this saved connection profile?	Удалить этот сохранённый профиль соединения?
+Open connections and files will not be deleted.	Открытые соединения и файлы останутся нетронутыми.
+Choose a profile; Enter selects, F2 edits, Del deletes.	Выберите профиль: Enter — выбор, F2 — правка, Del — удаление.
+No saved connection profiles	Нет сохранённых профилей соединений
+Saved profile deleted. Open connections are unchanged.	Профиль удалён. Открытые соединения не изменены.
+Saved profile changed; reopen Profiles and try again.	Профиль изменился; откройте «Профили» заново и повторите.
+A saved profile with this name already exists.	Профиль с таким именем уже существует.
+Invalid remote profile list	Некорректный список профилей соединений
+Duplicate remote profile name	Повторяющееся имя профиля соединения
+Profile saved; cannot refresh the saved-profile list	Профиль сохранён; не удалось обновить список профилей
+Profile deleted; cannot refresh the saved-profile list	Профиль удалён; не удалось обновить список профилей
+Network interface	Сетевой интерфейс
+Download	Приём
+Upload	Отправка
+Measuring…	Измерение…
+Traffic counters	Счётчики трафика
+No network interface selected	Сетевой интерфейс не выбран
+Network interface changed or disappeared	Сетевой интерфейс изменился или исчез
+Interface traffic counters are unavailable	Счётчики трафика интерфейса недоступны
+Traffic sampling worker stopped	Фоновое измерение трафика остановилось
+Invalid interface name	Некорректное имя интерфейса
+Invalid interface index	Некорректный индекс интерфейса
+Invalid interface counters snapshot size	Некорректный размер снимка счётчиков интерфейса
+Interface counters changed while reading	Счётчики интерфейса изменились во время чтения
+Live traffic · R/F5 Refresh details · ↑↓ scroll · ←→ pan	Трафик онлайн · R/F5 Обновить данные · ↑↓ прокрутка · ←→ сдвиг

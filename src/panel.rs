@@ -1,4 +1,5 @@
 pub mod archive;
+pub mod remote;
 use crate::filesystem::{self, Entry};
 pub use archive::Location;
 use std::{
@@ -184,6 +185,9 @@ impl Panel {
     }
 
     pub fn poll(&mut self) -> Option<String> {
+        if self.is_remote() {
+            return self.remote_poll();
+        }
         match self.results.try_recv() {
             Ok(response) => {
                 if !self.scope.accepts(response.request.token)
@@ -273,7 +277,7 @@ impl Panel {
 
     /// Passive refresh never disables navigation or paints a loading indicator.
     pub fn refresh_if_due(&mut self, show_hidden: bool, now: Instant) {
-        if !self.is_archive()
+        if !self.is_virtual()
             && !self.loading
             && !self.refreshing
             && now.saturating_duration_since(self.last_refresh) >= Duration::from_secs(2)
@@ -375,6 +379,10 @@ impl Panel {
     }
 
     pub fn enter(&mut self, show_hidden: bool) {
+        if self.is_remote() {
+            self.remote_enter(show_hidden);
+            return;
+        }
         if self.loading {
             return;
         }
@@ -392,6 +400,10 @@ impl Panel {
     }
 
     pub fn parent(&mut self, show_hidden: bool) {
+        if self.is_remote() {
+            self.remote_parent(show_hidden);
+            return;
+        }
         if self.loading {
             return;
         }
@@ -409,6 +421,11 @@ impl Panel {
     }
 
     pub fn refresh(&mut self, show_hidden: bool) {
+        if self.is_remote() {
+            self.remote_mut().unwrap().hidden = show_hidden;
+            self.remote_refresh();
+            return;
+        }
         if self.is_archive() {
             self.refresh_archive();
             return;
@@ -433,7 +450,7 @@ impl Panel {
     }
 
     pub fn targets(&self) -> Vec<PathBuf> {
-        if self.is_archive() || self.loading {
+        if self.is_virtual() || self.loading {
             return Vec::new();
         }
         self.entries
@@ -462,6 +479,10 @@ impl Panel {
     }
 
     pub fn go_to(&mut self, path: PathBuf, hidden: bool) {
+        if self.is_remote() {
+            self.leave_remote(hidden);
+            self.loading = false;
+        }
         if self.is_archive() {
             self.leave_archive(hidden);
             self.loading = false;

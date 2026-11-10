@@ -14,14 +14,21 @@ pub(crate) fn prompt_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
     let profile = app.config.palette;
     let dos = profile.styles_for(crate::palette::theme::Group::Dialogs);
     let prompt = app.modals.prompt().filter(|p| p.copy.is_none())?;
-    let deleting = matches!(
-        prompt.kind,
-        PromptKind::Operation(Kind::Delete | Kind::Trash) | PromptKind::ClearTempDrive(_)
-    );
-    let simple = matches!(
-        prompt.kind,
-        PromptKind::GoTo | PromptKind::ImportDos | PromptKind::Operation(Kind::Mkdir)
-    );
+    let remote = if let PromptKind::Remote(m) = &prompt.kind {
+        Some(m)
+    } else {
+        None
+    };
+    let deleting = remote.is_some_and(|m| matches!(m.kind, Kind::Delete | Kind::Trash))
+        || matches!(
+            prompt.kind,
+            PromptKind::Operation(Kind::Delete | Kind::Trash) | PromptKind::ClearTempDrive(_)
+        );
+    let simple = remote.is_some_and(|m| matches!(m.kind, Kind::Move | Kind::Mkdir))
+        || matches!(
+            prompt.kind,
+            PromptKind::GoTo | PromptKind::ImportDos | PromptKind::Operation(Kind::Mkdir)
+        );
     // original-dn/RESOURCE/ENGLISH/DN.DNR dlgMkDir is 49×7.
     let width = if matches!(prompt.kind, PromptKind::Operation(Kind::Mkdir)) {
         49
@@ -45,7 +52,12 @@ pub(crate) fn prompt_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
                 app.config
                     .language
                     .text("Move {} item(s) to Trash?")
-                    .replace("{}", &prompt.sources.len().to_string()),
+                    .replace(
+                        "{}",
+                        &remote
+                            .map_or(prompt.sources.len(), |m| m.members.len())
+                            .to_string(),
+                    ),
                 app.config
                     .language
                     .text("Restore using your desktop file manager.")
@@ -56,13 +68,32 @@ pub(crate) fn prompt_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
                 app.config
                     .language
                     .text("Permanently delete {} item(s)?")
-                    .replace("{}", &prompt.sources.len().to_string()),
+                    .replace(
+                        "{}",
+                        &remote
+                            .map_or(prompt.sources.len(), |m| m.members.len())
+                            .to_string(),
+                    ),
                 app.config
                     .language
                     .text("This cannot be undone.")
                     .to_string(),
             ]
         };
+        if let Some(remote) = remote {
+            lines.push(
+                app.config
+                    .language
+                    .text("Remote deletion is permanent; system Trash is unavailable.")
+                    .into(),
+            );
+            for member in remote.members.iter().take(2) {
+                lines.push(formatting::tail(
+                    &display_name(&remote.connection.label(&member.path)),
+                    rect.width - 4,
+                ));
+            }
+        }
         if matches!(prompt.kind, PromptKind::ClearTempDrive(_)) {
             lines.push(
                 app.config

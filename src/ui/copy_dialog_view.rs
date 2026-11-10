@@ -34,7 +34,9 @@ pub(crate) fn copy_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
         Target::SubmitPrompt,
         Target::CancelPrompt,
     );
-    let label = if let Some(selection) = &copy.extraction {
+    let label = if let Some(remote) = &copy.remote {
+        remote.summary()
+    } else if let Some(selection) = &copy.extraction {
         language
             .text("Extract {} selected archive items to")
             .replace("{}", &selection.members.len().to_string())
@@ -91,12 +93,14 @@ pub(crate) fn copy_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
         spec.cursor = Some((field.x + (column - scroll) as u16, field.y));
     }
     let history = Rect::new(field.right(), field.y, 2, 1);
-    spec.control(Control::new(
+    let mut history_control = Control::new(
         10,
         history,
         ControlKind::History,
         Target::Copy(Action::History),
-    ));
+    );
+    history_control.enabled = !copy.remote.as_ref().is_some_and(|r| r.uploading());
+    spec.control(history_control);
     for (row, label, action, checked, focus) in [
         (
             0,
@@ -151,7 +155,7 @@ pub(crate) fn copy_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
             Some(Action::CheckSpace),
             copy.options.check_free_space,
             3,
-            true,
+            !copy.remote.as_ref().is_some_and(|r| r.uploading()),
         ),
         (
             3,
@@ -160,7 +164,7 @@ pub(crate) fn copy_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
             Some(Action::Verify),
             copy.options.verify_writes || copy.options.remove_sources,
             4,
-            !copy.options.remove_sources,
+            !copy.options.remove_sources && !copy.remote.as_ref().is_some_and(|r| r.uploading()),
         ),
         (
             31,
@@ -178,7 +182,7 @@ pub(crate) fn copy_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
             Some(Action::RemoveSources),
             moving || copy.options.remove_sources,
             5,
-            !moving && copy.extraction.is_none(),
+            !moving && copy.extraction.is_none() && copy.remote.is_none(),
         ),
     ] {
         let area = Rect::new(rect.x + x, rect.y + y, 25, 1);
@@ -212,6 +216,9 @@ pub(crate) fn copy_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
             ControlKind::Button(label.into()),
             target,
         );
+        if index == 2 && copy.remote.as_ref().is_some_and(|r| r.uploading()) {
+            control.enabled = false;
+        }
         control.label_keys(language, source);
         spec.control(control);
     }

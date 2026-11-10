@@ -19,6 +19,7 @@ pub enum Kind {
     Characters,
     System,
     Memory,
+    Network,
     Bookmarks,
     EditHistory,
     ViewHistory,
@@ -33,7 +34,7 @@ impl Kind {
             Self::Tree => Focus::Tree,
             Self::Find | Self::Sizes => Focus::Discovery,
             Self::FileInfo => Focus::FileInfo,
-            Self::Characters | Self::System | Self::Memory => Focus::Utility,
+            Self::Characters | Self::System | Self::Memory | Self::Network => Focus::Utility,
             Self::Bookmarks => Focus::Navigation,
             Self::EditHistory | Self::ViewHistory | Self::DirectoryHistory => Focus::FileTools,
             Self::CommandHistory => Focus::CommandHistory,
@@ -50,6 +51,7 @@ impl Kind {
             Self::Characters => "ASCII table",
             Self::System => "System information",
             Self::Memory => "Memory information",
+            Self::Network => "Network information",
             Self::Bookmarks => "Bookmarks",
             Self::EditHistory => "File Edit History",
             Self::ViewHistory => "File View History",
@@ -341,7 +343,8 @@ pub(crate) fn prepare(app: &mut App, area: Rect) {
         }
         let t = app.desktop.tool_mut(id).unwrap();
         if let Some(tree) = t.state.directory_tree_mut() {
-            tree.page_rows = usize::from(s.bounds.height.saturating_sub(10)).max(1);
+            // The spec excludes the native shadow row and reserves a usage summary.
+            tree.page_rows = usize::from(s.bounds.height.saturating_sub(11)).max(1);
             tree.keep_visible();
         }
         if let Some(d) = t.state.discovery_mut() {
@@ -400,7 +403,7 @@ pub(crate) fn poll(app: &mut App) -> bool {
             Kind::Find | Kind::Sizes => crate::discovery::poll(app),
             Kind::FileInfo => app.file_info_mut().is_some_and(|i| i.poll()),
             Kind::Bookmarks => crate::navigation_tools::poll(app),
-            Kind::System | Kind::Memory => crate::utilities::poll(app),
+            Kind::System | Kind::Memory | Kind::Network => crate::utilities::poll(app),
             Kind::CommandHistory => {
                 let history = app.command_line.history().to_vec();
                 app.command_history_mut()

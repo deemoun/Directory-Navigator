@@ -3,6 +3,7 @@ pub(crate) mod apk_workshop;
 pub(crate) mod calculator;
 pub(crate) mod host;
 pub(crate) mod mp3_player;
+pub(crate) mod remote_connections;
 pub(crate) mod tetris;
 
 use crate::{
@@ -24,6 +25,7 @@ use std::{
 };
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct PluginId(pub &'static str);
+pub const REMOTE_CONNECTIONS: PluginId = PluginId("remote_connections");
 pub const CALCULATOR: PluginId = PluginId("calculator");
 pub const TETRIS: PluginId = PluginId("tetris");
 pub const APK_WORKSHOP: PluginId = PluginId("apk_workshop");
@@ -148,6 +150,8 @@ pub(crate) enum Event<'a> {
     },
 }
 pub(crate) enum Effect {
+    RemoteConnected(std::sync::Arc<crate::network::remote::Connection>),
+    RemoteTerminal(crate::network::remote::Profile),
     ApkPreview {
         unicode: bool,
         label: String,
@@ -236,6 +240,8 @@ impl Default for Runtime {
             entries: BTreeMap::new(),
             now: Instant::now(),
         };
+        s.register(Box::<remote_connections::RemoteConnections>::default())
+            .expect("remote connections ID");
         s.register(Box::<apk_workshop::ApkWorkshop>::default())
             .expect("APK Workshop ID");
         s.register(Box::<calculator::CalculatorPlugin>::default())

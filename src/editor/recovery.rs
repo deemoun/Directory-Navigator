@@ -272,7 +272,9 @@ pub fn poll(app: &mut App, now: Instant) -> bool {
                                     s.path(*id),
                                     Record {
                                         text: b.text.clone(),
-                                        path: if e.archive_origin.is_some() {
+                                        path: if e.archive_origin.is_some()
+                                            || e.remote_origin.is_some()
+                                        {
                                             None
                                         } else {
                                             e.path.clone().or_else(|| e.recovery_source.clone())
