@@ -1,5 +1,10 @@
 # Directory Navigator
 
+[![GitHub stars](https://img.shields.io/github/stars/deemoun/Directory-Navigator?style=flat)](https://github.com/deemoun/Directory-Navigator/stargazers)
+[![crates.io version](https://img.shields.io/crates/v/directory-navigator)](https://crates.io/crates/directory-navigator)
+[![crates.io downloads](https://img.shields.io/crates/d/directory-navigator)](https://crates.io/crates/directory-navigator)
+[![MIT license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
 [English](README.md) | [Русский](README.ru.md)
 
 A modern terminal file manager built in **Rust with Turbo Vision**, inspired by

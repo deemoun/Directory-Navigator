@@ -1,5 +1,10 @@
 # Directory Navigator
 
+[![Звёзды GitHub](https://img.shields.io/github/stars/deemoun/Directory-Navigator?style=flat)](https://github.com/deemoun/Directory-Navigator/stargazers)
+[![Версия на crates.io](https://img.shields.io/crates/v/directory-navigator)](https://crates.io/crates/directory-navigator)
+[![Загрузки с crates.io](https://img.shields.io/crates/d/directory-navigator)](https://crates.io/crates/directory-navigator)
+[![Лицензия MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
 [English](README.md) | [Русский](README.ru.md)
 
 Современный терминальный файловый менеджер на **Rust и Turbo Vision**, вдохновлённый
