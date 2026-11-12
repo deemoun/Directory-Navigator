@@ -474,3 +474,113 @@ fn debian_policy_rejects_publication_automatic_triggers_and_missing_package_test
     }
     Ok(())
 }
+
+fn assert_ppa_artifacts_policy(text: &str) {
+    let text = text.replace("\r\n", "\n");
+    let events = text.split_once("\non:\n").unwrap().1;
+    let events = events.split_once("\npermissions:\n").unwrap().0;
+    let events = events
+        .lines()
+        .filter(|line| line.starts_with("  ") && !line.starts_with("   "))
+        .collect::<Vec<_>>();
+    assert_eq!(events, ["  workflow_dispatch:"]);
+    for required in [
+        "contents: read",
+        "persist-credentials: false",
+        "ref: ${{ github.sha }}",
+        "      maintainer:\n",
+        "        required: true\n",
+        "PPA_MAINTAINER: ${{ inputs.maintainer }}",
+        "PPA_REVISION: ${{ inputs.revision }}",
+        "package_ppa.deb.maintainer(",
+        "package_ppa.package_version(",
+        "rustc-1.97 cargo-1.97",
+        "python3 scripts/package_ppa.py",
+        "--maintainer \"$PPA_MAINTAINER\"",
+        "--revision \"$PPA_REVISION\"",
+        "os: ubuntu-24.04\n            arch: amd64",
+        "os: ubuntu-24.04-arm\n            arch: arm64",
+        "runs-on: ${{ matrix.os }}",
+        "needs: source",
+        "--network none",
+        "target=/input,readonly",
+        "package_deb.smoke(",
+        "needs: [source, test]",
+        "name: dn-ppa-source-candidate",
+        "name: dn-ppa-source-noble",
+        "name: dn-ppa-validation-${{ matrix.arch }}",
+        "target/ppa-upload/*.dsc\n",
+        "target/ppa-upload/*.orig.tar.xz\n",
+        "target/ppa-upload/*.debian.tar.xz\n",
+        "target/ppa-upload/*_source.changes\n",
+        "target/ppa-upload/*_source.buildinfo\n",
+        "target/ppa-upload/SHA256SUMS\n",
+        "source/*.dsc\n",
+        "source/*.orig.tar.xz\n",
+        "source/*.debian.tar.xz\n",
+        "source/*_source.changes\n",
+        "source/*_source.buildinfo\n",
+        "source/SHA256SUMS\n",
+        "sha256sum --check SHA256SUMS",
+        "if-no-files-found: error",
+        "retention-days: 30",
+    ] {
+        assert!(
+            text.contains(required),
+            "Missing PPA requirement: {required}"
+        );
+    }
+    for forbidden in [
+        "contents: write",
+        "write-all",
+        "persist-credentials: true",
+        "secrets.",
+        "dput ",
+        "debsign ",
+        "cargo publish",
+        "git push",
+        "git tag",
+        "gh release",
+        "softprops/action-gh-release",
+        "ncipollo/release-action",
+        "--privileged",
+        "continue-on-error: true",
+        "if: always()\n    runs-on:",
+    ] {
+        assert!(
+            !text.contains(forbidden),
+            "Unexpected PPA capability: {forbidden}"
+        );
+    }
+}
+
+#[test]
+fn ppa_workflow_validates_both_architectures_before_saving_source() -> io::Result<()> {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(".github/workflows/ppa.yml");
+    for variant in line_ending_variants(&fs::read_to_string(path)?.replace("\r\n", "\n")) {
+        assert_ppa_artifacts_policy(&variant);
+    }
+    Ok(())
+}
+
+#[test]
+fn ppa_policy_rejects_uploads_automatic_triggers_and_unvalidated_artifacts() -> io::Result<()> {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(".github/workflows/ppa.yml");
+    let text = fs::read_to_string(path)?.replace("\r\n", "\n");
+    for mutation in [
+        text.replacen("contents: read", "contents: write", 1),
+        text.replacen("  workflow_dispatch:", "  push:\n  workflow_dispatch:", 1),
+        text.replace("needs: [source, test]", "needs: source"),
+        text.replace("--network none", ""),
+        text.replace("ubuntu-24.04-arm", "ubuntu-24.04"),
+        text.replace("package_deb.smoke(", "disabled_smoke("),
+        text.replace("source/*.dsc", "source/*"),
+        format!("{text}\n# dput ppa:owner/name source.changes\n"),
+    ] {
+        assert_ne!(mutation, text);
+        for variant in line_ending_variants(&mutation) {
+            assert!(std::panic::catch_unwind(|| assert_ppa_artifacts_policy(&variant)).is_err());
+        }
+    }
+    Ok(())
+}

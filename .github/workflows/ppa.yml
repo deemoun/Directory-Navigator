@@ -1,0 +1,198 @@
+name: Build PPA source package
+run-name: PPA source package (revision ${{ inputs.revision }})
+
+on:
+  workflow_dispatch:
+    inputs:
+      maintainer:
+        description: 'Public maintainer identity: Name <email> matching your signing key'
+        required: true
+        type: string
+      revision:
+        description: 'Positive PPA packaging revision'
+        required: true
+        default: '1'
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ppa-source-${{ github.repository }}-${{ github.ref }}-${{ inputs.revision }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  CARGO_TERM_COLOR: always
+  PPA_MAINTAINER: ${{ inputs.maintainer }}
+  PPA_REVISION: ${{ inputs.revision }}
+
+jobs:
+  source:
+    name: Generate unsigned Noble source package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Validate inputs
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          import sys
+          sys.path.insert(0, 'scripts')
+          import package_ppa
+          package_ppa.deb.maintainer(os.environ['PPA_MAINTAINER'])
+          package_ppa.package_version(package_ppa.deb.metadata(Path.cwd()), os.environ['PPA_REVISION'], 'noble')
+          PY
+          echo "SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)" >> "$GITHUB_ENV"
+      - name: Install source packaging tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential debhelper devscripts dpkg-dev lintian pkg-config libasound2-dev rustc-1.97 cargo-1.97
+          mkdir -p "$RUNNER_TEMP/ppa-toolchain"
+          for tool in cargo rustc rustdoc; do
+            ln -s "/usr/bin/$tool-1.97" "$RUNNER_TEMP/ppa-toolchain/$tool"
+          done
+          echo "$RUNNER_TEMP/ppa-toolchain" >> "$GITHUB_PATH"
+      - name: Test packaging and release helpers
+        run: python3 -m unittest discover -s scripts -p 'test_*.py'
+      - name: Generate and validate unsigned source package
+        env:
+          RUSTC: /usr/bin/rustc-1.97
+          RUSTDOC: /usr/bin/rustdoc-1.97
+        run: |
+          python3 scripts/package_ppa.py \
+            --maintainer "$PPA_MAINTAINER" \
+            --revision "$PPA_REVISION"
+          bundles=(target/ppa/*/SHA256SUMS)
+          test "${#bundles[@]}" -eq 1
+          cd "$(dirname "${bundles[0]}")"
+          sha256sum --check SHA256SUMS
+          cd "$GITHUB_WORKSPACE"
+          mkdir -p target/ppa-upload
+          shopt -s nullglob
+          files=(target/ppa/*/*.dsc target/ppa/*/*.orig.tar.xz target/ppa/*/*.debian.tar.xz target/ppa/*/*_source.changes target/ppa/*/*_source.buildinfo target/ppa/*/SHA256SUMS)
+          cp -- "${files[@]}" target/ppa-upload/
+          cd target/ppa-upload
+          sha256sum --check SHA256SUMS
+      - name: Save candidate source for native validation
+        uses: actions/upload-artifact@v7
+        with:
+          name: dn-ppa-source-candidate
+          path: |
+            target/ppa-upload/*.dsc
+            target/ppa-upload/*.orig.tar.xz
+            target/ppa-upload/*.debian.tar.xz
+            target/ppa-upload/*_source.changes
+            target/ppa-upload/*_source.buildinfo
+            target/ppa-upload/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 2
+          compression-level: 0
+
+  test:
+    name: Validate PPA on ${{ matrix.arch }}
+    needs: source
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            arch: amd64
+          - os: ubuntu-24.04-arm
+            arch: arm64
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v8
+        with:
+          name: dn-ppa-source-candidate
+          path: ${{ runner.temp }}/ppa-source
+      - name: Build clean Noble validation image
+        run: docker build --tag dn-ppa-test --file .github/scripts/ppa-test.Dockerfile .github/scripts
+      - name: Build and test extracted sources offline
+        env:
+          DEB_ARCH: ${{ matrix.arch }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/ppa-results"
+          chmod 0777 "$RUNNER_TEMP/ppa-results"
+          docker run --rm --network none \
+            --mount "type=bind,source=$RUNNER_TEMP/ppa-source,target=/input,readonly" \
+            --mount "type=bind,source=$RUNNER_TEMP/ppa-results,target=/out" \
+            --mount "type=bind,source=$GITHUB_WORKSPACE/.github/scripts/test-ppa.sh,target=/test-ppa.sh,readonly" \
+            dn-ppa-test bash /test-ppa.sh "$DEB_ARCH" 2>&1 | tee "$RUNNER_TEMP/ppa-results/build.log"
+      - name: Test package installation and lifecycle
+        env:
+          DEB_ARCH: ${{ matrix.arch }}
+        run: |
+          python3 - <<'PY' 2>&1 | tee "$RUNNER_TEMP/ppa-results/install.log"
+          import os
+          from pathlib import Path
+          import sys
+          sys.path.insert(0, 'scripts')
+          import package_deb
+          import package_ppa
+          arch = os.environ['DEB_ARCH']
+          app_version = package_deb.metadata(Path.cwd())
+          version = package_ppa.package_version(app_version, os.environ['PPA_REVISION'], 'noble')
+          packages = list((Path(os.environ['RUNNER_TEMP']) / 'ppa-results').glob('*.deb'))
+          if len(packages) != 1:
+              raise ValueError('Expected exactly one binary test package')
+          if package_deb.run(['dpkg-deb', '--field', packages[0], 'Version']) != version:
+              raise ValueError('Binary package version differs from the source upload')
+          if package_deb.run(['dpkg-deb', '--field', packages[0], 'Maintainer']) != os.environ['PPA_MAINTAINER']:
+              raise ValueError('Binary package maintainer differs from the workflow input')
+          package_deb.smoke(packages[0], arch, version, app_version, 'ubuntu:24.04')
+          PY
+      - name: Save validation logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: dn-ppa-validation-${{ matrix.arch }}
+          path: ${{ runner.temp }}/ppa-results/*.log
+          if-no-files-found: warn
+          retention-days: 30
+
+  artifacts:
+    name: Save validated unsigned source package
+    needs: [source, test]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: dn-ppa-source-candidate
+          path: source
+      - name: Verify final checksums
+        working-directory: source
+        run: sha256sum --check SHA256SUMS
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dn-ppa-source-noble
+          path: |
+            source/*.dsc
+            source/*.orig.tar.xz
+            source/*.debian.tar.xz
+            source/*_source.changes
+            source/*_source.buildinfo
+            source/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0

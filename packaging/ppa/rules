@@ -1,0 +1,33 @@
+#!/usr/bin/make -f
+
+# Use Noble's versioned toolchain, isolated Cargo state and vendored sources.
+export RUSTC = /usr/bin/rustc-1.97
+export RUSTDOC = /usr/bin/rustdoc-1.97
+export CARGO_HOME = $(CURDIR)/debian/cargo-home
+export CARGO_TARGET_DIR = $(CURDIR)/target
+export CARGO_NET_OFFLINE = true
+export CARGO_INCREMENTAL = 0
+export CARGO_PROFILE_DEV_DEBUG = 0
+export CARGO_PROFILE_TEST_DEBUG = 0
+CARGO = /usr/bin/cargo-1.97
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	$(RUSTC) --version
+	$(CARGO) --version
+
+override_dh_auto_build:
+	$(CARGO) build --release --frozen --bin dn
+	./target/release/dn --version
+
+override_dh_auto_test:
+ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
+	python3 -m unittest discover -s scripts -p 'test_*.py'
+	$(CARGO) test --frozen
+	$(CARGO) check --frozen --no-default-features
+endif
+
+override_dh_auto_clean:
+	rm -rf target debian/cargo-home

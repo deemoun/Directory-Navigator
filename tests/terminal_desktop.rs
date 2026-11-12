@@ -3,6 +3,7 @@
 #[path = "support/pty.rs"]
 pub mod pty;
 use pty::Session;
+mod support;
 use std::{fs, io};
 
 #[test]
@@ -1906,6 +1907,62 @@ fn network_live_loopback_rates_and_switching_restore_terminal() -> io::Result<()
                 && s.text().contains(loopback_name)
         })?;
         s.send(b"\x1b", "close live rates", |s| s.command_prompt_active())?;
+        s.finish()?;
+    }
+    Ok(())
+}
+
+#[test]
+fn quick_directories_double_click_navigates_and_restores_terminal() -> io::Result<()> {
+    use dn::localization::Language;
+    for language in [Language::English, Language::Russian] {
+        let fixture = support::Fixture::new("bookmark-mouse-target")?.canonicalized()?;
+        let destination = fixture.0.join("inside");
+        fs::create_dir(&destination)?;
+        fs::write(destination.join("hit.txt"), "private fixture")?;
+        let bookmark = dn::bookmarks::encode(&destination);
+        let preferences = format!(
+            "[regional]\nlanguage='{}'\n[bookmarks]\n2='{bookmark}'\n",
+            language.key()
+        );
+        let mut s = Session::with_preferences("bookmark-double-click", &preferences)?;
+        s.wait("manager ready", |s| {
+            s.manager_document_ready()
+                && s.command_prompt_active()
+                && s.text().contains("item-000.")
+                && fs::read_to_string(s.root.join("settings/dn/diagnostics.txt")).is_ok_and(
+                    |state| {
+                        state
+                            .lines()
+                            .any(|line| line == "panels_loading=[false, false]")
+                    },
+                )
+        })?;
+        if language == Language::Russian {
+            s.resize(100, 32)?;
+        }
+        let title = language.text("Quick directories");
+        s.send(b"\x1bpq\r", "bookmarks opened", |s| {
+            s.text().contains(title) && s.text().matches(language.text("<empty>")).count() == 8
+        })?;
+        let text = s.text();
+        let (y, line) = text
+            .lines()
+            .enumerate()
+            .find(|(_, line)| line.contains("2  ") && line.contains("inside"))
+            .ok_or_else(|| io::Error::other("Second bookmark row missing"))?;
+        let byte = line.find("2  ").unwrap() + 3;
+        let x = unicode_width::UnicodeWidthStr::width(&line[..byte]);
+        let click = format!("\x1b[<0;{};{}M\x1b[<0;{};{}m", x + 1, y + 1, x + 1, y + 1);
+        s.send(
+            format!("{click}{click}").as_bytes(),
+            "double-click opened bookmark",
+            |s| {
+                !s.text().contains(title)
+                    && s.text().contains("hit.txt")
+                    && s.command_prompt_active()
+            },
+        )?;
         s.finish()?;
     }
     Ok(())

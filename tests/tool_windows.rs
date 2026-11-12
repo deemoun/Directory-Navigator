@@ -640,3 +640,136 @@ fn quick_directories_completion_cannot_close_a_reopened_window_or_steal_focus() 
     assert_eq!(a.desktop.active().id, editor);
     Ok(())
 }
+
+#[test]
+fn quick_directories_double_click_opens_the_clicked_row_in_its_original_panel() -> io::Result<()> {
+    use dn::{
+        localization::Language,
+        navigation_tools::{self, Action},
+    };
+    for (panel, language, width, height) in [
+        (0, Language::English, 80, 25),
+        (1, Language::Russian, 100, 32),
+    ] {
+        let f = support::Fixture::new("bookmarks-double-click")?.canonicalized()?;
+        let child = f.0.join("Ёжик");
+        std::fs::create_dir(&child)?;
+        let mut a = f.app()?;
+        a.config.language = language;
+        a.active = panel;
+        a.config.bookmarks[1] = Some(child.clone());
+        navigation_tools::open_bookmarks(&mut a);
+        let owner = a.desktop.active().id;
+        support::draw(&mut a, width, height)?;
+        a.active = 1 - panel;
+        support::click(&mut a, Target::Navigation(Action::Slot(1)));
+        assert_eq!(a.panels[panel].path, f.0);
+        assert!(!a.panels[panel].loading, "A single click only selects");
+        assert!(a.desktop.contains(owner));
+        support::click(&mut a, Target::Navigation(Action::Slot(1)));
+        wait(&mut a, |a| !a.panels[panel].loading);
+        assert_eq!(a.panels[panel].path, child);
+        assert_eq!(a.panels[1 - panel].path, f.0);
+        assert!(!a.desktop.contains(owner));
+        assert_eq!(a.desktop.active().id, WindowId::MANAGER);
+    }
+    Ok(())
+}
+
+#[test]
+fn quick_directories_double_click_requires_consecutive_matching_bookmark_clicks() -> io::Result<()>
+{
+    use dn::navigation_tools::{self, Action, Modal};
+    for interruption in [
+        "row", "keyboard", "expired", "path", "blank", "scroll", "set", "reopen",
+    ] {
+        let f = support::Fixture::new("bookmarks-click-reset")?.canonicalized()?;
+        let first = f.0.join("first");
+        let second = f.0.join("second");
+        std::fs::create_dir(&first)?;
+        std::fs::create_dir(&second)?;
+        let mut a = f.app()?;
+        a.config.bookmarks[0] = Some(first.clone());
+        a.config.bookmarks[1] = Some(second.clone());
+        navigation_tools::open_bookmarks(&mut a);
+        support::draw(&mut a, 100, 32)?;
+        support::click(&mut a, Target::Navigation(Action::Slot(0)));
+        match interruption {
+            "row" => support::click(&mut a, Target::Navigation(Action::Slot(1))),
+            "keyboard" => key(&mut a, K::Down, M::NONE),
+            "expired" => {
+                if let Some(Modal::Bookmarks {
+                    last_click: Some((_, time)),
+                    ..
+                }) = a.navigation_dialog_mut()
+                {
+                    *time = Instant::now() - Duration::from_millis(401);
+                } else {
+                    panic!("First click must be tracked");
+                }
+            }
+            "path" => a.config.bookmarks[0] = Some(second),
+            "blank" | "scroll" => navigation_tools::mouse(
+                &mut a,
+                MouseEvent {
+                    kind: if interruption == "scroll" {
+                        E::ScrollDown
+                    } else {
+                        E::Down(B::Left)
+                    },
+                    column: 0,
+                    row: 0,
+                    modifiers: M::NONE,
+                },
+                None,
+            ),
+            "set" => navigation_tools::action(&mut a, Action::Set),
+            "reopen" => {
+                navigation_tools::action(&mut a, Action::Close);
+                navigation_tools::open_bookmarks(&mut a);
+                support::draw(&mut a, 100, 32)?;
+            }
+            _ => unreachable!(),
+        }
+        support::click(&mut a, Target::Navigation(Action::Slot(0)));
+        assert!(
+            !a.panels[0].loading,
+            "Interrupted clicks must only select: {interruption}"
+        );
+        assert_eq!(a.panels[0].path, f.0, "{interruption}");
+        assert!(a.navigation_dialog().is_some(), "{interruption}");
+    }
+    Ok(())
+}
+
+#[test]
+fn quick_directories_double_click_retains_empty_and_inaccessible_bookmarks() -> io::Result<()> {
+    use dn::navigation_tools::{self, Action, Modal};
+    for missing in [false, true] {
+        let f = support::Fixture::new("bookmarks-double-failure")?.canonicalized()?;
+        let mut a = f.app()?;
+        if missing {
+            a.config.bookmarks[0] = Some(f.0.join("missing"));
+        }
+        navigation_tools::open_bookmarks(&mut a);
+        let owner = a.desktop.active().id;
+        support::draw(&mut a, 80, 25)?;
+        support::click(&mut a, Target::Navigation(Action::Slot(0)));
+        support::click(&mut a, Target::Navigation(Action::Slot(0)));
+        wait(&mut a, |a| !a.panels[0].loading);
+        assert!(a.desktop.contains(owner));
+        assert_eq!(a.panels[0].path, f.0);
+        assert_eq!(a.panels[1].path, f.0);
+        a.desktop.activate(owner);
+        a.sync_modals();
+        navigation_tools::action(&mut a, Action::Clear);
+        assert!(matches!(
+            a.navigation_dialog(),
+            Some(Modal::Bookmarks {
+                last_click: None,
+                ..
+            })
+        ));
+    }
+    Ok(())
+}

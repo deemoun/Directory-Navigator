@@ -164,3 +164,167 @@ automatic admission to official Debian/Ubuntu repositories.
 References: [cargo-deb](https://github.com/kornelski/cargo-deb),
 [Debian shared-library dependency policy](https://www.debian.org/doc/debian-policy/ch-sharedlibs.html),
 [Launchpad PPA requirements](https://ubuntu.com/docs/launchpad/user/reference/packaging/ppas/ppa/).
+
+## Launchpad PPA source packages (Ubuntu 24.04)
+
+The source-package helper targets `ppa:deemoun/directory-navigator` with a single
+source upload for **amd64 and arm64**. Enable both architectures on the PPA.
+The target suite is **noble**. DN 1.1.10, revision 1, produces packaging version
+`1.1.10-1~ppa1~noble1`; `--revision 2` produces `1.1.10-1~ppa2~noble1` for a
+packaging correction. The application version and dependency lockfile are retained.
+
+Noble's `rustc-1.97` and `cargo-1.97` packages provide Rust 1.97.1, required by
+current archive dependencies. Enable Noble's `universe`, `noble-updates` and
+`noble-security` repositories. The Debian rules explicitly invoke
+`/usr/bin/rustc-1.97` and `/usr/bin/cargo-1.97`, retain default audio support and
+use `--frozen`, a package-local Cargo home and vendored dependency sources.
+
+### Prepare on macOS
+
+Python 3.11+, Git and a working Rust/Cargo installation are required. From the
+repository, prepare the sources before choosing the public maintainer identity:
+
+```sh
+python3 scripts/package_ppa.py --prepare-only
+```
+
+Add `--offline` when all locked crate sources are already cached. Preparation
+otherwise downloads the locked dependencies. No signing key is read by this
+helper. Without `--maintainer`, the staged `debian/control` and `debian/changelog`
+use `@MAINTAINER@`. Supply the identity when generating the upload files.
+Its output is under `target/ppa/1.1.10-1~ppa1~noble1/`:
+
+- `directory-navigator-1.1.10/`, including the generated `debian/` directory.
+- `directory-navigator_1.1.10.orig.tar.xz`, containing the source and dependencies.
+- `SHA256SUMS`, covering the original tarball.
+
+Preparation uses the working contents of tracked files from an explicit set of
+source, test, documentation, resource, packaging and workflow directories, plus
+the source-package helper/templates. Untracked application changes must be added
+to the source inventory before preparing a release. Local credentials, build
+outputs and original DOS reference sources are excluded. All generated state
+stays in the ignored `target/` directory. Existing revision outputs are refused.
+
+The original tarball excludes the top-level `debian/` directory, supplied
+separately by the source package. It includes every locked dependency and its
+original license files. `VENDORED_LICENSES.json` records crate versions, license
+expressions, package checksums and license-file paths. `VENDORED_LICENSES.txt`
+collects those notices and is installed with the other package documentation.
+Review that inventory when dependencies change. Vendored file checksums are
+verified against Cargo's metadata, and the original tarball is read back and
+compared with the staged sources. Cargo metadata resolution is also checked for
+both Linux targets using an empty Cargo home and offline mode. This checks source
+completeness; it does not compile Linux binaries.
+
+### Generate the unsigned upload bundle on Ubuntu
+
+On Ubuntu 24.04, install the packaging tools:
+
+```sh
+sudo apt update
+sudo apt install build-essential debhelper devscripts dpkg-dev lintian \
+  python3 gnupg pkg-config libasound2-dev rustc-1.97 cargo-1.97
+```
+
+From a repository checkout, the helper can prepare and generate the complete
+unsigned source upload in one command:
+
+```sh
+python3 scripts/package_ppa.py \
+  --maintainer 'Your Name <your-verified-email@example.org>'
+```
+
+Alternatively, copy the complete macOS-prepared output directory to Ubuntu,
+verify its checksum, and generate from the staged tree. First replace
+`@MAINTAINER@` in the staged `debian/control` and `debian/changelog` with your
+chosen `Name <email>` matching the signing key registered on Launchpad:
+
+```sh
+cd '1.1.10-1~ppa1~noble1'
+sha256sum --check SHA256SUMS
+cd directory-navigator-1.1.10
+dpkg-buildpackage --build=source --no-check-builddeps -sa -us -uc
+cd ..
+lintian --fail-on error directory-navigator_1.1.10-1~ppa1~noble1_source.changes
+```
+
+The helper's Linux mode additionally verifies SHA-256 references in the `.dsc`
+and `_source.changes`, extracts the `.dsc` with `dpkg-source -x`, compares the
+extracted files with the staged source, and runs Lintian. Its `SHA256SUMS` covers
+the unsigned upload artifacts. The bundle contains the `.dsc`, `.orig.tar.xz`,
+`.debian.tar.xz`, `_source.changes` and any referenced `_source.buildinfo`.
+Signing later changes metadata files; regenerate checksums after signing if you
+need checksums for the signed upload.
+
+### Validate native Noble builds
+
+Use a clean native Noble machine or disposable VM/container for **each** of
+amd64 and arm64. Install the declared build dependencies, then extract the `.dsc`
+into a private working directory. Disable network access after dependency
+installation. The vendored sources and fresh package-local Cargo home must
+suffice for the build and tests:
+
+```sh
+dpkg-source -x directory-navigator_1.1.10-1~ppa1~noble1.dsc dn-build
+cd dn-build
+dpkg-buildpackage --build=binary -us -uc
+cd ..
+lintian --fail-on error directory-navigator_1.1.10-1~ppa1~noble1_*.changes
+```
+
+The build runs the portable helper tests, full native Rust suite and
+no-default-features check unless the operator explicitly sets Debian's standard
+`DEB_BUILD_OPTIONS=nocheck`. For release validation, leave that option unset.
+Check the resulting `.deb` architecture, default-audio ALSA dependency and
+`dn --version`. In disposable environments, test installation, upgrade,
+removal, reinstallation and purge. Installing into a container does not validate
+GPM, real-console behavior or audible playback. Record those checks separately.
+
+### Manual GitHub Actions PPA validation
+
+Select **Actions → Build PPA source package → Run workflow** after the packaging
+files and workflow are available on GitHub. Enter the public **maintainer**
+identity as `Name <email>` and a positive **revision** (default `1`). The workflow
+uses the application version from the selected checkout and targets Noble.
+The identity is supplied for that run and embedded in its package metadata.
+
+One source job generates unsigned upload files, verifies their references and
+checksums, extracts the source package and runs Lintian. Native amd64 and arm64
+jobs then build the same source bundle in clean Ubuntu 24.04 containers using
+the versioned Rust 1.97 toolchain. Networking is disabled during compilation and
+the complete package test suite. A separate disposable container tests package
+installation, reinstallation, upgrade, removal and purge.
+
+After both architectures pass, download **dn-ppa-source-noble** from the run's
+artifacts. It contains the unsigned `.dsc`, original/Debian source tarballs,
+`_source.changes`, referenced `_source.buildinfo` and `SHA256SUMS`, retained for
+30 days. **dn-ppa-validation-amd64** and **dn-ppa-validation-arm64** retain build
+and installation logs for 30 days. A **dn-ppa-source-candidate** intermediate
+artifact is retained for two days, including when native validation fails.
+Use the final `dn-ppa-source-noble` artifact for the manual signing step.
+
+The workflow has only `workflow_dispatch` and read-only repository permissions.
+It saves Actions artifacts without accessing signing keys, uploading to
+Launchpad, creating GitHub releases or changing tags.
+
+### Sign and upload manually
+
+After source and binary validation, sign with the full fingerprint of the key
+registered on Launchpad. Run on a machine containing that private key and the
+complete set of generated source upload files:
+
+```sh
+debsign -k YOUR_FINGERPRINT \
+  directory-navigator_1.1.10-1~ppa1~noble1_source.changes
+dput ppa:deemoun/directory-navigator \
+  directory-navigator_1.1.10-1~ppa1~noble1_source.changes
+```
+
+The helper never invokes these commands. Watch acceptance mail and both build
+results at the PPA's package page. Once accepted, a corrected upload needs a new
+packaging revision. The existing binary `.deb` workflow remains a separate manual
+artifact build.
+
+References: [Launchpad source uploads](https://ubuntu.com/docs/launchpad/user/how-to/packaging/ppa-package-upload/),
+[Noble Rust 1.97 packages](https://packages.ubuntu.com/noble-updates/devel/rustc-1.97),
+[Cargo vendoring](https://doc.rust-lang.org/cargo/commands/cargo-vendor.html).

@@ -1,0 +1,16 @@
+Source: directory-navigator
+Section: utils
+Priority: optional
+Maintainer: @MAINTAINER@
+Build-Depends: debhelper-compat (= 13), rustc-1.97 (>= 1.97.1), cargo-1.97 (>= 1.97.1), gcc, g++, make, pkg-config, libasound2-dev, python3 (>= 3.11)
+Standards-Version: 4.7.0
+Rules-Requires-Root: no
+Homepage: https://github.com/deemoun/Directory-Navigator
+
+Package: directory-navigator
+Architecture: amd64 arm64
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Suggests: gpm, openssh-client, xdg-utils
+Description: terminal file manager inspired by DOS Navigator
+ A dual-pane terminal file manager with movable windows, text editing and
+ viewing, archive browsing, music playback and remote file access.

@@ -1,5 +1,6 @@
 use crate::{app::App, dialog, menu};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+use std::{path::PathBuf, time::Instant};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Action {
     Slot(usize),
@@ -23,6 +24,7 @@ pub enum Modal {
         slot: usize,
         focus: usize,
         pending: Option<(std::path::PathBuf, u64)>,
+        last_click: Option<((usize, Option<PathBuf>), Instant)>,
     },
     Filter {
         field: String,
@@ -49,6 +51,7 @@ pub fn open_bookmarks(app: &mut App) {
         slot: 0,
         focus: 0,
         pending: None,
+        last_click: None,
     }));
 }
 pub fn open_filter(app: &mut App) {
@@ -66,6 +69,7 @@ pub fn open_filter(app: &mut App) {
     }));
 }
 pub fn assign(app: &mut App, slot: usize) {
+    reset_click(app);
     if !crate::archive::require_native(app) {
         return;
     }
@@ -126,6 +130,7 @@ pub(crate) fn poll(app: &mut App) -> bool {
     true
 }
 pub fn action(app: &mut App, action: Action) {
+    reset_click(app);
     let slot = match app.navigation_dialog() {
         Some(Modal::Bookmarks { slot, .. }) => *slot,
         _ => 0,
@@ -177,6 +182,7 @@ pub fn paste(app: &mut App, text: &str) {
     }
 }
 pub fn key(app: &mut App, key: KeyEvent) {
+    reset_click(app);
     if crate::dialog_controls::key(app, key, crate::focus::Focus::Navigation) {
         return;
     }
@@ -215,8 +221,48 @@ pub fn key(app: &mut App, key: KeyEvent) {
 }
 pub fn mouse(app: &mut App, event: MouseEvent, target: Option<crate::mouse::Target>) {
     if event.kind == MouseEventKind::Down(MouseButton::Left) {
+        if let Some(crate::mouse::Target::Navigation(Action::Slot(slot))) = target {
+            if let Some(path) = app.config.bookmarks.get(slot) {
+                let identity = (slot, path.clone());
+                let now = Instant::now();
+                let double = match app.navigation_dialog() {
+                    Some(Modal::Bookmarks { last_click, .. }) => {
+                        crate::list_state::ClickTracker::STRICT.matches(
+                            last_click.as_ref(),
+                            &identity,
+                            now,
+                        )
+                    }
+                    _ => false,
+                };
+                action(app, Action::Slot(slot));
+                if double {
+                    action(app, Action::Go);
+                } else if let Some(Modal::Bookmarks { last_click, .. }) =
+                    app.navigation_dialog_mut()
+                {
+                    *last_click = Some((identity, now));
+                }
+                return;
+            }
+        }
+        reset_click(app);
         if let Some(crate::mouse::Target::Navigation(command)) = target {
             action(app, command);
         }
+    } else if matches!(
+        event.kind,
+        MouseEventKind::Down(_)
+            | MouseEventKind::Drag(_)
+            | MouseEventKind::ScrollUp
+            | MouseEventKind::ScrollDown
+    ) {
+        reset_click(app);
+    }
+}
+
+fn reset_click(app: &mut App) {
+    if let Some(Modal::Bookmarks { last_click, .. }) = app.navigation_dialog_mut() {
+        *last_click = None;
     }
 }
