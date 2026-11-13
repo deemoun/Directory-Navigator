@@ -1,14 +1,94 @@
 # Directory Navigator
 
-## Current status — stable 1.1.10
+## Current status — stable 1.1.11
 
-Directory Navigator 1.1.10 was published on **10 November 2026** and is available
-on [crates.io](https://crates.io/crates/directory-navigator/1.1.10). The crate is
+Directory Navigator 1.1.11 was published on **12 November 2026** and is available
+on [crates.io](https://crates.io/crates/directory-navigator/1.1.11). The crate is
 `directory-navigator`; the installed executable remains `dn`. macOS, Linux and
 Windows remain supported. Version 1.1.9 was the first stable release.
 
 See the [English README](README.md), [Russian README](README.ru.md) and
 [user guide](docs/USER_GUIDE.md) for installation, controls, safeguards and limits.
+
+### Transfer and selection fixes in 1.1.11
+
+- Publication follows mounted-volume capabilities rather than filesystem names.
+  Native capability queries or bounded private probes select exclusive rename,
+  hard-link publication or exclusive-create compatibility copying. Results are
+  cached by native volume identity for the current transfer; changed parents are
+  revalidated. Unknown capabilities retain staging.
+- New files on confirmed compatibility volumes are copied directly to exclusively
+  created destinations, avoiding the previous second destination payload write.
+  Read-back verification is mandatory on this path, even with Verify disk writes
+  unchecked. Approved replacements still use staging and conflict checks.
+- Cancellation and ordinary failures clean up incomplete output only while DN
+  still owns it. Source removal retains the existing verified move/batch guards.
+  Completed publications survive later failures; a crash or power loss can leave
+  a new compatibility output incomplete. A directory-sync failure after
+  publication retains completed output and stops source cleanup.
+- Explicitly unsupported optional Unix permissions, timestamps and extended
+  attributes are tolerated on macOS/Linux. Permission, read-only, space and I/O
+  failures are not treated as capability evidence. An unsupported hard link does
+  not disguise an invalid or ambiguous rename as justification for direct copying.
+- Redundant synchronization was reduced. Payload bytes count once, publication
+  retries do not inflate transfer speed, and verification has its own phase.
+  Copy errors identify the failing operation and destination.
+- Windows directory guards now use native volume/file IDs, with a regression
+  forcing identical creation times on different directories. Timestamp equality
+  is not accepted as proof of directory identity.
+- Shift+arrows marks traversed pane entries, including column navigation, while
+  retaining existing marks and excluding the parent row. Quick directories also
+  opens entries on double-click through its existing Go To action.
+- English/Russian transfer help and the guide describe the compatibility path.
+  No dependencies or configuration format changed. Rust/Clippy 1.100 compatibility
+  fixes simplify a windowing boolean guard and three Tetris fixture loops without
+  changing behavior, assertions or warning policy.
+
+### 1.1.11 publication and validation
+
+- `cargo publish --locked` succeeded from a clean working tree. The crates.io API
+  confirmed 1.1.11 is published and not yanked. Cargo publication itself did not
+  push Git changes or trigger workflows.
+- Package preparation and the publish dry run compiled the source package. Its
+  428 files included transfer sources/tests, embedded fixtures, locales, guides
+  and license notices; generated test outputs and build products were excluded.
+  The rebuilt release executable reported `Directory Navigator 1.1.11`.
+- The completed [1.1.11 release CI run](https://github.com/deemoun/Directory-Navigator/actions/runs/43354794041)
+  succeeded for commit `00a3f597725c7cebd713bffdb4658666f8d95c2b`.
+  All five build jobs passed formatting, all-target Clippy with warnings denied,
+  tests, no-audio tests, release builds and version/package verification:
+  macOS ARM64/Intel, Linux ARM64/x86_64 and Windows x86_64 MSVC. Release-helper,
+  workflow-policy and complete-release-asset checks also passed. This existing
+  run was inspected read-only; this documentation update did not start CI.
+- Local transfer development passed the full native suite and release-terminal
+  scenarios on macOS ARM64/APFS. After the final CI lint cleanup, the affected
+  windowing/Tetris suites and a rebuilt-release desktop/dialog walkthrough passed.
+  Terminal restoration was checked. These are preparation-stage results, not a
+  newly aggregated test count for this documentation edit.
+- Matching Rust 1.100 all-target Clippy checks passed locally for macOS ARM64 and
+  by cross-compilation for Linux ARM64/x86_64 and Windows x86_64. Local validation
+  also included no-default-features checks/tests, release helpers, workflow policy,
+  formatting and diff checks. Cross-compilation is distinct from the native
+  platform execution performed by the release CI jobs.
+- Physical FAT32/exFAT/NTFS copy and performance checks were unavailable locally;
+  macOS denied the private USB write fixture. CI success does not establish
+  removable-drive performance, every filesystem/driver combination, audible
+  playback or real Linux virtual-console behavior. Earlier user-reported platform
+  tests remain separate historical evidence.
+
+#### Local compatibility-path benchmark
+
+Private APFS fixtures compared the modeled previous two-pass algorithm with
+forced direct compatibility copying. Both paths verified data; times are medians
+of three interleaved runs, with no timing assertions in ordinary CI tests.
+
+| Workload | Two-pass baseline | Direct compatibility |
+| --- | ---: | ---: |
+| One 64 MiB file | 0.086 s | 0.046 s |
+| 256 files of 4 KiB each | 3.526 s | 1.881 s |
+
+Destination payload writes fell from two copies to one. These are local APFS
+measurements, not physical USB, exFAT or NTFS throughput claims.
 
 ### Networking in 1.1.10
 
@@ -22,7 +102,7 @@ SSH hands off to installed OpenSSH. FTP publication is server-dependent; SFTP
 replacement requires atomic rename support. Direct server-to-server copying and
 remote session restoration remain outside this implementation. Saved profiles
 support selection, editing/renaming and confirmed deletion. These capabilities
-are included in the published 1.1.10 crate.
+were introduced in 1.1.10 and remain available in 1.1.11.
 
 ### Directory-tree analysis in 1.1.10
 
@@ -61,7 +141,7 @@ are included in the published 1.1.10 crate.
   Linux virtual-console support includes GPM input, console-compatible colors
   and locale/font diagnostics; manual system setup can still be required.
 
-### 1.1.10 publication and local validation
+### Historical 1.1.10 publication and local validation
 
 - `cargo publish --locked` completed successfully; the crates.io API confirmed
   version 1.1.10 is published and not yanked. Publication did not push Git changes
@@ -81,7 +161,7 @@ are included in the published 1.1.10 crate.
   Linux ARM64 runtime execution of the corrected PTY case was unavailable locally.
   These local results do not establish a successful five-platform 1.1.10 CI run.
 
-### Local Debian packaging tooling (after publication)
+### Local Debian packaging tooling (introduced after 1.1.10 publication)
 
 `scripts/package_deb.py` wraps cargo-deb for native Debian/Ubuntu amd64 and arm64
 builds, with locked Cargo builds, dependency/asset checks, Lintian and optional
@@ -109,7 +189,7 @@ repository tooling was added after the 1.1.10 crate publication; see the
 - The user separately reported testing the platform binaries. That report is
   distinct from automated CI and the locally exercised runtime scenarios.
 - Counts and platform exclusions in the historical notes below describe their
-  individual development stages, not a fresh 1.1.10 validation run.
+  individual development stages, not a fresh 1.1.11 validation run.
 
 ## Historical implementation and validation notes
 
@@ -1303,8 +1383,13 @@ older increment entries below also record earlier migration stages.
 ## Current limitations and next steps
 
 - There is no transfer restart/resume journal or atomic publication of an entire
-  directory tree. Crashes can leave staging files or completed portions of a
-  transfer. Cancellation retains completed work rather than rolling it back.
+  directory tree. Crashes can leave staging files, completed portions of a
+  transfer or incomplete new compatibility outputs. Cancellation retains completed
+  work rather than rolling it back; cleanup removes only output DN still owns.
+- Filesystem/driver limits still apply, including FAT32's approximately 4 GiB
+  per-file limit. Copying does not explicitly preserve NTFS ACLs or alternate data
+  streams on Windows. Read-back verification and atomic publication do not
+  guarantee power-loss durability on every platform, filesystem or device.
 - Ancestor/entry snapshots detect replacements between operation stages, but
   path-based recursion still has check-to-use races; full descriptor-relative
   traversal remains future hardening. Nesting beyond 512 in discovery is
