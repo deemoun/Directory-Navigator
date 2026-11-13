@@ -70,6 +70,7 @@ pub enum Target {
     PatternField,
     CancelPattern,
     CloseFileInfo,
+    FileInfo(crate::file_info::Action),
     ColumnChoice(usize, crate::columns::ColumnPreset),
     AcceptColumns,
     CancelColumns,
@@ -437,8 +438,10 @@ fn handle_mouse(app: &mut App, event: MouseEvent) {
         match event.kind {
             MouseEventKind::ScrollUp => info.step(-3),
             MouseEventKind::ScrollDown => info.step(3),
-            MouseEventKind::Down(MouseButton::Left) if target == Some(Target::CloseFileInfo) => {
-                app.set_file_info(None)
+            MouseEventKind::Down(MouseButton::Left) => {
+                if let Some(t @ (Target::CloseFileInfo | Target::FileInfo(_))) = target {
+                    crate::dialog_controls::tool_action(app, t);
+                }
             }
             _ => {}
         }

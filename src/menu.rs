@@ -76,6 +76,7 @@ pub enum Action {
     Welcome,
     Plugin(crate::plugins::PluginId),
     AddMp3,
+    SendNearby,
     Settings(SettingsKind),
     Confirmations,
     View(ViewMode),
@@ -273,6 +274,7 @@ pub fn execute(app: &mut App, action: Action) {
             title: " Confirmation policy — read-only ",
             message: "[x] Confirm copy/move destinations\n[x] Confirm Trash / permanent deletion\n[x] Refuse existing destinations\n\nThese safeguards are always enabled.\nDeletion mode: Options → File Manager → Setup.\nEsc cancels an operation; completed items remain.\n\nEnter / Esc: close".into(),
         }),
+        Action::SendNearby => crate::peer::open_send(app),
         Action::AddMp3 => crate::plugins::host::add_mp3(app),
         Action::Plugin(id)=>crate::plugins::host::open(app,id),
         Action::About => app.push_dialog(crate::dialog::Dialog {

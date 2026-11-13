@@ -44,6 +44,7 @@ and modern filesystem handling.
 
 ## What you can do
 
+- Edit Unix permissions or Windows file attributes through File Attributes / Info (Alt+E).
 - Browse two folders side by side, mark files, and copy, move or rename them.
 - Create directories and send files to Trash with confirmation.
 - Find files, compare directories, calculate folder sizes and use bookmarks.
@@ -57,7 +58,7 @@ and modern filesystem handling.
 - Configure file extensions to use DN's viewer/editor or your preferred commands.
 - Classic panel footers show selection totals and available/total volume space.
 - Choose English or Russian, with independent date order and 12/24-hour time.
-- Recall commands through a searchable session history; copy filenames or paths to the internal clipboard.
+- Recall commands through a searchable session history; copy filenames or paths to the system clipboard, with an internal fallback in consoles.
 - Use the calculator, character table and configurable user menus—or play Tetris or Pentix with separate, persistent high scores.
 - Inspect and modify standalone Android APKs with the opt-in **APK Workshop**: manifest/DEX inspection, persistent working projects, asset and manifest edits, unsigned export, optional SDK signing and ADB/logcat. Works without apktool; see [APK Workshop](docs/USER_GUIDE.md#apk-workshop) for supported edits and SDK requirements.
 - Play local **MP3, FLAC, WAV and Ogg Vorbis** files on macOS, Linux and Windows in a DN-style player with a session queue, recursive folder import, track tags and durations, shuffle/repeat, pause, seek and volume. Disabled by default; enable it in Options → Configuration → Plugins, then use Utilities → Add music to player. Audio support is included in default builds. Based on Dos Navigator by RIT Research Labs.
@@ -549,6 +550,29 @@ transfers and automatic connection restoration are not supported. **SSH terminal
 hands the terminal to the installed OpenSSH `ssh` client and restores DN afterward;
 it uses OpenSSH's own host-key checks and credentials. The shell always keeps a
 real local working directory. See the [guide](docs/USER_GUIDE.md#remote-connections).
+
+## Nearby DN transfers
+
+**Utilities → Nearby transfers…** opens a session-only LAN sender/receiver.
+The enabled-by-default plugin starts no networking until **Receive** or
+**Use panel selection** is chosen. **File → Send to nearby DN…** captures visible
+marked files/folders, or the current item. Archive and remote members must first
+be extracted or downloaded.
+
+Choose a receiver, compare the **eight verification digits on both screens**,
+and confirm on both computers. The receiver then reviews the offer and chooses
+an existing local destination. Transfers use direct encrypted QUIC through Iroh,
+without relays, public discovery, port mapping or internet probes. Manual
+connection details can be copied when multicast discovery is blocked; UDP must
+still be allowed between the computers. Names contain only a random session
+identity, not usernames or hostnames.
+
+Transfer Center owns progress, cancellation, conflict prompts and results. Closing
+the receiving window stops discovery and new offers; accepted jobs continue.
+Verification is remembered only for this DN run, and every offer still requires
+approval. One peer session is supported at a time. Links and special files,
+remote browsing and restart/resume are not supported. See the
+[guide](docs/USER_GUIDE.md#nearby-dn-transfers) for bounds and delivery guarantees.
 
 ## License
 

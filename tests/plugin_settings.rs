@@ -78,7 +78,7 @@ fn settings_draft_cancel_commit_disable_live_game_and_reenable_keep_scores() -> 
         .unwrap();
     a.desktop.activate(dn::desktop::WindowId::MANAGER);
     a.open_settings(SettingsKind::Plugins);
-    assert_eq!(a.modals.settings().unwrap().control_count(), 6);
+    assert_eq!(a.modals.settings().unwrap().control_count(), 7);
     key(&mut a, K::Tab);
     key(&mut a, K::Tab);
     key(&mut a, K::Char(' '));
@@ -163,7 +163,7 @@ fn plugins_dialog_localized_native_controls_mouse_keyboard_and_immutable_render(
             key(&mut a, K::BackTab);
             assert_eq!(a.modals.settings().unwrap().cursor, 0);
             key(&mut a, K::BackTab);
-            assert_eq!(a.modals.settings().unwrap().cursor, 7);
+            assert_eq!(a.modals.settings().unwrap().cursor, 8);
             let snap = dn::layout::prepare_window(
                 &mut a,
                 dn::testing::layout::Rect::new(7, 3, 80, 25),
@@ -362,19 +362,20 @@ fn internal_mp3_option_follows_plugin_draft_and_preserves_cancel() -> io::Result
     use dn::plugins::MP3_PLAYER;
     let (_t, mut a) = fixture()?;
     a.open_settings(SettingsKind::Plugins);
+    let music_row = a.modals.settings().unwrap().control_count() - 1;
     draw(&mut a, 80, 25)?;
     assert!(!a
         .mouse
         .regions
         .iter()
-        .any(|(_, t)| *t == Target::Setting(5)));
+        .any(|(_, t)| *t == Target::Setting(music_row)));
     click(&mut a, Target::Setting(1));
     draw(&mut a, 80, 25)?;
     assert_eq!(
         a.mouse
             .regions
             .iter()
-            .any(|(_, t)| *t == Target::Setting(5)),
+            .any(|(_, t)| *t == Target::Setting(music_row)),
         cfg!(all(
             feature = "audio",
             any(
@@ -389,7 +390,7 @@ fn internal_mp3_option_follows_plugin_draft_and_preserves_cancel() -> io::Result
         any(target_os = "macos", target_os = "linux", target_os = "windows")
     ))]
     {
-        click(&mut a, Target::Setting(5));
+        click(&mut a, Target::Setting(music_row));
         assert!(a.modals.settings().unwrap().draft.mp3.play_on_enter);
         click(&mut a, Target::Setting(1));
         draw(&mut a, 80, 25)?;
@@ -397,7 +398,7 @@ fn internal_mp3_option_follows_plugin_draft_and_preserves_cancel() -> io::Result
             .mouse
             .regions
             .iter()
-            .any(|(_, t)| *t == Target::Setting(5)));
+            .any(|(_, t)| *t == Target::Setting(music_row)));
         assert!(a.modals.settings().unwrap().draft.mp3.play_on_enter);
     }
     click(&mut a, Target::CancelSettings);
@@ -411,7 +412,7 @@ fn internal_mp3_option_follows_plugin_draft_and_preserves_cancel() -> io::Result
         draw(&mut a, 80, 25)?;
         click(&mut a, Target::Setting(1));
         draw(&mut a, 80, 25)?;
-        click(&mut a, Target::Setting(5));
+        click(&mut a, Target::Setting(music_row));
         click(&mut a, Target::AcceptSettings);
         assert!(a.config.mp3.play_on_enter && a.config.plugin_enabled(MP3_PLAYER));
     }

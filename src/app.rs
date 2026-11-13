@@ -13,6 +13,7 @@ mod modals;
 mod polling;
 
 pub struct App {
+    pub(crate) peer: crate::peer::State,
     pub(crate) session: crate::session::Runtime,
     #[cfg(target_os = "linux")]
     pub(crate) console_mouse: crate::terminal::gpm::Snapshot,
@@ -35,6 +36,7 @@ pub struct App {
     pub utilities: crate::utilities::Utilities,
     pub file_tools: crate::file_tools::Tools,
     pub editor_clipboard: String,
+    pub clipboard: crate::clipboard::State,
     pub editor_recovery: Option<crate::editor::recovery::Manager>,
     pub editor_search: crate::editor::search::SearchMemory,
     pub desktop: crate::desktop::Desktop,
@@ -71,6 +73,7 @@ impl App {
     pub fn new(path: PathBuf) -> io::Result<Self> {
         let config = Config::default();
         let mut app = Self {
+            peer: Default::default(),
             #[cfg(target_os = "linux")]
             console_mouse: Default::default(),
             session: Default::default(),
@@ -93,6 +96,7 @@ impl App {
             utilities: crate::utilities::Utilities::default(),
             file_tools: crate::file_tools::Tools::default(),
             editor_clipboard: String::new(),
+            clipboard: Default::default(),
             editor_recovery: None,
             editor_search: crate::editor::search::SearchMemory::default(),
             desktop: Default::default(),

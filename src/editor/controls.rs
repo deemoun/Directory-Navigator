@@ -1117,6 +1117,12 @@ pub fn action(app: &mut App, command: EditorAction) {
             editor.modals.set_editor_menu(None);
         }
     }
+    let copied = matches!(command, A::Copy | A::Cut)
+        && app
+            .desktop
+            .active_editor()
+            .and_then(|e| e.buffer.as_ref())
+            .is_some_and(|b| !b.selected().is_empty());
     let previous_preferences = app.config.editor;
     let result = match command {
         A::Submit => submit_prompt(app),
@@ -1144,6 +1150,9 @@ pub fn action(app: &mut App, command: EditorAction) {
         }
         _ => apply(app, command),
     };
+    if copied && result.is_ok() {
+        crate::clipboard::copy(app, app.editor_clipboard.clone());
+    }
     if previous_preferences != app.config.editor {
         for id in app.desktop.document_ids(crate::desktop::WindowKind::Editor) {
             if let Some(editor) = app.desktop.editor_mut(id) {
@@ -1244,8 +1253,7 @@ fn apply(app: &mut App, command: EditorAction) -> Result<(), String> {
         }
         A::Help => editor.modals.set_editor_modal(Some(Modal::Help)),
         A::Paste => {
-            let text = app.editor_clipboard.clone();
-            paste(app, &text);
+            crate::clipboard::paste(app, true);
         }
         _ => {
             if let Some(buffer) = &mut editor.buffer {

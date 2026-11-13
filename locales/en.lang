@@ -189,7 +189,7 @@ System Setup	System Setup
 S~y~stem Information	S~y~stem Information
 S~y~stem Setup...	S~y~stem Setup...
 Tab / ↑↓ choose · Space toggle · Enter OK · Esc Cancel	Tab / ↑↓ choose · Space toggle · Enter OK · Esc Cancel
-Tab panels · Arrows/PgUp/PgDn/Home/End navigate\nAlt+F/U/P/M/O menus · Alt+0 windows · Alt+X exits\nEnter app/dir/archive · Ctrl+Enter OS app · F3 view · F4 edit · BS parent\nIns / Space marks · Ctrl+A all · Ctrl+U clear\n+ / - group · Alt+E info · Alt+K columns\nAlt+F7 quick search · Ctrl+F7 recursive Find\nCtrl+Q quick view · Ctrl+T tree · Alt+F9 Tetris\nCtrl+1–9 bookmarks set · Alt+1–9 go · Alt+Del filter\nCtrl+K calculator · Ctrl+B ASCII · Alt+Y memory\nCtrl+C compare · Alt+L list file\nAlt+BS directories · Alt+PgUp edits / PgDn views\nF2 user menu · Shift+F2 sort · Ctrl+F3 name / F4 ext / F5 date / F6 size\nF5 copy · F6 move · Shift+F6 rename here\nF7 mkdir · F8 Trash/delete · F9 menu · F10 exit\nCtrl+H hidden · Ctrl+L go to · Ctrl+R refresh\nClick row · Ctrl+click mark · Double-click open\nWheel scrolls · Esc cancels dialogs/operations\nType commands · Enter runs · Esc clears · Ctrl+E/X history · Alt+F8 list\nFile menu: Copy names / paths uses internal clipboard\nOptions: File associations configures Enter actions\nOptions: Import DOS settings previews DN.CFG preferences\nColors: white dirs · green exec · cyan source\nMagenta archives · blue links · yellow marks\nTrash by default; File Manager Setup changes mode.\nTransfers ask before replacing files; Ask merges folders.	Tab panels · Arrows/PgUp/PgDn/Home/End navigate\nAlt+F/U/P/M/O menus · Alt+0 windows · Alt+X exits\nEnter app/dir/archive · Ctrl+Enter OS app · F3 view · F4 edit · BS parent\nIns / Space marks · Ctrl+A all · Ctrl+U clear\n+ / - group · Alt+E info · Alt+K columns\nAlt+F7 quick search · Ctrl+F7 recursive Find\nCtrl+Q quick view · Ctrl+T tree · Alt+F9 Tetris\nCtrl+1–9 bookmarks set · Alt+1–9 go · Alt+Del filter\nCtrl+K calculator · Ctrl+B ASCII · Alt+Y memory\nCtrl+C compare · Alt+L list file\nAlt+BS directories · Alt+PgUp edits / PgDn views\nF2 user menu · Shift+F2 sort · Ctrl+F3 name / F4 ext / F5 date / F6 size\nF5 copy · F6 move · Shift+F6 rename here\nF7 mkdir · F8 Trash/delete · F9 menu · F10 exit\nCtrl+H hidden · Ctrl+L go to · Ctrl+R refresh\nClick row · Ctrl+click mark · Double-click open\nWheel scrolls · Esc cancels dialogs/operations\nType commands · Enter runs · Esc clears · Ctrl+E/X history · Alt+F8 list\nFile menu: Copy names / paths uses internal clipboard\nOptions: File associations configures Enter actions\nOptions: Import DOS settings previews DN.CFG preferences\nColors: white dirs · green exec · cyan source\nMagenta archives · blue links · yellow marks\nTrash by default; File Manager Setup changes mode.\nTransfers ask before replacing files; Ask merges folders.
+Tab panels · Arrows/PgUp/PgDn/Home/End navigate\nAlt+F/U/P/M/O menus · Alt+0 windows · Alt+X exits\nEnter app/dir/archive · Ctrl+Enter OS app · F3 view · F4 edit · BS parent\nIns / Space marks · Ctrl+A all · Ctrl+U clear\n+ / - group · Alt+E info · Alt+K columns\nAlt+F7 quick search · Ctrl+F7 recursive Find\nCtrl+Q quick view · Ctrl+T tree · Alt+F9 Tetris\nCtrl+1–9 bookmarks set · Alt+1–9 go · Alt+Del filter\nCtrl+K calculator · Ctrl+B ASCII · Alt+Y memory\nCtrl+C compare · Alt+L list file\nAlt+BS directories · Alt+PgUp edits / PgDn views\nF2 user menu · Shift+F2 sort · Ctrl+F3 name / F4 ext / F5 date / F6 size\nF5 copy · F6 move · Shift+F6 rename here\nF7 mkdir · F8 Trash/delete · F9 menu · F10 exit\nCtrl+H hidden · Ctrl+L go to · Ctrl+R refresh\nClick row · Ctrl+click mark · Double-click open\nWheel scrolls · Esc cancels dialogs/operations\nType commands · Enter runs · Esc clears · Ctrl+E/X history · Alt+F8 list\nFile menu: Copy names / paths uses system clipboard; console fallback\nOptions: File associations configures Enter actions\nOptions: Import DOS settings previews DN.CFG preferences\nColors: white dirs · green exec · cyan source\nMagenta archives · blue links · yellow marks\nTrash by default; File Manager Setup changes mode.\nTransfers ask before replacing files; Ask merges folders.	Tab panels · Arrows/PgUp/PgDn/Home/End navigate\nAlt+F/U/P/M/O menus · Alt+0 windows · Alt+X exits\nEnter app/dir/archive · Ctrl+Enter OS app · F3 view · F4 edit · BS parent\nIns / Space marks · Ctrl+A all · Ctrl+U clear\n+ / - group · Alt+E info · Alt+K columns\nAlt+F7 quick search · Ctrl+F7 recursive Find\nCtrl+Q quick view · Ctrl+T tree · Alt+F9 Tetris\nCtrl+1–9 bookmarks set · Alt+1–9 go · Alt+Del filter\nCtrl+K calculator · Ctrl+B ASCII · Alt+Y memory\nCtrl+C compare · Alt+L list file\nAlt+BS directories · Alt+PgUp edits / PgDn views\nF2 user menu · Shift+F2 sort · Ctrl+F3 name / F4 ext / F5 date / F6 size\nF5 copy · F6 move · Shift+F6 rename here\nF7 mkdir · F8 Trash/delete · F9 menu · F10 exit\nCtrl+H hidden · Ctrl+L go to · Ctrl+R refresh\nClick row · Ctrl+click mark · Double-click open\nWheel scrolls · Esc cancels dialogs/operations\nType commands · Enter runs · Esc clears · Ctrl+E/X history · Alt+F8 list\nFile menu: Copy names / paths uses system clipboard; console fallback\nOptions: File associations configures Enter actions\nOptions: Import DOS settings previews DN.CFG preferences\nColors: white dirs · green exec · cyan source\nMagenta archives · blue links · yellow marks\nTrash by default; File Manager Setup changes mode.\nTransfers ask before replacing files; Ask merges folders.
 Tab width	Tab width
 Terminal	Terminal
 Terminal size	Terminal size
@@ -422,7 +422,7 @@ Automatic (Classic DN)	Automatic (Classic DN)
 Classic DN	Classic DN
 Mac-friendly	Mac-friendly
 Mac-friendly: press Ctrl+O, release, then choose\n1 Help · 2 User · 3 View · 4 Edit · 5 Copy\n6 Move · 7 MkDir · 8 Trash/delete · 9 Menu · 0 Quit\ns Quick search · f Recursive Find · i Info · z Sort\nb Bookmarks · l Filter · e Columns · r Refresh\nh Commands · j Directories · a Edits · v Views\no OS default app · p List file · y Tetris\nk Keyboard settings · u Windows · m Menu\nUp/Down Page · Left/Right First/last entry\nCtrl+A all · Ctrl+U clear · Ctrl+O then Space marks\nEsc or click cancels the prefix; nothing is typed.\nClassic DN keys remain available.\nCommand shortcuts belong to your terminal.\nTrash/delete still requires confirmation.	Mac-friendly: press Ctrl+O, release, then choose\n1 Help · 2 User · 3 View · 4 Edit · 5 Copy\n6 Move · 7 MkDir · 8 Trash/delete · 9 Menu · 0 Quit\ns Quick search · f Recursive Find · i Info · z Sort\nb Bookmarks · l Filter · e Columns · r Refresh\nh Commands · j Directories · a Edits · v Views\no OS default app · p List file · y Tetris\nk Keyboard settings · u Windows · m Menu\nUp/Down Page · Left/Right First/last entry\nCtrl+A all · Ctrl+U clear · Ctrl+O then Space marks\nEsc or click cancels the prefix; nothing is typed.\nClassic DN keys remain available.\nCommand shortcuts belong to your terminal.\nTrash/delete still requires confirmation.
-Mac-friendly: Ctrl+O, release, then digit or letter\n1 Help · 2 Save · 3 Open · 6 Duplicate · 7 Find · 0 Menu\na Save As · w Close · x Quit DN · m Menu · u Windows\nn Next match · p Reverse · r Replace · g Go to line\nCtrl+S Save · Ctrl+F Find · Ctrl+G Go to line\nCtrl+Z/Y Undo/Redo · Ctrl+C/X/V internal clipboard\nTab/Shift+Tab block indent · Ctrl+] matching bracket\nCtrl+O then Left/Right: word movement\nAdd Shift to the arrow to extend selection\nUp/Down Page · , / . Line start/end\nh / e Document start/end · c Clear selection\nEsc or click cancels the prefix. Classic keys still work.\nOpen/Close/Quit protect unsaved changes.\nUnicode / DOS / Windows text, 64 MiB / 1,000,000 lines. F8 Encoding.\nSave As asks before replacing an existing file.\nF5: Markdown preview of unsaved text.	Mac-friendly: Ctrl+O, release, then digit or letter\n1 Help · 2 Save · 3 Open · 6 Duplicate · 7 Find · 0 Menu\na Save As · w Close · x Quit DN · m Menu · u Windows\nn Next match · p Reverse · r Replace · g Go to line\nCtrl+S Save · Ctrl+F Find · Ctrl+G Go to line\nCtrl+Z/Y Undo/Redo · Ctrl+C/X/V internal clipboard\nTab/Shift+Tab block indent · Ctrl+] matching bracket\nCtrl+O then Left/Right: word movement\nAdd Shift to the arrow to extend selection\nUp/Down Page · , / . Line start/end\nh / e Document start/end · c Clear selection\nEsc or click cancels the prefix. Classic keys still work.\nOpen/Close/Quit protect unsaved changes.\nUnicode / DOS / Windows text, 64 MiB / 1,000,000 lines. F8 Encoding.\nSave As asks before replacing an existing file.\nF5: Markdown preview of unsaved text.
+Mac-friendly: Ctrl+O, release, then digit or letter\n1 Help · 2 Save · 3 Open · 6 Duplicate · 7 Find · 0 Menu\na Save As · w Close · x Quit DN · m Menu · u Windows\nn Next match · p Reverse · r Replace · g Go to line\nCtrl+S Save · Ctrl+F Find · Ctrl+G Go to line\nCtrl+Z/Y Undo/Redo · Ctrl+C/X/V system clipboard; internal fallback\nTab/Shift+Tab block indent · Ctrl+] matching bracket\nCtrl+O then Left/Right: word movement\nAdd Shift to the arrow to extend selection\nUp/Down Page · , / . Line start/end\nh / e Document start/end · c Clear selection\nEsc or click cancels the prefix. Classic keys still work.\nOpen/Close/Quit protect unsaved changes.\nUnicode / DOS / Windows text, 64 MiB / 1,000,000 lines. F8 Encoding.\nSave As asks before replacing an existing file.\nF5: Markdown preview of unsaved text.	Mac-friendly: Ctrl+O, release, then digit or letter\n1 Help · 2 Save · 3 Open · 6 Duplicate · 7 Find · 0 Menu\na Save As · w Close · x Quit DN · m Menu · u Windows\nn Next match · p Reverse · r Replace · g Go to line\nCtrl+S Save · Ctrl+F Find · Ctrl+G Go to line\nCtrl+Z/Y Undo/Redo · Ctrl+C/X/V system clipboard; internal fallback\nTab/Shift+Tab block indent · Ctrl+] matching bracket\nCtrl+O then Left/Right: word movement\nAdd Shift to the arrow to extend selection\nUp/Down Page · , / . Line start/end\nh / e Document start/end · c Clear selection\nEsc or click cancels the prefix. Classic keys still work.\nOpen/Close/Quit protect unsaved changes.\nUnicode / DOS / Windows text, 64 MiB / 1,000,000 lines. F8 Encoding.\nSave As asks before replacing an existing file.\nF5: Markdown preview of unsaved text.
 Mac-friendly: press Ctrl+O, release, then choose\n2 Wrap · 3 Close · 7 Find · 0 Quit DN\nf Find · g Go to · n Next match · p Reverse · w Close · u Windows\nUp/Down Page · Left/Right First/last row\nEsc or click cancels the prefix.\nClassic DN keys remain available.\nF5: return to editor preview source; Ctrl+O then m: Markdown/source.	Mac-friendly: press Ctrl+O, release, then choose\n2 Wrap · 3 Close · 7 Find · 0 Quit DN\nf Find · g Go to · n Next match · p Reverse · w Close · u Windows\nUp/Down Page · Left/Right First/last row\nEsc or click cancels the prefix.\nClassic DN keys remain available.\nF5: return to editor preview source; Ctrl+O then m: Markdown/source.
 ^O means Ctrl+O, release, then the next key.\n1 Help · 2 User · 3 View · 4 Edit · 5 Copy\n6 Move · 7 MkDir · 8 Trash · 9 Menu · 0 Quit\ns Quick search · f Find · i Info · z Sort\nb Bookmarks · l Filter · h Commands · k Keyboard\nEditor: a Save As · w Close · r Replace · x Quit\nViewer: 2 Wrap · n Next · p Reverse · w Close\nThe prefix displays a guide for the current screen.\nClassic DN shortcuts remain available.	^O means Ctrl+O, release, then the next key.\n1 Help · 2 User · 3 View · 4 Edit · 5 Copy\n6 Move · 7 MkDir · 8 Trash · 9 Menu · 0 Quit\ns Quick search · f Find · i Info · z Sort\nb Bookmarks · l Filter · h Commands · k Keyboard\nEditor: a Save As · w Close · r Replace · x Quit\nViewer: 2 Wrap · n Next · p Reverse · w Close\nThe prefix displays a guide for the current screen.\nClassic DN shortcuts remain available.
 Classic DN uses F1–F10 and Alt/Ctrl combinations.\nTab switches panels; Insert or Space marks entries.\nF3 View · F4 Edit · F5 Copy · F6 Move\nF7 MkDir · F8 Trash/delete · F9 Menu · F10 Quit\nEditor: F2 Save · F7 Find · F10 Menu\nMac-friendly adds Ctrl+O sequences without Fn/Option.\nDefault: Classic DN. Automatic: Mac on macOS, Classic elsewhere.	Classic DN uses F1–F10 and Alt/Ctrl combinations.\nTab switches panels; Insert or Space marks entries.\nF3 View · F4 Edit · F5 Copy · F6 Move\nF7 MkDir · F8 Trash/delete · F9 Menu · F10 Quit\nEditor: F2 Save · F7 Find · F10 Menu\nMac-friendly adds Ctrl+O sequences without Fn/Option.\nDefault: Classic DN. Automatic: Mac on macOS, Classic elsewhere.
@@ -1399,3 +1399,110 @@ Invalid interface index	Invalid interface index
 Invalid interface counters snapshot size	Invalid interface counters snapshot size
 Interface counters changed while reading	Interface counters changed while reading
 Live traffic · R/F5 Refresh details · ↑↓ scroll · ←→ pan	Live traffic · R/F5 Refresh details · ↑↓ scroll · ←→ pan
+Properties	Properties
+Edit attributes…	Edit attributes…
+Owner read	Owner read
+Owner write	Owner write
+Owner execute	Owner execute
+Group read	Group read
+Group write	Group write
+Group execute	Group execute
+Others read	Others read
+Others write	Others write
+Others execute	Others execute
+Hidden	Hidden
+System	System
+Unix mode bits only; ownership and special bits are preserved.	Unix mode bits only; ownership and special bits are preserved.
+Windows attributes only; NTFS access permissions are unchanged.	Windows attributes only; NTFS access permissions are unchanged.
+Attributes applied.	Attributes applied.
+Applying attributes…	Applying attributes…
+Attributes unavailable	Attributes unavailable
+Links and special files are not editable.	Links and special files are not editable.
+Entry changed while reading attributes.	Entry changed while reading attributes.
+Entry or attributes changed. Close Properties and reopen before applying.	Entry or attributes changed. Close Properties and reopen before applying.
+Clipboard text exceeds 2 MiB; paste was not inserted.	Clipboard text exceeds 2 MiB; paste was not inserted.
+Clipboard contains NUL; paste was not inserted.	Clipboard contains NUL; paste was not inserted.
+Text retained internally; desktop clipboard limit is 2 MiB.	Text retained internally; desktop clipboard limit is 2 MiB.
+Copied internally; updating system clipboard…	Copied internally; updating system clipboard…
+System clipboard busy; text retained internally.	System clipboard busy; text retained internally.
+Copied to system and internal clipboards.	Copied to system and internal clipboards.
+System clipboard unavailable; text retained internally.	System clipboard unavailable; text retained internally.
+System clipboard unavailable; using internal clipboard.	System clipboard unavailable; using internal clipboard.
+Clipboard text could not be decoded; paste was not inserted.	Clipboard text could not be decoded; paste was not inserted.
+Nearby transfers	Nearby transfers
+Nearby transfers...	Nearby transfers...
+Send to nearby DN...	Send to nearby DN...
+Nearby Transfers Help	Nearby Transfers Help
+Receive	Receive
+Stop receiving	Stop receiving
+Use panel selection	Use panel selection
+Send selected…	Send selected…
+Copy connection details	Copy connection details
+Manual connection details	Manual connection details
+Compare all eight digits on both screens.	Compare all eight digits on both screens.
+Confirm only if the verification codes match.	Confirm only if the verification codes match.
+Codes match	Codes match
+Reject	Reject
+Local receive directory	Local receive directory
+Accept	Accept
+Decline	Decline
+Tree…	Tree…
+Selected items	Selected items
+Choose Receive or use the panel selection to send files.	Choose Receive or use the panel selection to send files.
+Choose a nearby receiver, then Send.	Choose a nearby receiver, then Send.
+Receiving is enabled while this window is open.	Receiving is enabled while this window is open.
+Looking for nearby DN receivers…	Looking for nearby DN receivers…
+Starting local discovery…	Starting local discovery…
+Connecting to nearby DN…	Connecting to nearby DN…
+Waiting for the other DN to confirm…	Waiting for the other DN to confirm…
+Pairing was declined.	Pairing was declined.
+Send job queued in Transfer Center.	Send job queued in Transfer Center.
+Receive job queued in Transfer Center.	Receive job queued in Transfer Center.
+Review the offer and choose a local receive directory.	Review the offer and choose a local receive directory.
+Transfer offer declined.	Transfer offer declined.
+The peer disconnected; the offer was closed.	The peer disconnected; the offer was closed.
+Receiving stopped.	Receiving stopped.
+Another peer session is active.	Another peer session is active.
+Wait for the listing, or clear filtered marks first.	Wait for the listing, or clear filtered marks first.
+Select real files or directories first	Select real files or directories first
+Source selection worker stopped.	Source selection worker stopped.
+Choose an absolute local receive directory.	Choose an absolute local receive directory.
+Choose an existing local receive directory.	Choose an existing local receive directory.
+Receive directory cannot be a link	Receive directory cannot be a link
+The peer offer is no longer available.	The peer offer is no longer available.
+Extract or download items before sending to nearby DN.	Extract or download items before sending to nearby DN.
+Nearby service is busy or unavailable	Nearby service is busy or unavailable
+Nearby transfers unavailable	Nearby transfers unavailable
+LAN discovery unavailable; use manual connection details	LAN discovery unavailable; use manual connection details
+Awaiting peer approval	Awaiting peer approval
+Incompatible DN peer protocol	Incompatible DN peer protocol
+Peer did not respond in time	Peer did not respond in time
+Peer transfer cancelled	Peer transfer cancelled
+Peer source changed; select the files again	Peer source changed; select the files again
+Peer checksum failed; incomplete file was not published	Peer checksum failed; incomplete file was not published
+Peer has no reachable address on a connected LAN	Peer has no reachable address on a connected LAN
+Manual peer address must be on a connected LAN	Manual peer address must be on a connected LAN
+Not enough free space for the peer offer	Not enough free space for the peer offer
+Nearby transfers only copy; sources are never removed.	Nearby transfers only copy; sources are never removed.
+Nearby transfers send selected real files and folders directly between DN instances on the same LAN.\nReceive advertises this instance only while its window remains open.\nChoose panel selection, select a nearby receiver, then Send. Manual connection details work when multicast is blocked.\nCompare all eight verification digits on both screens before confirming. Device names alone are not trusted. Pairing lasts for this DN session only.\nThe receiver reviews the offer and chooses a local directory. Existing files use the normal replacement prompts; folders merge under Ask.\nTransfer Center owns accepted jobs: closing Nearby transfers stops new offers, not accepted transfers. Cancel a job in Transfer Center.\nNo public discovery, relay, internet probing, automatic acceptance, remote browsing or restart/resume is used. Links and special files are not transferred.	Nearby transfers send selected real files and folders directly between DN instances on the same LAN.\nReceive advertises this instance only while its window remains open.\nChoose panel selection, select a nearby receiver, then Send. Manual connection details work when multicast is blocked.\nCompare all eight verification digits on both screens before confirming. Device names alone are not trusted. Pairing lasts for this DN session only.\nThe receiver reviews the offer and chooses a local directory. Existing files use the normal replacement prompts; folders merge under Ask.\nTransfer Center owns accepted jobs: closing Nearby transfers stops new offers, not accepted transfers. Cancel a job in Transfer Center.\nNo public discovery, relay, internet probing, automatic acceptance, remote browsing or restart/resume is used. Links and special files are not transferred.
+
+Preview limited to the first 100 entries.	Preview limited to the first 100 entries.
+
+Nearby receiver is busy.	Nearby receiver is busy.
+No connected LAN interface is available	No connected LAN interface is available
+Pairing was declined	Pairing was declined
+Peer connection left the permitted LAN	Peer connection left the permitted LAN
+Delivery not confirmed; the receiver may already have files	Delivery not confirmed; the receiver may already have files
+Peer source was truncated	Peer source was truncated
+Peer source changed	Peer source changed
+Peer output names collide	Peer output names collide
+Peer offer exceeds transfer limits	Peer offer exceeds transfer limits
+Peer manifest exceeds 16 MiB	Peer manifest exceeds 16 MiB
+Peer offer size does not match its entries	Peer offer size does not match its entries
+Peer destination has incompatible types or links	Peer destination has incompatible types or links
+Peer destination directory exists	Peer destination directory exists
+Files received; sender acknowledgement was not confirmed.	Files received; sender acknowledgement was not confirmed.
+File published; directory synchronization failed	File published; directory synchronization failed
+Nearby event queue is full; retry the connection.	Nearby event queue is full; retry the connection.
+No receivers found; check Receive or use manual details if multicast is blocked.	No receivers found; check Receive or use manual details if multicast is blocked.
+Could not connect; check Receive, the LAN address and UDP firewall access	Could not connect; check Receive, the LAN address and UDP firewall access

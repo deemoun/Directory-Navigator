@@ -226,3 +226,8 @@ impl Drop for Session {
         restore_input(self.release_mouse());
     }
 }
+
+#[cfg(target_os = "linux")]
+pub(crate) fn virtual_console() -> bool {
+    gpm::client::console_fd().is_some()
+}

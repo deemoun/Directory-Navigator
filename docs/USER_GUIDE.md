@@ -430,6 +430,16 @@ File Attributes / Info reads fresh metadata in the background, without following
 the selected symlink. It shows exact bytes, local modification time with UTC
 offset, permissions and the link target. Arrows/page keys scroll, Left/Right
 reveals long paths, Home resets scrolling, and Enter/Esc/Close dismisses it.
+Choose **Edit attributes…** in Properties to edit the current entry. On macOS/Linux,
+the checkboxes control owner/group/other read, write and execute permissions;
+ownership and special bits are preserved. On Windows they control Read-only,
+Hidden, System and Archive, preserving other flags and NTFS access permissions.
+Apply changes only the selected entry, never its descendants. Cancel/Esc discards
+unapplied changes. Links and special files are not editable. Access failures are
+reported, and changed/replaced entries must be reopened before applying. macOS
+requires permission to open a metadata handle; completely inaccessible entries
+remain informational. Linux uses a pinned O_PATH handle and requires `/proc` for
+applying changes.
 
 Setup columns and Options → File Manager → Column defaults open the same
 two-panel preset dialog. Name only, Name + Size, and Name + Size + Modified
@@ -448,7 +458,7 @@ Like saving a new editor file, complete list publication requires filesystem har
 Utilities also provides separate System Information and Network Information windows.
 Information dialogs are read-only snapshots;
 Refresh updates them. Unsupported or denied native fields display their errors.
-Calculator and character-table Copy use DN's internal editor clipboard (Ctrl+V).
+Calculator and character-table Copy share the editor's system/internal clipboard (Ctrl+V).
 
 The character table (Ctrl+B) uses Turbo Vision's native Table control. Choose
 ASCII or DOS CP437, then use the arrow keys or click a cell. Home/End select the
@@ -795,7 +805,7 @@ polling continues; returning restores the panes, with listings refreshed.
 An empty Enter still opens the highlighted entry. Esc clears the command;
 Left/Right/Home/End, Backspace and Delete edit it when nonempty. Up/Down still
 navigate files. Ctrl+E/Ctrl+X recall previous/next submitted commands (100 unique,
-session-only); Shift+Insert pastes the internal clipboard. Bracketed paste never
+session-only); Shift+Insert pastes system text with an internal clipboard fallback. Bracketed paste never
 executes commands, and multiline/control-character input is rejected.
 Space/+/-/* retain selection actions when the prompt is empty. `cd`, `cd ~` and
 `cd "directory with spaces"` navigate the active panel; other shell commands use
@@ -846,8 +856,19 @@ quoting. Parent `..` is excluded; marks hidden by filtering do not cause fallbac
 to the highlighted entry. Invalid Unicode, embedded CR/LF and text over 2 MiB
 are rejected without changing the clipboard.
 
-This uses DN’s internal text clipboard, shared with the editor and utilities,
-not the operating system clipboard. Shift+Insert pastes into the command prompt
+Copy also updates the system text clipboard when desktop access is available.
+Editor Copy/Cut and Paste exchange text with other applications; Shift+Insert in
+the command prompt reads the system clipboard too. The internal clipboard remains
+the fallback when desktop access fails or DN runs in a Linux virtual console.
+An empty system text clipboard pastes nothing. Invalid text or text over 2 MiB
+is refused. Clipboard reads run in the background; changing the destination window,
+text or cursor before completion discards the pending paste. Bracketed terminal
+paste continues to work. Linux uses X11 or Wayland data-control when supported by
+the compositor; clipboard persistence after DN exits depends on a clipboard manager.
+SSH uses only a desktop clipboard accessible to the remote process; no OSC 52
+sequence is sent. Set `DN_DISABLE_SYSTEM_CLIPBOARD=1` before launching DN to use
+only the internal clipboard.
+DN's internal clipboard is session-only. Shift+Insert pastes into the command prompt
 only when its existing single-line validation permits the text. Copying paths
 does not insert or execute a command.
 
@@ -1839,3 +1860,56 @@ Measuring is shown until a valid interval is available. Counter resets and long
 gaps restart measurement. Unavailable counters are labelled explicitly, with
 the reason in the scrollable details; sampling retries in the background.
 Metadata still uses the Refresh snapshot. Closing the window stops sampling.
+
+## Nearby DN transfers
+
+Open **Utilities → Nearby transfers…**. No sockets or discovery start simply
+because the plugin is enabled or the window opens. Choose **Receive** to advertise
+and accept pairing requests, or **Use panel selection** to discover receivers.
+**File → Send to nearby DN…** captures the originating panel and visible marked
+native entries, otherwise its current entry. Changing panels afterward does not
+change the captured sources. Archive/remote entries require extraction/download.
+
+Select a discovered receiver and **Send selected…**, or paste its **Copy connection
+details** value into the manual field and choose **Connect**. Details contain the
+authenticated endpoint identity and literal LAN IP addresses/ports, including
+IPv6 link-local scope. Internet destinations and DNS names are rejected. There
+are no relays, public address lookup, port mapping or internet probes. Multicast
+and direct UDP may need firewall permission; DN does not change firewall rules.
+
+Compare **all eight digits** on both computers before choosing **Codes match**.
+The code comes from the established encrypted connection, not a value supplied by
+the other peer. Reject a mismatch. Unconfirmed pairing expires after two minutes.
+Names identify only a random DN session, and are not proof of trust. Verified
+endpoint identities are remembered in memory until DN exits; the receiver must
+still approve every offer. One peer session at a time prevents crossed sends.
+
+The receiver sees the item count, payload size and a scrollable preview of the
+first 100 entries. Choose an existing local destination, using **Tree…** if useful,
+and **Accept**, or **Decline**. A native panel supplies the initial directory;
+otherwise an explicit destination is required. Incoming offers stay in this
+window without taking focus. Closing it cancels unaccepted work and stops
+advertising. Accepted jobs continue independently in **Transfer Center**, which
+owns cancellation, queueing, existing-file replacement prompts and results.
+
+Offers retain root names, descendant hierarchy, hidden files and empty folders.
+Only regular files and real directories are sent. Links, reparse points and
+special files are refused. Each offer is bounded to 100,000 entries, 64 GiB of
+payload, 512 directory levels and 16 MiB of manifest data. Names must be portable
+between supported platforms; conflicting/case-colliding output names are refused.
+
+Files stream with bounded buffers and incremental BLAKE3 checksums into private
+staging on the destination filesystem. DN checks source/destination identities,
+lengths and checksums before publication. Ask merges directories and prompts for
+file replacement; explicit Refuse/Skip retain their normal directory rules.
+Replacement files remain staged, and compatibility-volume publication retains its
+mandatory verification. Available modification times are retained; ownership,
+privileged permissions and Windows ACLs are not imported. There is no additional
+whole-transfer spool, blob database or temporary ZIP.
+
+Cancellation or disconnection removes owned incomplete output; already published
+files remain. Compatibility publication can leave an incomplete new file after a
+crash or power loss, as with normal Copy. Sender success requires the receiver's
+final receipt. If it is lost, delivery is **unconfirmed**: inspect the destination
+before retrying. No persistent trust, automatic acceptance, remote browsing,
+source deletion, move or restart/resume is provided.

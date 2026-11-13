@@ -3,6 +3,7 @@ pub(crate) mod apk_workshop;
 pub(crate) mod calculator;
 pub(crate) mod host;
 pub(crate) mod mp3_player;
+pub(crate) mod nearby_transfers;
 pub(crate) mod remote_connections;
 pub(crate) mod tetris;
 
@@ -25,6 +26,7 @@ use std::{
 };
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct PluginId(pub &'static str);
+pub const NEARBY_TRANSFERS: PluginId = PluginId("nearby_transfers");
 pub const REMOTE_CONNECTIONS: PluginId = PluginId("remote_connections");
 pub const CALCULATOR: PluginId = PluginId("calculator");
 pub const TETRIS: PluginId = PluginId("tetris");
@@ -104,6 +106,7 @@ pub(crate) struct Context {
     pub now: Instant,
     pub storage: Option<PathBuf>,
     pub mp3: crate::config::Mp3Preferences,
+    pub nearby: crate::peer::Snapshot,
 }
 impl Context {
     pub fn target(&self, id: usize) -> Target {
@@ -128,6 +131,7 @@ impl Context {
     }
 }
 pub(crate) enum Event<'a> {
+    NearbyDirectory(PathBuf),
     OpenApk(PathBuf),
     ApkContext {
         base: PathBuf,
@@ -150,6 +154,7 @@ pub(crate) enum Event<'a> {
     },
 }
 pub(crate) enum Effect {
+    Nearby(crate::peer::Action),
     RemoteConnected(std::sync::Arc<crate::network::remote::Connection>),
     RemoteTerminal(crate::network::remote::Profile),
     ApkPreview {
@@ -240,6 +245,8 @@ impl Default for Runtime {
             entries: BTreeMap::new(),
             now: Instant::now(),
         };
+        s.register(Box::<nearby_transfers::NearbyTransfers>::default())
+            .expect("nearby transfers ID");
         s.register(Box::<remote_connections::RemoteConnections>::default())
             .expect("remote connections ID");
         s.register(Box::<apk_workshop::ApkWorkshop>::default())

@@ -139,6 +139,54 @@ impl<'a> Resolver<'a> {
             source_modified: input.modified().ok(),
             destination_modified: existing.modified().ok(),
         };
+        self.decide(conflict, approved, target)
+    }
+    /// A remote source has a label and metadata, never a fabricated native path.
+    pub(crate) fn remote_file(
+        &mut self,
+        label: &str,
+        size: u64,
+        modified: Option<std::time::SystemTime>,
+        target: &Path,
+    ) -> io::Result<Option<Option<Approved>>> {
+        let existing = match fs::symlink_metadata(target) {
+            Ok(m) => m,
+            Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(Some(None)),
+            Err(e) => return Err(e),
+        };
+        if self.policy == ExistingDestination::Skip {
+            return Ok(None);
+        }
+        if self.policy == ExistingDestination::Refuse {
+            absent(target)?;
+        }
+        if !existing.is_file() || redirected(&existing) {
+            return Err(io::Error::other(
+                "Only regular files can be replaced; incompatible types or links were retained",
+            ));
+        }
+        let approved = Approved::capture(target, existing.clone())?;
+        self.decide(
+            Conflict {
+                source: PathBuf::new(),
+                source_label: Some(label.to_owned()),
+                destination: target.to_owned(),
+                destination_label: None,
+                source_size: size,
+                destination_size: existing.len(),
+                source_modified: modified,
+                destination_modified: existing.modified().ok(),
+            },
+            approved,
+            target,
+        )
+    }
+    fn decide(
+        &mut self,
+        conflict: Conflict,
+        approved: Approved,
+        target: &Path,
+    ) -> io::Result<Option<Option<Approved>>> {
         let decision = match self.all {
             Some(d) => d,
             None => (self.ask)(&conflict)?,

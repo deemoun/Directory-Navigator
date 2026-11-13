@@ -1387,6 +1387,7 @@ mod tests {
             now: Instant::now(),
             storage: None,
             mp3: Default::default(),
+            nearby: Default::default(),
         }
     }
     fn player() -> (Mp3Player, Rc<RefCell<FakeState>>) {

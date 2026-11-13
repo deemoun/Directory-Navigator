@@ -159,13 +159,73 @@ pub(crate) fn tools_spec(
         let mut spec = DialogSpec::new(
             rect,
             scope(app, layer)?,
-            0,
-            app.config
-                .language
-                .text(" File Attributes / Info (read-only) "),
+            info.focus,
+            app.config.language.text("Properties"),
             Target::CloseFileInfo,
             Target::CloseFileInfo,
         );
+        if info.editing {
+            use crate::file_info::{attributes::FIELDS, Action};
+            spec.cancel = Target::FileInfo(Action::Cancel);
+            spec.default = Target::FileInfo(Action::Cancel);
+            spec.caption(
+                Paragraph::new(display_name(&info.path.to_string_lossy())).style(dos(theme::TEXT)),
+                Rect::new(rect.x + 2, rect.y + 1, rect.width - 4, 1),
+            );
+            let attributes = info
+                .contents
+                .as_ref()
+                .and_then(|r| r.as_ref().ok())
+                .and_then(|i| i.attributes.as_ref());
+            for (index, (label, bit)) in FIELDS.iter().enumerate() {
+                let mut control = Control::new(
+                    index,
+                    Rect::new(
+                        rect.x + 3 + (index % 3) as u16 * 23,
+                        rect.y + 3 + (index / 3) as u16 * 2,
+                        21,
+                        1,
+                    ),
+                    ControlKind::Checkbox {
+                        caption: app.config.language.text(label).into(),
+                        checked: attributes.is_some_and(|a| a.value & bit != 0),
+                    },
+                    Target::FileInfo(Action::Toggle(index)),
+                );
+                control.enabled = attributes.is_some() && !info.busy();
+                spec.control(control);
+            }
+            let explanation = if cfg!(unix) {
+                "Unix mode bits only; ownership and special bits are preserved."
+            } else {
+                "Windows attributes only; NTFS access permissions are unchanged."
+            };
+            spec.caption(
+                Paragraph::new(app.config.language.text(explanation)).style(dos(theme::TEXT)),
+                Rect::new(rect.x + 2, rect.y + 10, rect.width - 4, 2),
+            );
+            spec.caption(
+                Paragraph::new(display_name(app.config.language.text(&info.notice)))
+                    .style(dos(theme::TEXT))
+                    .wrap(crate::painting::Wrap { trim: false }),
+                Rect::new(rect.x + 2, rect.y + 13, rect.width - 4, 2),
+            );
+            let mut apply = Control::new(
+                FIELDS.len(),
+                Rect::new(rect.x + 8, rect.bottom() - 2, 16, 1),
+                ControlKind::Button(app.config.language.text("Apply").into()),
+                Target::FileInfo(Action::Apply),
+            );
+            apply.enabled = !info.busy() && attributes.is_some_and(|a| a.changed());
+            spec.control(apply);
+            spec.control(Control::new(
+                FIELDS.len() + 1,
+                Rect::new(rect.right() - 25, rect.bottom() - 2, 16, 1),
+                ControlKind::Button(app.config.language.text("Cancel").into()),
+                Target::FileInfo(Action::Cancel),
+            ));
+            return Some(spec);
+        }
         let lines: std::borrow::Cow<'_, [String]> = match &info.contents {
             Some(Ok(contents)) => std::borrow::Cow::Borrowed(&contents.lines),
             Some(Err(error)) => std::borrow::Cow::Owned(vec![
@@ -194,6 +254,17 @@ pub(crate) fn tools_spec(
             .style(dos(theme::TEXT)),
             Rect::new(rect.x + 2, rect.bottom() - 3, rect.width - 4, 1),
         );
+        let mut edit = Control::new(
+            1,
+            Rect::new(rect.x + 4, rect.bottom() - 2, 24, 1),
+            ControlKind::Button(app.config.language.text("Edit attributes…").into()),
+            Target::FileInfo(crate::file_info::Action::Edit),
+        );
+        edit.enabled = info
+            .contents
+            .as_ref()
+            .is_some_and(|r| r.as_ref().is_ok_and(|i| i.attributes.is_some()));
+        spec.control(edit);
         spec.control(Control::new(
             0,
             Rect::new(rect.x + (rect.width - 14) / 2, rect.bottom() - 2, 14, 1),

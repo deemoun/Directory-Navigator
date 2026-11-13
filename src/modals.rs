@@ -658,3 +658,10 @@ slot!(
     crate::viewer::pdf::password::Dialog,
     ViewerSearch
 );
+
+impl ModalStack {
+    pub(crate) fn push_peer_tree(&mut self, tree: crate::directory_tree::Tree, owner: WindowId) {
+        self.take_directory_tree();
+        self.push(tree, Focus::Tree, ModalOwner::Document(owner));
+    }
+}

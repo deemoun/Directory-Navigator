@@ -189,7 +189,7 @@ System Setup	Система
 S~y~stem Information	~С~истема
 S~y~stem Setup...	~С~истема...
 Tab / ↑↓ choose · Space toggle · Enter OK · Esc Cancel	Tab / ↑↓ — выбор · Пробел — смена · Enter OK · Esc отмена
-Tab panels · Arrows/PgUp/PgDn/Home/End navigate\nAlt+F/U/P/M/O menus · Alt+0 windows · Alt+X exits\nEnter app/dir/archive · Ctrl+Enter OS app · F3 view · F4 edit · BS parent\nIns / Space marks · Ctrl+A all · Ctrl+U clear\n+ / - group · Alt+E info · Alt+K columns\nAlt+F7 quick search · Ctrl+F7 recursive Find\nCtrl+Q quick view · Ctrl+T tree · Alt+F9 Tetris\nCtrl+1–9 bookmarks set · Alt+1–9 go · Alt+Del filter\nCtrl+K calculator · Ctrl+B ASCII · Alt+Y memory\nCtrl+C compare · Alt+L list file\nAlt+BS directories · Alt+PgUp edits / PgDn views\nF2 user menu · Shift+F2 sort · Ctrl+F3 name / F4 ext / F5 date / F6 size\nF5 copy · F6 move · Shift+F6 rename here\nF7 mkdir · F8 Trash/delete · F9 menu · F10 exit\nCtrl+H hidden · Ctrl+L go to · Ctrl+R refresh\nClick row · Ctrl+click mark · Double-click open\nWheel scrolls · Esc cancels dialogs/operations\nType commands · Enter runs · Esc clears · Ctrl+E/X history · Alt+F8 list\nFile menu: Copy names / paths uses internal clipboard\nOptions: File associations configures Enter actions\nOptions: Import DOS settings previews DN.CFG preferences\nColors: white dirs · green exec · cyan source\nMagenta archives · blue links · yellow marks\nTrash by default; File Manager Setup changes mode.\nTransfers ask before replacing files; Ask merges folders.	Tab — сменить панель · Стрелки/PgUp/PgDn/Home/End — навигация\nAlt+F/U/P/M/O меню · Alt+0 окна · Alt+X выход\nEnter — открыть · Ctrl+Enter — приложение ОС · F3 просмотр · F4 редактор\nIns / Пробел — отметить · Ctrl+A все · Ctrl+U снять отметки\n+ / - — группа · Alt+E свойства · Alt+K колонки\nAlt+F7 — быстрый поиск · Ctrl+F7 — поиск по папкам\nCtrl+Q — быстрый просмотр · Ctrl+T — дерево · Alt+F9 — Тетрис\nCtrl+1–9 — назначить закладку · Alt+1–9 — перейти · Alt+Del фильтр\nCtrl+K калькулятор · Ctrl+B символы · Alt+Y память\nCtrl+C сравнить · Alt+L список файлов\nAlt+BS история папок · Alt+PgUp редактор / PgDn просмотр\nF2 меню пользователя · Shift+F2 сортировка\nF5 копировать · F6 переместить · Shift+F6 переименовать\nF7 создать папку · F8 корзина/удаление · F9 меню · F10 выход\nCtrl+H скрытые · Ctrl+L перейти · Ctrl+R обновить\nЩелчок — выбрать · Ctrl+щелчок — отметить · Двойной — открыть\nКолесо — прокрутка · Esc — отмена\nКоманды: Enter выполнить · Esc очистить · Ctrl+E/X история · Alt+F8 список\nФайл: копирование имён/путей во внутренний буфер\nБелый — папки · Зелёный — программы · Бирюзовый — исходники\nПурпурный — архивы · Синий — ссылки · Жёлтый — отметки\nПо умолчанию файлы перемещаются в корзину.\nПеред заменой файлов появляется запрос; Ask объединяет папки.\nПараметры → Ассоциации файлов — действия Enter\nПараметры → Импорт настроек DOS — просмотр параметров DN.CFG
+Tab panels · Arrows/PgUp/PgDn/Home/End navigate\nAlt+F/U/P/M/O menus · Alt+0 windows · Alt+X exits\nEnter app/dir/archive · Ctrl+Enter OS app · F3 view · F4 edit · BS parent\nIns / Space marks · Ctrl+A all · Ctrl+U clear\n+ / - group · Alt+E info · Alt+K columns\nAlt+F7 quick search · Ctrl+F7 recursive Find\nCtrl+Q quick view · Ctrl+T tree · Alt+F9 Tetris\nCtrl+1–9 bookmarks set · Alt+1–9 go · Alt+Del filter\nCtrl+K calculator · Ctrl+B ASCII · Alt+Y memory\nCtrl+C compare · Alt+L list file\nAlt+BS directories · Alt+PgUp edits / PgDn views\nF2 user menu · Shift+F2 sort · Ctrl+F3 name / F4 ext / F5 date / F6 size\nF5 copy · F6 move · Shift+F6 rename here\nF7 mkdir · F8 Trash/delete · F9 menu · F10 exit\nCtrl+H hidden · Ctrl+L go to · Ctrl+R refresh\nClick row · Ctrl+click mark · Double-click open\nWheel scrolls · Esc cancels dialogs/operations\nType commands · Enter runs · Esc clears · Ctrl+E/X history · Alt+F8 list\nFile menu: Copy names / paths uses system clipboard; console fallback\nOptions: File associations configures Enter actions\nOptions: Import DOS settings previews DN.CFG preferences\nColors: white dirs · green exec · cyan source\nMagenta archives · blue links · yellow marks\nTrash by default; File Manager Setup changes mode.\nTransfers ask before replacing files; Ask merges folders.	Tab — сменить панель · Стрелки/PgUp/PgDn/Home/End — навигация\nAlt+F/U/P/M/O меню · Alt+0 окна · Alt+X выход\nEnter — открыть · Ctrl+Enter — приложение ОС · F3 просмотр · F4 редактор\nIns / Пробел — отметить · Ctrl+A все · Ctrl+U снять отметки\n+ / - — группа · Alt+E свойства · Alt+K колонки\nAlt+F7 — быстрый поиск · Ctrl+F7 — поиск по папкам\nCtrl+Q — быстрый просмотр · Ctrl+T — дерево · Alt+F9 — Тетрис\nCtrl+1–9 — назначить закладку · Alt+1–9 — перейти · Alt+Del фильтр\nCtrl+K калькулятор · Ctrl+B символы · Alt+Y память\nCtrl+C сравнить · Alt+L список файлов\nAlt+BS история папок · Alt+PgUp редактор / PgDn просмотр\nF2 меню пользователя · Shift+F2 сортировка\nF5 копировать · F6 переместить · Shift+F6 переименовать\nF7 создать папку · F8 корзина/удаление · F9 меню · F10 выход\nCtrl+H скрытые · Ctrl+L перейти · Ctrl+R обновить\nЩелчок — выбрать · Ctrl+щелчок — отметить · Двойной — открыть\nКолесо — прокрутка · Esc — отмена\nКоманды: Enter выполнить · Esc очистить · Ctrl+E/X история · Alt+F8 список\nФайл: копирование имён/путей во внутренний буфер\nБелый — папки · Зелёный — программы · Бирюзовый — исходники\nПурпурный — архивы · Синий — ссылки · Жёлтый — отметки\nПо умолчанию файлы перемещаются в корзину.\nПеред заменой файлов появляется запрос; Ask объединяет папки.\nПараметры → Ассоциации файлов — действия Enter\nПараметры → Импорт настроек DOS — просмотр параметров DN.CFG
 Tab width	Ширина табуляции
 Terminal	Терминал
 Terminal size	Размер терминала
@@ -422,7 +422,7 @@ Automatic (Classic DN)	Авто (классические DN)
 Classic DN	Классические DN
 Mac-friendly	Для Mac
 Mac-friendly: press Ctrl+O, release, then choose\n1 Help · 2 User · 3 View · 4 Edit · 5 Copy\n6 Move · 7 MkDir · 8 Trash/delete · 9 Menu · 0 Quit\ns Quick search · f Recursive Find · i Info · z Sort\nb Bookmarks · l Filter · e Columns · r Refresh\nh Commands · j Directories · a Edits · v Views\no OS default app · p List file · y Tetris\nk Keyboard settings · u Windows · m Menu\nUp/Down Page · Left/Right First/last entry\nCtrl+A all · Ctrl+U clear · Ctrl+O then Space marks\nEsc or click cancels the prefix; nothing is typed.\nClassic DN keys remain available.\nCommand shortcuts belong to your terminal.\nTrash/delete still requires confirmation.	Для Mac: нажмите Ctrl+O, отпустите, затем выберите\n1 Помощь · 2 Пользователь · 3 Просмотр · 4 Редактор · 5 Копия\n6 Перенос · 7 Папка · 8 Корзина · 9 Меню · 0 Выход\ns Быстрый поиск · f Поиск файлов · i Свойства · z Сортировка\nb Закладки · l Фильтр · e Колонки · r Обновить\nh Команды · j Каталоги · a Редактирование · v Просмотр\no Приложение ОС · p Список файлов · y Тетрис\nk Клавиши · u Окна · m Меню\n↑/↓ Страница · ←/→ Начало/конец списка\nCtrl+A всё · Ctrl+U снять отметки · Ctrl+O, Пробел отметить\nEsc или щелчок отменяет префикс; текст не вводится.\nКлассические клавиши DN также работают.\nСочетания Command обрабатывает терминал.\nУдаление и корзина требуют подтверждения.
-Mac-friendly: Ctrl+O, release, then digit or letter\n1 Help · 2 Save · 3 Open · 6 Duplicate · 7 Find · 0 Menu\na Save As · w Close · x Quit DN · m Menu · u Windows\nn Next match · p Reverse · r Replace · g Go to line\nCtrl+S Save · Ctrl+F Find · Ctrl+G Go to line\nCtrl+Z/Y Undo/Redo · Ctrl+C/X/V internal clipboard\nTab/Shift+Tab block indent · Ctrl+] matching bracket\nCtrl+O then Left/Right: word movement\nAdd Shift to the arrow to extend selection\nUp/Down Page · , / . Line start/end\nh / e Document start/end · c Clear selection\nEsc or click cancels the prefix. Classic keys still work.\nOpen/Close/Quit protect unsaved changes.\nUnicode / DOS / Windows text, 64 MiB / 1,000,000 lines. F8 Encoding.\nSave As asks before replacing an existing file.\nF5: Markdown preview of unsaved text.	Для Mac: Ctrl+O, отпустите, затем цифра или буква\n1 Помощь · 2 Сохранить · 3 Открыть · 6 Дубль · 7 Поиск · 0 Меню\na Сохранить как · w Закрыть · x Выход · m Меню · u Окна\nn Далее · p Назад · r Замена · g Перейти к строке\nCtrl+S Сохранить · Ctrl+F Найти · Ctrl+G К строке\nCtrl+Z/Y Отмена/Повтор · Ctrl+C/X/V внутренний буфер\nTab/Shift+Tab отступ блока · Ctrl+] парная скобка\nCtrl+O, затем влево/вправо: движение по словам\nДобавьте Shift к стрелке для выделения\n↑/↓ Страница · , / . Начало/конец строки\nh / e Начало/конец текста · c Удалить выделение\nEsc или щелчок отменяет префикс. Клавиши DN работают.\nОткрытие, закрытие и выход защищают несохранённый текст.\nUnicode / DOS / Windows, 64 МиБ / 1 000 000 строк. F8 Кодировка.\nСохранить как запрашивает подтверждение замены.\nF5: предпросмотр Markdown без сохранения.
+Mac-friendly: Ctrl+O, release, then digit or letter\n1 Help · 2 Save · 3 Open · 6 Duplicate · 7 Find · 0 Menu\na Save As · w Close · x Quit DN · m Menu · u Windows\nn Next match · p Reverse · r Replace · g Go to line\nCtrl+S Save · Ctrl+F Find · Ctrl+G Go to line\nCtrl+Z/Y Undo/Redo · Ctrl+C/X/V system clipboard; internal fallback\nTab/Shift+Tab block indent · Ctrl+] matching bracket\nCtrl+O then Left/Right: word movement\nAdd Shift to the arrow to extend selection\nUp/Down Page · , / . Line start/end\nh / e Document start/end · c Clear selection\nEsc or click cancels the prefix. Classic keys still work.\nOpen/Close/Quit protect unsaved changes.\nUnicode / DOS / Windows text, 64 MiB / 1,000,000 lines. F8 Encoding.\nSave As asks before replacing an existing file.\nF5: Markdown preview of unsaved text.	Для Mac: Ctrl+O, отпустите, затем цифра или буква\n1 Помощь · 2 Сохранить · 3 Открыть · 6 Дубль · 7 Поиск · 0 Меню\na Сохранить как · w Закрыть · x Выход · m Меню · u Окна\nn Далее · p Назад · r Замена · g Перейти к строке\nCtrl+S Сохранить · Ctrl+F Найти · Ctrl+G К строке\nCtrl+Z/Y Отмена/Повтор · Ctrl+C/X/V буфер ОС; в консоли — DN\nTab/Shift+Tab отступ блока · Ctrl+] парная скобка\nCtrl+O, затем влево/вправо: движение по словам\nДобавьте Shift к стрелке для выделения\n↑/↓ Страница · , / . Начало/конец строки\nh / e Начало/конец текста · c Удалить выделение\nEsc или щелчок отменяет префикс. Клавиши DN работают.\nОткрытие, закрытие и выход защищают несохранённый текст.\nUnicode / DOS / Windows, 64 МиБ / 1 000 000 строк. F8 Кодировка.\nСохранить как запрашивает подтверждение замены.\nF5: предпросмотр Markdown без сохранения.
 Mac-friendly: press Ctrl+O, release, then choose\n2 Wrap · 3 Close · 7 Find · 0 Quit DN\nf Find · g Go to · n Next match · p Reverse · w Close · u Windows\nUp/Down Page · Left/Right First/last row\nEsc or click cancels the prefix.\nClassic DN keys remain available.\nF5: return to editor preview source; Ctrl+O then m: Markdown/source.	Для Mac: нажмите Ctrl+O, отпустите, затем выберите\n2 Перенос строк · 3 Закрыть · 7 Поиск · 0 Выход из DN\nf Поиск · g Перейти · n Далее · p Назад · w Закрыть · u Окна\n↑/↓ Страница · ←/→ Начало/конец\nEsc или щелчок отменяет префикс.\nКлассические клавиши DN также работают.\nF5: возврат в редактор; Ctrl+O затем m: Markdown/исходный текст.
 ^O means Ctrl+O, release, then the next key.\n1 Help · 2 User · 3 View · 4 Edit · 5 Copy\n6 Move · 7 MkDir · 8 Trash · 9 Menu · 0 Quit\ns Quick search · f Find · i Info · z Sort\nb Bookmarks · l Filter · h Commands · k Keyboard\nEditor: a Save As · w Close · r Replace · x Quit\nViewer: 2 Wrap · n Next · p Reverse · w Close\nThe prefix displays a guide for the current screen.\nClassic DN shortcuts remain available.	^O: нажмите Ctrl+O, отпустите, затем другую клавишу.\n1 Помощь · 2 Пользователь · 3 Просмотр · 4 Редактор · 5 Копия\n6 Перенос · 7 Папка · 8 Корзина · 9 Меню · 0 Выход\ns Быстрый поиск · f Поиск файлов · i Свойства · z Сортировка\nb Закладки · l Фильтр · h Команды · k Клавиши\nРедактор: a Сохранить как · w Закрыть · r Замена · x Выход\nПросмотр: 2 Перенос строк · n Далее · p Назад · w Закрыть\nПосле Ctrl+O видна подсказка для текущего экрана.\nКлассические клавиши DN также работают.
 Classic DN uses F1–F10 and Alt/Ctrl combinations.\nTab switches panels; Insert or Space marks entries.\nF3 View · F4 Edit · F5 Copy · F6 Move\nF7 MkDir · F8 Trash/delete · F9 Menu · F10 Quit\nEditor: F2 Save · F7 Find · F10 Menu\nMac-friendly adds Ctrl+O sequences without Fn/Option.\nDefault: Classic DN. Automatic: Mac on macOS, Classic elsewhere.	Классические DN: F1–F10 и сочетания с Alt/Ctrl.\nTab переключает панели; Insert или Пробел отмечает.\nF3 Просмотр · F4 Редактор · F5 Копия · F6 Перенос\nF7 Папка · F8 Корзина/удаление · F9 Меню · F10 Выход\nРедактор: F2 Сохранить · F7 Поиск · F10 Меню\nПрофиль Mac добавляет Ctrl+O без Fn/Option.\nПо умолчанию — DN. Авто: Mac на macOS, иначе DN.
@@ -1401,3 +1401,110 @@ Invalid interface index	Некорректный индекс интерфейс
 Invalid interface counters snapshot size	Некорректный размер снимка счётчиков интерфейса
 Interface counters changed while reading	Счётчики интерфейса изменились во время чтения
 Live traffic · R/F5 Refresh details · ↑↓ scroll · ←→ pan	Трафик онлайн · R/F5 Обновить данные · ↑↓ прокрутка · ←→ сдвиг
+Properties	Свойства
+Edit attributes…	Изменить атрибуты…
+Owner read	Влад.: чтение
+Owner write	Влад.: запись
+Owner execute	Влад.: выполн.
+Group read	Группа: чтение
+Group write	Группа: запись
+Group execute	Группа: выполн.
+Others read	Другие: чтение
+Others write	Другие: запись
+Others execute	Другие: выполн.
+Hidden	Скрытый
+System	Системный
+Unix mode bits only; ownership and special bits are preserved.	Права Unix; владелец и специальные биты сохраняются.
+Windows attributes only; NTFS access permissions are unchanged.	Атрибуты Windows; права доступа NTFS не изменяются.
+Attributes applied.	Атрибуты применены.
+Applying attributes…	Применение атрибутов…
+Attributes unavailable	Атрибуты недоступны
+Links and special files are not editable.	Ссылки и специальные файлы нельзя изменять.
+Entry changed while reading attributes.	Объект изменился при чтении атрибутов.
+Entry or attributes changed. Close Properties and reopen before applying.	Объект или атрибуты изменились. Закройте и заново откройте свойства.
+Clipboard text exceeds 2 MiB; paste was not inserted.	Текст буфера больше 2 МиБ; вставка отменена.
+Clipboard contains NUL; paste was not inserted.	В буфере есть NUL; вставка отменена.
+Text retained internally; desktop clipboard limit is 2 MiB.	Текст сохранён в DN; предел системного буфера — 2 МиБ.
+Copied internally; updating system clipboard…	Скопировано в DN; обновление системного буфера…
+System clipboard busy; text retained internally.	Системный буфер занят; текст сохранён в DN.
+Copied to system and internal clipboards.	Скопировано в системный буфер и буфер DN.
+System clipboard unavailable; text retained internally.	Системный буфер недоступен; текст сохранён в DN.
+System clipboard unavailable; using internal clipboard.	Системный буфер недоступен; используется буфер DN.
+Clipboard text could not be decoded; paste was not inserted.	Не удалось декодировать текст буфера; вставка отменена.
+Nearby transfers	Передача между DN
+Nearby transfers...	Передача между DN...
+Send to nearby DN...	Отправить в соседний DN...
+Nearby Transfers Help	Помощь по передаче между DN
+Receive	Приём
+Stop receiving	Остановить приём
+Use panel selection	Выбрать из панели
+Send selected…	Отправить…
+Copy connection details	Копировать адрес
+Manual connection details	Адрес подключения вручную
+Compare all eight digits on both screens.	Сравните все восемь цифр на обоих экранах.
+Confirm only if the verification codes match.	Подтверждайте только при совпадении кодов.
+Codes match	Коды совпадают
+Reject	Отклонить
+Local receive directory	Каталог для приёма
+Accept	Принять
+Decline	Отклонить
+Tree…	Дерево…
+Selected items	Выбрано объектов
+Choose Receive or use the panel selection to send files.	Включите приём или выберите объекты из панели для отправки.
+Choose a nearby receiver, then Send.	Выберите соседний DN, затем отправьте объекты.
+Receiving is enabled while this window is open.	Приём включён, пока это окно открыто.
+Looking for nearby DN receivers…	Поиск соседних экземпляров DN для приёма…
+Starting local discovery…	Запуск поиска в локальной сети…
+Connecting to nearby DN…	Подключение к соседнему DN…
+Waiting for the other DN to confirm…	Ожидание подтверждения в другом DN…
+Pairing was declined.	Сопряжение отклонено.
+Send job queued in Transfer Center.	Отправка добавлена в Центр передач.
+Receive job queued in Transfer Center.	Приём добавлен в Центр передач.
+Review the offer and choose a local receive directory.	Проверьте предложение и выберите каталог для приёма.
+Transfer offer declined.	Предложение передачи отклонено.
+The peer disconnected; the offer was closed.	Другой DN отключился; предложение закрыто.
+Receiving stopped.	Приём остановлен.
+Another peer session is active.	Уже выполняется передача между DN.
+Wait for the listing, or clear filtered marks first.	Дождитесь списка или снимите отметки, скрытые фильтром.
+Select real files or directories first	Сначала выберите обычные файлы или каталоги
+Source selection worker stopped.	Подготовка выбранных объектов остановлена.
+Choose an absolute local receive directory.	Укажите абсолютный путь к локальному каталогу для приёма.
+Choose an existing local receive directory.	Выберите существующий локальный каталог для приёма.
+Receive directory cannot be a link	Каталог для приёма не может быть ссылкой
+The peer offer is no longer available.	Предложение передачи больше недоступно.
+Extract or download items before sending to nearby DN.	Сначала извлеките или скачайте объекты для отправки в соседний DN.
+Nearby service is busy or unavailable	Служба передачи между DN занята или недоступна
+Nearby transfers unavailable	Передача между DN недоступна
+LAN discovery unavailable; use manual connection details	Поиск в локальной сети недоступен; используйте адрес подключения
+Awaiting peer approval	Ожидание подтверждения в другом DN
+Incompatible DN peer protocol	Несовместимые версии протокола передачи DN
+Peer did not respond in time	Другой DN не ответил вовремя
+Peer transfer cancelled	Передача между DN отменена
+Peer source changed; select the files again	Исходный объект изменился; выберите файлы заново
+Peer checksum failed; incomplete file was not published	Ошибка контрольной суммы; неполный файл не опубликован
+Peer has no reachable address on a connected LAN	В локальной сети нет доступного адреса другого DN
+Manual peer address must be on a connected LAN	Адрес другого DN должен находиться в подключённой локальной сети
+Not enough free space for the peer offer	Недостаточно места для предложенных файлов
+Nearby transfers only copy; sources are never removed.	Передача между DN только копирует; оригиналы не удаляются.
+Nearby transfers send selected real files and folders directly between DN instances on the same LAN.\nReceive advertises this instance only while its window remains open.\nChoose panel selection, select a nearby receiver, then Send. Manual connection details work when multicast is blocked.\nCompare all eight verification digits on both screens before confirming. Device names alone are not trusted. Pairing lasts for this DN session only.\nThe receiver reviews the offer and chooses a local directory. Existing files use the normal replacement prompts; folders merge under Ask.\nTransfer Center owns accepted jobs: closing Nearby transfers stops new offers, not accepted transfers. Cancel a job in Transfer Center.\nNo public discovery, relay, internet probing, automatic acceptance, remote browsing or restart/resume is used. Links and special files are not transferred.	Передача между DN отправляет выбранные обычные файлы и каталоги напрямую в пределах одной локальной сети.\nПриём объявляет этот экземпляр DN только при открытом окне.\nВыберите объекты из панели, соседний DN и отправку. Если multicast заблокирован, используйте адрес подключения вручную.\nПеред подтверждением сравните все восемь цифр на обоих экранах. Имени устройства недостаточно. Сопряжение действует только в текущем сеансе DN.\nПолучатель проверяет предложение и выбирает локальный каталог. Для существующих файлов работают обычные запросы замены; режим Ask объединяет папки.\nПринятые задания принадлежат Центру передач: закрытие окна прекращает новые предложения, но не принятые передачи. Отменяйте их в Центре передач.\nНет публичного поиска, ретрансляторов, интернет-проверок, автоматического приёма, удалённого просмотра и возобновления после перезапуска. Ссылки и специальные файлы не передаются.
+
+Preview limited to the first 100 entries.	Показаны первые 100 элементов.
+
+Nearby receiver is busy.	Получатель занят другой передачей.
+No connected LAN interface is available	Нет подключённого интерфейса локальной сети
+Pairing was declined	Сопряжение отклонено
+Peer connection left the permitted LAN	Соединение вышло за пределы разрешённой локальной сети
+Delivery not confirmed; the receiver may already have files	Доставка не подтверждена; файлы уже могут находиться у получателя
+Peer source was truncated	Исходный файл был усечён
+Peer source changed	Исходный файл изменился
+Peer output names collide	Имена получаемых объектов совпадают
+Peer offer exceeds transfer limits	Предложение превышает ограничения передачи
+Peer manifest exceeds 16 MiB	Описание передачи превышает 16 МиБ
+Peer offer size does not match its entries	Размер предложения не соответствует списку объектов
+Peer destination has incompatible types or links	В назначении несовместимые типы объектов или ссылки
+Peer destination directory exists	Каталог назначения уже существует
+Files received; sender acknowledgement was not confirmed.	Файлы получены; подтверждение отправителя не получено.
+File published; directory synchronization failed	Файл опубликован; синхронизация каталога не удалась
+Nearby event queue is full; retry the connection.	Очередь сетевых событий заполнена; повторите подключение.
+No receivers found; check Receive or use manual details if multicast is blocked.	Получатели не найдены; включите приём или введите адрес вручную, если multicast заблокирован.
+Could not connect; check Receive, the LAN address and UDP firewall access	Не удалось подключиться; проверьте приём, адрес локальной сети и доступ UDP

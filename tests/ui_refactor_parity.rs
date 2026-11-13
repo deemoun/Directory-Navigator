@@ -148,6 +148,13 @@ fn shared_logic_preserves_native_frames() -> io::Result<()> {
                             assert!(message.contains("1,000,000") || message.contains("1 000 000"));
                             assert!(!message.contains("16 MiB") && !message.contains("16 МиБ"));
                             assert!(message.contains("F8"));
+                            if profile == Profile::Mac {
+                                assert!(message.contains(if language == Language::English {
+                                    "system clipboard"
+                                } else {
+                                    "буфер ОС"
+                                }));
+                            }
                         }
                         if case == 0 {
                             let buffer = Buffer::rendered(ui::render(&a, &snapshot));
@@ -193,6 +200,7 @@ fn shared_logic_preserves_native_frames() -> io::Result<()> {
                                 .map(|c| c.symbol())
                                 .collect::<String>();
                             assert!(text.contains(language.text("Remote connections")), "{text}");
+                            assert!(text.contains(language.text("Nearby transfers")), "{text}");
                             assert!(
                                 text.contains(language.text("Play music files in internal player")),
                                 "{text}"

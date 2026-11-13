@@ -1,17 +1,17 @@
 # Built-in tools
 
-The built-in plugins are Calculator, Tetris/Pentix and the Music Player.
-They are compiled
-into DN; there is no dynamic loader, binary ABI, installation format, external SDK,
-new dependency or separate plugin configuration format. This is an internal Rust interface which
+The built-in plugins are Calculator, Tetris/Pentix, Music Player, APK Workshop,
+Remote connections and Nearby transfers. They are compiled into DN; there is no
+dynamic loader, binary ABI, installation format, external SDK or separate plugin
+configuration format. This is an internal Rust interface which
 may evolve with the application.
 
 ## Enable and disable
 
 Options → Configuration → Plugins lists every registered built-in tool, including
 disabled tools. Checkboxes edit a draft: OK applies it, Cancel discards it.
-Calculator and Tetris are enabled by default; the experimental Music Player is
-disabled by default. Compiled-in defaults live in `plugins::enabled_by_default`.
+Tools are enabled by default except Music Player, which requires explicit opt-in.
+Enabling Nearby transfers does not start networking. Compiled-in defaults live in `plugins::enabled_by_default`.
 Explicit user choices override those defaults and survive saving/restarting. Disabling closes the current presentation and
 hides its menu entry and blocks shortcut launches. Enabling restores the menu
 entry without opening the tool automatically. Calculator
@@ -52,13 +52,15 @@ Enter/Esc and button Space through the plugin's actual shared native controls.
 A plugin can retain specialized key behavior, as Tetris does for Space.
 
 Callbacks receive a small `Context`: presentation owner, viewport, language,
-palette, activity, injected time, typed MP3 defaults and the existing configuration storage path.
-They never receive `App` or own the terminal/event loop. Effects are limited to
-closing their own presentation, copying text to DN's internal clipboard,
-opening owned Help, requesting captured panel paths, and submitting validated
-MP3 setup defaults to the host. Interactive Copy/Help effects require the foreground binding;
-background activity cannot change another tool's focus or clipboard. Filesystem policy and score validation remain in the existing
-score store; no generic filesystem or background-job API is introduced.
+palette, activity, injected time, typed music defaults, the Nearby transfers
+presentation snapshot and the existing configuration storage path.
+They never receive `App` or own the terminal/event loop. Effects are typed requests for closing their own presentation, copying text
+through the host clipboard bridge (with its internal fallback), opening owned
+Help, captured panel paths, validated music preferences, APK operations, remote
+connections and Nearby transfer actions. Interactive Copy/Help effects require the foreground binding;
+background activity cannot change another tool's focus or clipboard. Filesystem
+publication, networking and score validation remain host responsibilities; plugins
+do not receive a generic filesystem, configuration-writing or terminal API.
 
 A view is either a shared dialog or a custom native scene plus shared controls.
 Preparation delivers activity changes before capturing the frame; painting reads
@@ -260,3 +262,18 @@ The saved-profile list and its Cancel-default deletion confirmation are owned pa
 of the connection dialog. Page transitions retire their action targets. Edit/Delete
 capture profile metadata and reject concurrent changes before atomic publication;
 profile removal does not retire active remote connections or transfers.
+
+## Nearby transfer ownership
+
+`nearby_transfers` presents discovery, verification and offer approval through
+shared controls. Typed effects request capture, Receive/Stop, connect, comparison,
+accept/decline or an owned destination Tree picker. The host validates the live
+binding, captures native sources and destinations and runs the lazy Iroh service.
+A dedicated runtime uses bounded queues; overflow rejects unaccepted work and
+retains a failure notice. Discovery and pairing events carry the window generation.
+Inactive completions update their own document without activating it.
+
+An accepted typed peer request belongs to Transfer Center, with workspace-owned
+cancellation, conflict decisions and guarded publication. Closing the plugin
+retires unaccepted work and stops advertising, while accepted jobs retain their
+session. Pairing trust and endpoint keys remain in memory until DN exits.

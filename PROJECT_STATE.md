@@ -10,6 +10,37 @@ Windows remain supported. Version 1.1.9 was the first stable release.
 See the [English README](README.md), [Russian README](README.ru.md) and
 [user guide](docs/USER_GUIDE.md) for installation, controls, safeguards and limits.
 
+### Unreleased: Nearby transfers
+
+The internal `nearby_transfers` plugin adds explicit, encrypted LAN sending and
+receiving through Iroh 1.4.1 and iroh-mdns-address-lookup 0.6.1. It is enabled by
+default but opens no network service at startup. Both peers compare a TLS-exporter
+code; receiver approval and destination choice precede every transfer. Trust is
+session-only. Accepted jobs use Transfer Center and guarded per-file publication;
+closing the plugin stops new offers, not accepted jobs. No public discovery,
+relays, port mapping, internet probes, blob storage or persisted peer identity.
+See [Nearby transfers](docs/USER_GUIDE.md#nearby-dn-transfers) for limits.
+
+Validation for this unreleased change is separate from the published 1.1.11 matrix
+below. The local full native suite passed, as did the focused protocol tests,
+44 packaging/release helpers, workflow policy, formatting and diff checks.
+All-target Clippy with warnings denied passed on macOS ARM64 and through the
+available Linux ARM64/x86_64 and Windows x86_64 cross-toolchains. The build without
+default features passed; music/plugin settings tests also passed without audio.
+The locked release rebuild reports 1.1.11.
+
+Two rebuilt release instances on the same Mac paired using manual LAN details,
+compared codes, approved reception and transferred a private multi-MiB Unicode-named
+file with a final receipt; both terminals restored after exit. Window/help/resize
+and immutable-frame checks passed. Loopback tests additionally cover folders,
+empty directories, session trust, conflict choices, cancellation, changed sources
+and destinations, corrupt streams, missing receipts, bounds and event overflow.
+
+The explicit multicast discovery test timed out on this host; automatic discovery
+is not runtime-verified here. Real two-machine LAN discovery, physical IPv6,
+Windows/Linux runtime and packet-capture verification remain pending. No CI was
+triggered, and cross-compilation is not platform runtime evidence.
+
 ### Transfer and selection fixes in 1.1.11
 
 - Publication follows mounted-volume capabilities rather than filesystem names.
@@ -1411,16 +1442,16 @@ older increment entries below also record earlier migration stages.
   configuration bound. Unsaved text is handled by save/discard guards and crash
   recovery, not session snapshots. Recovery does not restore undo history or
   guarantee every final keystroke.
-- Permission/attribute editing, persistent command history and operating-system
-  clipboard integration remain unimplemented. Command history and DN's internal
-  clipboard are session-only. External commands run with the user's permissions;
+- The working tree adds non-recursive Unix permission / Windows attribute editing
+  and desktop text clipboard access with an internal console fallback. These are
+  post-1.1.11 changes, not part of the published release. Persistent command history
+  remains unimplemented. Command history and DN's internal clipboard are session-only. External commands run with the user's permissions;
   user menus do not emulate DOS batch syntax.
 - Linux Trash supports the home volume only. macOS Trash refuses undecodable
   names; Finder Put Back is not guaranteed. Restore through the desktop manager.
   Linux external opening needs xdg-utils and a desktop session.
 - Suggested follow-up work: transfer interruption/recovery hardening, actionable
-  bug-report diagnostics, permission editing, persistent command history and OS
-  clipboard integration. These are candidates, not committed release promises.
+  bug-report diagnostics, persistent command history and broader desktop/console validation. These are candidates, not committed release promises.
 
 ## Build and run
 

@@ -151,6 +151,11 @@ fn set_focus(app: &mut App, scope: Focus, next: usize) {
                 m.focus = next;
             }
         }
+        Focus::FileInfo => {
+            if let Some(info) = app.file_info_mut() {
+                info.focus = next;
+            }
+        }
         Focus::Columns => {
             if let Some(m) = app.modals.columns_dialog_mut() {
                 m.cursor = next;
@@ -193,6 +198,7 @@ pub(crate) fn tool_action(app: &mut App, target: Target) {
         Some(Target::ColumnChoice(panel, preset)) => crate::columns::choose(app, panel, preset),
         Some(Target::AcceptColumns) => crate::columns::accept(app),
         Some(Target::CancelColumns) => crate::columns::cancel(app),
+        Some(Target::FileInfo(action)) => crate::file_info::action(app, action),
         Some(Target::CloseFileInfo) => app.set_file_info(None),
         Some(Target::Tree(a)) => crate::directory_tree::action(app, a),
         Some(Target::UserMenu(a)) => crate::user_menu::action(app, a),

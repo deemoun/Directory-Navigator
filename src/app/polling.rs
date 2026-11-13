@@ -10,6 +10,8 @@ impl App {
     pub fn poll(&mut self) -> bool {
         // Retire closed owners and orphaned children before polling any reply.
         self.sync_modals();
+        let peer_changed = crate::peer::poll(self);
+        let clipboard_changed = crate::clipboard::poll(self);
         let associations_changed = crate::associations::poll(self);
         let archive_changed = crate::archive::poll(self);
         let network_changed = crate::network::poll(self);
@@ -24,7 +26,9 @@ impl App {
         let recovery_changed = crate::editor::recovery::poll(self, std::time::Instant::now());
         let mut changed = crate::config_import::poll(self);
         changed |= crate::plugins::host::poll(self, std::time::Instant::now());
-        changed |= saver_changed
+        changed |= peer_changed
+            | clipboard_changed
+            | saver_changed
             | associations_changed
             | recovery_changed
             | editor_changed
@@ -44,9 +48,7 @@ impl App {
                     crate::desktop::WindowKind::Plugin(_)
                 );
         }
-        if let Some(info) = self.file_info_mut() {
-            changed |= info.poll();
-        }
+        changed |= crate::file_info::poll(self);
         changed |= self.poll_viewers();
         let refresh_allowed =
             crate::focus::current(self) == crate::focus::Focus::Manager && !self.screensaver.active;
@@ -139,13 +141,17 @@ impl App {
                             .viewer(*id)
                             .is_some_and(|v| v.contents.is_none() || v.pending_work())
                 })
-            || self.file_info().is_some_and(|i| i.contents.is_none())
+            || self.file_info().is_some_and(|i| i.busy())
             || self
                 .utility_state()
                 .information
                 .as_ref()
                 .is_some_and(|i| i.loading());
-        if pending || self.screensaver.active {
+        if pending
+            || crate::peer::active(self)
+            || self.clipboard.pending()
+            || self.screensaver.active
+        {
             Duration::from_millis(50)
         } else if self.config.show_clock {
             Duration::from_millis(1000 - u64::from(chrono::Local::now().timestamp_subsec_millis()))

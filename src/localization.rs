@@ -48,7 +48,10 @@ impl Language {
             let translated = self.text(key);
             let value = if matches!(key, "Modified" | "Modified (local)") {
                 format.information(value)
-            } else if matches!(key, "Entry type" | "Read-only attribute") {
+            } else if matches!(
+                key,
+                "Entry type" | "Read-only attribute" | "Attributes unavailable"
+            ) {
                 self.text(value).to_owned()
             } else {
                 value.to_owned()

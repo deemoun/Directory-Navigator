@@ -68,6 +68,11 @@ pub(crate) fn context(app: &App, b: Binding, area: Rect, now: Instant) -> Option
         now,
         storage: app.config_store.path().ok().map(PathBuf::from),
         mp3: app.config.mp3,
+        nearby: if b.plugin == NEARBY_TRANSFERS {
+            app.peer.view.clone()
+        } else {
+            Default::default()
+        },
     })
 }
 pub(crate) fn open(app: &mut App, id: PluginId) {
@@ -131,6 +136,12 @@ pub(crate) fn open(app: &mut App, id: PluginId) {
             .unwrap()
             .tool
             .open(&ctx);
+    }
+    if id == NEARBY_TRANSFERS {
+        crate::peer::opened(app, b);
+        if let Some(path) = crate::peer::base(app) {
+            dispatch(app, b, Event::NearbyDirectory(path));
+        }
     }
     if id == APK_WORKSHOP {
         let panel = &app.panels[app.active];
@@ -335,7 +346,11 @@ fn apply(app: &mut App, b: Binding, effects: Vec<Effect>) {
                     app.config.mp3 = prefs;
                 }
             }
-            Effect::CopyText(text) => app.editor_clipboard = text,
+            Effect::Nearby(action) if b.plugin == NEARBY_TRANSFERS => {
+                crate::peer::action(app, b, action)
+            }
+            Effect::Nearby(_) => {}
+            Effect::CopyText(text) => crate::clipboard::copy(app, text),
             Effect::Help { title, text } => app.push_dialog(crate::dialog::Dialog {
                 title,
                 message: text,

@@ -55,7 +55,7 @@ impl Status {
     }
 }
 #[derive(Clone)]
-struct Origin {
+pub(crate) struct Origin {
     owner: Owner,
     path: PathBuf,
     location: (u64, usize),
@@ -65,6 +65,7 @@ struct Origin {
 #[derive(Clone)]
 pub enum Request {
     Filesystem,
+    Peer(crate::peer::session::Transfer),
     Remote(crate::network::transfer::Transfer),
     Create(crate::archive::create::Creation),
     Archive {
@@ -392,6 +393,16 @@ fn submit_request(
     root: Option<crate::temp_drive::Root>,
     request: Request,
 ) -> Result<TransferId, String> {
+    submit_request_visible(app, plan, options, root, request, true)
+}
+fn submit_request_visible(
+    app: &mut App,
+    plan: Plan,
+    options: CopyOptions,
+    root: Option<crate::temp_drive::Root>,
+    request: Request,
+    show: bool,
+) -> Result<TransferId, String> {
     if let Some(root) = &root {
         root.validate().map_err(|e| e.to_string())?;
     }
@@ -441,8 +452,9 @@ fn submit_request(
     };
     let archive = matches!(request, Request::Archive { .. });
     let packing = matches!(request, Request::Create(_));
-    let remote = matches!(request, Request::Remote(_));
+    let remote = matches!(request, Request::Remote(_) | Request::Peer(_));
     let source_count = match &request {
+        Request::Peer(t) => t.session.manifest.entries.len(),
         Request::Archive { selection, .. } => selection.members.len(),
         Request::Remote(crate::network::transfer::Transfer::Download { members, .. }) => {
             members.len()
@@ -453,6 +465,7 @@ fn submit_request(
         _ => plan.sources.len(),
     };
     let archive_summary = match &request {
+        Request::Peer(request) => Some(request.summary()),
         Request::Remote(request) => Some(request.summary()),
         Request::Archive { selection, .. } => Some(format!(
             "{} :: {}{}",
@@ -509,7 +522,9 @@ fn submit_request(
     app.transfers.selected = Some(id);
     app.transfers.trim();
     start_next(app, Instant::now());
-    open(app);
+    if show {
+        open(app);
+    }
     Ok(id)
 }
 fn fail(app: &mut App, id: TransferId, error: io::Error, now: Instant) {
@@ -559,6 +574,7 @@ fn start_next(app: &mut App, now: Instant) {
     // retain their earlier asynchronous identity snapshot before execution.
     let id = e.id;
     let result = match &e.request {
+        Request::Peer(request) => Job::start_peer(id, request.clone(), e.options, e.root.clone()),
         Request::Remote(request) => {
             Job::start_remote(id, request.clone(), e.options, e.root.clone())
         }
@@ -668,6 +684,8 @@ pub(crate) fn poll(app: &mut App, now: Instant) -> bool {
                                             | operations::Phase::Calculating
                                     ) {
                                         Status::Preparing
+                                    } else if p.phase == operations::Phase::WaitingPeer {
+                                        Status::Waiting
                                     } else {
                                         Status::Running
                                     };
@@ -1057,6 +1075,47 @@ pub(crate) fn submit_remote_root(
         root,
         Request::Remote(request),
     )
+}
+
+pub(crate) fn capture_origin(app: &App) -> Origin {
+    let panel = &app.panels[app.active];
+    Origin {
+        owner: panel.scope.owner(),
+        path: panel.path.clone(),
+        location: panel.location_key(),
+        selected: panel.selected.clone(),
+        cursor: panel.entries.get(panel.cursor).map(|e| e.name.clone()),
+    }
+}
+pub(crate) fn submit_peer(
+    app: &mut App,
+    request: crate::peer::session::Transfer,
+    origin: Option<Origin>,
+    show: bool,
+) -> Result<TransferId, String> {
+    let destination = request
+        .destination
+        .clone()
+        .unwrap_or_else(|| app.panels[app.active].path.clone());
+    let plan = Plan {
+        kind: operations::Kind::Copy,
+        sources: vec![],
+        destination,
+    };
+    let id = submit_request_visible(
+        app,
+        plan,
+        CopyOptions::default(),
+        None,
+        Request::Peer(request),
+        show,
+    )?;
+    if let Some(origin) = origin {
+        if let Some(entry) = app.transfers.entries.iter_mut().find(|e| e.id == id) {
+            entry.origin = origin;
+        }
+    }
+    Ok(id)
 }
 
 #[cfg(test)]

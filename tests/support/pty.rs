@@ -170,6 +170,14 @@ impl Session {
         let master = unsafe { File::from_raw_fd(master) };
         let slave = unsafe { File::from_raw_fd(slave) };
         let original = mode(&slave)?;
+        // Multiple instances must not inherit another session's PTY descriptors.
+        // The configured standard streams are duplicated into 0/1/2 at exec.
+        for fd in [master.as_raw_fd(), slave.as_raw_fd()] {
+            // SAFETY: these are newly owned, live descriptors.
+            if unsafe { libc::fcntl(fd, libc::F_SETFD, libc::FD_CLOEXEC) } < 0 {
+                return Err(io::Error::last_os_error());
+            }
+        }
         // SAFETY: preserve the live descriptor's flags and add nonblocking reads.
         unsafe {
             let flags = libc::fcntl(master.as_raw_fd(), libc::F_GETFL);
@@ -193,6 +201,7 @@ impl Session {
             .arg(binary)
             .current_dir(&root)
             .env("TERM", terminal)
+            .env("DN_DISABLE_SYSTEM_CLIPBOARD", "1")
             .env("XDG_CONFIG_HOME", root.join("settings"))
             .env(
                 "DN_TEST_DIAGNOSTICS",
@@ -663,6 +672,14 @@ impl Drop for Session {
             unsafe {
                 libc::kill(-(self.child.id() as i32), libc::SIGKILL);
             }
+        }
+        // Close the PTY before reaping: macOS can retain a killed session leader
+        // in tty teardown while the master is still owned by its waiting parent.
+        if let Ok(empty) = File::open("/dev/null") {
+            drop(std::mem::replace(&mut self.master, empty));
+        }
+        if let Ok(empty) = File::open("/dev/null") {
+            drop(std::mem::replace(&mut self.slave, empty));
         }
         let _ = self.child.wait();
         let _ = fs::remove_dir_all(&self.root);

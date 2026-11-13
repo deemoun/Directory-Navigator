@@ -5,6 +5,7 @@ pub const DISPLAY_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub mod app;
 pub mod associations;
 pub(crate) mod button_feedback;
+pub mod clipboard;
 pub mod columns;
 pub mod commands;
 pub mod config;
@@ -27,6 +28,7 @@ pub mod operations;
 pub mod panel;
 pub mod panel_layout;
 pub mod pattern;
+pub mod peer;
 #[doc(hidden)]
 pub mod plugins;
 pub mod quick_search;

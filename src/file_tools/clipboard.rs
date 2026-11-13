@@ -75,7 +75,7 @@ pub fn copy(app: &mut App, full_paths: bool) {
     };
     match result {
         Ok((text, count)) => {
-            app.editor_clipboard = text;
+            crate::clipboard::copy(app, text);
             app.notice = format!(
                 "{} {count}",
                 app.config

@@ -196,8 +196,7 @@ pub fn key(app: &mut App, key: KeyEvent) -> bool {
             paste(app, &c.to_string());
         }
         KeyCode::Insert if key.modifiers.contains(KeyModifiers::SHIFT) => {
-            let text = app.editor_clipboard.clone();
-            paste(app, &text);
+            crate::clipboard::paste(app, false);
         }
         KeyCode::Esc => line.clear(),
         KeyCode::Enter if !line.text.is_empty() => {

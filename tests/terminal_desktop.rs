@@ -1998,3 +1998,240 @@ fn shift_arrows_mark_files_and_copy_dialog_retains_selection() -> io::Result<()>
     }
     Ok(())
 }
+
+#[test]
+fn properties_permission_apply_cancel_and_terminal_restoration() -> io::Result<()> {
+    use dn::localization::Language;
+    use std::os::unix::fs::PermissionsExt;
+    for language in [Language::English, Language::Russian] {
+        let mut s = Session::with_preferences(
+            "properties-permissions",
+            &format!("[regional]\nlanguage='{}'\n", language.key()),
+        )?;
+        s.wait("manager ready", |s| {
+            s.command_prompt_active() && s.text().contains("item-000.")
+        })?;
+        let path = s.root.join("item-000.txt");
+        let before = fs::metadata(&path)?.permissions().mode();
+        s.select_file_with_language("item-000.txt", language)?;
+        s.send(b"\x1be", "Properties", |s| {
+            s.text().contains(language.text("Edit attributes…"))
+                && s.text().contains(language.text("Permissions"))
+        })?;
+        // Wait for metadata: the Edit button is present but disabled while loading.
+        // Close is initially focused; Tab moves to Edit attributes.
+        s.send(b"\t\r", "edit permissions", |s| {
+            s.text().contains(language.text("Owner read"))
+        })?;
+        let text = s.text();
+        let label = language.text("Owner execute");
+        let (row, line) = text
+            .lines()
+            .enumerate()
+            .find(|(_, line)| line.contains(label))
+            .ok_or_else(|| io::Error::other("Missing execute checkbox"))?;
+        let column = unicode_width::UnicodeWidthStr::width(&line[..line.find(label).unwrap()]);
+        let click = format!(
+            "\x1b[<0;{};{}M\x1b[<0;{};{}m",
+            column + 1,
+            row + 1,
+            column + 1,
+            row + 1
+        );
+        s.send(click.as_bytes(), "toggle execute draft", |s| {
+            s.text().contains(language.text("Apply"))
+        })?;
+        assert_eq!(fs::metadata(&path)?.permissions().mode(), before);
+        // Click Apply through its rendered location.
+        let text = s.text();
+        let label = language.text("Apply");
+        let (row, line) = text
+            .lines()
+            .enumerate()
+            .find(|(_, line)| line.contains(label))
+            .ok_or_else(|| io::Error::other("Missing Apply"))?;
+        let column = unicode_width::UnicodeWidthStr::width(&line[..line.find(label).unwrap()]);
+        let click = format!(
+            "\x1b[<0;{};{}M\x1b[<0;{};{}m",
+            column + 1,
+            row + 1,
+            column + 1,
+            row + 1
+        );
+        s.send(click.as_bytes(), "apply permissions", |s| {
+            s.text().contains(language.text("Attributes applied."))
+        })?;
+        assert_eq!(
+            fs::metadata(&path)?.permissions().mode() & 0o7777,
+            (before ^ 0o100) & 0o7777
+        );
+        s.resize(100, 32)?;
+        s.send(b"\x1b", "return to information", |s| {
+            s.text().contains(language.text("Edit attributes…"))
+        })?;
+        s.send(b"\x1b", "close Properties", |s| s.command_prompt_active())?;
+        fs::set_permissions(&path, fs::Permissions::from_mode(before))?;
+        s.finish()?;
+    }
+    Ok(())
+}
+
+fn nearby_open(s: &mut Session) -> io::Result<()> {
+    s.send(b"\x1bu\x1b[B\x1b[B\r", "Nearby transfers", |s| {
+        s.text().contains("Manual connection details") && s.text().contains("Use panel selection")
+    })
+}
+fn nearby_click(
+    s: &mut Session,
+    label: &str,
+    stage: &str,
+    ready: impl Fn(&Session) -> bool,
+) -> io::Result<()> {
+    use unicode_width::UnicodeWidthStr;
+    let text = s.text();
+    let (row, line) = text
+        .lines()
+        .enumerate()
+        .find(|(_, line)| line.contains(label))
+        .ok_or_else(|| io::Error::other(format!("Missing Nearby control: {label}\n{text}")))?;
+    let index = line.find(label).unwrap();
+    let x = line[..index].width() + 1;
+    let y = row + 1;
+    s.send(
+        format!("\x1b[<0;{x};{y}M\x1b[<0;{x};{y}m").as_bytes(),
+        stage,
+        ready,
+    )
+}
+#[test]
+fn nearby_window_help_resize_idle_and_terminal_restoration() -> io::Result<()> {
+    let mut s = Session::new("nearby-window")?;
+    s.wait("manager ready", |s| {
+        s.command_prompt_active() && s.text().contains("item-000.")
+    })?;
+    nearby_open(&mut s)?;
+    let diagnostics = fs::read_to_string(s.root.join("settings/dn/diagnostics.txt"))?;
+    assert!(diagnostics.contains("nearby_receiving=false\nnearby_details=\n"));
+    s.send(b"\x1bOP", "Nearby help", |s| {
+        s.text().contains("Nearby Transfers Help")
+    })?;
+    s.send(b"\x1b", "close owned help", |s| {
+        s.text().contains("Manual connection details")
+            && !s.text().contains("Nearby Transfers Help")
+    })?;
+    s.resize(100, 32)?;
+    s.resize(40, 12)?;
+    s.resize(80, 25)?;
+    s.wait("restored Nearby window", |s| {
+        s.text().contains("Use panel selection")
+    })?;
+    nearby_click(&mut s, "Close", "close Nearby", |s| {
+        s.command_prompt_active()
+    })?;
+    s.finish()
+}
+
+/// Explicit LAN check: not run on CI runners without a connected local interface.
+#[test]
+#[ignore = "requires an eligible connected LAN interface and local multicast/UDP permission"]
+fn nearby_two_instances_pair_approve_stream_and_restore_terminals() -> io::Result<()> {
+    let mut receiver = Session::new("nearby-receiver")?;
+    let mut sender = Session::new("nearby-sender")?;
+    receiver.wait("receiver ready", |s| {
+        s.command_prompt_active() && s.text().contains("item-000.")
+    })?;
+    sender.wait("sender ready", |s| {
+        s.command_prompt_active() && s.text().contains("item-000.")
+    })?;
+    let name = "peer-Ёжик.txt";
+    let data = vec![0x57; 3 * 1024 * 1024 + 71];
+    fs::write(sender.root.join(name), &data)?;
+    sender.send(b"\x12", "refresh source", |s| s.command_prompt_active())?;
+    sender.select_file(name)?;
+    nearby_open(&mut receiver)?;
+    nearby_click(&mut receiver, "Receive", "receive enabled", |s| {
+        s.text().contains("Stop receiving")
+    })?;
+    receiver.wait("manual endpoint details", |s| {
+        fs::read_to_string(s.root.join("settings/dn/diagnostics.txt"))
+            .is_ok_and(|d| d.contains("nearby_details=dn-peer:1:"))
+    })?;
+    let diagnostics = fs::read_to_string(receiver.root.join("settings/dn/diagnostics.txt"))?;
+    let card = diagnostics
+        .lines()
+        .find_map(|line| line.strip_prefix("nearby_details="))
+        .unwrap()
+        .to_owned();
+    assert!(!card.contains("127.0.0.1"));
+    nearby_open(&mut sender)?;
+    nearby_click(
+        &mut sender,
+        "Use panel selection",
+        "sources captured",
+        |s| {
+            s.text().contains("Selected items: 1")
+                && fs::read_to_string(s.root.join("settings/dn/diagnostics.txt"))
+                    .is_ok_and(|d| d.contains("nearby_busy=false"))
+        },
+    )?;
+    // Manual field is the row immediately below its caption, inside the shared control.
+    let row = sender
+        .text()
+        .lines()
+        .position(|l| l.contains("Manual connection details"))
+        .unwrap()
+        + 2;
+    sender.send(
+        format!("\x1b[<0;8;{row}M\x1b[<0;8;{row}m").as_bytes(),
+        "focus manual address",
+        |s| s.text().contains("Manual connection details"),
+    )?;
+    sender.paste(&card, "manual address", |s| s.text().contains("dn-peer:1:"))?;
+    nearby_click(&mut sender, "Connect", "sender verification", |s| {
+        s.text().contains("Compare all eight digits")
+    })?;
+    receiver.wait("receiver verification", |s| {
+        s.text().contains("Compare all eight digits")
+    })?;
+    let code = |s: &Session| -> Option<String> {
+        let text = s.text();
+        let words = text.split_whitespace().collect::<Vec<_>>();
+        words
+            .windows(2)
+            .find(|w| {
+                w.iter()
+                    .all(|s| s.len() == 4 && s.bytes().all(|b| b.is_ascii_digit()))
+            })
+            .map(|w| format!("{} {}", w[0], w[1]))
+    };
+    assert!(code(&sender).is_some());
+    assert_eq!(code(&sender), code(&receiver));
+    nearby_click(&mut receiver, "Codes match", "receiver confirmed", |s| {
+        s.text().contains("Waiting for the other DN")
+    })?;
+    nearby_click(&mut sender, "Codes match", "sender queued", |s| {
+        s.text().contains("Transfer Center")
+    })?;
+    receiver.wait("review incoming offer", |s| {
+        s.text().contains("Local receive directory") && s.text().contains(name)
+    })?;
+    nearby_click(&mut receiver, "Accept", "receive completed", |s| {
+        s.text().contains("Completed") && fs::read(s.root.join(name)).is_ok_and(|b| b == data)
+    })?;
+    sender.wait("delivery receipt", |s| s.text().contains("Completed"))?;
+    assert_eq!(fs::read(sender.root.join(name))?, data);
+    sender.send(b"\x1b", "close sender center", |s| {
+        s.text().contains("Manual connection details")
+    })?;
+    receiver.send(b"\x1b", "close receiver center", |s| {
+        s.text().contains("Manual connection details")
+    })?;
+    sender.send(b"\x1b", "close sender Nearby", |s| {
+        s.command_prompt_active()
+    })?;
+    receiver.send(b"\x1b", "close receiver Nearby", |s| {
+        s.command_prompt_active()
+    })?;
+    sender.finish()?;
+    receiver.finish()
+}

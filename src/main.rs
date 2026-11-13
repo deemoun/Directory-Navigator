@@ -29,6 +29,7 @@ fn run() -> io::Result<()> {
         }
     }
     let mut app = App::new(std::env::current_dir()?)?;
+    app.clipboard.enable();
     let mut diagnostics = diagnostics::Recorder::from_env();
     app.load_initial_config_with_session(bypass_session);
     match app

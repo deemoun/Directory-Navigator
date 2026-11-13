@@ -218,7 +218,7 @@ pub fn action(app: &mut App, a: Action) {
                 .ok_or("ASCII controls cannot be copied")
             {
                 Ok(text) => {
-                    app.editor_clipboard = text;
+                    crate::clipboard::copy(app, text);
                     app.utility_state_mut().notice = "Copied to DN internal clipboard".into();
                 }
                 Err(e) => app.utility_state_mut().notice = e.into(),

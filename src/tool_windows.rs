@@ -401,7 +401,7 @@ pub(crate) fn poll(app: &mut App) -> bool {
         changed |= match kind {
             Kind::Tree => app.directory_tree_mut().is_some_and(|t| t.poll()),
             Kind::Find | Kind::Sizes => crate::discovery::poll(app),
-            Kind::FileInfo => app.file_info_mut().is_some_and(|i| i.poll()),
+            Kind::FileInfo => crate::file_info::poll(app),
             Kind::Bookmarks => crate::navigation_tools::poll(app),
             Kind::System | Kind::Memory | Kind::Network => crate::utilities::poll(app),
             Kind::CommandHistory => {

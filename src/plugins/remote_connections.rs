@@ -499,6 +499,7 @@ mod tests {
             now: Instant::now(),
             storage: None,
             mp3: Default::default(),
+            nearby: Default::default(),
         }
     }
     pub(super) fn frame(p: &RemoteConnections, c: &Context) -> String {

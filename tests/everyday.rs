@@ -586,3 +586,96 @@ fn panel_footer_sizes_totals_paths_and_resized_mouse_rows() -> io::Result<()> {
     assert_eq!(formatting::grouped_bytes(1_234_567_890), "1,234,567,890");
     Ok(())
 }
+
+#[test]
+fn properties_attributes_draft_keyboard_mouse_cancel_and_immutable_frames() -> io::Result<()> {
+    use dn::file_info::Action as A;
+    for language in [
+        dn::localization::Language::English,
+        dn::localization::Language::Russian,
+    ] {
+        let temp = Temp::new()?;
+        let path = temp.0.join("permissions.txt");
+        fs::write(&path, b"unchanged")?;
+        let before = fs::metadata(&path)?.permissions();
+        let mut app = temp.app()?;
+        app.config.language = language;
+        focus(&mut app, "permissions.txt");
+        app.open_file_info();
+        wait(&mut app, |a| a.file_info().unwrap().contents.is_some());
+        render(&mut app, 80, 25)?;
+        key(&mut app, KeyCode::Tab);
+        assert_eq!(app.file_info().unwrap().focus, 1);
+        key(&mut app, KeyCode::Enter);
+        assert!(app.file_info().unwrap().editing);
+        let first = render(&mut app, 80, 25)?.backend().buffer().clone();
+        for _ in 0..3 {
+            assert_eq!(*render(&mut app, 80, 25)?.backend().buffer(), first);
+        }
+        key(&mut app, KeyCode::Char(' '));
+        assert!(app
+            .file_info()
+            .unwrap()
+            .contents
+            .as_ref()
+            .unwrap()
+            .as_ref()
+            .unwrap()
+            .attributes
+            .as_ref()
+            .unwrap()
+            .changed());
+        assert_eq!(fs::metadata(&path)?.permissions(), before);
+        key(&mut app, KeyCode::Esc);
+        assert!(!app.file_info().unwrap().editing);
+        let mut colors = dn::palette::theme::DEFAULTS;
+        colors[0] = 0x1e;
+        app.config.palette = dn::palette::PaletteProfile::Custom(colors);
+        render(&mut app, 40, 12)?;
+        render(&mut app, 100, 32)?;
+        click(&mut app, Target::FileInfo(A::Edit));
+        render(&mut app, 100, 32)?;
+        let index = if cfg!(unix) { 2 } else { 1 };
+        click(&mut app, Target::FileInfo(A::Toggle(index)));
+        render(&mut app, 100, 32)?;
+        click(&mut app, Target::FileInfo(A::Apply));
+        wait(&mut app, |a| {
+            a.file_info().unwrap().notice == "Attributes applied."
+        });
+        #[cfg(unix)]
+        assert_ne!(fs::metadata(&path)?.permissions(), before);
+        #[cfg(windows)]
+        {
+            use std::os::windows::fs::MetadataExt;
+            assert_ne!(fs::metadata(&path)?.file_attributes() & 2, 0);
+        }
+        assert_eq!(fs::read(&path)?, b"unchanged");
+        fs::set_permissions(&path, before)?;
+    }
+    Ok(())
+}
+
+#[test]
+#[cfg(unix)]
+fn properties_retains_handle_to_restore_removed_read_access() -> io::Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+    let temp = Temp::new()?;
+    let path = temp.0.join("permissions.txt");
+    fs::write(&path, b"unchanged")?;
+    fs::set_permissions(&path, fs::Permissions::from_mode(0o600))?;
+    let mut app = temp.app()?;
+    focus(&mut app, "permissions.txt");
+    app.open_file_info();
+    wait(&mut app, |a| a.file_info().unwrap().contents.is_some());
+    dn::file_info::action(&mut app, file_info::Action::Edit);
+    dn::file_info::action(&mut app, file_info::Action::Toggle(0));
+    dn::file_info::action(&mut app, file_info::Action::Apply);
+    wait(&mut app, |a| !a.file_info().unwrap().busy());
+    assert_eq!(fs::metadata(&path)?.permissions().mode() & 0o777, 0o200);
+    dn::file_info::action(&mut app, file_info::Action::Toggle(0));
+    dn::file_info::action(&mut app, file_info::Action::Apply);
+    wait(&mut app, |a| !a.file_info().unwrap().busy());
+    assert_eq!(fs::metadata(&path)?.permissions().mode() & 0o777, 0o600);
+    assert_eq!(fs::read(&path)?, b"unchanged");
+    Ok(())
+}

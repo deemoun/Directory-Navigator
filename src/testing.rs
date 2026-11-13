@@ -45,6 +45,13 @@ pub fn diagnostic_state(app: &crate::app::App) -> String {
         app.modal_infos(), crate::button_feedback::diagnostic(app),
         native.manipulated_surface(), native.z_order(),
     );
+    if crate::peer::active(app) {
+        let _ = writeln!(
+            state,
+            "nearby_receiving={}\nnearby_details={}\nnearby_busy={}",
+            app.peer.view.receiving, app.peer.view.details, app.peer.view.busy
+        );
+    }
     for window in app.desktop.windows() {
         if let Some(s) = native.surface(crate::windowing::geometry::SurfaceKey::Document(window.id))
         {

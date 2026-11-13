@@ -6,6 +6,7 @@ mod copy_options;
 #[cfg(test)]
 mod direct_tests;
 mod guards;
+pub(crate) mod incoming;
 pub(crate) mod transfer;
 use crate::filesystem::open_regular;
 pub use copy_options::{CopyOptions, ExistingDestination};
@@ -122,6 +123,7 @@ pub enum Event {
 pub enum Phase {
     Preparing,
     Calculating,
+    WaitingPeer,
     #[default]
     Copying,
     Verifying,
@@ -133,6 +135,7 @@ impl Phase {
         match self {
             Self::Preparing => "Preparing",
             Self::Calculating => "Calculating totals",
+            Self::WaitingPeer => "Awaiting peer approval",
             Self::Copying => "Copying",
             Self::Verifying => "Verifying",
             Self::Renaming => "Renaming",

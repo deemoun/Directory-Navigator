@@ -58,6 +58,7 @@ pub const ROOTS: &[Root] = &[
             item("~F~ind...", "Ctrl+F7", Find),
             item("~C~opy...", "F5", Key(5)),
             item("Copy to ~T~emp Drive...", "", CopyToTempDrive),
+            item("Send to nearby DN...", "", SendNearby),
             item("Copy ~n~ames / paths", "", Submenu(MenuId::CopyNames)),
             item("~R~ename/Move...", "F6", Key(6)),
             item("~M~ake directory", "F7", Key(7)),
@@ -74,6 +75,11 @@ pub const ROOTS: &[Root] = &[
         entries: &[
             item("~U~ser menu", "F2", UserMenu),
             item("Smart~P~ad", "Alt+Q", SmartPad),
+            item(
+                "Nearby transfers...",
+                "",
+                Plugin(crate::plugins::NEARBY_TRANSFERS),
+            ),
             item(
                 "Remote co~n~nections...",
                 "",
