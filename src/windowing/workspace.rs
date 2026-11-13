@@ -386,13 +386,9 @@ pub(crate) fn key(app: &mut App, key: crossterm::event::KeyEvent) -> bool {
             return true;
         }
     }
-    if key.code == K::Char('0')
+    key.code == K::Char('0')
         && key.modifiers == M::ALT
         && foreground(app).is_some_and(|s| matches!(s.id.key, SurfaceKey::Page(..)))
-    {
-        return true;
-    }
-    false
 }
 pub(crate) fn capture_mouse(app: &mut App, event: crossterm::event::MouseEvent) -> bool {
     let offset = app.layout_key.map_or((0, 0), |(_, b, _)| (b.x, b.y));

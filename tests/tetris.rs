@@ -60,9 +60,9 @@ fn one_to_four_lines_compact_and_use_original_scoring() {
     for lines in 1..=4 {
         let mut game = Game::with_seed(1, now);
         game.board[0][0] = 9;
-        for row in HEIGHT - lines..HEIGHT {
-            game.board[row] = [7; WIDTH];
-            game.board[row][5] = 0;
+        for row in &mut game.board[HEIGHT - lines..HEIGHT] {
+            *row = [7; WIDTH];
+            row[5] = 0;
         }
         piece(&mut game, 2, 4, HEIGHT as i32 - 4);
         game.drop(now);
@@ -161,9 +161,9 @@ fn level_progression_preview_bonus_and_seeded_pieces() {
     game.lines = u32::MAX - 1;
     game.score = u64::MAX - 1;
     game.board = [[0; WIDTH]; HEIGHT];
-    for row in HEIGHT - 4..HEIGHT {
-        game.board[row] = [7; WIDTH];
-        game.board[row][5] = 0;
+    for row in &mut game.board[HEIGHT - 4..HEIGHT] {
+        *row = [7; WIDTH];
+        row[5] = 0;
     }
     piece(&mut game, 2, 4, HEIGHT as i32 - 4);
     game.drop(now);
@@ -922,9 +922,9 @@ fn pentix_can_clear_five_lines_with_original_scoring() {
     let now = Instant::now();
     let mut game = Game::with_seed(6, now);
     game.mode = tetris::GameMode::Pentix;
-    for row in HEIGHT - 5..HEIGHT {
-        game.board[row] = [7; WIDTH];
-        game.board[row][6] = 0;
+    for row in &mut game.board[HEIGHT - 5..HEIGHT] {
+        *row = [7; WIDTH];
+        row[6] = 0;
     }
     piece(&mut game, 11, 4, HEIGHT as i32 - 5);
     game.drop(now);
