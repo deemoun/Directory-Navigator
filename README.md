@@ -28,6 +28,12 @@ Supports **macOS, Windows and Linux**. Install the latest published release from
   </tr>
 </table>
 
+## Watch the video
+
+[![Watch Directory Navigator on YouTube](https://img.youtube.com/vi/QPLtVPms_nY/hqdefault.jpg)](https://youtu.be/QPLtVPms_nY)
+
+[▶ Watch on YouTube](https://youtu.be/QPLtVPms_nY)
+
 ## Built on Turbo Vision
 
 [Turbo Vision for Rust](https://github.com/aovestdipaperino/turbo-vision-4-rust)

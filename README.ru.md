@@ -29,6 +29,12 @@
   </tr>
 </table>
 
+## Видео
+
+[![Смотреть видео о Directory Navigator на YouTube](https://img.youtube.com/vi/QPLtVPms_nY/hqdefault.jpg)](https://youtu.be/QPLtVPms_nY)
+
+[▶ Смотреть на YouTube](https://youtu.be/QPLtVPms_nY)
+
 ## На основе Turbo Vision
 
 [Turbo Vision for Rust](https://github.com/aovestdipaperino/turbo-vision-4-rust)
