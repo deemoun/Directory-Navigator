@@ -506,3 +506,43 @@ fn brief_mouse_wheel_and_double_click_in_later_columns() -> io::Result<()> {
     assert_eq!(app.panels[1].path, destination);
     Ok(())
 }
+
+#[test]
+fn shift_arrows_mark_traversed_rows_without_marking_parent_or_other_pane() -> io::Result<()> {
+    let t = Temp::new()?;
+    for index in 0..45 {
+        fs::write(t.0.join(format!("row-{index:02}.txt")), "fixture")?;
+    }
+    let mut app = t.app()?;
+    render(&mut app, 80, 25)?;
+    focus(&mut app, "row-00.txt");
+    let shift = |app: &mut App, code| {
+        input::handle(app, KeyEvent::new(code, KeyModifiers::SHIFT));
+    };
+    shift(&mut app, KeyCode::Down);
+    assert_eq!(highlighted(&app), "row-01.txt");
+    assert!(app.panels[0]
+        .selected
+        .contains(std::ffi::OsStr::new("row-00.txt")));
+    assert!(app.panels[0]
+        .selected
+        .contains(std::ffi::OsStr::new("row-01.txt")));
+    shift(&mut app, KeyCode::Right);
+    let end = app.panels[0].cursor;
+    assert!(end > 2);
+    assert_eq!(app.panels[0].selected.len(), end);
+    shift(&mut app, KeyCode::Left);
+    assert_eq!(highlighted(&app), "row-01.txt");
+    shift(&mut app, KeyCode::Up);
+    assert_eq!(highlighted(&app), "row-00.txt");
+    assert_eq!(app.panels[0].selected.len(), end);
+    let before = app.panels[0].selected.clone();
+    key(&mut app, KeyCode::Down);
+    assert_eq!(app.panels[0].selected, before);
+    assert!(app.panels[1].selected.is_empty());
+    focus(&mut app, "..");
+    shift(&mut app, KeyCode::Up);
+    assert!(!app.panels[0].selected.contains(std::ffi::OsStr::new("..")));
+    assert_eq!(app.panels[0].selected, before);
+    Ok(())
+}

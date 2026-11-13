@@ -1,6 +1,10 @@
 //! Guarded file operations. Replacement requires a per-job conflict decision.
+mod capabilities;
+mod compatible;
 pub mod conflict;
 mod copy_options;
+#[cfg(test)]
+mod direct_tests;
 mod guards;
 pub(crate) mod transfer;
 use crate::filesystem::open_regular;
@@ -18,6 +22,66 @@ use std::{
     thread,
     time::{Duration, Instant},
 };
+
+#[derive(Debug)]
+struct CopyStepError {
+    step: &'static str,
+    path: PathBuf,
+    cause: io::Error,
+}
+impl std::fmt::Display for CopyStepError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} ({}): {}", self.step, self.path.display(), self.cause)
+    }
+}
+impl std::error::Error for CopyStepError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(&self.cause)
+    }
+}
+fn copy_step<T>(result: io::Result<T>, step: &'static str, path: &Path) -> io::Result<T> {
+    result.map_err(|cause| {
+        io::Error::new(
+            cause.kind(),
+            CopyStepError {
+                step,
+                path: path.to_owned(),
+                cause,
+            },
+        )
+    })
+}
+
+fn copy_bytes(
+    input: &mut impl Read,
+    output: &mut impl Write,
+    length: u64,
+    buffer: &mut [u8],
+    cancel: &AtomicBool,
+    mut progress: impl FnMut(u64) -> io::Result<()>,
+) -> io::Result<()> {
+    let mut remaining = length;
+    while remaining > 0 {
+        check(cancel)?;
+        let limit = remaining.min(buffer.len() as u64) as usize;
+        let count = input.read(&mut buffer[..limit])?;
+        if count == 0 {
+            return Err(io::Error::other(
+                "Source shrank during copy; original retained",
+            ));
+        }
+        output.write_all(&buffer[..count])?;
+        remaining -= count as u64;
+        progress(count as u64)?;
+    }
+    check(cancel)?;
+    if input.read(&mut buffer[..1])? != 0 {
+        return Err(io::Error::other(
+            "Source grew during copy; original retained",
+        ));
+    }
+    Ok(())
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Kind {
@@ -561,11 +625,35 @@ fn run_checked_expected(
     plan: &Plan,
     options: CopyOptions,
     cancel: &AtomicBool,
+    notify: impl FnMut(&Progress),
+    strategy: MoveStrategy,
+    space: impl Fn(&Path) -> io::Result<u128>,
+    expected: Option<&transfer::Prepared>,
+    ask: &mut conflict::Ask<'_>,
+) -> io::Result<Progress> {
+    run_with_capabilities(
+        plan,
+        options,
+        cancel,
+        notify,
+        strategy,
+        space,
+        expected,
+        ask,
+        &mut capabilities::Cache::default(),
+    )
+}
+#[allow(clippy::too_many_arguments)]
+fn run_with_capabilities(
+    plan: &Plan,
+    options: CopyOptions,
+    cancel: &AtomicBool,
     mut notify: impl FnMut(&Progress),
     strategy: MoveStrategy,
     space: impl Fn(&Path) -> io::Result<u128>,
     expected: Option<&transfer::Prepared>,
     ask: &mut conflict::Ask<'_>,
+    capabilities: &mut capabilities::Cache,
 ) -> io::Result<Progress> {
     let mut resolver = conflict::Resolver::new(options.existing, ask);
     let mut effective = plan.clone();
@@ -757,20 +845,33 @@ fn run_checked_expected(
                             "Destination directory changed during copy",
                         ));
                     }
-                    crate::platform_fs::copy_extended_metadata(&input, &output)?;
+                    copy_step(
+                        crate::platform_fs::copy_extended_metadata(&input, &output),
+                        "Copying directory extended metadata",
+                        &target,
+                    )?;
                     #[cfg(unix)]
                     {
-                        output.set_permissions(metadata.permissions())?;
-                        if let Ok(modified) = metadata.modified() {
-                            output.set_times(fs::FileTimes::new().set_modified(modified))?;
-                        }
-                        output.sync_all()?;
+                        copy_step(
+                            crate::platform_fs::copy_basic_metadata(&output, &metadata),
+                            "Copying directory permissions and timestamps",
+                            &target,
+                        )?;
+                        copy_step(
+                            crate::platform_fs::sync_directory(&output),
+                            "Synchronizing copied directory",
+                            &target,
+                        )?;
                     }
                     #[cfg(not(unix))]
                     {
                         let _ = metadata;
                     }
-                    crate::platform_fs::sync_parent(&target)?;
+                    copy_step(
+                        crate::platform_fs::sync_parent(&target),
+                        "Synchronizing destination parent",
+                        &target,
+                    )?;
                     continue;
                 }
                 Work::Visit(source, target) => (source, target),
@@ -846,37 +947,32 @@ fn run_checked_expected(
                     progress.detail(source.clone(), "Skipped existing destination".into());
                     continue;
                 };
-                let mut staged = crate::publication::StagedFile::create(&target)?;
-                let output = &mut staged.file;
-                let mut remaining = metadata.len();
-                while remaining > 0 {
-                    check(cancel)?;
-                    let limit = remaining.min(buffer.len() as u64) as usize;
-                    let count = input.read(&mut buffer[..limit])?;
-                    if count == 0 {
-                        return Err(io::Error::other(
-                            "Source shrank during copy; original retained",
-                        ));
-                    }
-                    output.write_all(&buffer[..count])?;
-                    remaining -= count as u64;
-                    progress.bytes = progress.bytes.saturating_add(count as u64);
-                    progress.written = progress.written.saturating_add(count as u64);
-                    notify(&progress);
-                }
                 check(cancel)?;
-                if input.read(&mut buffer[..1])? != 0 {
-                    return Err(io::Error::other(
-                        "Source grew during copy; original retained",
-                    ));
-                }
-                output.sync_all()?;
-                if options.verify_writes || options.remove_sources {
-                    progress.phase = Phase::Verifying;
-                    notify(&progress);
-                    copy_options::verify(&mut input, output, metadata.len(), cancel)?;
-                }
+                let capability = if approved.is_none() {
+                    capabilities.get(&target, &guards)?
+                } else {
+                    capabilities::Capability::Unknown
+                };
                 check(cancel)?;
+                guards.verify_parent(&source)?;
+                guards.verify_parent(&target)?;
+                verify_entry(&source, &metadata)?;
+                let direct = capability == capabilities::Capability::Compatibility;
+                let mut destination = compatible::Destination::create(&target, direct)?;
+                let output = destination.file();
+                copy_bytes(
+                    &mut input,
+                    output,
+                    metadata.len(),
+                    &mut buffer,
+                    cancel,
+                    |count| {
+                        progress.bytes = progress.bytes.saturating_add(count);
+                        progress.written = progress.written.saturating_add(count);
+                        notify(&progress);
+                        Ok(())
+                    },
+                )?;
                 guards.verify_parent(&source)?;
                 guards.verify_parent(&target)?;
                 if !unchanged_file(&metadata, &input.metadata()?)
@@ -886,17 +982,63 @@ fn run_checked_expected(
                         "Source changed during copy; original retained",
                     ));
                 }
-                crate::platform_fs::copy_extended_metadata(&input, output)?;
-                output.set_permissions(metadata.permissions())?;
-                if let Ok(modified) = metadata.modified() {
-                    output.set_times(fs::FileTimes::new().set_modified(modified))?;
+                copy_step(
+                    crate::platform_fs::copy_extended_metadata(&input, output),
+                    "Copying file extended metadata",
+                    &target,
+                )?;
+                copy_step(
+                    crate::platform_fs::copy_basic_metadata(output, &metadata),
+                    "Copying file permissions and timestamps",
+                    &target,
+                )?;
+                copy_step(output.sync_all(), "Synchronizing copied file", &target)?;
+                if direct || options.verify_writes || options.remove_sources {
+                    progress.phase = Phase::Verifying;
+                    notify(&progress);
+                    copy_options::verify(&mut input, output, metadata.len(), cancel)?;
                 }
-                output.sync_all()?;
                 check(cancel)?;
                 guards.verify_parent(&source)?;
                 guards.verify_parent(&target)?;
                 verify_entry(&source, &metadata)?;
-                conflict::publish(&staged, &target, approved.as_ref())?;
+                if !unchanged_file(&metadata, &input.metadata()?) {
+                    return Err(io::Error::other(
+                        "Source changed during verification; original retained",
+                    ));
+                }
+                match &mut destination {
+                    compatible::Destination::Direct(output) => {
+                        copy_step(output.commit(), "Completing verified copy", &target)?;
+                    }
+                    compatible::Destination::Staged(staged) => {
+                        let fallback = copy_step(
+                            conflict::publish(
+                                staged,
+                                &target,
+                                approved.as_ref(),
+                                capability,
+                                cancel,
+                                |written, phase| {
+                                    guards.verify_parent(&source)?;
+                                    guards.verify_parent(&target)?;
+                                    if written > 0 || progress.phase != phase {
+                                        // Staging already counted this source payload.
+                                        // Retrying publication must not inflate transfer speed.
+                                        progress.phase = phase;
+                                        notify(&progress);
+                                    }
+                                    Ok(())
+                                },
+                            ),
+                            "Publishing completed copy",
+                            &target,
+                        )?;
+                        if fallback {
+                            capabilities.learned_compatibility(&target);
+                        }
+                    }
+                }
             } else {
                 return Err(io::Error::other(format!(
                     "Unsupported special file: {}",
@@ -1104,5 +1246,30 @@ mod prepared_delete_tests {
         assert_eq!(fs::read(&plan.sources[0])?, b"replacement");
         assert_eq!(fs::read(&plan.sources[1])?, b"keep");
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod copy_diagnostic_tests {
+    use super::*;
+    #[test]
+    fn failed_copy_step_retains_path_kind_and_original_cause() {
+        let path = Path::new("USB 世界").join("result.txt");
+        let error = copy_step::<()>(
+            Err(io::Error::new(io::ErrorKind::StorageFull, "device failure")),
+            "Publishing completed copy",
+            &path,
+        )
+        .unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::StorageFull);
+        let context = error
+            .get_ref()
+            .unwrap()
+            .downcast_ref::<CopyStepError>()
+            .unwrap();
+        assert_eq!(context.path, path);
+        assert_eq!(context.cause.kind(), io::ErrorKind::StorageFull);
+        assert!(error.to_string().contains("Publishing completed copy"));
+        assert!(error.to_string().contains("device failure"));
     }
 }

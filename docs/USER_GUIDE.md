@@ -192,6 +192,7 @@ an immediate refresh.
 | Enter / Backspace | Open directory, archive or default application / parent directory |
 | Ctrl+Enter | Open with OS default application (also in File menu) |
 | Insert / Space | Toggle mark and advance |
+| Shift+arrows / PgUp / PgDn / Home / End | Mark traversed entries while navigating; existing marks remain |
 | Ctrl+A / Ctrl+U | Mark all / clear marks |
 | + / - | Select / unselect group by name pattern |
 | Alt+Backspace | Directory history (session only) |
@@ -285,7 +286,7 @@ Move/rename use DN's expanded dialog with these supported choices:
 - **Check free disk space**: estimate regular-file lengths before writing. This is
   advisory: filesystem overhead and later space changes can still cause errors.
   An unavailable space reading stops the operation before writing.
-- **Verify disk writes**: read back and compare staged file bytes before publishing.
+- **Verify disk writes**: read back and compare copied file bytes before completion. Compatibility copying always verifies new files, even when this option is off.
 - **Remove source files (Copy only)**: force verification, copy the whole selected
   batch, then use the guarded move cleanup. A failed or cancelled copy retains its sources;
   errors during cleanup retain remaining sources and completed destinations.
@@ -303,9 +304,30 @@ directory for renaming. Both dialogs share destination history, as in DN.
 
 Move/rename prefers native exclusive rename. Its space check runs only when
 copying is required; a native rename needs no copy capacity. Selecting **Verify
-disk writes** uses staged copying even on the same volume, then guarded source
+disk writes** copies and verifies bytes even on the same volume, then uses guarded source
 cleanup after the whole copied batch succeeds. Cancellation/errors keep completed
 native renames and published copies; there is no automatic rollback.
+
+Publication follows the mounted volume's capabilities, not its format name.
+DN uses native capability information or bounded private probes and caches results
+only for the current transfer. Supported volumes retain staged publication.
+Unknown capabilities keep the staged path; permission, read-only, space and I/O
+errors never select a faster copying mode.
+
+When neither exclusive rename nor hard-link publication is available, new files
+are copied directly into exclusively created destinations and always verified.
+This avoids writing the file twice on the destination volume. Existing targets
+still require approval and use staged replacement. Normal failure or cancellation
+removes incomplete output only while DN still owns it. A crash or power loss can
+leave a new compatibility output incomplete; check it before retrying.
+
+Copied metadata is limited to what DN and the mounted driver support. Explicitly
+unsupported optional Unix permissions, timestamps and extended attributes do not
+abort the data copy; real permission and I/O failures remain errors. FAT32 has an
+approximately 4 GiB per-file limit, while exFAT supports larger files. NTFS ACLs
+and alternate data streams are not explicitly copied by DN's Windows backend.
+Atomic publication and read-back verification do not guarantee survival of power
+loss. A failure after publication retains completed output and reports its result.
 
 Copy and Move open the **Transfer Center**, a switchable desktop window. One
 transfer runs at a time; additional requests join its queue. Browse, edit and
@@ -315,8 +337,8 @@ control and Close hide the window without cancelling work.
 
 Select a request to see its phase, current path, item/skip counts, bytes and
 elapsed time. The native progress bar uses estimated totals where available;
-large, unreadable or changing trees can have unknown totals. Speed counts actual
-copied bytes, not native renames. Remaining time is shown only when meaningful.
+large, unreadable or changing trees can have unknown totals. Speed counts source payload bytes once; verification and publication retries do
+not add bytes, and native renames do not count as copied data. Remaining time is shown only when meaningful.
 Enter opens details; F1 opens Help. Cancel selected requests cancellation of
 active work and waits for acknowledgement, or removes a queued request without
 writing. Errors and cancellation pause the queue; Resume queue starts waiting

@@ -1967,3 +1967,34 @@ fn quick_directories_double_click_navigates_and_restores_terminal() -> io::Resul
     }
     Ok(())
 }
+
+#[test]
+fn shift_arrows_mark_files_and_copy_dialog_retains_selection() -> io::Result<()> {
+    use dn::localization::Language;
+    for language in [Language::English, Language::Russian] {
+        let mut s = Session::with_preferences(
+            "shift-pane-marks",
+            &format!("[regional]\nlanguage='{}'\n", language.key()),
+        )?;
+        s.select_file_with_language("item-000.txt", language)?;
+        s.send(b"\x1b[1;2B", "Shift Down marks traversed files", |s| {
+            s.text()
+                .contains(&format!("2 {}", language.text("selected files")))
+        })?;
+        s.send(b"\x1b[15~", "copy marked files", |s| {
+            s.text().contains(
+                &language
+                    .text("Copy {} selected items to")
+                    .replace("{}", "2"),
+            )
+        })?;
+        s.send(b"\x1b", "cancel selected copy", |s| {
+            s.command_prompt_active()
+        })?;
+        s.send(b"\t", "switch pane without losing marks", |s| {
+            s.command_prompt_active()
+        })?;
+        s.finish()?;
+    }
+    Ok(())
+}

@@ -71,6 +71,28 @@ pub fn rename_no_replace(source: &Path, target: &Path) -> io::Result<()> {
         ))
     }
 }
+/// Explicit operation-unavailable responses only; permissions, cross-device,
+/// invalid arguments and general I/O failures are not capability evidence.
+pub(crate) fn unsupported_operation(error: &io::Error) -> bool {
+    if error.kind() == io::ErrorKind::Unsupported {
+        return true;
+    }
+    #[cfg(unix)]
+    {
+        error.raw_os_error().is_some_and(|code| {
+            code == libc::ENOTSUP || code == libc::EOPNOTSUPP || code == libc::ENOSYS
+        })
+    }
+    #[cfg(windows)]
+    {
+        matches!(error.raw_os_error(), Some(1 | 50))
+    }
+    #[cfg(not(any(unix, windows)))]
+    {
+        false
+    }
+}
+
 pub fn can_copy_fallback(error: &io::Error) -> bool {
     if error.kind() == io::ErrorKind::Unsupported {
         return true;
@@ -109,10 +131,7 @@ pub fn sync_parent(path: &Path) -> io::Result<()> {
             .parent()
             .filter(|p| !p.as_os_str().is_empty())
             .unwrap_or(Path::new("."));
-        match File::open(parent)?.sync_all() {
-            Err(e) if matches!(e.raw_os_error(), Some(libc::EINVAL | libc::ENOTSUP)) => Ok(()),
-            result => result,
-        }
+        sync_directory(&File::open(parent)?)
     }
     #[cfg(not(unix))]
     {
@@ -120,39 +139,78 @@ pub fn sync_parent(path: &Path) -> io::Result<()> {
         Ok(())
     }
 }
+
+/// Directory fsync is unavailable on some filesystems. This exception must
+/// never be applied to regular-file synchronization.
+pub fn sync_directory(directory: &File) -> io::Result<()> {
+    #[cfg(unix)]
+    {
+        match directory.sync_all() {
+            Err(e) if matches!(e.raw_os_error(), Some(libc::EINVAL | libc::ENOTSUP)) => Ok(()),
+            result => result,
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = directory;
+        Ok(())
+    }
+}
+/// Preserve the basic metadata that the destination filesystem can represent.
+/// In particular, macOS FAT volumes do not implement Unix permission bits.
+pub fn copy_basic_metadata(target: &File, metadata: &Metadata) -> io::Result<()> {
+    optional_metadata(target.set_permissions(metadata.permissions()))?;
+    if let Ok(modified) = metadata.modified() {
+        optional_metadata(target.set_times(fs::FileTimes::new().set_modified(modified)))?;
+    }
+    Ok(())
+}
+
+fn optional_metadata(result: io::Result<()>) -> io::Result<()> {
+    #[cfg(unix)]
+    if result.as_ref().is_err_and(|error| {
+        error.kind() == io::ErrorKind::Unsupported
+            || error
+                .raw_os_error()
+                .is_some_and(|code| code == libc::ENOTSUP || code == libc::EOPNOTSUPP)
+    }) {
+        return Ok(());
+    }
+    result
+}
+
 pub fn copy_extended_metadata(source: &File, target: &File) -> io::Result<()> {
     #[cfg(target_os = "macos")]
     {
         use std::os::fd::AsRawFd;
-        if unsafe {
-            libc::fcopyfile(
-                source.as_raw_fd(),
-                target.as_raw_fd(),
-                std::ptr::null_mut(),
-                libc::COPYFILE_ACL | libc::COPYFILE_XATTR,
-            )
-        } != 0
-        {
-            return Err(io::Error::last_os_error());
-        }
+        copy_macos_metadata(|flags| {
+            if unsafe {
+                libc::fcopyfile(
+                    source.as_raw_fd(),
+                    target.as_raw_fd(),
+                    std::ptr::null_mut(),
+                    flags,
+                )
+            } == 0
+            {
+                Ok(())
+            } else {
+                Err(io::Error::last_os_error())
+            }
+        })?;
     }
     #[cfg(target_os = "linux")]
     {
         use std::os::fd::AsRawFd;
         let size = unsafe { libc::flistxattr(source.as_raw_fd(), std::ptr::null_mut(), 0) };
         if size < 0 {
-            let e = io::Error::last_os_error();
-            return if e.raw_os_error() == Some(libc::ENOTSUP) {
-                Ok(())
-            } else {
-                Err(e)
-            };
+            return optional_metadata(Err(io::Error::last_os_error()));
         }
         let mut names = vec![0u8; size as usize];
         let count =
             unsafe { libc::flistxattr(source.as_raw_fd(), names.as_mut_ptr().cast(), names.len()) };
         if count < 0 {
-            return Err(io::Error::last_os_error());
+            return optional_metadata(Err(io::Error::last_os_error()));
         }
         for name in names[..count as usize].split_inclusive(|b| *b == 0) {
             if name.last() != Some(&0) {
@@ -167,7 +225,7 @@ pub fn copy_extended_metadata(source: &File, target: &File) -> io::Result<()> {
                 )
             };
             if size < 0 {
-                return Err(io::Error::last_os_error());
+                return optional_metadata(Err(io::Error::last_os_error()));
             }
             let mut value = vec![0u8; size as usize];
             let count = unsafe {
@@ -179,7 +237,7 @@ pub fn copy_extended_metadata(source: &File, target: &File) -> io::Result<()> {
                 )
             };
             if count < 0 {
-                return Err(io::Error::last_os_error());
+                return optional_metadata(Err(io::Error::last_os_error()));
             }
             if unsafe {
                 libc::fsetxattr(
@@ -191,7 +249,7 @@ pub fn copy_extended_metadata(source: &File, target: &File) -> io::Result<()> {
                 )
             } != 0
             {
-                return Err(io::Error::last_os_error());
+                optional_metadata(Err(io::Error::last_os_error()))?;
             }
         }
     }
@@ -335,4 +393,94 @@ pub fn open_directory(path: &Path) -> io::Result<File> {
         return Err(io::Error::other("Directory changed before opening"));
     }
     Ok(file)
+}
+
+// Copy the two independent metadata classes separately: a destination may
+// support extended attributes while lacking ACLs, or vice versa.
+#[cfg(target_os = "macos")]
+fn copy_macos_metadata(
+    mut copy: impl FnMut(libc::copyfile_flags_t) -> io::Result<()>,
+) -> io::Result<()> {
+    for flags in [libc::COPYFILE_ACL, libc::COPYFILE_XATTR] {
+        optional_metadata(copy(flags))?;
+    }
+    Ok(())
+}
+
+#[cfg(all(test, target_os = "macos"))]
+mod metadata_tests {
+    use super::*;
+
+    #[test]
+    fn unsupported_usb_metadata_does_not_prevent_copying_other_metadata() {
+        for unsupported in [libc::COPYFILE_ACL, libc::COPYFILE_XATTR] {
+            let mut calls = Vec::new();
+            copy_macos_metadata(|flags| {
+                calls.push(flags);
+                if flags == unsupported {
+                    Err(io::Error::from_raw_os_error(libc::ENOTSUP))
+                } else {
+                    Ok(())
+                }
+            })
+            .expect("unsupported optional metadata must not fail the data copy");
+            assert_eq!(calls, [libc::COPYFILE_ACL, libc::COPYFILE_XATTR]);
+        }
+        copy_macos_metadata(|_| Err(io::Error::from_raw_os_error(libc::ENOTSUP)))
+            .expect("neither metadata class is required on a USB filesystem");
+    }
+
+    #[test]
+    fn unsupported_basic_permissions_and_times_are_optional_but_real_errors_are_not() {
+        optional_metadata(Err(io::Error::from_raw_os_error(libc::ENOTSUP)))
+            .expect("FAT permissions must not prevent data publication");
+        for errno in [libc::EACCES, libc::EIO, libc::ENOSPC, libc::EROFS] {
+            assert_eq!(
+                optional_metadata(Err(io::Error::from_raw_os_error(errno)))
+                    .unwrap_err()
+                    .raw_os_error(),
+                Some(errno)
+            );
+        }
+    }
+
+    #[test]
+    fn metadata_permission_io_and_space_errors_are_not_ignored() {
+        for errno in [
+            libc::EACCES,
+            libc::EPERM,
+            libc::EIO,
+            libc::ENOSPC,
+            libc::EROFS,
+        ] {
+            let error = copy_macos_metadata(|_| Err(io::Error::from_raw_os_error(errno)))
+                .expect_err("real failures must remain visible");
+            assert_eq!(error.raw_os_error(), Some(errno));
+        }
+    }
+}
+
+#[cfg(all(test, unix))]
+mod optional_metadata_policy_tests {
+    use super::*;
+    #[test]
+    fn unsupported_metadata_is_optional_on_both_unix_hosts_but_real_errors_remain() {
+        for code in [libc::ENOTSUP, libc::EOPNOTSUPP] {
+            assert!(optional_metadata(Err(io::Error::from_raw_os_error(code))).is_ok());
+        }
+        for code in [
+            libc::EACCES,
+            libc::EPERM,
+            libc::ENOSPC,
+            libc::EIO,
+            libc::EROFS,
+        ] {
+            assert_eq!(
+                optional_metadata(Err(io::Error::from_raw_os_error(code)))
+                    .unwrap_err()
+                    .raw_os_error(),
+                Some(code)
+            );
+        }
+    }
 }

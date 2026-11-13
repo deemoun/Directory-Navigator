@@ -146,7 +146,16 @@ pub(crate) fn key(app: &mut App, key: KeyEvent) -> bool {
         .native()
         .pane_key(app.active, app.utilities.size, key);
     if let Some((index, command)) = command {
-        panel_command::apply(app, index, command);
+        let mark = key.modifiers == M::SHIFT
+            && matches!(
+                command,
+                Command::Step(_)
+                    | Command::Column(_)
+                    | Command::Page(_)
+                    | Command::First
+                    | Command::Last
+            );
+        panel_command::apply_with_selection(app, index, command, mark);
         true
     } else {
         false

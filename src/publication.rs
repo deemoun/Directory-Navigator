@@ -49,19 +49,42 @@ impl StagedFile {
     /// Success means the destination is published; directory durability is separate.
     pub(crate) fn publish_unsynced(&self, destination: &Path) -> io::Result<()> {
         self.file.sync_all()?;
+        self.publish_ready(destination)
+    }
+    /// Publish after the caller synchronized all data and metadata. No writes
+    /// may occur between that synchronization and this call.
+    pub(crate) fn publish_ready(&self, destination: &Path) -> io::Result<()> {
         if !crate::platform_fs::owns_file(&self.path, &self.file) {
             return Err(io::Error::other("Temporary output was replaced"));
         }
-        match crate::platform_fs::rename_no_replace(&self.path, destination) {
-            Ok(()) => {}
-            Err(e) if crate::platform_fs::can_copy_fallback(&e) => {
-                fs::hard_link(&self.path, destination)?;
-            }
-            Err(e) => return Err(e),
-        }
+        publication_attempt(
+            crate::platform_fs::rename_no_replace(&self.path, destination),
+            || fs::hard_link(&self.path, destination),
+        )?;
         Ok(())
     }
 }
+fn publication_attempt(
+    rename: io::Result<()>,
+    link: impl FnOnce() -> io::Result<()>,
+) -> io::Result<()> {
+    match rename {
+        Ok(()) => Ok(()),
+        Err(rename_error) if crate::platform_fs::can_copy_fallback(&rename_error) => {
+            match link() {
+                Ok(()) => Ok(()),
+                Err(link_error) if crate::platform_fs::unsupported_operation(&rename_error) => {
+                    Err(link_error)
+                }
+                // A link limitation alone must not disguise an invalid/ambiguous
+                // rename as proof that direct copying is necessary.
+                Err(_) => Err(rename_error),
+            }
+        }
+        Err(error) => Err(error),
+    }
+}
+
 impl Drop for StagedFile {
     fn drop(&mut self) {
         if crate::platform_fs::owns_file(&self.path, &self.file) {
@@ -102,6 +125,57 @@ mod tests {
             let _ = fs::remove_dir_all(&self.0);
         }
     }
+    #[test]
+    fn unsupported_link_does_not_disguise_ambiguous_or_denied_rename() {
+        for kind in [
+            io::ErrorKind::PermissionDenied,
+            io::ErrorKind::Other,
+            io::ErrorKind::InvalidInput,
+        ] {
+            let error =
+                publication_attempt(Err(io::Error::new(kind, "original rename error")), || {
+                    Err(io::Error::new(
+                        io::ErrorKind::Unsupported,
+                        "links unavailable",
+                    ))
+                })
+                .unwrap_err();
+            assert_eq!(error.kind(), kind);
+            assert!(error.to_string().contains("original rename error"));
+        }
+        let error = publication_attempt(
+            Err(io::Error::new(
+                io::ErrorKind::Unsupported,
+                "rename unavailable",
+            )),
+            || {
+                Err(io::Error::new(
+                    io::ErrorKind::PermissionDenied,
+                    "link denied",
+                ))
+            },
+        )
+        .unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::PermissionDenied);
+        #[cfg(unix)]
+        {
+            let error =
+                publication_attempt(Err(io::Error::from_raw_os_error(libc::EINVAL)), || {
+                    Err(io::ErrorKind::Unsupported.into())
+                })
+                .unwrap_err();
+            assert_eq!(error.raw_os_error(), Some(libc::EINVAL));
+        }
+        #[cfg(windows)]
+        {
+            let error = publication_attempt(Err(io::Error::from_raw_os_error(17)), || {
+                Err(io::ErrorKind::Unsupported.into())
+            })
+            .unwrap_err();
+            assert_eq!(error.raw_os_error(), Some(17));
+        }
+    }
+
     #[test]
     fn abandoned_staging_removes_only_its_own_partial_output() -> io::Result<()> {
         let t = Temp::new()?;

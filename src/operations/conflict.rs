@@ -184,20 +184,22 @@ pub(crate) fn verify_replacement(path: &Path, original: &Metadata) -> io::Result
     }
     Ok(())
 }
-pub(crate) fn publish(
+pub(super) fn publish(
     stage: &crate::publication::StagedFile,
     target: &Path,
     approved: Option<&Approved>,
-) -> io::Result<()> {
+    capability: super::capabilities::Capability,
+    cancel: &AtomicBool,
+    progress: impl FnMut(u64, Phase) -> io::Result<()>,
+) -> io::Result<bool> {
     if let Some(original) = approved {
-        stage.file.sync_all()?;
         if !crate::platform_fs::owns_file(stage.path(), &stage.file) {
             return Err(io::Error::other("Temporary output was replaced"));
         }
         original.verify(target)?;
         fs::rename(stage.path(), target)?;
-        crate::platform_fs::sync_parent(target)
+        crate::platform_fs::sync_parent(target).map(|_| false)
     } else {
-        stage.publish(target)
+        super::compatible::publish(stage, target, capability, cancel, progress)
     }
 }
