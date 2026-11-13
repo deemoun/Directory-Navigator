@@ -1,16 +1,85 @@
 # Directory Navigator
 
-## Current status — stable 1.1.12
+## Current status — stable 1.1.13
 
-Directory Navigator 1.1.12 is published and available
-on [crates.io](https://crates.io/crates/directory-navigator/1.1.12). The crate is
+Directory Navigator 1.1.13 is published and available
+on [crates.io](https://crates.io/crates/directory-navigator/1.1.13). The crate is
 `directory-navigator`; the installed executable remains `dn`. macOS, Linux and
 Windows remain supported. Version 1.1.9 was the first stable release.
 
 See the [English README](README.md), [Russian README](README.ru.md) and
 [user guide](docs/USER_GUIDE.md) for installation, controls, safeguards and limits.
 
-### Unreleased 1.1.13: Nearby text sharing
+### Nearby improvements in 1.1.13
+
+- **Send text…** shares links and multiline Unicode text up to **64 KiB UTF-8**.
+  The receiver approves the offer, previews the text and explicitly chooses
+  **Copy / Dismiss**. There is no automatic clipboard change or URL opening.
+  Console sessions retain the internal clipboard fallback; drafts and previews
+  are session-only. A receipt confirms retention by the other DN, not copying;
+  lost receipts leave delivery unconfirmed. File transfers remain compatible
+  through separate file, connection-test and text protocol identifiers.
+- **Test connection** verifies encrypted reachability and bilateral eight-digit
+  pairing without selecting or sending files. Session-only nicknames and
+  **Device info…** expose the public identity and local interfaces/addresses;
+  anonymous default names contain no username or hostname.
+- **Refresh** and automatic interface monitoring handle newly available local
+  interfaces, including VM interfaces, while retaining session identity/trust.
+  Rebinding waits during pairing or queued/active peer transfers. Manual cards
+  retain eligible addresses and translate IPv6 link-local scopes locally.
+  Status distinguishes absent/filtered announcements, discovery/binding errors
+  and connection timeouts. Dismissing text releases Busy and restores parent
+  controls together.
+
+See the [Nearby guide](docs/USER_GUIDE.md#nearby-dn-transfers) for controls,
+approval, LAN restrictions and delivery guarantees.
+
+### 1.1.13 publication and validation
+
+- `cargo publish --locked` succeeded from a clean checkout. The crates.io API
+  confirms 1.1.13 is published and not yanked. Package preparation and the publish
+  dry run verified 442 packaged files and compiled the packaged sources. Source,
+  locales, documentation and licenses were included; generated archives, build
+  products and credential files were excluded. The release executable reports
+  `Directory Navigator 1.1.13`. Cargo publication did not push Git or start CI.
+- The completed [1.1.13 unified release run](https://github.com/deemoun/Directory-Navigator/actions/runs/43507140947)
+  succeeded for commit `a0318bf502ed85460a7ab03f46a4a92680350f31`.
+  macOS ARM64, Windows x86_64 and Linux ARM64/x86_64 passed formatting,
+  all-target Clippy with warnings denied, full tests, no-audio tests, release
+  builds and version/package checks. Intel macOS passed formatting, its release
+  build, CLI version/help smoke checks and packaging; Clippy/full/no-audio tests
+  were intentionally skipped in this unified workflow. All five artifacts and
+  the final release job passed. The separate Build all platforms workflow still
+  retains full Intel tests. These existing results were inspected read-only.
+- The [earlier 1.1.13 run](https://github.com/deemoun/Directory-Navigator/actions/runs/43494695128)
+  reached the approximately 45-minute Intel job limit during release compilation
+  after its preceding checks; it was cancelled, not a reported test assertion
+  failure. The successful run above includes the lighter Intel workflow.
+- Local application preparation passed **1,230 native tests**, with nine
+  environment/hardware-dependent tests ignored, plus five-target all-target
+  Clippy, no-default-features, no-audio plugin tests, helpers and workflow-policy
+  checks. These are recorded preparation results, not a fresh full-suite count
+  for this documentation edit. The current workflow-policy suite has 13 tests;
+  the Python helper suite has 44, including release/packaging safeguards.
+- Five rebuilt-release Nearby terminal scenarios passed on this Mac: EN/RU
+  composition, connection testing, receipt-confirmed file delivery, text
+  approval/preview/copy, multiline paste into a private unsaved editor, window
+  interaction and terminal restoration. Protocol tests cover bounds, malformed
+  UTF-8, cancellation, stale owners/clipboard reads, old file-only peers and lost
+  receipts. Desktop clipboard results were injected; terminal tests used the
+  internal fallback without overwriting the real desktop clipboard.
+- Same-host/loopback tests and CI are distinct from actual two-machine LAN/VM
+  testing. Physical multicast discovery previously timed out on this host;
+  actual UTM host–guest, physical IPv6 and real desktop clipboard checks remain
+  pending. No firewall cause is inferred. Native CI tests and CLI execution do
+  not establish hardware/audio or real-console coverage.
+
+This documentation refresh re-ran all 13 workflow-policy tests and 44 Python
+helper tests successfully, checked local Markdown links/anchors and passed
+`git diff --check`. Application sources were unchanged, so no release rebuild was
+needed; no commit, push, publication or CI run was performed by this refresh.
+
+### 1.1.13 text sharing — historical development validation
 
 Nearby adds a session-only multiline composer and explicit accept/preview/copy
 flow for links and text, bounded to 64 KiB UTF-8. A separate text ALPN preserves
@@ -35,9 +104,10 @@ These are local macOS/same-host tests and cross-compilation, not two-machine or
 Linux/Windows runtime evidence. A real desktop clipboard was not overwritten;
 terminal scenarios use the internal fallback and clipboard results are tested by
 injection. Earlier multicast/UTM limitations remain. No dependency/configuration
-change, commit, push, publication or CI run was performed.
+change occurred; no commit, push, publication or CI run was performed during that
+development stage.
 
-### Earlier unreleased work: Nearby connection tests and device names
+### 1.1.13 connection tests and device names — historical development validation
 
 Nearby adds an explicit encrypted **Test connection** action, with bilateral
 eight-digit pairing but no selection, file manifest or Transfer Center job.
@@ -62,7 +132,7 @@ terminal restoration. These are same-host checks, not two-machine, UTM or
 Linux/Windows runtime validation. The earlier multicast/UTM limitations below
 remain unresolved. No CI run, commit, push or publication was performed.
 
-### Earlier unreleased work: Nearby discovery and VM interface reliability
+### 1.1.13 discovery and VM interface reliability — historical development validation
 
 Nearby now rescans active local interfaces and rebuilds changed bindings while
 idle, preserving the in-memory identity and trust. Refresh during pairing or an
@@ -1520,11 +1590,16 @@ older increment entries below also record earlier migration stages.
   configuration bound. Unsaved text is handled by save/discard guards and crash
   recovery, not session snapshots. Recovery does not restore undo history or
   guarantee every final keystroke.
-- The working tree adds non-recursive Unix permission / Windows attribute editing
-  and desktop text clipboard access with an internal console fallback. These are
-  post-1.1.11 changes, not part of the published release. Persistent command history
-  remains unimplemented. Command history and DN's internal clipboard are session-only. External commands run with the user's permissions;
-  user menus do not emulate DOS batch syntax.
+- Published builds provide non-recursive Unix permission / Windows attribute
+  editing and desktop text clipboard access with an internal console fallback.
+  Persistent command history remains unimplemented. Command history and DN's
+  internal clipboard are session-only. External commands run with the user's
+  permissions; user menus do not emulate DOS batch syntax.
+- Nearby remains directly connected LAN-only: no relays, internet probes, routed
+  private-network/NAT exceptions or persistent trust. Multicast discovery can
+  still require manual connection details, and a direct UDP path is necessary.
+  Text is bounded to 64 KiB UTF-8 and requires peers supporting text sharing;
+  there is no automatic clipboard synchronization, chat history or restart/resume.
 - Linux Trash supports the home volume only. macOS Trash refuses undecodable
   names; Finder Put Back is not guaranteed. Restore through the desktop manager.
   Linux external opening needs xdg-utils and a desktop session.
