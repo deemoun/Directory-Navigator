@@ -553,9 +553,27 @@ real local working directory. See the [guide](docs/USER_GUIDE.md#remote-connecti
 
 ## Nearby DN transfers
 
+**Send text…** sends links or multiline Unicode text to the selected receiver or
+manual address. Its owned composer provides **Paste / Clear / Send / Cancel**;
+Enter inserts a newline and Tab moves between controls. The limit is 64 KiB of
+UTF-8; oversized input is refused without truncation. The recipient is captured
+when the composer opens. Cancel/failure retains the draft until Nearby closes.
+
+Receive and bilateral pairing are required. The receiver first approves an offer
+showing sender and byte count, then previews the received text and chooses
+**Copy / Dismiss**. Copy updates the system and internal clipboard where available,
+or only DN's internal clipboard in a console. Nothing changes the clipboard or
+opens a URL automatically. A preview remains until dismissed and blocks another
+offer. Sender confirmation means the other DN retained the text, not that it was
+copied; a missing receipt leaves delivery unconfirmed. Text uses no temporary file,
+transfer job, persistent history or clipboard synchronization. Both peers must
+support text sharing; existing file transfers remain compatible.
+
+**Test connection** verifies reachability and bilateral pairing without selecting or sending files. Enable **Receive** on the other DN; both versions must support connection tests. Select a receiver or enter its manual details first. Edit **This DN** and press Enter for a session-only nickname (blank restores the anonymous default). **Device info…** shows the full public identity and local interfaces/IP:ports. Nicknames are discovery hints, never proof of identity.
+
 **Utilities → Nearby transfers…** opens a session-only LAN sender/receiver.
-The enabled-by-default plugin starts no networking until **Receive** or
-**Use panel selection** is chosen. **File → Send to nearby DN…** captures visible
+The enabled-by-default plugin starts no networking until **Receive**, **Refresh**,
+**Test connection** or **Use panel selection** is chosen. **File → Send to nearby DN…** captures visible
 marked files/folders, or the current item. Archive and remote members must first
 be extracted or downloaded.
 
@@ -564,13 +582,16 @@ and confirm on both computers. The receiver then reviews the offer and chooses
 an existing local destination. Transfers use direct encrypted QUIC through Iroh,
 without relays, public discovery, port mapping or internet probes. Manual
 connection details can be copied when multicast discovery is blocked; UDP must
-still be allowed between the computers. Names contain only a random session
-identity, not usernames or hostnames.
+still be allowed between the computers. Default names contain only a random session identity, not usernames or hostnames.
 
 Transfer Center owns progress, cancellation, conflict prompts and results. Closing
 the receiving window stops discovery and new offers; accepted jobs continue.
 Verification is remembered only for this DN run, and every offer still requires
-approval. One peer session is supported at a time. Links and special files,
+approval. **Refresh** rescans interfaces and restarts discovery without clearing
+your file selection. New VM interfaces are bound automatically when idle; during a
+peer session the refresh is deferred. Status separates missing announcements from
+receivers whose addresses fall outside connected LANs. Manual details retain usable
+addresses and translate IPv6 scopes locally; they do not enable routed/NAT-only paths. One peer session is supported at a time. Links and special files,
 remote browsing and restart/resume are not supported. See the
 [guide](docs/USER_GUIDE.md#nearby-dn-transfers) for bounds and delivery guarantees.
 

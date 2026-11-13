@@ -5,7 +5,7 @@ use std::sync::mpsc::{self, Receiver, SyncSender};
 
 const LIMIT: usize = crate::file_tools::clipboard::MAX_BYTES;
 enum Request {
-    Write(String),
+    Write(String, Option<(crate::plugins::Binding, u64)>),
     Read(u64),
 }
 enum ReadError {
@@ -13,11 +13,15 @@ enum ReadError {
     Invalid(String),
 }
 enum Reply {
-    Written(Result<(), String>),
+    Written(Result<(), String>, Option<(crate::plugins::Binding, u64)>),
     Read(u64, Result<String, ReadError>),
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum Destination {
+    Plugin {
+        binding: crate::plugins::Binding,
+        token: crate::plugins::ClipboardToken,
+    },
     Editor {
         id: WindowId,
         revision: u64,
@@ -71,8 +75,9 @@ impl State {
                             .map_err(|e| e.to_string()),
                     };
                     let result = match request {
-                        Request::Write(text) => Reply::Written(
+                        Request::Write(text, target) => Reply::Written(
                             backend.and_then(|c| c.set_text(text).map_err(|e| e.to_string())),
+                            target,
                         ),
                         Request::Read(id) => Reply::Read(
                             id,
@@ -116,6 +121,29 @@ fn validate(text: String) -> Result<String, String> {
     }
 }
 pub fn copy(app: &mut App, text: String) {
+    copy_to(app, text, None);
+}
+pub(crate) fn copy_plugin(
+    app: &mut App,
+    binding: crate::plugins::Binding,
+    serial: u64,
+    text: String,
+) {
+    copy_to(app, text, Some((binding, serial)));
+}
+fn copy_notice(app: &mut App, target: Option<(crate::plugins::Binding, u64)>, message: &str) {
+    let message = app.config.language.text(message).to_owned();
+    app.notice = message.clone();
+    if let Some((binding, serial)) = target {
+        crate::plugins::host::clipboard_copied(app, binding, serial, message);
+    }
+}
+fn copy_to(app: &mut App, text: String, target: Option<(crate::plugins::Binding, u64)>) {
+    copy_notice(
+        app,
+        target,
+        "System clipboard unavailable; text retained internally.",
+    );
     // Internal clipboard remains useful even if the desktop is absent or busy.
     app.editor_clipboard = text.clone();
     if text.len() > LIMIT {
@@ -131,7 +159,7 @@ pub fn copy(app: &mut App, text: String) {
             .clipboard
             .sender
             .as_ref()
-            .is_some_and(|s| s.try_send(Request::Write(text)).is_ok())
+            .is_some_and(|s| s.try_send(Request::Write(text, target)).is_ok())
         {
             app.notice = app
                 .config
@@ -145,6 +173,10 @@ pub fn copy(app: &mut App, text: String) {
                 .text("System clipboard busy; text retained internally.")
                 .into();
         }
+    }
+    if let Some((binding, serial)) = target {
+        let message = app.notice.clone();
+        crate::plugins::host::clipboard_copied(app, binding, serial, message);
     }
 }
 fn destination(app: &App, editor: bool) -> Option<Destination> {
@@ -177,6 +209,9 @@ pub fn paste(app: &mut App, editor: bool) {
         }
         return;
     };
+    request_paste(app, target);
+}
+fn request_paste(app: &mut App, target: Destination) {
     if app.clipboard.start() {
         app.clipboard.sequence = app.clipboard.sequence.wrapping_add(1);
         let id = app.clipboard.sequence;
@@ -193,7 +228,33 @@ pub fn paste(app: &mut App, editor: bool) {
     }
     insert(app, &target, &app.editor_clipboard.clone());
 }
+pub(crate) fn paste_plugin(
+    app: &mut App,
+    binding: crate::plugins::Binding,
+    token: crate::plugins::ClipboardToken,
+) {
+    if crate::plugins::host::clipboard_token(app, binding) == Some(token) {
+        request_paste(app, Destination::Plugin { binding, token });
+    }
+}
+fn valid(app: &App, target: &Destination) -> bool {
+    match target {
+        Destination::Plugin { binding, token } => {
+            crate::plugins::host::clipboard_token(app, *binding) == Some(*token)
+        }
+        _ => {
+            destination(app, matches!(target, Destination::Editor { .. })).as_ref() == Some(target)
+        }
+    }
+}
 fn insert(app: &mut App, target: &Destination, text: &str) {
+    if app.screensaver.active || !valid(app, target) {
+        return;
+    }
+    if let Destination::Plugin { binding, .. } = target {
+        crate::plugins::host::dispatch(app, *binding, crate::plugins::Event::Paste(text));
+        return;
+    }
     let editor = matches!(target, Destination::Editor { .. });
     if destination(app, editor).as_ref() != Some(target) || app.screensaver.active {
         return;
@@ -205,7 +266,7 @@ fn insert(app: &mut App, target: &Destination, text: &str) {
     }
 }
 fn inform(app: &mut App, target: &Destination, message: &str) {
-    if destination(app, matches!(target, Destination::Editor { .. })).as_ref() != Some(target) {
+    if !valid(app, target) {
         return;
     }
     let message = app.config.language.text(message).to_owned();
@@ -213,6 +274,16 @@ fn inform(app: &mut App, target: &Destination, message: &str) {
         if let Some(editor) = app.desktop.editor_mut(*id) {
             editor.notice = message.clone();
         }
+    }
+    if let Destination::Plugin { binding, token } = target {
+        crate::plugins::host::dispatch(
+            app,
+            *binding,
+            crate::plugins::Event::ClipboardPasteNotice {
+                token: *token,
+                message: message.clone(),
+            },
+        );
     }
     app.notice = message;
 }
@@ -242,16 +313,16 @@ pub fn poll(app: &mut App) -> bool {
     {
         changed = true;
         match reply {
-            Reply::Written(result) => {
-                app.notice = app
-                    .config
-                    .language
-                    .text(if result.is_ok() {
+            Reply::Written(result, target) => {
+                copy_notice(
+                    app,
+                    target,
+                    if result.is_ok() {
                         "Copied to system and internal clipboards."
                     } else {
                         "System clipboard unavailable; text retained internally."
-                    })
-                    .into()
+                    },
+                );
             }
             Reply::Read(id, result) => {
                 if app.clipboard.pending.as_ref().is_none_or(|p| p.0 != id) {
@@ -445,6 +516,55 @@ mod editor_tests {
                 .text,
             "abc"
         );
+        assert!(app.clipboard.sender.is_none());
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod plugin_tests {
+    use super::*;
+    use crate::plugins::{host, ActionId, Event, NEARBY_TRANSFERS};
+    #[test]
+    fn plugin_paste_uses_internal_fallback_and_rejects_changed_or_reopened_composers(
+    ) -> std::io::Result<()> {
+        let root = std::env::temp_dir().join(format!("dn-clipboard-nearby-{}", std::process::id()));
+        std::fs::create_dir(&root)?;
+        struct Fixture(std::path::PathBuf);
+        impl Drop for Fixture {
+            fn drop(&mut self) {
+                let _ = std::fs::remove_dir_all(&self.0);
+            }
+        }
+        let _fixture = Fixture(root.clone());
+        let mut app = App::new(root)?;
+        host::open(&mut app, NEARBY_TRANSFERS);
+        let binding = app.desktop.plugins.binding(NEARBY_TRANSFERS).unwrap();
+        host::dispatch(&mut app, binding, Event::Focus(20));
+        host::dispatch(&mut app, binding, Event::Paste("manual-card"));
+        host::dispatch(&mut app, binding, Event::Action(ActionId(31)));
+        let token = host::clipboard_token(&app, binding).unwrap();
+        app.editor_clipboard = "https://example.test/Ёжик".into();
+        paste_plugin(&mut app, binding, token);
+        let after = host::clipboard_token(&app, binding).unwrap();
+        assert_ne!(after, token);
+        assert_eq!(after.cursor, app.editor_clipboard.len());
+        insert(&mut app, &Destination::Plugin { binding, token }, "STALE");
+        assert_eq!(host::clipboard_token(&app, binding), Some(after));
+        host::dispatch(&mut app, binding, Event::Action(ActionId(33)));
+        assert!(host::clipboard_token(&app, binding).is_none());
+        host::dispatch(&mut app, binding, Event::Action(ActionId(31)));
+        let reopened = host::clipboard_token(&app, binding).unwrap();
+        assert_ne!(reopened.session, after.session);
+        insert(
+            &mut app,
+            &Destination::Plugin {
+                binding,
+                token: after,
+            },
+            "STALE",
+        );
+        assert_eq!(host::clipboard_token(&app, binding), Some(reopened));
         assert!(app.clipboard.sender.is_none());
         Ok(())
     }

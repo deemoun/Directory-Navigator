@@ -130,7 +130,22 @@ impl Context {
         )
     }
 }
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct ClipboardToken {
+    pub session: u64,
+    pub revision: u64,
+    pub cursor: usize,
+    pub anchor: Option<usize>,
+}
 pub(crate) enum Event<'a> {
+    ClipboardCopied {
+        serial: u64,
+        message: String,
+    },
+    ClipboardPasteNotice {
+        token: ClipboardToken,
+        message: String,
+    },
     NearbyDirectory(PathBuf),
     OpenApk(PathBuf),
     ApkContext {
@@ -170,6 +185,11 @@ pub(crate) enum Effect {
     },
     Close,
     CopyText(String),
+    CopyTextOwned {
+        text: String,
+        serial: u64,
+    },
+    PasteText(ClipboardToken),
     RequestMusicFile {
         play: bool,
     },
@@ -226,6 +246,9 @@ pub(crate) trait ToolPlugin: Any {
         View::Dialog(Box::new(self.controls(ctx)))
     }
     fn next_wake(&self, _: Instant) -> Option<Duration> {
+        None
+    }
+    fn clipboard_token(&self) -> Option<ClipboardToken> {
         None
     }
     fn close(&mut self) {}

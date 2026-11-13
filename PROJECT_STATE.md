@@ -1,16 +1,94 @@
 # Directory Navigator
 
-## Current status — stable 1.1.11
+## Current status — stable 1.1.12
 
-Directory Navigator 1.1.11 was published on **12 November 2026** and is available
-on [crates.io](https://crates.io/crates/directory-navigator/1.1.11). The crate is
+Directory Navigator 1.1.12 is published and available
+on [crates.io](https://crates.io/crates/directory-navigator/1.1.12). The crate is
 `directory-navigator`; the installed executable remains `dn`. macOS, Linux and
 Windows remain supported. Version 1.1.9 was the first stable release.
 
 See the [English README](README.md), [Russian README](README.ru.md) and
 [user guide](docs/USER_GUIDE.md) for installation, controls, safeguards and limits.
 
-### Unreleased: Nearby transfers
+### Unreleased 1.1.13: Nearby text sharing
+
+Nearby adds a session-only multiline composer and explicit accept/preview/copy
+flow for links and text, bounded to 64 KiB UTF-8. A separate text ALPN preserves
+file/test protocol compatibility. No clipboard changes or URL opening happen
+automatically; terminal-only sessions retain the internal clipboard. Drafts and
+previews are not persisted. Delivery receipts follow live-owner retention; a
+missing receipt is unconfirmed delivery. No dependencies/configuration change.
+
+Local validation for text sharing: 1,230 native tests passed, with nine
+hardware/environment-dependent tests ignored. Five-target all-target Clippy
+(macOS ARM64/Intel, Linux ARM64/x86-64, Windows x86-64), no-default-features,
+no-audio plugin tests, 44 Python helpers and workflow-policy checks passed.
+The locked release rebuild reports 1.1.13. All five Nearby release terminal
+scenarios passed, including EN/RU composition, no-file pairing, file transfer,
+text approval/preview, explicit internal-clipboard copying and multiline paste
+into a private unsaved editor, with terminal restoration. Protocol regressions
+also cover malformed/oversized input, cancelled approval, old file-only peers,
+lost receipts and stale clipboard targets. Dismissing a preview publishes the
+released Busy state with its restored parent controls.
+
+These are local macOS/same-host tests and cross-compilation, not two-machine or
+Linux/Windows runtime evidence. A real desktop clipboard was not overwritten;
+terminal scenarios use the internal fallback and clipboard results are tested by
+injection. Earlier multicast/UTM limitations remain. No dependency/configuration
+change, commit, push, publication or CI run was performed.
+
+### Earlier unreleased work: Nearby connection tests and device names
+
+Nearby adds an explicit encrypted **Test connection** action, with bilateral
+eight-digit pairing but no selection, file manifest or Transfer Center job.
+An independent test ALPN preserves existing file-transfer compatibility; connection
+tests require an updated peer with Receive enabled. Nicknames are explicit,
+bounded and session-only, defaulting to an anonymous identity. Device info shows
+the public endpoint identity and local interfaces/IP:ports without reading names
+from the OS account or hostname. No new dependencies or configuration fields.
+
+Local validation for connection tests/nicknames: the full native suite passed
+(1,220 tests, eight environment-dependent tests ignored). Focused peer tests,
+EN/RU immutable UI checks, no-default-features and no-audio plugin tests passed.
+All-target Clippy with warnings denied passed for macOS ARM64/Intel, Linux
+ARM64/x86-64 and Windows x86-64, using the available cross toolchains. All 44
+packaging/release helper tests and workflow-policy tests passed. The locked
+release build reports 1.1.12.
+
+Two rebuilt DN instances on this Mac completed a no-file connection test with
+matching codes and also an approved receipt-confirmed file transfer. The release
+terminal walkthrough covered nickname editing, owned Device info, resize and
+terminal restoration. These are same-host checks, not two-machine, UTM or
+Linux/Windows runtime validation. The earlier multicast/UTM limitations below
+remain unresolved. No CI run, commit, push or publication was performed.
+
+### Earlier unreleased work: Nearby discovery and VM interface reliability
+
+Nearby now rescans active local interfaces and rebuilds changed bindings while
+idle, preserving the in-memory identity and trust. Refresh during pairing or an
+accepted/queued transfer is deferred. Typed discovery snapshots use owner and
+network generations, with separate missing/filtered/failed discovery states.
+Manual cards validate every field, retain eligible addresses and translate remote
+IPv6 link-local scopes locally. Connected-LAN restrictions remain unchanged.
+No new dependencies, configuration fields or application version change.
+
+Deterministic tests cover mixed cards, scope translation, interface changes,
+deferred refresh with a live encrypted stream, stale snapshots and bounded caches.
+For that earlier change, the full native suite passed (1,217 tests); focused peer/UI tests and the terminal
+desktop suite also passed. Five-target all-target Clippy with warnings denied,
+no-default-features checks, no-audio plugin/music tests and release/workflow helpers
+passed. The locked release rebuild remains version 1.1.12.
+
+Two rebuilt instances on this Mac exercised mouse/keyboard Refresh, retained
+source selection, pairing, approved receipt-confirmed delivery and terminal
+restoration. The physical multicast discovery test still timed out on this host;
+no firewall or multicast cause is claimed. UTM app access was not approved, so VM
+startup-before/after and actual host–guest checks remain pending. Linux/Windows
+runtime coverage remains unavailable; cross-compilation is not runtime validation.
+No CI, commit, push or publication was performed for these local changes.
+Older validation below is historical and does not establish VM/multicast coverage.
+
+### Nearby transfers in 1.1.12 — historical development validation
 
 The internal `nearby_transfers` plugin adds explicit, encrypted LAN sending and
 receiving through Iroh 1.4.1 and iroh-mdns-address-lookup 0.6.1. It is enabled by
@@ -21,8 +99,8 @@ closing the plugin stops new offers, not accepted jobs. No public discovery,
 relays, port mapping, internet probes, blob storage or persisted peer identity.
 See [Nearby transfers](docs/USER_GUIDE.md#nearby-dn-transfers) for limits.
 
-Validation for this unreleased change is separate from the published 1.1.11 matrix
-below. The local full native suite passed, as did the focused protocol tests,
+The following validation was recorded during 1.1.12 development and is separate
+from the published 1.1.11 matrix below. The local full native suite passed, as did the focused protocol tests,
 44 packaging/release helpers, workflow policy, formatting and diff checks.
 All-target Clippy with warnings denied passed on macOS ARM64 and through the
 available Linux ARM64/x86_64 and Windows x86_64 cross-toolchains. The build without

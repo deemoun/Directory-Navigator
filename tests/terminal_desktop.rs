@@ -2088,12 +2088,27 @@ fn nearby_click(
     ready: impl Fn(&Session) -> bool,
 ) -> io::Result<()> {
     use unicode_width::UnicodeWidthStr;
+    let label = label.trim();
     let text = s.text();
     let (row, line) = text
         .lines()
         .enumerate()
-        .find(|(_, line)| line.contains(label))
-        .ok_or_else(|| io::Error::other(format!("Missing Nearby control: {label}\n{text}")))?;
+        .find(|(_, line)| {
+            if line.contains('═') || line.contains("Receive:") {
+                return false;
+            }
+            let Some(index) = line.find(label) else {
+                return false;
+            };
+            let before = &line[..index];
+            let after = &line[index + label.len()..];
+            let after = after.strip_prefix('…').unwrap_or(after);
+            (before.chars().rev().take_while(|c| *c == ' ').count() >= 2
+                || before.trim_end().ends_with('►'))
+                && (after.chars().take_while(|c| *c == ' ').count() >= 2
+                    || after.trim_start().starts_with('◄'))
+        })
+        .ok_or_else(|| io::Error::other(format!("Missing Nearby button: {label}\n{text}")))?;
     let index = line.find(label).unwrap();
     let x = line[..index].width() + 1;
     let y = row + 1;
@@ -2112,6 +2127,38 @@ fn nearby_window_help_resize_idle_and_terminal_restoration() -> io::Result<()> {
     nearby_open(&mut s)?;
     let diagnostics = fs::read_to_string(s.root.join("settings/dn/diagnostics.txt"))?;
     assert!(diagnostics.contains("nearby_receiving=false\nnearby_details=\n"));
+    let name_row = s
+        .text()
+        .lines()
+        .position(|l| l.contains("This DN:"))
+        .unwrap()
+        + 1;
+    s.send(
+        format!("\x1b[<0;18;{name_row}M\x1b[<0;18;{name_row}m\x01").as_bytes(),
+        "nickname focus",
+        |s| s.text().contains("This DN:"),
+    )?;
+    // Home + Delete clears the anonymous name through ordinary input handling.
+    s.send(b"\x1b[H", "nickname home", |s| {
+        s.text().contains("This DN:")
+    })?;
+    for _ in 0..11 {
+        s.send(b"\x1b[3~", "clear nickname", |s| {
+            s.text().contains("This DN:")
+        })?;
+    }
+    s.paste("Лаптоп", "nickname draft", |s| {
+        s.text().contains("Лаптоп")
+    })?;
+    s.send(b"\r", "apply nickname", |s| {
+        s.text().contains("Session nickname applied")
+    })?;
+    nearby_click(&mut s, "Device info", "owned device info", |s| {
+        s.text().contains("Endpoint identity:")
+    })?;
+    s.send(b"\x1b", "close device info", |s| {
+        s.text().contains("Manual connection details")
+    })?;
     s.send(b"\x1bOP", "Nearby help", |s| {
         s.text().contains("Nearby Transfers Help")
     })?;
@@ -2129,6 +2176,261 @@ fn nearby_window_help_resize_idle_and_terminal_restoration() -> io::Result<()> {
         s.command_prompt_active()
     })?;
     s.finish()
+}
+
+#[test]
+fn nearby_text_composer_owned_cancel_edit_resize_and_terminal_restoration() -> io::Result<()> {
+    for language in [
+        dn::localization::Language::English,
+        dn::localization::Language::Russian,
+    ] {
+        let mut session = Session::with_preferences(
+            "nearby-text-composer",
+            &format!("[regional]\nlanguage='{}'\n", language.key()),
+        )?;
+        session.wait("manager", |s| {
+            s.command_prompt_active() && s.text().contains("item-000.")
+        })?;
+        session.send(b"\x1bu\x1b[B\x1b[B\r", "open Nearby", |s| {
+            s.text()
+                .contains(language.text("Manual connection details"))
+        })?;
+        let row = session
+            .text()
+            .lines()
+            .position(|l| l.contains(language.text("Manual connection details")))
+            .unwrap()
+            + 2;
+        session.send(
+            format!("\x1b[<0;8;{row}M\x1b[<0;8;{row}m").as_bytes(),
+            "focus manual",
+            |s| {
+                s.text()
+                    .contains(language.text("Manual connection details"))
+            },
+        )?;
+        session.paste("manual-card", "manual draft", |s| {
+            s.text().contains("manual-card")
+        })?;
+        nearby_click(
+            &mut session,
+            language.text("Send text…"),
+            "owned composer",
+            |s| s.text().contains(language.text("UTF-8 bytes")),
+        )?;
+        session.paste(
+            "https://example.test/Ёжик\r\n世界",
+            "multiline draft",
+            |s| s.text().contains("https://example.test/Ёжик") && s.text().contains("世界"),
+        )?;
+        session.send(b"\r", "Enter inserts newline", |s| {
+            s.text().contains(language.text("UTF-8 bytes"))
+        })?;
+        session.resize(100, 32)?;
+        session.resize(40, 12)?;
+        session.resize(80, 25)?;
+        session.wait("composer restored", |s| {
+            s.text().contains("https://example.test/Ёжик")
+        })?;
+        session.send(b"\x1b", "cancel child only", |s| {
+            s.text()
+                .contains(language.text("Manual connection details"))
+                && !s.text().contains(language.text("UTF-8 bytes"))
+        })?;
+        nearby_click(
+            &mut session,
+            language.text("Send text…"),
+            "retained draft",
+            |s| s.text().contains("https://example.test/Ёжик"),
+        )?;
+        nearby_click(&mut session, language.text("Clear"), "clear draft", |s| {
+            !s.text().contains("https://example.test/Ёжик") && s.text().contains("0 / 65536")
+        })?;
+        session.send(b"\x1b", "close composer", |s| {
+            s.text()
+                .contains(language.text("Manual connection details"))
+        })?;
+        nearby_click(&mut session, language.text("Close"), "close Nearby", |s| {
+            s.command_prompt_active()
+        })?;
+        session.finish()?;
+    }
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires an eligible connected LAN interface and local UDP permission"]
+fn nearby_two_instances_share_text_preview_copy_and_restore_terminals() -> io::Result<()> {
+    let mut receiver = Session::new("nearby-text-receiver")?;
+    let mut sender = Session::new("nearby-text-sender")?;
+    for session in [&mut receiver, &mut sender] {
+        session.wait("manager", |s| {
+            s.command_prompt_active() && s.text().contains("item-000.")
+        })?;
+        nearby_open(session)?;
+    }
+    nearby_click(&mut receiver, "Receive", "Receive enabled", |s| {
+        s.text().contains("Stop receiving")
+    })?;
+    receiver.wait("connection card", |s| {
+        fs::read_to_string(s.root.join("settings/dn/diagnostics.txt"))
+            .is_ok_and(|d| d.contains("nearby_details=dn-peer:1:"))
+    })?;
+    let diagnostics = fs::read_to_string(receiver.root.join("settings/dn/diagnostics.txt"))?;
+    let card = diagnostics
+        .lines()
+        .find_map(|l| l.strip_prefix("nearby_details="))
+        .unwrap();
+    let row = sender
+        .text()
+        .lines()
+        .position(|l| l.contains("Manual connection details"))
+        .unwrap()
+        + 2;
+    sender.send(
+        format!("\x1b[<0;8;{row}M\x1b[<0;8;{row}m").as_bytes(),
+        "focus address",
+        |s| s.text().contains("Manual connection details"),
+    )?;
+    sender.paste(card, "manual card", |s| {
+        s.text().contains(&card[card.len().saturating_sub(16)..])
+    })?;
+    nearby_click(&mut sender, "Send text…", "text composer", |s| {
+        s.text().contains("UTF-8 bytes")
+    })?;
+    sender.paste(
+        "https://example.test/Ёжик\nHello 世界",
+        "text draft",
+        |s| s.text().contains("Hello 世界"),
+    )?;
+    // Padded label identifies the Send button rather than the composer title.
+    nearby_click(&mut sender, " Send ", "pair sender", |s| {
+        s.text().contains("Compare all eight digits")
+    })?;
+    receiver.wait("pair receiver", |s| {
+        s.text().contains("Compare all eight digits")
+    })?;
+    nearby_click(&mut receiver, "Codes match", "receiver confirms", |s| {
+        s.text().contains("Waiting for the other DN")
+    })?;
+    nearby_click(&mut sender, "Codes match", "offer waiting", |s| {
+        s.text().contains("Manual connection details")
+    })?;
+    receiver.wait("text offer", |s| s.text().contains("Text bytes"))?;
+    assert!(!receiver.text().contains("https://example.test/Ёжик"));
+    nearby_click(&mut receiver, "Accept", "text preview", |s| {
+        s.text().contains("Received text") && s.text().contains("https://example.test/Ёжик")
+    })?;
+    sender.wait("text receipt", |s| {
+        s.text().contains("Text received by the other DN")
+    })?;
+    nearby_click(&mut receiver, " Copy ", "copy explicitly", |s| {
+        s.text().contains("text retained internally")
+    })?;
+    nearby_click(&mut receiver, "Dismiss", "dismiss preview", |s| {
+        s.text().contains("Manual connection details") && !s.text().contains("Received text")
+    })?;
+    nearby_click(&mut receiver, "Close", "receiver manager", |s| {
+        s.command_prompt_active()
+    })?;
+    receiver.select_file("item-000.txt")?;
+    receiver.send(b"\x1b[14~", "open private editor", |s| {
+        s.text().contains("F2 Save") && s.text().contains(" 1 fixture")
+    })?;
+    receiver.send(b"\x1b[2;2~", "paste exact multiline text", |s| {
+        s.text().contains("https://example.test/Ёжик") && s.text().contains("Hello 世界")
+    })?;
+    receiver.send(b"\x1b", "close dirty private editor", |s| {
+        s.text().contains("Discard")
+    })?;
+    receiver.send(b"d", "discard private pasted buffer", |s| {
+        s.command_prompt_active()
+    })?;
+    nearby_click(&mut sender, "Close", "sender manager", |s| {
+        s.command_prompt_active()
+    })?;
+    sender.finish()?;
+    receiver.finish()
+}
+
+/// Explicit direct-UDP check, independent of multicast discovery and file selection.
+#[test]
+#[ignore = "requires an eligible connected LAN interface and local UDP permission"]
+fn nearby_two_instances_test_connection_without_sending_files() -> io::Result<()> {
+    let mut receiver = Session::new("nearby-test-receiver")?;
+    let mut sender = Session::new("nearby-test-sender")?;
+    for session in [&mut receiver, &mut sender] {
+        session.wait("manager ready", |s| {
+            s.command_prompt_active() && s.text().contains("item-000.")
+        })?;
+        nearby_open(session)?;
+    }
+    nearby_click(&mut receiver, "Receive", "receive enabled", |s| {
+        s.text().contains("Stop receiving")
+    })?;
+    receiver.wait("connection card", |s| {
+        fs::read_to_string(s.root.join("settings/dn/diagnostics.txt"))
+            .is_ok_and(|d| d.contains("nearby_details=dn-peer:1:"))
+    })?;
+    let diagnostics = fs::read_to_string(receiver.root.join("settings/dn/diagnostics.txt"))?;
+    let card = diagnostics
+        .lines()
+        .find_map(|l| l.strip_prefix("nearby_details="))
+        .unwrap();
+    let row = sender
+        .text()
+        .lines()
+        .position(|l| l.contains("Manual connection details"))
+        .unwrap()
+        + 2;
+    sender.send(
+        format!("\x1b[<0;8;{row}M\x1b[<0;8;{row}m").as_bytes(),
+        "manual focus",
+        |s| s.text().contains("Manual connection details"),
+    )?;
+    sender.paste(card, "manual card", |s| {
+        s.text().contains(&card[card.len().saturating_sub(16)..])
+    })?;
+    nearby_click(&mut sender, "Test connection", "test pairing", |s| {
+        s.text().contains("Connection test — no files")
+    })?;
+    receiver.wait("receiver test pairing", |s| {
+        s.text().contains("Connection test — no files")
+    })?;
+    let code = |s: &Session| {
+        let text = s.text();
+        let words = text.split_whitespace().collect::<Vec<_>>();
+        words
+            .windows(2)
+            .find(|w| {
+                w.iter()
+                    .all(|v| v.len() == 4 && v.bytes().all(|b| b.is_ascii_digit()))
+            })
+            .map(|w| format!("{} {}", w[0], w[1]))
+    };
+    assert!(code(&sender).is_some());
+    assert_eq!(code(&sender), code(&receiver));
+    nearby_click(
+        &mut receiver,
+        "Codes match",
+        "receiver confirms test",
+        |s| s.text().contains("Waiting for the other DN"),
+    )?;
+    nearby_click(&mut sender, "Codes match", "test succeeded", |s| {
+        s.text().contains("No files were sent.")
+    })?;
+    receiver.wait("receiver test succeeded", |s| {
+        s.text().contains("No files were sent.")
+    })?;
+    for session in [&mut sender, &mut receiver] {
+        assert!(!session.text().contains("Transfer Center"));
+        assert!(session.text().contains("Selected items: 0"));
+        nearby_click(session, "Close", "close tested window", |s| {
+            s.command_prompt_active()
+        })?;
+    }
+    sender.finish()?;
+    receiver.finish()
 }
 
 /// Explicit LAN check: not run on CI runners without a connected local interface.
@@ -2163,6 +2465,32 @@ fn nearby_two_instances_pair_approve_stream_and_restore_terminals() -> io::Resul
         .unwrap()
         .to_owned();
     assert!(!card.contains("127.0.0.1"));
+    let request = |s: &Session| {
+        fs::read_to_string(s.root.join("settings/dn/diagnostics.txt"))
+            .ok()
+            .and_then(|text| {
+                text.lines().find_map(|l| {
+                    l.strip_prefix("nearby_network_request=")
+                        .and_then(|v| v.parse::<u64>().ok())
+                })
+            })
+            .unwrap_or(0)
+    };
+    let receiver_request = request(&receiver);
+    nearby_click(&mut receiver, "Refresh", "refresh receiving sockets", |s| {
+        request(s) > receiver_request
+            && s.text().contains("Advertising on LAN")
+            && fs::read_to_string(s.root.join("settings/dn/diagnostics.txt"))
+                .is_ok_and(|d| d.contains("nearby_network_ready=true"))
+    })?;
+    let receiver_request = request(&receiver);
+    receiver.send(b" ", "keyboard refresh", |s| {
+        request(s) > receiver_request && s.text().contains("Advertising on LAN")
+    })?;
+    let details = fs::read_to_string(receiver.root.join("settings/dn/diagnostics.txt"))?;
+    assert!(details
+        .lines()
+        .any(|line| line == format!("nearby_details={card}")));
     nearby_open(&mut sender)?;
     nearby_click(
         &mut sender,
@@ -2170,8 +2498,21 @@ fn nearby_two_instances_pair_approve_stream_and_restore_terminals() -> io::Resul
         "sources captured",
         |s| {
             s.text().contains("Selected items: 1")
+                && fs::read_to_string(s.root.join("settings/dn/diagnostics.txt")).is_ok_and(|d| {
+                    d.contains("nearby_busy=false") && d.contains("nearby_network_ready=true")
+                })
+        },
+    )?;
+    let sender_request = request(&sender);
+    nearby_click(
+        &mut sender,
+        "Refresh",
+        "refresh preserves captured source",
+        |s| {
+            request(s) > sender_request
+                && s.text().contains("Selected items: 1")
                 && fs::read_to_string(s.root.join("settings/dn/diagnostics.txt"))
-                    .is_ok_and(|d| d.contains("nearby_busy=false"))
+                    .is_ok_and(|d| d.contains("nearby_network_ready=true"))
         },
     )?;
     // Manual field is the row immediately below its caption, inside the shared control.
@@ -2186,7 +2527,9 @@ fn nearby_two_instances_pair_approve_stream_and_restore_terminals() -> io::Resul
         "focus manual address",
         |s| s.text().contains("Manual connection details"),
     )?;
-    sender.paste(&card, "manual address", |s| s.text().contains("dn-peer:1:"))?;
+    sender.paste(&card, "manual address", |s| {
+        s.text().contains(&card[card.len().saturating_sub(16)..])
+    })?;
     nearby_click(&mut sender, "Connect", "sender verification", |s| {
         s.text().contains("Compare all eight digits")
     })?;

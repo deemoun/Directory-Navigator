@@ -277,3 +277,17 @@ An accepted typed peer request belongs to Transfer Center, with workspace-owned
 cancellation, conflict decisions and guarded publication. Closing the plugin
 retires unaccepted work and stops advertising, while accepted jobs retain their
 session. Pairing trust and endpoint keys remain in memory until DN exits.
+
+Nearby discovery snapshots carry an owner generation, a refresh request and a
+binding revision. The host rejects stale snapshots independently of accepted
+workspace transfer jobs. Refresh uses the same session key/trust and defers socket
+rebinding until idle; presentation remains read-only.
+
+Nearby connection tests use a separate ALPN and no file manifest or transfer job. The host owns the in-memory identity/nickname, interface snapshots and bilateral verification. Nicknames are explicit session-only hints; they are never derived from usernames/hostnames or persisted. Device info uses an owned shared help document.
+
+Nearby text sharing uses `dn-text/1`, host-owned offers/receipts and a 64 KiB UTF-8
+limit. It never enters the filesystem-transfer queue. The receiver's live owner
+must retain the body before receipt; a shared reservation covers both the network
+exchange and outstanding preview. Scoped clipboard reads capture binding, composer
+session, buffer revision, cursor and selection; stale replies are discarded. Copy
+status updates target the received-item serial, including inactive live owners.

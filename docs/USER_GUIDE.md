@@ -1863,6 +1863,24 @@ Metadata still uses the Refresh snapshot. Closing the window stops sampling.
 
 ## Nearby DN transfers
 
+**Send text…** sends links or multiline Unicode text to the selected receiver or
+manual address. Its owned composer provides **Paste / Clear / Send / Cancel**;
+Enter inserts a newline and Tab moves between controls. The limit is 64 KiB of
+UTF-8; oversized input is refused without truncation. The recipient is captured
+when the composer opens. Cancel/failure retains the draft until Nearby closes.
+
+Receive and bilateral pairing are required. The receiver first approves an offer
+showing sender and byte count, then previews the received text and chooses
+**Copy / Dismiss**. Copy updates the system and internal clipboard where available,
+or only DN's internal clipboard in a console. Nothing changes the clipboard or
+opens a URL automatically. A preview remains until dismissed and blocks another
+offer. Sender confirmation means the other DN retained the text, not that it was
+copied; a missing receipt leaves delivery unconfirmed. Text uses no temporary file,
+transfer job, persistent history or clipboard synchronization. Both peers must
+support text sharing; existing file transfers remain compatible.
+
+**Test connection** verifies reachability and bilateral pairing without selecting or sending files. Enable **Receive** on the other DN; both versions must support connection tests. Select a receiver or enter its manual details first. Edit **This DN** and press Enter for a session-only nickname (blank restores the anonymous default). **Device info…** shows the full public identity and local interfaces/IP:ports. Nicknames are discovery hints, never proof of identity.
+
 Open **Utilities → Nearby transfers…**. No sockets or discovery start simply
 because the plugin is enabled or the window opens. Choose **Receive** to advertise
 and accept pairing requests, or **Use panel selection** to discover receivers.
@@ -1877,10 +1895,32 @@ IPv6 link-local scope. Internet destinations and DNS names are rejected. There
 are no relays, public address lookup, port mapping or internet probes. Multicast
 and direct UDP may need firewall permission; DN does not change firewall rules.
 
+**Refresh** rescans the eligible local interfaces and restarts discovery, preserving
+captured files and the selected receiver identity when it reappears. Starting a VM
+or connecting another local interface no longer requires restarting DN. Endpoint
+bindings are rebuilt only while idle, retaining the in-memory identity and trust.
+During pairing or a queued/active peer transfer, **Network refresh pending** waits
+until that session ends. Closing Receive still stops advertising immediately.
+
+The status line distinguishes Receive off, advertising, searching, no announcements,
+receivers seen but filtered, binding failure and discovery failure. Counts show
+seen / usable / filtered identities. No announcements means none were received;
+it does not diagnose a firewall or prove multicast is blocked. Discovery continues
+after that notice. Connection timeouts are reported separately.
+
+Manual cards may contain several addresses: syntactically valid addresses outside
+the connected LANs are ignored when another eligible address exists. Malformed
+cards are rejected. Remote IPv6 link-local interface numbers are translated into
+eligible local scopes rather than assumed to match. This remains a connected-LAN
+feature; a VM's internet access alone does not establish a supported host–guest
+UDP path. Use UTM Shared Network with host isolation disabled and a directly
+connected host/guest subnet. Networks that block announcements can use manual
+details if direct UDP is available; routed/NAT-only peers remain unsupported.
+
 Compare **all eight digits** on both computers before choosing **Codes match**.
 The code comes from the established encrypted connection, not a value supplied by
 the other peer. Reject a mismatch. Unconfirmed pairing expires after two minutes.
-Names identify only a random DN session, and are not proof of trust. Verified
+Default names identify a random DN session; explicit nicknames are also not proof of trust. Verified
 endpoint identities are remembered in memory until DN exits; the receiver must
 still approve every offer. One peer session at a time prevents crossed sends.
 

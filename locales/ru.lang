@@ -1486,7 +1486,7 @@ Peer has no reachable address on a connected LAN	В локальной сети 
 Manual peer address must be on a connected LAN	Адрес другого DN должен находиться в подключённой локальной сети
 Not enough free space for the peer offer	Недостаточно места для предложенных файлов
 Nearby transfers only copy; sources are never removed.	Передача между DN только копирует; оригиналы не удаляются.
-Nearby transfers send selected real files and folders directly between DN instances on the same LAN.\nReceive advertises this instance only while its window remains open.\nChoose panel selection, select a nearby receiver, then Send. Manual connection details work when multicast is blocked.\nCompare all eight verification digits on both screens before confirming. Device names alone are not trusted. Pairing lasts for this DN session only.\nThe receiver reviews the offer and chooses a local directory. Existing files use the normal replacement prompts; folders merge under Ask.\nTransfer Center owns accepted jobs: closing Nearby transfers stops new offers, not accepted transfers. Cancel a job in Transfer Center.\nNo public discovery, relay, internet probing, automatic acceptance, remote browsing or restart/resume is used. Links and special files are not transferred.	Передача между DN отправляет выбранные обычные файлы и каталоги напрямую в пределах одной локальной сети.\nПриём объявляет этот экземпляр DN только при открытом окне.\nВыберите объекты из панели, соседний DN и отправку. Если multicast заблокирован, используйте адрес подключения вручную.\nПеред подтверждением сравните все восемь цифр на обоих экранах. Имени устройства недостаточно. Сопряжение действует только в текущем сеансе DN.\nПолучатель проверяет предложение и выбирает локальный каталог. Для существующих файлов работают обычные запросы замены; режим Ask объединяет папки.\nПринятые задания принадлежат Центру передач: закрытие окна прекращает новые предложения, но не принятые передачи. Отменяйте их в Центре передач.\nНет публичного поиска, ретрансляторов, интернет-проверок, автоматического приёма, удалённого просмотра и возобновления после перезапуска. Ссылки и специальные файлы не передаются.
+Nearby transfers send selected real files and folders directly between DN instances on the same LAN.\nReceive advertises this instance only while its window remains open.\nChoose panel selection, select a nearby receiver, then Send. Manual connection details work when multicast is blocked.\nCompare all eight verification digits on both screens before confirming. Device names alone are not trusted. Pairing lasts for this DN session only.\nThe receiver reviews the offer and chooses a local directory. Existing files use the normal replacement prompts; folders merge under Ask.\nTransfer Center owns accepted jobs: closing Nearby transfers stops new offers, not accepted transfers. Cancel a job in Transfer Center.\nNo public discovery, relay, internet probing, automatic acceptance, remote browsing or restart/resume is used. Links and special files are not transferred.\nRefresh rescans interfaces and restarts discovery without changing the selected files. New VM interfaces are bound automatically when no peer session is active; otherwise refresh waits until it finishes.\nManual details can contain several addresses. DN keeps eligible connected-LAN addresses and translates IPv6 scopes locally. Routed and NAT-only paths remain unsupported.\nNo announcements is not proof that multicast or a firewall is blocked.\nTest connection checks reachability and pairing without selecting or sending files. The other DN must have Receive enabled and support connection tests.\nEdit This DN and press Enter to apply a session-only nickname; blank restores the anonymous default. Device info shows the public identity and local interfaces/addresses. Nicknames never prove identity.\nSend text shares up to 64 KiB of Unicode text or links. Enter inserts a newline; Paste reads your clipboard and Send transmits only after pairing and receiver approval.\nThe receiver accepts the offer, previews the text, then chooses Copy or Dismiss. Nothing is copied or opened automatically. The console uses DN’s internal clipboard when a system clipboard is unavailable. Text drafts and previews are session-only; no files or transfer jobs are created.	Передача между DN отправляет выбранные обычные файлы и каталоги напрямую в пределах одной локальной сети.\nПриём объявляет этот экземпляр DN только при открытом окне.\nВыберите объекты из панели, соседний DN и отправку. Если multicast заблокирован, используйте адрес подключения вручную.\nПеред подтверждением сравните все восемь цифр на обоих экранах. Имени устройства недостаточно. Сопряжение действует только в текущем сеансе DN.\nПолучатель проверяет предложение и выбирает локальный каталог. Для существующих файлов работают обычные запросы замены; режим Ask объединяет папки.\nПринятые задания принадлежат Центру передач: закрытие окна прекращает новые предложения, но не принятые передачи. Отменяйте их в Центре передач.\nНет публичного поиска, ретрансляторов, интернет-проверок, автоматического приёма, удалённого просмотра и возобновления после перезапуска. Ссылки и специальные файлы не передаются.\nОбновить повторно проверяет интерфейсы и запускает поиск, сохраняя выбранные файлы. Новые интерфейсы ВМ подключаются автоматически вне активного сеанса; иначе обновление ожидает его завершения.\nАдрес подключения может содержать несколько адресов. DN выбирает подходящие адреса подключённой локальной сети и назначает локальные области IPv6. Маршрутизируемые сети и NAT без прямого доступа не поддерживаются.\nОтсутствие объявлений не доказывает блокировку multicast или межсетевым экраном.\n«Проверить связь» проверяет соединение и код без выбора и отправки файлов. На другом DN должен быть включён приём и поддерживаться проверка связи.\nИзмените «Этот DN» и нажмите Enter, чтобы задать имя до выхода из программы; пустое имя возвращает анонимное значение. «Об устройстве» показывает идентификатор и локальные интерфейсы с адресами. Имя не подтверждает личность.\n«Отправить текст» передаёт до 64 КиБ текста Unicode или ссылок. Enter вставляет новую строку; «Вставить» читает буфер, отправка начинается только после проверки кода и согласия получателя.\nПолучатель принимает предложение, просматривает текст и выбирает «Копировать» или закрытие просмотра. Копирования и открытия ссылок без команды нет. В консоли используется внутренний буфер DN. Черновики и просмотр действуют только до закрытия окна; файлы и задания передачи не создаются.
 
 Preview limited to the first 100 entries.	Показаны первые 100 элементов.
 
@@ -1508,3 +1508,63 @@ File published; directory synchronization failed	Файл опубликован
 Nearby event queue is full; retry the connection.	Очередь сетевых событий заполнена; повторите подключение.
 No receivers found; check Receive or use manual details if multicast is blocked.	Получатели не найдены; включите приём или введите адрес вручную, если multicast заблокирован.
 Could not connect; check Receive, the LAN address and UDP firewall access	Не удалось подключиться; проверьте приём, адрес локальной сети и доступ UDP
+Discovery is off	Поиск выключен
+Starting LAN discovery	Запуск поиска в локальной сети
+Advertising on LAN	Приём объявлен в локальной сети
+Searching for receivers	Поиск получателей
+No announcements received; still searching	Объявлений нет; поиск продолжается
+Receivers seen; no eligible LAN address	Получатели найдены; подходящих адресов нет
+LAN binding unavailable	Не удалось открыть сокеты локальной сети
+Discovery unavailable; use manual details	Поиск недоступен; введите адрес вручную
+Network refresh pending	Обновление сети отложено
+Receive: on	Приём: вкл
+Receive: off	Приём: выкл
+Seen / usable / filtered:	Найдено / доступно / отсеяно:
+Discovery stream ended. Refresh to retry.	Поиск завершился. Нажмите Обновить для повтора.
+No peer address is on a connected LAN; routed or NAT-only paths are not enabled.	Нет адресов в подключённой локальной сети; маршрутизируемые сети и NAT не поддерживаются.
+Connection timed out; check Receive and the UDP path	Подключение не установлено вовремя; проверьте приём и доступность UDP
+Could not connect to nearby DN	Не удалось подключиться к соседнему DN
+Wait for network refresh, then connect.	Дождитесь обновления сети, затем подключитесь.
+This DN:	Этот DN:
+Endpoint identity:	Идентификатор узла:
+Local interfaces and addresses:	Локальные интерфейсы и адреса:
+Start Receive, Refresh or Test connection to initialize networking.	Включите приём, обновите поиск или проверьте соединение для запуска сети.
+Edit the name field and press Enter to apply. A blank name restores the anonymous default. Nicknames are session-only and do not prove identity.	Измените имя и нажмите Enter. Пустое имя возвращает анонимное значение. Имя действует до выхода из DN и не подтверждает личность.
+Nearby device	Устройство DN
+Enter applies name	Enter — применить
+Peers seen/usable/filtered:	Узлы всего/доступно/отсев:
+Networking not started	Сеть не запущена
+Test connection	Проверить связь
+Device info…	Об устройстве…
+Connection test — no files will be sent.	Проверка связи — без отправки файлов.
+Connection verified with {}. No files were sent.	Связь с {} проверена. Файлы не отправлялись.
+Session nickname applied. It is not saved to configuration.	Имя сеанса применено. В настройках оно не сохраняется.
+Finish the peer session before changing its name.	Завершите сеанс передачи, прежде чем менять имя.
+Testing connection; no files will be sent.	Проверка связи; файлы не отправляются.
+Use a nickname of at most 24 characters, without control characters.	Введите имя не длиннее 24 символов без управляющих знаков.
+Connection test failed; enable Receive and use a DN version supporting connection tests	Проверка связи не удалась; включите приём и используйте DN с поддержкой проверки связи
+Send text…	Отправить текст…
+Send text	Отправка текста
+Incoming text	Входящий текст
+Received text	Полученный текст
+Text bytes	Байт текста
+UTF-8 bytes	байт UTF-8
+Accept to receive and preview. Your clipboard will not change.	Примите текст для просмотра. Буфер обмена пока не изменится.
+Enter: newline · Tab: controls · Ctrl+A: select all	Enter: новая строка · Tab: кнопки · Ctrl+A: выделить всё
+Arrows / PgUp / PgDn: scroll · Links are plain text	Стрелки / PgUp / PgDn: прокрутка · Ссылки — обычный текст
+Dismiss	Закрыть просмотр
+Text limit is 64 KiB; nothing was inserted.	Предел текста — 64 КиБ; ничего не вставлено.
+Control characters cannot be composed; nothing was inserted.	Управляющие знаки недопустимы; ничего не вставлено.
+Text must contain 1–65536 UTF-8 bytes.	Текст должен содержать от 1 до 65536 байт UTF-8.
+Text received by the other DN; clipboard copying is their choice.	Другой DN получил текст; копирование в буфер выбирает получатель.
+Sending text; waiting for approval…	Отправка текста; ожидание согласия…
+Receiving approved text…	Приём подтверждённого текста…
+Text offer declined; no text was received.	Предложение отклонено; текст не получен.
+Text offer declined; no text was sent.	Предложение отклонено; текст не отправлен.
+Text connection failed; enable Receive and use a DN version supporting text sharing	Не удалось отправить текст; включите приём и используйте DN с поддержкой обмена текстом
+Text delivery unconfirmed; the other DN may have received it	Доставка текста не подтверждена; другой DN мог его получить
+Invalid text offer; limit is 64 KiB.	Некорректное предложение текста; предел — 64 КиБ.
+Invalid text payload	Некорректные данные текста
+Text preview is no longer available	Просмотр текста больше недоступен
+Invalid text-offer response	Некорректный ответ на предложение текста
+Missing text receipt	Нет подтверждения приёма текста

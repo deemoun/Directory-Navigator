@@ -10,6 +10,9 @@ use std::{
     time::Duration,
 };
 pub const ALPN: &[u8] = b"dn-transfer/1";
+pub const TEXT_ALPN: &[u8] = b"dn-text/1";
+pub const TEXT_LIMIT: usize = 64 * 1024;
+pub const TEST_ALPN: &[u8] = b"dn-connect-test/1";
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub enum Message {
@@ -19,6 +22,17 @@ pub enum Message {
         name: String,
         trusted: bool,
     },
+    TextOffer {
+        bytes: usize,
+    },
+    TextAccepted,
+    TextDeclined,
+    TextBody(String),
+    TextReceipt,
+    TestRequest,
+    TestResponse,
+    TestFinished,
+    TestReceipt,
     Busy,
     Confirmed,
     Offer(Manifest),
@@ -74,10 +88,13 @@ pub async fn send(stream: &mut SendStream, message: &Message) -> io::Result<()> 
     stream.write_all(&bytes).await.map_err(error)
 }
 pub async fn receive(stream: &mut RecvStream) -> io::Result<Message> {
+    receive_limited(stream, MANIFEST_LIMIT).await
+}
+pub async fn receive_limited(stream: &mut RecvStream, limit: usize) -> io::Result<Message> {
     let mut size = [0; 4];
     stream.read_exact(&mut size).await.map_err(error)?;
     let size = u32::from_be_bytes(size) as usize;
-    if size == 0 || size > MANIFEST_LIMIT {
+    if size == 0 || size > limit {
         return Err(error("Invalid peer message length"));
     }
     let mut bytes = vec![0; size];
@@ -88,8 +105,9 @@ pub fn code(
     connection: &Connection,
     sender: iroh::EndpointId,
     receiver: iroh::EndpointId,
+    protocol: &[u8],
 ) -> io::Result<String> {
-    let context = format!("dn-transfer/1:{sender}:{receiver}");
+    let context = format!("{}:{sender}:{receiver}", String::from_utf8_lossy(protocol));
     let mut bytes = [0; 8];
     connection
         .export_keying_material(&mut bytes, b"EXPORTER-DN-Pairing-v1", context.as_bytes())

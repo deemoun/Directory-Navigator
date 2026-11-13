@@ -20,19 +20,25 @@ impl Lan {
             loopback: true,
         }
     }
+    #[cfg(test)]
+    pub fn set_interfaces(&self, interfaces: Vec<netdev::Interface>) {
+        *self.interfaces.write().unwrap() = interfaces;
+    }
     fn interfaces() -> Vec<netdev::Interface> {
         netdev::get_interfaces()
             .into_iter()
             .filter(|i| i.is_up() && !i.is_loopback())
             .collect()
     }
-    pub fn refresh(&self) {
+    pub fn refresh(&self) -> bool {
+        let before = self.binds();
         if !self.loopback {
             let current = Self::interfaces();
             if let Ok(mut interfaces) = self.interfaces.write() {
                 *interfaces = current;
             }
         }
+        self.binds() != before
     }
     pub fn allows(&self, address: &SocketAddr) -> bool {
         let ip = address.ip();
@@ -98,12 +104,13 @@ impl Lan {
         let unscoped = address
             .ip_addrs()
             .filter_map(|a| match a {
-                SocketAddr::V6(a) if a.ip().is_unicast_link_local() && a.scope_id() == 0 => {
-                    Some(*a)
-                }
+                SocketAddr::V6(a) if a.ip().is_unicast_link_local() => Some(*a),
                 _ => None,
             })
             .collect::<Vec<_>>();
+        address.addrs.retain(
+            |a| !matches!(a,TransportAddr::Ip(SocketAddr::V6(a)) if a.ip().is_unicast_link_local()),
+        );
         if let Ok(interfaces) = self.interfaces.read() {
             for a in unscoped {
                 for i in interfaces.iter().take(64) {
@@ -120,13 +127,31 @@ impl Lan {
         }
         self.filter(address)
     }
+    pub fn describe(&self, address: &SocketAddr) -> String {
+        self.interfaces
+            .read()
+            .ok()
+            .and_then(|interfaces| {
+                interfaces
+                    .iter()
+                    .find(|i| match address {
+                        SocketAddr::V4(a) => i.ipv4.iter().any(|net| net.addr() == *a.ip()),
+                        SocketAddr::V6(a) => {
+                            i.ipv6.iter().any(|net| net.addr() == *a.ip())
+                                && (!a.ip().is_unicast_link_local() || a.scope_id() == i.index)
+                        }
+                    })
+                    .map(|i| crate::filesystem::display_name(&i.name))
+            })
+            .unwrap_or_else(|| "Local interface".into())
+    }
     pub fn filter(&self, mut addr: EndpointAddr) -> io::Result<EndpointAddr> {
         addr.addrs
             .retain(|a| matches!(a, TransportAddr::Ip(ip) if self.allows(ip)));
         addr.addrs = addr.addrs.into_iter().take(16).collect();
         if addr.addrs.is_empty() {
             return Err(io::Error::other(
-                "Peer has no reachable address on a connected LAN",
+                "No peer address is on a connected LAN; routed or NAT-only paths are not enabled.",
             ));
         }
         Ok(addr)
@@ -164,19 +189,15 @@ pub fn parse(value: &str, lan: &Lan) -> io::Result<EndpointAddr> {
         .ok_or_else(|| io::Error::other("Missing peer identity or address"))?;
     let id = id.parse().map_err(io::Error::other)?;
     let mut addr = EndpointAddr::new(id);
-    for a in addresses.split(',').take(17) {
-        let ip: SocketAddr = a.parse().map_err(io::Error::other)?;
-        if !lan.allows(&ip) {
-            return Err(io::Error::other(
-                "Manual peer address must be on a connected LAN",
-            ));
-        }
-        addr = addr.with_ip_addr(ip);
-    }
-    if addr.addrs.len() > 16 {
+    let addresses = addresses.split(',').collect::<Vec<_>>();
+    if addresses.len() > 16 {
         return Err(io::Error::other("Too many peer addresses"));
     }
-    lan.filter(addr)
+    for a in addresses {
+        let ip: SocketAddr = a.parse().map_err(io::Error::other)?;
+        addr = addr.with_ip_addr(ip);
+    }
+    lan.discovered(addr)
 }
 
 #[cfg(test)]
@@ -231,5 +252,44 @@ mod tests {
         let shared = lan.clone();
         lan.interfaces.write().unwrap().clear();
         assert!(!shared.allows(&"192.168.2.9:1234".parse().unwrap()));
+    }
+    #[test]
+    fn manual_cards_keep_usable_addresses_but_validate_every_field() {
+        let id = iroh::SecretKey::from_bytes(&[11; 32]).public();
+        let lan = Lan::loopback();
+        let value = format!("dn-peer:1:{id}@8.8.8.8:1234,127.0.0.1:1234");
+        let parsed =
+            parse(&value, &lan).expect("an unusable address must not discard a usable one");
+        assert_eq!(
+            parsed.ip_addrs().copied().collect::<Vec<_>>(),
+            vec!["127.0.0.1:1234".parse::<SocketAddr>().unwrap()]
+        );
+        for suffix in [",", ",bad", ",localhost:1234"] {
+            assert!(parse(&(value.clone() + suffix), &lan).is_err());
+        }
+        let repeated = std::iter::repeat_n("127.0.0.1:1234", 17)
+            .collect::<Vec<_>>()
+            .join(",");
+        assert!(parse(&format!("dn-peer:1:{id}@{repeated}"), &lan).is_err());
+    }
+    #[test]
+    fn manual_link_local_cards_translate_foreign_scopes_and_keep_ipv4() {
+        let mut interface = netdev::Interface::dummy();
+        interface.index = 42;
+        interface.ipv4 = vec!["10.0.2.1/24".parse().unwrap()];
+        interface.ipv6 = vec!["fe80::1/64".parse().unwrap()];
+        let lan = Lan::loopback();
+        lan.set_interfaces(vec![interface]);
+        let id = iroh::SecretKey::from_bytes(&[13; 32]).public();
+        let card = format!("dn-peer:1:{id}@10.0.0.167:1234,10.0.2.15:1234,[fe80::5%7]:1234");
+        let addresses = parse(&card, &lan).unwrap();
+        assert_eq!(addresses.ip_addrs().count(), 2);
+        assert!(addresses
+            .ip_addrs()
+            .any(|a| *a == "10.0.2.15:1234".parse::<SocketAddr>().unwrap()));
+        assert!(addresses
+            .ip_addrs()
+            .any(|a| matches!(a,SocketAddr::V6(a) if a.scope_id()==42)));
+        assert!(parse(&format!("dn-peer:1:{id}@10.0.0.167:1234"), &lan).is_err());
     }
 }

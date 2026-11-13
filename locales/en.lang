@@ -1484,7 +1484,7 @@ Peer has no reachable address on a connected LAN	Peer has no reachable address o
 Manual peer address must be on a connected LAN	Manual peer address must be on a connected LAN
 Not enough free space for the peer offer	Not enough free space for the peer offer
 Nearby transfers only copy; sources are never removed.	Nearby transfers only copy; sources are never removed.
-Nearby transfers send selected real files and folders directly between DN instances on the same LAN.\nReceive advertises this instance only while its window remains open.\nChoose panel selection, select a nearby receiver, then Send. Manual connection details work when multicast is blocked.\nCompare all eight verification digits on both screens before confirming. Device names alone are not trusted. Pairing lasts for this DN session only.\nThe receiver reviews the offer and chooses a local directory. Existing files use the normal replacement prompts; folders merge under Ask.\nTransfer Center owns accepted jobs: closing Nearby transfers stops new offers, not accepted transfers. Cancel a job in Transfer Center.\nNo public discovery, relay, internet probing, automatic acceptance, remote browsing or restart/resume is used. Links and special files are not transferred.	Nearby transfers send selected real files and folders directly between DN instances on the same LAN.\nReceive advertises this instance only while its window remains open.\nChoose panel selection, select a nearby receiver, then Send. Manual connection details work when multicast is blocked.\nCompare all eight verification digits on both screens before confirming. Device names alone are not trusted. Pairing lasts for this DN session only.\nThe receiver reviews the offer and chooses a local directory. Existing files use the normal replacement prompts; folders merge under Ask.\nTransfer Center owns accepted jobs: closing Nearby transfers stops new offers, not accepted transfers. Cancel a job in Transfer Center.\nNo public discovery, relay, internet probing, automatic acceptance, remote browsing or restart/resume is used. Links and special files are not transferred.
+Nearby transfers send selected real files and folders directly between DN instances on the same LAN.\nReceive advertises this instance only while its window remains open.\nChoose panel selection, select a nearby receiver, then Send. Manual connection details work when multicast is blocked.\nCompare all eight verification digits on both screens before confirming. Device names alone are not trusted. Pairing lasts for this DN session only.\nThe receiver reviews the offer and chooses a local directory. Existing files use the normal replacement prompts; folders merge under Ask.\nTransfer Center owns accepted jobs: closing Nearby transfers stops new offers, not accepted transfers. Cancel a job in Transfer Center.\nNo public discovery, relay, internet probing, automatic acceptance, remote browsing or restart/resume is used. Links and special files are not transferred.\nRefresh rescans interfaces and restarts discovery without changing the selected files. New VM interfaces are bound automatically when no peer session is active; otherwise refresh waits until it finishes.\nManual details can contain several addresses. DN keeps eligible connected-LAN addresses and translates IPv6 scopes locally. Routed and NAT-only paths remain unsupported.\nNo announcements is not proof that multicast or a firewall is blocked.\nTest connection checks reachability and pairing without selecting or sending files. The other DN must have Receive enabled and support connection tests.\nEdit This DN and press Enter to apply a session-only nickname; blank restores the anonymous default. Device info shows the public identity and local interfaces/addresses. Nicknames never prove identity.\nSend text shares up to 64 KiB of Unicode text or links. Enter inserts a newline; Paste reads your clipboard and Send transmits only after pairing and receiver approval.\nThe receiver accepts the offer, previews the text, then chooses Copy or Dismiss. Nothing is copied or opened automatically. The console uses DN’s internal clipboard when a system clipboard is unavailable. Text drafts and previews are session-only; no files or transfer jobs are created.	Nearby transfers send selected real files and folders directly between DN instances on the same LAN.\nReceive advertises this instance only while its window remains open.\nChoose panel selection, select a nearby receiver, then Send. Manual connection details work when multicast is blocked.\nCompare all eight verification digits on both screens before confirming. Device names alone are not trusted. Pairing lasts for this DN session only.\nThe receiver reviews the offer and chooses a local directory. Existing files use the normal replacement prompts; folders merge under Ask.\nTransfer Center owns accepted jobs: closing Nearby transfers stops new offers, not accepted transfers. Cancel a job in Transfer Center.\nNo public discovery, relay, internet probing, automatic acceptance, remote browsing or restart/resume is used. Links and special files are not transferred.\nRefresh rescans interfaces and restarts discovery without changing the selected files. New VM interfaces are bound automatically when no peer session is active; otherwise refresh waits until it finishes.\nManual details can contain several addresses. DN keeps eligible connected-LAN addresses and translates IPv6 scopes locally. Routed and NAT-only paths remain unsupported.\nNo announcements is not proof that multicast or a firewall is blocked.\nTest connection checks reachability and pairing without selecting or sending files. The other DN must have Receive enabled and support connection tests.\nEdit This DN and press Enter to apply a session-only nickname; blank restores the anonymous default. Device info shows the public identity and local interfaces/addresses. Nicknames never prove identity.\nSend text shares up to 64 KiB of Unicode text or links. Enter inserts a newline; Paste reads your clipboard and Send transmits only after pairing and receiver approval.\nThe receiver accepts the offer, previews the text, then chooses Copy or Dismiss. Nothing is copied or opened automatically. The console uses DN’s internal clipboard when a system clipboard is unavailable. Text drafts and previews are session-only; no files or transfer jobs are created.
 
 Preview limited to the first 100 entries.	Preview limited to the first 100 entries.
 
@@ -1506,3 +1506,63 @@ File published; directory synchronization failed	File published; directory synch
 Nearby event queue is full; retry the connection.	Nearby event queue is full; retry the connection.
 No receivers found; check Receive or use manual details if multicast is blocked.	No receivers found; check Receive or use manual details if multicast is blocked.
 Could not connect; check Receive, the LAN address and UDP firewall access	Could not connect; check Receive, the LAN address and UDP firewall access
+Discovery is off	Discovery is off
+Starting LAN discovery	Starting LAN discovery
+Advertising on LAN	Advertising on LAN
+Searching for receivers	Searching for receivers
+No announcements received; still searching	No announcements received; still searching
+Receivers seen; no eligible LAN address	Receivers seen; no eligible LAN address
+LAN binding unavailable	LAN binding unavailable
+Discovery unavailable; use manual details	Discovery unavailable; use manual details
+Network refresh pending	Network refresh pending
+Receive: on	Receive: on
+Receive: off	Receive: off
+Seen / usable / filtered:	Seen / usable / filtered:
+Discovery stream ended. Refresh to retry.	Discovery stream ended. Refresh to retry.
+No peer address is on a connected LAN; routed or NAT-only paths are not enabled.	No peer address is on a connected LAN; routed or NAT-only paths are not enabled.
+Connection timed out; check Receive and the UDP path	Connection timed out; check Receive and the UDP path
+Could not connect to nearby DN	Could not connect to nearby DN
+Wait for network refresh, then connect.	Wait for network refresh, then connect.
+This DN:	This DN:
+Endpoint identity:	Endpoint identity:
+Local interfaces and addresses:	Local interfaces and addresses:
+Start Receive, Refresh or Test connection to initialize networking.	Start Receive, Refresh or Test connection to initialize networking.
+Edit the name field and press Enter to apply. A blank name restores the anonymous default. Nicknames are session-only and do not prove identity.	Edit the name field and press Enter to apply. A blank name restores the anonymous default. Nicknames are session-only and do not prove identity.
+Nearby device	Nearby device
+Enter applies name	Enter applies name
+Peers seen/usable/filtered:	Peers seen/usable/filtered:
+Networking not started	Networking not started
+Test connection	Test connection
+Device info…	Device info…
+Connection test — no files will be sent.	Connection test — no files will be sent.
+Connection verified with {}. No files were sent.	Connection verified with {}. No files were sent.
+Session nickname applied. It is not saved to configuration.	Session nickname applied. It is not saved to configuration.
+Finish the peer session before changing its name.	Finish the peer session before changing its name.
+Testing connection; no files will be sent.	Testing connection; no files will be sent.
+Use a nickname of at most 24 characters, without control characters.	Use a nickname of at most 24 characters, without control characters.
+Connection test failed; enable Receive and use a DN version supporting connection tests	Connection test failed; enable Receive and use a DN version supporting connection tests
+Send text…	Send text…
+Send text	Send text
+Incoming text	Incoming text
+Received text	Received text
+Text bytes	Text bytes
+UTF-8 bytes	UTF-8 bytes
+Accept to receive and preview. Your clipboard will not change.	Accept to receive and preview. Your clipboard will not change.
+Enter: newline · Tab: controls · Ctrl+A: select all	Enter: newline · Tab: controls · Ctrl+A: select all
+Arrows / PgUp / PgDn: scroll · Links are plain text	Arrows / PgUp / PgDn: scroll · Links are plain text
+Dismiss	Dismiss
+Text limit is 64 KiB; nothing was inserted.	Text limit is 64 KiB; nothing was inserted.
+Control characters cannot be composed; nothing was inserted.	Control characters cannot be composed; nothing was inserted.
+Text must contain 1–65536 UTF-8 bytes.	Text must contain 1–65536 UTF-8 bytes.
+Text received by the other DN; clipboard copying is their choice.	Text received by the other DN; clipboard copying is their choice.
+Sending text; waiting for approval…	Sending text; waiting for approval…
+Receiving approved text…	Receiving approved text…
+Text offer declined; no text was received.	Text offer declined; no text was received.
+Text offer declined; no text was sent.	Text offer declined; no text was sent.
+Text connection failed; enable Receive and use a DN version supporting text sharing	Text connection failed; enable Receive and use a DN version supporting text sharing
+Text delivery unconfirmed; the other DN may have received it	Text delivery unconfirmed; the other DN may have received it
+Invalid text offer; limit is 64 KiB.	Invalid text offer; limit is 64 KiB.
+Invalid text payload	Invalid text payload
+Text preview is no longer available	Text preview is no longer available
+Invalid text-offer response	Invalid text-offer response
+Missing text receipt	Missing text receipt

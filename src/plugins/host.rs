@@ -350,6 +350,10 @@ fn apply(app: &mut App, b: Binding, effects: Vec<Effect>) {
                 crate::peer::action(app, b, action)
             }
             Effect::Nearby(_) => {}
+            Effect::PasteText(token) => crate::clipboard::paste_plugin(app, b, token),
+            Effect::CopyTextOwned { text, serial } => {
+                crate::clipboard::copy_plugin(app, b, serial, text)
+            }
             Effect::CopyText(text) => crate::clipboard::copy(app, text),
             Effect::Help { title, text } => app.push_dialog(crate::dialog::Dialog {
                 title,
@@ -682,4 +686,34 @@ pub(crate) fn open_apk(app: &mut App, path: PathBuf) -> bool {
         dispatch(app, b, Event::OpenApk(path));
     }
     true
+}
+
+pub(crate) fn clipboard_token(app: &App, b: Binding) -> Option<super::ClipboardToken> {
+    if active(app) != Some(b) {
+        return None;
+    }
+    app.desktop
+        .plugins
+        .entries
+        .get(&b.plugin)
+        .filter(|entry| entry.binding == Some(b))?
+        .tool
+        .clipboard_token()
+}
+
+/// Copy completion updates only the live owner, including an inactive preview.
+pub(crate) fn clipboard_copied(app: &mut App, b: Binding, serial: u64, message: String) {
+    let Some(ctx) = context(
+        app,
+        b,
+        crate::turbo::dialog_spec::input_area(app),
+        Instant::now(),
+    ) else {
+        return;
+    };
+    if let Some(entry) = app.desktop.plugins.entries.get_mut(&b.plugin) {
+        let _ = entry
+            .tool
+            .event(Event::ClipboardCopied { serial, message }, &ctx);
+    }
 }

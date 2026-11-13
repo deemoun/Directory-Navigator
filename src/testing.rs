@@ -48,8 +48,8 @@ pub fn diagnostic_state(app: &crate::app::App) -> String {
     if crate::peer::active(app) {
         let _ = writeln!(
             state,
-            "nearby_receiving={}\nnearby_details={}\nnearby_busy={}",
-            app.peer.view.receiving, app.peer.view.details, app.peer.view.busy
+            "nearby_receiving={}\nnearby_details={}\nnearby_busy={}\nnearby_network_ready={}\nnearby_network_request={}\nnearby_network_revision={}\nnearby_network_phase={:?}",
+            app.peer.view.receiving, app.peer.view.details, app.peer.view.busy,app.peer.view.network.ready,app.peer.view.network.request,app.peer.view.network.revision,app.peer.view.network.phase
         );
     }
     for window in app.desktop.windows() {
