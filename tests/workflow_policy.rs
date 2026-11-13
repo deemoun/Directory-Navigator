@@ -142,6 +142,85 @@ fn assert_release_policy(text: &str) {
     assert!(text.contains("cancel-in-progress: false"));
     assert!(text.contains("type: string"));
     assert!(text.contains("git write-tree"));
+    assert_release_validation_levels(&text);
+}
+
+fn release_step<'a>(text: &'a str, name: &str) -> &'a str {
+    let marker = format!("      - name: {name}\n");
+    text.split_once(&marker)
+        .expect("Required release step")
+        .1
+        .split("\n      - ")
+        .next()
+        .unwrap()
+}
+
+fn assert_release_validation_levels(text: &str) {
+    for name in ["Clippy", "Test", "Test without audio"] {
+        let step = release_step(text, name);
+        let conditions = step
+            .lines()
+            .filter(|line| line.trim().starts_with("if:"))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            conditions,
+            ["        if: matrix.target != 'x86_64-apple-darwin'"],
+            "Only Intel may omit {name}"
+        );
+    }
+    for name in [
+        "Check formatting",
+        "Build release",
+        "Verify version and package",
+    ] {
+        assert!(
+            !release_step(text, name)
+                .lines()
+                .any(|line| line.trim().starts_with("if:")),
+            "{name} must cover all targets"
+        );
+    }
+    let smoke = release_step(text, "Intel macOS CLI smoke checks");
+    assert!(smoke.contains("if: matrix.target == 'x86_64-apple-darwin'"));
+    assert!(smoke.contains("set -euo pipefail"));
+    assert!(smoke.contains("--version"));
+    assert!(smoke.contains("Directory Navigator $RELEASE_VERSION"));
+    assert!(smoke.contains("--help"));
+    assert!(smoke.contains("Usage: dn"));
+}
+
+#[test]
+fn release_limits_light_validation_to_intel_and_keeps_mandatory_builds() -> io::Result<()> {
+    let text = release_workflow()?;
+    for valid in line_ending_variants(&text) {
+        assert_release_policy(&valid);
+    }
+    for mutation in [
+        text.replacen(
+            "        if: matrix.target != 'x86_64-apple-darwin'\n",
+            "",
+            1,
+        ),
+        text.replace(
+            "matrix.target != 'x86_64-apple-darwin'",
+            "matrix.target != 'aarch64-apple-darwin'",
+        ),
+        text.replace(
+            "      - name: Build release\n",
+            "      - name: Build release\n        if: matrix.target != 'x86_64-apple-darwin'\n",
+        ),
+        text.replace(
+            "matrix.target == 'x86_64-apple-darwin'",
+            "matrix.target == 'x86_64-pc-windows-msvc'",
+        ),
+        text.replace("--help >", "--version >"),
+    ] {
+        assert_ne!(mutation, text);
+        for variant in line_ending_variants(&mutation) {
+            assert!(std::panic::catch_unwind(|| assert_release_policy(&variant)).is_err());
+        }
+    }
+    Ok(())
 }
 
 fn release_workflow() -> io::Result<String> {

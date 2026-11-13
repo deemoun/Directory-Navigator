@@ -468,9 +468,13 @@ After pushing the workflow to the default branch, open **Actions → Build unifi
 release → Run workflow**, choose the source branch and enter a version **without
 `v`**, for example `1.0.0` or `1.1.0-beta.1`.
 
-The manual workflow checks, tests and builds all five targets: macOS Apple Silicon
-and Intel, Windows x86_64, and Linux x86_64 and ARM64. It embeds your version in
-the app, About and CLI, then creates an **unpublished draft release** tagged
+The manual workflow builds all five targets: macOS Apple Silicon and Intel,
+Windows x86_64, and Linux x86_64 and ARM64. Apple Silicon, Windows and Linux run
+full Clippy and test suites, including no-audio tests. Intel macOS uses formatting,
+a release build, CLI version/help smoke checks and package verification, avoiding
+extra development/test builds within the release timeout. The separate **Build all
+platforms** workflow retains full Intel tests when needed. The release workflow
+embeds your version in the app, About and CLI, then creates an **unpublished draft release** tagged
 `v<version>`. Prerelease versions are marked automatically.
 
 Downloads are five versioned binary archives (four TAR.GZ files and a Windows ZIP),

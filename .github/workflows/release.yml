@@ -111,13 +111,27 @@ jobs:
       - name: Check formatting
         run: cargo fmt --check
       - name: Clippy
+        if: matrix.target != 'x86_64-apple-darwin'
         run: cargo clippy --locked --all-targets --target ${{ matrix.target }} -- -D warnings
       - name: Test
+        if: matrix.target != 'x86_64-apple-darwin'
         run: cargo test --locked --target ${{ matrix.target }}
       - name: Test without audio
+        if: matrix.target != 'x86_64-apple-darwin'
         run: cargo test --locked --no-default-features --target ${{ matrix.target }} --test mp3_player --test plugin_settings
       - name: Build release
         run: cargo build --release --locked --target ${{ matrix.target }}
+      # Intel macOS is build/smoke coverage here; dedicated builds retain full tests.
+      - name: Intel macOS CLI smoke checks
+        if: matrix.target == 'x86_64-apple-darwin'
+        env:
+          BUILD_TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          binary="target/${BUILD_TARGET}/release/dn"
+          test "$("$binary" --version)" = "Directory Navigator $RELEASE_VERSION"
+          "$binary" --help > "$RUNNER_TEMP/dn-intel-help.txt"
+          grep -F -- 'Usage: dn' "$RUNNER_TEMP/dn-intel-help.txt"
       - name: Verify version and package
         env:
           BUILD_TARGET: ${{ matrix.target }}
