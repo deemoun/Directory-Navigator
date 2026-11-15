@@ -5,6 +5,7 @@ pub mod conflict;
 mod copy_options;
 #[cfg(test)]
 mod direct_tests;
+pub(crate) mod generated;
 mod guards;
 pub(crate) mod incoming;
 pub(crate) mod transfer;

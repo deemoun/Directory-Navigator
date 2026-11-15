@@ -11,7 +11,7 @@ use crate::{
     turbo::dialog_spec::{centered, Control, ControlKind},
 };
 use crossterm::event::{KeyCode as K, KeyModifiers as M};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use zeroize::Zeroize;
 const CANCEL: usize = 10;
 const HELP: usize = 11;
@@ -55,6 +55,9 @@ pub struct RemoteConnections {
     storage: Option<PathBuf>,
     notice: String,
     ftp_confirmed: bool,
+    reconnect: Option<crate::network::ReconnectTarget>,
+    failure: Option<(std::io::ErrorKind, String)>,
+    progress: Arc<Mutex<remote::ConnectPhase>>,
 }
 impl RemoteConnections {
     fn new_profile() -> Profile {
@@ -124,8 +127,12 @@ impl RemoteConnections {
                 profile,
                 password: zeroize::Zeroizing::new(self.fields[6].clone()),
             };
+            let progress = self.progress.clone();
+            *progress.lock().unwrap() = remote::ConnectPhase::Connecting;
             Task::spawn(&self.scope, "dn-remote-connect", move |cancel| {
-                remote::connect(credentials, &cancel)
+                remote::connect_progress(credentials, &cancel, &mut |phase| {
+                    *progress.lock().unwrap() = phase
+                })
             })
         })();
         match result {
@@ -137,7 +144,17 @@ impl RemoteConnections {
             Err(e) => self.notice = e.to_string(),
         }
     }
+    fn connected(&mut self, connection: Arc<Connection>) -> Vec<Effect> {
+        if let Some(target) = self.reconnect.take() {
+            vec![Effect::RemoteReconnected { connection, target }]
+        } else {
+            vec![Effect::RemoteConnected(connection)]
+        }
+    }
     fn action(&mut self, id: usize, ctx: &Context) -> Vec<Effect> {
+        if self.reconnect.is_some() && matches!(id, SAVE | NEXT | PROTOCOL | TERMINAL) {
+            return vec![];
+        }
         match id {
             CANCEL => {
                 self.task = None;
@@ -146,7 +163,7 @@ impl RemoteConnections {
             HELP => {
                 return vec![Effect::Help {
                     title: " Remote connection help ",
-                    text: crate::network::HELP.into(),
+                    text:format!("{}\n\n{}",ctx.language.text(crate::network::HELP),self.failure.as_ref().map_or_else(String::new,|(kind,cause)|crate::error_report::Report::new("Connection could not be established.",cause,"Check the server address, port, credentials and server identity before retrying.").io(*kind).render(ctx.language))),
                 }]
             }
             TERMINAL => match self.profile() {
@@ -235,6 +252,9 @@ impl ToolPlugin for RemoteConnections {
             Owner::Modal(id) => crate::requests::Owner::Modal(id),
         });
         self.task = None;
+        self.reconnect = None;
+        self.failure = None;
+        self.progress = Default::default();
         self.ftp_confirmed = false;
         self.focus = 0;
         self.notice.clear();
@@ -262,6 +282,17 @@ impl ToolPlugin for RemoteConnections {
         self.apply(p);
     }
     fn event(&mut self, event: Event<'_>, ctx: &Context) -> Vec<Effect> {
+        if let Event::RemoteReconnect { profile, target } = event {
+            self.failure = target
+                .reason
+                .as_ref()
+                .map(|r| (std::io::ErrorKind::Other, r.cause.clone()));
+            self.apply(profile);
+            self.reconnect = Some(target);
+            self.focus = 6;
+            self.notice="Reconnect retains this pane's directory, filter, cursor and marks. Enter credentials again.".into();
+            return vec![];
+        }
         if self.profiles_open {
             return self.profiles_event(event, ctx);
         }
@@ -270,15 +301,16 @@ impl ToolPlugin for RemoteConnections {
         }
         if ctx.active {
             if let Some(connection) = self.ready.take() {
-                return vec![Effect::RemoteConnected(connection)];
+                return self.connected(connection);
             }
         }
         if let Some(task) = &self.task {
+            self.notice = self.progress.lock().unwrap().label().into();
             match task.try_recv() {
                 Ok(Ok(connection)) => {
                     self.task = None;
                     if ctx.active {
-                        return vec![Effect::RemoteConnected(connection)];
+                        return self.connected(connection);
                     }
                     self.ready = Some(connection);
                     self.notice = "Connection ready".into();
@@ -291,7 +323,8 @@ impl ToolPlugin for RemoteConnections {
                 }
                 Ok(Err(ConnectError::Failure(e))) => {
                     self.task = None;
-                    self.notice = e.to_string();
+                    self.failure = Some((e.kind(), e.to_string()));
+                    self.notice=crate::error_report::Report::new("Connection could not be established.",e.to_string(),"Check the server address, port, credentials and server identity before retrying.").io(e.kind()).inline(ctx.language,70);
                 }
                 Err(std::sync::mpsc::TryRecvError::Disconnected) => {
                     self.task = None;
@@ -318,6 +351,7 @@ impl ToolPlugin for RemoteConnections {
             Event::Key(k)
                 if self.focus < 7
                     && self.task.is_none()
+                    && (self.reconnect.is_none() || self.focus == 6)
                     && self.observed.is_none()
                     && !k.modifiers.intersects(M::ALT | M::CONTROL) =>
             {
@@ -328,7 +362,10 @@ impl ToolPlugin for RemoteConnections {
                 vec![]
             }
             Event::Paste(text)
-                if self.focus < 7 && self.task.is_none() && self.observed.is_none() =>
+                if self.focus < 7
+                    && self.task.is_none()
+                    && self.observed.is_none()
+                    && (self.reconnect.is_none() || self.focus == 6) =>
             {
                 let i = self.focus;
                 if self.fields[i].len() + text.len() <= 4096 {
@@ -350,7 +387,11 @@ impl ToolPlugin for RemoteConnections {
         let mut s = ctx.dialog(
             r,
             self.focus,
-            ctx.language.text("Remote connections"),
+            ctx.language.text(if self.reconnect.is_some() {
+                "Reconnect remote panel"
+            } else {
+                "Remote connections"
+            }),
             if self.observed.is_some() {
                 CANCEL
             } else {
@@ -421,9 +462,9 @@ impl ToolPlugin for RemoteConnections {
                 ctx.target(100 + i),
             );
             c.enter_action = false;
-            c.enabled = self.task.is_none();
+            c.enabled = self.task.is_none() && (self.reconnect.is_none() || i == 6);
             s.control(c);
-            if self.focus == i {
+            if self.focus == i && self.task.is_none() && (self.reconnect.is_none() || i == 6) {
                 s.cursor = Some((r.x + 2 + column.min(usize::from(width - 1)) as u16, y + 1));
             }
         }
@@ -440,6 +481,8 @@ impl ToolPlugin for RemoteConnections {
                 CONNECT,
                 if self.task.is_some() {
                     "Connecting…"
+                } else if self.reconnect.is_some() {
+                    "Reconnect"
                 } else {
                     "Connect"
                 },
@@ -457,7 +500,8 @@ impl ToolPlugin for RemoteConnections {
                 ctx.target(id),
             );
             c.enabled = (self.task.is_none() || id == CANCEL || id == HELP)
-                && (id != TERMINAL || self.protocol == 0);
+                && (id != TERMINAL || self.protocol == 0)
+                && (self.reconnect.is_none() || !matches!(id, SAVE | NEXT | PROTOCOL | TERMINAL));
             s.control(c);
         }
         s
@@ -474,6 +518,8 @@ impl ToolPlugin for RemoteConnections {
         }
         self.observed = None;
         self.ready = None;
+        self.reconnect = None;
+        self.failure = None;
         self.profiles_open = false;
         self.delete_profile = None;
     }
@@ -499,6 +545,11 @@ mod tests {
             now: Instant::now(),
             storage: None,
             mp3: Default::default(),
+            dos: Default::default(),
+            video: Default::default(),
+            video_preferences: Default::default(),
+            acoustic: Default::default(),
+            bluetooth: Default::default(),
             nearby: Default::default(),
         }
     }

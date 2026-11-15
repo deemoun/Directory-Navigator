@@ -1,6 +1,13 @@
 # Directory Navigator
 
-## Current status — stable 1.1.13
+## Current status — preparing stable 1.1.14
+
+Directory Navigator 1.1.14 is being prepared; it has not been published. Video
+Merge no longer carries the Experimental label and remains opt-in. Bluetooth
+transfers is enabled by default, preserving explicitly saved disabled choices;
+startup does not open Bluetooth devices or start receiving. Acoustic remains an
+optional feature excluded from the default build. Earlier validation below
+records the work before this release preparation.
 
 Directory Navigator 1.1.13 is published and available
 on [crates.io](https://crates.io/crates/directory-navigator/1.1.13). The crate is
@@ -9,6 +16,181 @@ Windows remain supported. Version 1.1.9 was the first stable release.
 
 See the [English README](README.md), [Russian README](README.ru.md) and
 [user guide](docs/USER_GUIDE.md) for installation, controls, safeguards and limits.
+
+### Bluetooth transfers — implementation history before 1.1.14
+
+Initially added an opt-in Bluetooth transfers document for queued regular files between DN
+instances. Native adapters use IOBluetooth on macOS, BlueZ/system D-Bus on Linux
+and Bluetooth Classic/Winsock on Windows. OBEX framing is shared; a private DN
+service UUID avoids selecting the operating system's unrelated file receiver.
+Per-file approval precedes guarded destination-side staging/publication. The
+session queue is bounded to 256 files, each below 4 GiB. Folders, links, phone
+interoperability, resume and persistent queues are outside this milestone.
+Acoustic remains separate and absent from default builds. Real two-device radio
+interoperability remains unverified here; private-stream/UI tests and isolated
+adapter cross-checks must not be described as hardware coverage.
+
+Local validation (2026-11-15): the native suite passed 1,315 tests with 14 existing
+hardware/tool-dependent skips. Final Bluetooth-focused tests were repeated after
+lifecycle/completion review. Native and Intel macOS all-target Clippy, default and
+optional-acoustic presentation checks, no-default-features, 44 helper tests and
+workflow-policy checks passed. The normal 1.1.13 release was rebuilt and its EN/RU
+Bluetooth queue/help/resize/close scenarios passed in a real PTY with terminal
+restoration; no radio was enabled by these tests. Isolated native-adapter Clippy
+passed for Windows x64 and Linux x64/ARM64 using real Rust platform bindings.
+Whole-program Linux/Windows cross-checks remain blocked by missing Linux C cross
+compilers / Windows SDK headers in this Mac environment. No two-device Bluetooth
+hardware exchange or Linux/Windows runtime execution was available. Normal builds
+still exclude Acoustic's optional ggwave/snow dependencies; CI was not triggered.
+
+The follow-up CI audit made Windows Bluetooth enumeration a lazy, System32-only
+load of `bthprops.cpl`, so an absent Bluetooth component cannot become a startup
+requirement. Enumeration handles and the loaded library have owned cleanup. Two
+Windows-only regression tests cover a missing library and missing exports; they
+were cross-compiled with Clippy, not executed on this Mac. Generated Windows
+adapter IR contains runtime export lookup rather than direct BluetoothFind
+imports (this is not a final-PE/import-table or Windows runtime test). Linux's
+locked graph uses zbus without libdbus-sys, and neither Linux nor Windows includes
+the macOS Bluetooth crate or Acoustic dependencies by default. Native Bluetooth,
+settings, localization, no-audio test targets, workflow policy and 44 helpers passed;
+the normal release was rebuilt and its Bluetooth PTY scenario passed. Full
+Linux/Windows cross-build and hardware limitations above still apply. No workflow
+was started and no publication was performed.
+
+Pre-release Bluetooth review now explicitly requests an automatically allocated
+RFCOMM channel for the custom BlueZ server profile. macOS opens channels
+asynchronously and sends MTU-bounded buffers through the non-sleeping native write
+API, avoiding an asynchronous borrowed-buffer lifetime across cancellation.
+Negotiated decision keepalives cover one ten-minute approval/replacement budget;
+legacy peers retain one 110-second budget. Ambiguous final-write/receipt failures
+remain unconfirmed, cancellation retains its stopped status, and session-close
+errors after file receipts are warnings. Disconnected workers clear pending
+controls and retire their input generation. Real-radio and full Linux/Windows
+build limitations above remain; these changes do not establish hardware coverage.
+
+Validation for this review: the full native suite passed 1318 tests with 14 existing
+skips; the final ten Bluetooth-focused tests passed after the cancellation-outcome
+adjustment. Native/Intel all-target Clippy, no-default-features, no-audio player
+and settings tests, 44 helper tests, and workflow policy checks passed. Isolated
+Linux x64/ARM64 and Windows x64 adapters, including their tests, passed Clippy;
+this is not a complete application cross-build or native execution. Release
+1.1.13 was rebuilt and its EN/RU Bluetooth PTY scenario passed with terminal
+restoration. No real Bluetooth device exchange was available; no CI was run.
+
+### Unreleased remote-pane polish
+
+Remote panes retain cached listings after failed or cancelled navigation. A shared
+Panel reconnect action requests credentials again for the captured session and
+retains current directory, filter, selection and scroll where valid. Connection
+health distinguishes transport failures from path/access errors; accepted jobs
+are never automatically replayed. Status reflects observed operations, not a
+heartbeat. No credentials are persisted or version/configuration changes made.
+
+Local validation on macOS ARM64: full native suite, native/Intel all-target
+Clippy, no-default-features check, 44 packaging/helper tests and workflow-policy
+tests passed. Release 1.1.13 was rebuilt; the private FTP disconnect/reconnect
+terminal scenario passed repeatedly, including terminal restoration. Linux and
+Windows runtime checks remain unavailable here; cross-checks stop at missing
+Linux C cross-compilers and Windows SDK headers, respectively. CI was not run.
+
+### Video Merge — implementation history before 1.1.14
+
+Added a default-disabled experimental video-merging plugin using separately
+installed FFmpeg/FFprobe on macOS/Linux/Windows. It captures local files/folders,
+orders sources, excludes exact duplicates, offers compatible stream copy or
+H.264/H.265 conversion and an optional privacy-limited timeline CSV. Output uses
+shared guarded publication, cancellation and explicit replacement approval.
+Mixed HDR/10-bit inputs now convert automatically to SDR BT.709 with a nonblocking
+notice; compatible stream copy retains HDR. Persistent resume caches remain outside
+this milestone.
+See the [guide](docs/USER_GUIDE.md#video-merge).
+
+Faster-processing and timing follow-up:
+
+- Settings now uses one readable Processing list, Match source controls and an
+  Advanced page. Discovery runs independently of Analyze and refreshes an open
+  settings draft when results arrive. Explicit choices survive failed refreshes.
+- Automatic preserves compatible stream copy, otherwise prefers verified hardware
+  H.264, with a visible software fallback explanation before Start. VideoToolbox
+  probes/encoding prohibit software fallback. Capabilities are session-only and
+  tied to both executable identities; output dimensions are checked before Start.
+- Typed FFmpeg progress feeds monotonic elapsed time, conversion remaining and
+  retained completion/cancellation/failure time. Waiting, joining and validation
+  are distinct; painting never reads clocks or performs I/O.
+- Test speed uses private bounded samples through the real conversion pipeline.
+  On this Mac, generated two-second 4K/60 HLG samples measured approximately
+  **0.53× software / 0.72× Apple hardware**; 1080p/30 measured **2.23× / 2.43×**.
+  These are simple synthetic clips, not forecasts for user footage. Apple H.264
+  and H.265 hardware probes succeeded. HDR tone mapping remains CPU-based.
+- The rebuilt **1.1.13** passed the release terminal suite (**11 tests**), including
+  discovery before Analyze, explicit Apple hardware selection, private speed
+  testing, mixed HDR/SDR merging, final duration, settings cancellation, resize
+  and terminal restoration. No version/configuration change or dependency added.
+
+Current local follow-up validation: **1,277 native tests passed, 14 opt-in tests
+ignored**, with the real video/media fixtures exercised separately. Native and
+macOS Intel all-target Clippy, no-default-features, 44 Python helper tests,
+13 workflow-policy tests, formatting and diff checks passed. Linux ARM64/x86_64
+cross-checks remain blocked by absent native C cross compilers; Windows checking
+is blocked by missing SDK headers in `ring`. No Linux/Windows runtime test or CI
+run is claimed for this follow-up. The application release remains **1.1.13**.
+
+Initial Video Merge validation, recorded before the faster-processing follow-up
+and separate from published release CI and the older experimental results below:
+
+- The full default-feature native suite passed **1,273 tests**, with **13 ignored**.
+  Focused final checks also cover configuration-save rejection, owned close
+  confirmation, stale requests, source changes, process cancellation/capture bounds,
+  keyboard settings/confirmation controls, mouse-wheel source navigation,
+  and EN/RU immutable frames. The additional ignores are explicit subprocess/media
+  fixtures; real FFmpeg validation was run separately rather than required in CI.
+- Installed FFmpeg/FFprobe passed private H.264 stream-copy, H.264/H.265 conversion,
+  exact fractional FPS, anamorphic display scaling, mixed audio/silence,
+  mixed HLG/PQ HDR-to-SDR and 10-bit SDR conversion, compatible HDR remuxing,
+  neutral-color output checks, duplicate exclusion, CSV, malformed
+  media, cancellation and cleanup scenarios. Hardware encoders were not exercised.
+- The rebuilt **1.1.13** release passed the private terminal suite: **11 tests**,
+  including real mixed HDR/SDR folder analysis/merge, settings/picker cancellation,
+  resize and restoration.
+- Native default/acoustic all-target Clippy with warnings denied, no-default-features
+  checks, focused no-audio plugin tests, default/acoustic settings snapshots,
+  **44** Python helper tests and **13** workflow-policy tests passed, along with
+  formatting and diff checks. Only the intentional Plugins-settings frames changed.
+- macOS Intel all-target Clippy passed through the installed cross toolchain.
+  Linux ARM64/x86_64 cross-checks could not complete because their native C cross
+  compilers are absent; Windows checking was blocked by missing SDK headers.
+  Actual runtime coverage is macOS ARM64 only. No workflows or publication ran.
+
+### DOS and Acoustic — implementation history before 1.1.14
+
+DOSBox Staging launching and 1 KiB acoustic transfers are experimental plugins,
+both disabled by default. The `acoustic` build feature is also off by default and
+independent of music playback. Neither plugin starts devices/processes/networking
+merely by being enabled. See the [guide](docs/USER_GUIDE.md#experimental-dos-and-acoustic-plugins).
+Local validation for this unreleased work (separate from published 1.1.13 CI):
+
+- Full native suites passed: **1,251 tests** with default features and **1,269**
+  with `acoustic`; each run retained nine existing environment/hardware ignores.
+  The acoustic suite covers framing, synthetic waveforms, Noise/SAS approval,
+  retries, duplicate suppression, mid-payload cancellation, file publication,
+  lost receipts, clipboard generations, window reopening and music pause/resume.
+- All-target Clippy with warnings denied passed for macOS ARM64 natively and
+  macOS Intel, Linux ARM64/x86_64 and Windows x86_64 through available cross
+  toolchains. Default native Clippy also passed. No-default-features checks and
+  acoustic-without-music checks passed; dependency graphs confirmed the feature
+  separation. Python packaging/release/workflow helpers passed **44 tests**;
+  the Rust workflow-policy suite passed **13**. Formatting and diff checks passed.
+- Both locked release builds report `Directory Navigator 1.1.13`: normal
+  `target/release/dn` and optional `target/acoustic-release/release/dn`.
+  macOS ARM64 release PTY walkthroughs passed for configuration cancellation,
+  literal Unicode/metacharacter DOS arguments, file capture, text mode, resize
+  and terminal restoration. These use a private DOS mock and do not open audio
+  devices. EN/RU, custom colors and shrink/restore have headless coverage.
+- No installed DOSBox Staging/game or real speaker/microphone transfer was
+  exercised. Two-device acoustic reliability is **unverified**. Linux and Windows
+  runtime checks remain pending; cross-compilation is not runtime evidence.
+  CI was not run. The manual Rust-check workflow now checks the optional feature;
+  unified-release Intel validation remains unchanged and intentionally lighter.
 
 ### Nearby improvements in 1.1.13
 

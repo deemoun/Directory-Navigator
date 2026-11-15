@@ -10,7 +10,9 @@ impl App {
     pub fn poll(&mut self) -> bool {
         // Retire closed owners and orphaned children before polling any reply.
         self.sync_modals();
-        let peer_changed = crate::peer::poll(self);
+        let experiments_changed =
+            crate::dos::poll(self) | crate::acoustic::poll(self) | crate::video::poll(self);
+        let peer_changed = crate::peer::poll(self) | crate::bluetooth::poll(self);
         let clipboard_changed = crate::clipboard::poll(self);
         let associations_changed = crate::associations::poll(self);
         let archive_changed = crate::archive::poll(self);
@@ -26,7 +28,8 @@ impl App {
         let recovery_changed = crate::editor::recovery::poll(self, std::time::Instant::now());
         let mut changed = crate::config_import::poll(self);
         changed |= crate::plugins::host::poll(self, std::time::Instant::now());
-        changed |= peer_changed
+        changed |= experiments_changed
+            | peer_changed
             | clipboard_changed
             | saver_changed
             | associations_changed
@@ -149,6 +152,10 @@ impl App {
                 .is_some_and(|i| i.loading());
         if pending
             || crate::peer::active(self)
+            || crate::acoustic::active(self)
+            || self.dos.view.busy
+            || self.video.view.busy
+            || self.video.view.checking
             || self.clipboard.pending()
             || self.screensaver.active
         {
@@ -261,7 +268,9 @@ impl App {
     fn poll_panels(&mut self, refresh_allowed: bool) -> (bool, Vec<Dialog>) {
         let mut changed = false;
         let mut panel_errors = Vec::new();
-        for panel in &mut self.panels {
+        let remote_foreground = self.desktop.active().id == crate::desktop::WindowId::MANAGER
+            && self.modal_top().is_none();
+        for (index, panel) in self.panels.iter_mut().enumerate() {
             if panel.background_refreshing() && !refresh_allowed {
                 continue;
             }
@@ -286,10 +295,18 @@ impl App {
             }
             if let Some(message) = error {
                 changed = true;
-                panel_errors.push(Dialog {
+                if panel.is_remote() && (!remote_foreground || index != self.active) {
+                    self.notice = self
+                        .config
+                        .language
+                        .text("Remote directory request failed; the view is retained.")
+                        .into();
+                    continue;
+                }
+                panel_errors.push(if panel.is_remote(){Dialog{title:" Remote directory ",message:panel.remote_error_report(self.config.language)}}else{Dialog {
                     title: " Directory error ",
                     message: crate::error_report::Report::new("Directory access reported a problem.",message,"Check the directory path and permissions. Refresh or choose an accessible folder.").path("Current directory",&panel.path).render(self.config.language),
-                });
+                }});
             }
             changed |= loading != panel.loading || revision != panel.revision;
             changed |= panel.space.poll(&panel.path, std::time::Instant::now());

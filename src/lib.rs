@@ -2,6 +2,7 @@ pub mod apk;
 pub const APPLICATION_NAME: &str = "Directory Navigator";
 pub const DISPLAY_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+pub(crate) mod acoustic;
 pub mod app;
 pub mod associations;
 pub(crate) mod button_feedback;
@@ -15,6 +16,7 @@ pub mod dialog;
 pub(crate) mod dialog_adapter;
 pub(crate) mod dialog_controls;
 pub(crate) mod dialog_theme;
+pub(crate) mod dos;
 pub mod editor;
 pub mod file_info;
 pub mod file_tools;
@@ -120,3 +122,7 @@ pub(crate) mod error_report;
 pub(crate) mod help_text;
 
 pub mod network;
+
+pub mod video;
+
+pub(crate) mod bluetooth;

@@ -411,6 +411,11 @@ fn mp3_folder_tags_modes_info_and_resize_restore_terminal() -> io::Result<()> {
     s.wait("manager ready", |s| s.command_prompt_active())?;
     s.send(b"\x1bocp", "plugins", |s| s.text().contains("mp3_player"))?;
     s.send(b"\t \r", "enable player", |s| s.command_prompt_active())?;
+    // The fixture was created after DN started: observe a completed refresh
+    // instead of depending on the periodic directory scan's timing.
+    s.send(b"\x12", "refresh private music fixture", |s| {
+        s.command_prompt_active() && s.text().contains("music")
+    })?;
     s.select_file("music")?;
     s.send(b"\x1bua", "import folder", |s| {
         s.text().contains("Music Player")

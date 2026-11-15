@@ -59,6 +59,8 @@ pub const ROOTS: &[Root] = &[
             item("~C~opy...", "F5", Key(5)),
             item("Copy to ~T~emp Drive...", "", CopyToTempDrive),
             item("Send to nearby DN...", "", SendNearby),
+            item("Run in DOSBox...", "", RunDos),
+            item("Merge videos...", "", MergeVideos),
             item("Copy ~n~ames / paths", "", Submenu(MenuId::CopyNames)),
             item("~R~ename/Move...", "F6", Key(6)),
             item("~M~ake directory", "F7", Key(7)),
@@ -76,6 +78,11 @@ pub const ROOTS: &[Root] = &[
             item("~U~ser menu", "F2", UserMenu),
             item("Smart~P~ad", "Alt+Q", SmartPad),
             item(
+                "Bluetooth transfers...",
+                "",
+                Plugin(crate::plugins::BLUETOOTH_TRANSFERS),
+            ),
+            item(
                 "Nearby transfers...",
                 "",
                 Plugin(crate::plugins::NEARBY_TRANSFERS),
@@ -85,6 +92,17 @@ pub const ROOTS: &[Root] = &[
                 "",
                 Plugin(crate::plugins::REMOTE_CONNECTIONS),
             ),
+            item(
+                "DOS launcher (Experimental)...",
+                "",
+                Plugin(crate::plugins::DOS_LAUNCHER),
+            ),
+            item(
+                "Acoustic transfers (Experimental)...",
+                "",
+                Plugin(crate::plugins::ACOUSTIC_TRANSFERS),
+            ),
+            item("Video Merge...", "", Plugin(crate::plugins::VIDEO_MERGE)),
             item("~T~emp Drive", "", TempDrive),
             item("Clear Temp ~D~rive...", "", ClearTempDrive),
             item(
@@ -151,6 +169,7 @@ pub const ROOTS: &[Root] = &[
             line(),
             item("Change direc~t~ory...", "Alt+T", GoTo),
             item("~R~e-read", "Alt+R", Refresh),
+            item("Reconnect remote panel...", "", ReconnectRemote),
             item("Parent directory", "Backspace", Parent),
             item(
                 "History of ~d~irectories...",

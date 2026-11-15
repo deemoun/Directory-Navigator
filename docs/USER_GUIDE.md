@@ -1829,7 +1829,18 @@ a selection recursively after confirmation (no remote Trash). Links and special
 files cannot be transferred or edited; directory links are never followed.
 Native-only actions ask you to download first. Remote Move between panes is not
 supported. Ctrl+PgUp, or `..` at the remote root, disconnects and returns to the
-original disk directory. Esc while a pane is loading cancels that connection.
+original disk directory. Esc while a pane is loading stops that listing and keeps
+the remote location and cached view.
+
+**Panel → Reconnect remote panel…** requests credentials again for the same server
+and current directory. It preserves the filter, cursor, marks and scroll where
+still valid, changing only the captured pane. Passwords are never saved. Accepted
+transfers retain their original session and are not replayed. Wait for a busy
+connection to finish before reconnecting. The pane distinguishes disconnected,
+busy and ready states based on observed operations, without a continuous probe.
+Permission or missing-directory errors retain the view and do not by themselves
+mark the connection disconnected. Help in the connection dialog includes the
+last connection cause.
 
 Directory listings are bounded to 10,000 entries and 8 MiB of names per directory;
 recursive transfers/deletion to 100,000 items and 512 levels; individual transfers
@@ -1953,3 +1964,192 @@ crash or power loss, as with normal Copy. Sender success requires the receiver's
 final receipt. If it is lost, delivery is **unconfirmed**: inspect the destination
 before retrying. No persistent trust, automatic acceptance, remote browsing,
 source deletion, move or restart/resume is provided.
+
+## Experimental DOS and acoustic plugins
+
+Both plugins are **disabled by default**, including upgrades without an explicit
+saved choice. Enable them in **Options → Configuration → Plugins**. Enabling
+alone starts no emulator, opens no audio devices and starts no networking.
+
+- **DOS launcher (Experimental)** uses a separately installed
+  [DOSBox Staging](https://www.dosbox-staging.org/). Configure its executable in
+  **Utilities → DOS launcher…**, or leave the path blank for automatic discovery.
+  **File → Run in DOSBox…** launches the current regular COM, DOS EXE or BAT in
+  its own graphical window. The separate **Open DOS programs with DOSBox** option
+  enables Enter/double-click for COM and DOS MZ executables before associations;
+  Windows PE/NE/LE/LX executables are excluded and BAT stays explicit. Ctrl+Enter
+  and **Open with default app** bypass DOS handling. Folder-local configuration
+  loading is disabled; DOSBox's global configuration is retained. No emulator is
+  bundled; a graphical session is required.
+- **Acoustic transfers (Experimental)** additionally requires a build with
+  `cargo build --release --locked --features acoustic` from this checkout. The feature is off
+  by default and independent of music playback. **Utilities → Acoustic transfers…**
+  sends **1 KiB of UTF-8 text or one regular file up to 1 KiB** using audible tones.
+  Both devices need microphones for acknowledgements. Compare the eight-digit
+  code on both screens; both users confirm, then the receiver approves each
+  offer. Noise XX encrypts the session; identities, drafts and previews are
+  session-only. Text has Preview/Copy/Dismiss; files use guarded destination and
+  replacement handling. Stop/close releases devices; completed files remain.
+  Missing final receipts mean **unconfirmed delivery**. Tiny payloads can take
+  minutes, and real speaker/microphone reliability remains unverified.
+
+The acoustic feature uses system-default input/output (CoreAudio on macOS,
+ALSA on Linux, WASAPI on Windows). Linux builds need the same pkg-config and ALSA
+development packages documented for audio; `--no-default-features --features
+acoustic` includes the modem without the music engine. No system volume is
+changed. Music paused by the modem resumes only if its player state remains
+unchanged. Closing the receiver rejects pending work and releases both streams.
+
+Use a quiet room and keep speakers clear of clipping. Echo cancellation,
+noise suppression, microphone permissions and device loss can prevent reception.
+Framing uses bounded fragments, checksums, finite retries and duplicate filtering
+before Noise counters advance. Every new session uses fresh keys; acoustic trust
+is separate from Nearby/Iroh. There is no automatic acceptance, folders,
+multiselection, archive/remote sources or resume. Extract/download first.
+
+No acoustic or emulator hardware check is implied by a protocol test. The manual
+Rust-check workflow covers the optional feature without opening audio hardware;
+unified Intel release validation remains intentionally lighter.
+
+
+## Video Merge
+
+This plugin is **disabled by default**, independently of other plugins. Enable it in Options → Configuration → Plugins. Enabling it does not
+start a process. It works on macOS, Linux and Windows through separately installed
+FFmpeg/FFprobe, without a Rust feature or bundled video libraries.
+
+Install a build containing the encoders you need: `brew install ffmpeg` on macOS,
+`sudo apt install ffmpeg` on Debian/Ubuntu, an appropriately enabled FFmpeg build
+on Fedora, or a Windows FFmpeg installation whose `bin` directory is on PATH.
+Both tools are required. Settings permits explicit native executable paths;
+BAT/CMD wrappers are not accepted. DN never installs software or invokes a shell.
+
+Select visible marked local files/folders, or the current item, then File → Merge
+videos. Opening Utilities → Video Merge also captures visible marked local files
+and folders; without marks it opens an empty tool. Reactivating an already-open
+tool preserves its list. Add file uses DN's native picker; Add folder uses Directory tree. Supported
+extensions are MP4, MOV, MKV, WebM, MTS, M2TS and TS, checked through FFprobe.
+Include subfolders is off initially. Hidden video files are included; directory
+links are never followed. Folder clips use natural filename ordering, while
+explicit file selections retain their panel order. Move up/down sets merge order.
+
+Choose an MP4 output filename with Browse or the input field. Analyze scans,
+streams BLAKE3 hashes to exclude exact duplicates, probes video/audio and shows a
+conversion summary. Start is available after successful analysis; edits require
+reanalysis. Work stays responsive and continues when switching windows. Stop
+cancels it, and closing an active job asks for cancellation first.
+
+Auto uses stream copy only for compatible H.264/HEVC streams and AAC audio in MP4.
+It preserves encoded quality and timing, including fractional or variable frame
+rates. Otherwise conversion proposes the first clip's display size and exact
+fractional FPS. There is no automatic 1080p conversion, 30-FPS rounding or 60-FPS
+cap. Settings opens a readable Processing selector: Automatic, software H.264/H.265,
+and available platform hardware encoders. Automatic preserves compatible stream
+copy first; conversion prefers verified hardware H.264. Explicit choices request
+conversion. Match source resolution/frame rate are enabled by default; turn them
+off to enter custom values. Advanced holds software CRF (18/20 by default),
+Fast/Medium/Slow software presets, hardware bitrate in Mbps and tool paths.
+Hardware Auto bitrate scales from H.264 60 Mbps at 4K/60; H.265 uses two-thirds.
+Higher bitrate generally increases quality and size; it is not equivalent to CRF.
+Encoder discovery starts when Settings opens. Missing or unusable hardware has a
+reason; actual output dimensions are checked during Analyze. Automatic can use
+software with a notice before Start; a running job never silently changes encoder.
+Aspect ratio, rotation, AAC stereo normalization and silence for missing audio
+are retained. Hardware encoding does not make CPU HDR tone mapping hardware-based.
+
+Test speed compares software and verified hardware on a private sample of up to
+ten seconds (first HDR clip, otherwise first clip), with a 60-second limit per
+sample. It never publishes samples or changes your processing selection. Its
+conversion estimate is approximate: clips differ, and joining/validation add time.
+The main window shows conversion percentage, elapsed job time and estimated
+conversion remaining. Waiting for confirmation pauses rate estimation, not elapsed
+time. Joining and validation show their phase with remaining time estimating;
+completion, cancellation and failure retain total elapsed time. Size estimates are
+approximate video payloads and exclude audio/container overhead. Software CRF output
+size cannot be predicted in advance.
+
+Compatible HDR/10-bit clips retain their encoded quality through stream copy.
+When conversion is required, PQ/HLG HDR is automatically tone-mapped to SDR
+BT.709, and 10-bit SDR becomes 8-bit SDR. A notice explains the conversion without
+blocking Start. Dynamic HDR metadata is not retained on conversion. The built-in
+CPU filters require no additional color-processing library. Subtitle,
+data and extra audio/video tracks are not included.
+
+FFmpeg writes private destination-side work and staging files. DN rechecks source
+identities/content, validates the merged output and uses the same guarded
+publication/compatibility helpers as Copy. Existing outputs require Replace or
+Cancel, with Cancel focused. Old files remain until a complete replacement is
+published. Changed destinations, corrupt clips and tool failures stop the job;
+clips are never silently skipped. Stop removes owned incomplete work, while
+completed publications remain. Publication durability warnings are separate from
+pre-publication failures. On compatibility filesystems a crash can leave a partial
+new file, as with ordinary compatible Copy.
+
+Export timeline CSV is optional and initially off. It includes clip names, order
+and normalized segment start/end/duration, without GPS or absolute paths. The
+video and CSV are separate publications; a CSV failure does not undo a completed
+video. No work is cached for restart/resume. Bounds are 10,000 clips, 100,000 scan
+entries, 512 directory levels, 64 KiB of probed metadata per clip and 16 MiB per job,
+8 MiB per process capture and 24 hours per process.
+Settings OK applies tool paths through normal Save desktop/save-on-exit rules;
+Cancel/Esc discards its draft. Other merge settings last only for this window.
+
+## Bluetooth transfers
+
+Bluetooth transfers is a built-in plugin, enabled by default on macOS, Linux and Windows.
+Disable or re-enable it in **Options → Configuration → Plugins**. A saved disabled
+choice is preserved. Enabling it does not power on a radio, initiate pairing,
+advertise a receiver or open devices at startup.
+**Utilities → Bluetooth transfers…** opens its independent window.
+
+1. Pair the computers using system Bluetooth settings. Both must support Bluetooth
+   Classic/RFCOMM; a BLE-only adapter is insufficient.
+2. Mark native regular files in a pane, or place the cursor on one file, and open
+   Bluetooth transfers. The queue captures that selection. **Use selected files**
+   recaptures it; **Remove** removes the highlighted queued item.
+3. On the receiving DN, choose **Receive**. On the sending DN, **Refresh** the paired
+   device list, select the receiving computer, then choose **Send queue**.
+4. The receiver reviews each filename and declared size, edits the existing local
+   destination directory if needed, and chooses **Accept / Decline**. Acceptance
+   is explicit; device names alone are not proof of identity.
+5. Existing regular files prompt for replacement or skipping. Links, junctions
+   and directory conflicts are refused through shared destination guards. Skipping
+   leaves the original intact and continues the sender's queue.
+
+Only files are supported: no directory traversal, symlinks, archive members or
+remote-panel paths. Names use strict Unicode and portable filename validation.
+The queue is session-only, bounded to 256 files of at most 4 GiB minus one byte each
+(the standard OBEX Length header is 32-bit). Data is streamed in bounded packets;
+sources are safely opened and revalidated. Receivers stage on the destination
+filesystem and publish through the existing overwrite and compatibility guards.
+There is no automatic retry, persisted queue, move or resume support. Modification
+times and extended metadata are not exchanged in this first version.
+
+**Stop**, closing the window, disabling the plugin or exiting DN cancels owned
+work and removes incomplete private output; already completed publications remain.
+Switching documents leaves work running. Native calls may need to return before
+cancellation finishes. The window retains completed/skipped counts and errors.
+The sender reports success only after each file's final receipt. If that receipt
+is lost, delivery is **unconfirmed**, not proof that nothing was written.
+
+DN negotiates an OBEX extension for receiver-decision keepalives. Approval and
+replacement share a ten-minute budget; waiting messages do not authorize payload
+transmission. Older peers without this extension share a 110-second budget.
+Cancellation remains available while waiting. A session-close failure after final
+file receipts is a warning, not a reversal of confirmed delivery.
+
+The wire format uses OBEX Object Push. A private DN discovery UUID selects
+DN's receiver rather than a competing system file receiver. This milestone is
+DN-to-DN only: Android/system interoperability and iPhone integration are outside
+its tested scope. Bluetooth provides system pairing/link security; DN does not
+reuse Nearby identities or Acoustic pairing. No Wi-Fi, LAN discovery, relays or
+internet services are used. Acoustic remains separate and off in normal builds.
+
+Linux uses BlueZ's system D-Bus Profile API, including from a text console. The
+Bluetooth daemon and suitable permissions must be available; DN does not start
+services or change policies. macOS uses IOBluetooth; allow Bluetooth access to the
+terminal/application running DN when requested by the system. Windows uses its
+Bluetooth Classic stack and drivers. A disabled/missing adapter, permission or
+service failure is shown as an error; no other transport is silently substituted.
+Protocol, private-stream, platform-compilation and UI checks do not establish
+real radio interoperability: check actual two-device transfers separately.

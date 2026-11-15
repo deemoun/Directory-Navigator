@@ -159,7 +159,8 @@ fn plugins_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
         Rect::new(rect.x + 3, rect.y + 2, rect.width - 6, 1),
     );
     for (position, &index) in order.iter().enumerate() {
-        let option = index == settings.plugins.len();
+        let option = index >= settings.plugins.len();
+        let dos_option = index == settings.plugins.len() + 1;
         let visible = (offset..offset + rows).contains(&position);
         let row = Rect::new(
             rect.x + 3 + if option { 2 } else { 0 },
@@ -179,21 +180,36 @@ fn plugins_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
             ControlKind::Checkbox {
                 caption: if option {
                     language
-                        .text("Play music files in internal player")
+                        .text(if dos_option {
+                            "Open DOS programs with DOSBox"
+                        } else {
+                            "Play music files in internal player"
+                        })
                         .to_owned()
                 } else {
                     let (id, title) = settings.plugins[index];
                     format!("{} ({})", language.text(title), id.0)
                 },
                 checked: if option {
-                    settings.draft.mp3.play_on_enter
+                    if dos_option {
+                        settings.draft.dos.open_on_enter
+                    } else {
+                        settings.draft.mp3.play_on_enter
+                    }
                 } else {
                     settings.draft.plugin_enabled(settings.plugins[index].0)
                 },
             },
             Target::Setting(index),
         );
-        c.enabled = !option || settings.mp3_open_enabled();
+        c.enabled = if dos_option {
+            settings.draft.plugin_enabled(crate::plugins::DOS_LAUNCHER)
+        } else if option {
+            settings.mp3_open_enabled()
+        } else {
+            settings.plugins[index].0 != crate::plugins::ACOUSTIC_TRANSFERS
+                || crate::acoustic::available()
+        };
         if !visible {
             c.paint = false;
             c.hits.clear();

@@ -1,7 +1,8 @@
 # Built-in tools
 
 The built-in plugins are Calculator, Tetris/Pentix, Music Player, APK Workshop,
-Remote connections and Nearby transfers. They are compiled into DN; there is no
+Remote connections, Nearby transfers, Bluetooth transfers, DOS launcher, Acoustic transfers and
+Video Merge. They are compiled into DN; there is no
 dynamic loader, binary ABI, installation format, external SDK or separate plugin
 configuration format. This is an internal Rust interface which
 may evolve with the application.
@@ -10,7 +11,8 @@ may evolve with the application.
 
 Options → Configuration → Plugins lists every registered built-in tool, including
 disabled tools. Checkboxes edit a draft: OK applies it, Cancel discards it.
-Tools are enabled by default except Music Player, which requires explicit opt-in.
+Music Player, APK Workshop and the experimental DOS launcher, Acoustic transfers
+and Video Merge require explicit opt-in; Bluetooth and other built-in tools are enabled by default.
 Enabling Nearby transfers does not start networking. Compiled-in defaults live in `plugins::enabled_by_default`.
 Explicit user choices override those defaults and survive saving/restarting. Disabling closes the current presentation and
 hides its menu entry and blocks shortcut launches. Enabling restores the menu
@@ -291,3 +293,52 @@ must retain the body before receipt; a shared reservation covers both the networ
 exchange and outstanding preview. Scoped clipboard reads capture binding, composer
 session, buffer revision, cursor and selection; stale replies are discarded. Copy
 status updates target the received-item serial, including inactive live owners.
+
+## Experimental DOS and acoustic tools
+
+`dos_launcher` and `acoustic_transfers` opt out of the enabled default. Explicit
+saved overrides remain authoritative. DOS preferences use the normal config
+store and settings drafts. Typed effects ask the host to validate and launch;
+plugins do not execute a shell or write configuration themselves.
+
+The optional `acoustic` feature is off by default. The host owns the bounded
+service, audio streams, Noise keys, captured sources, receiver approvals and
+shared guarded publication. The plugin owns only drafts and presentation.
+Closing/retiring a live owner cancels its service; old channels cannot update a
+reopened window. Clipboard actions use owned tokens and the existing bridge.
+No painting performs device, filesystem or crypto work.
+
+
+### Video Merge
+
+`video_merge` is compiled on all supported platforms and disabled by default.
+The plugin owns source ordering, settings drafts and shared Open/Save/Tree
+controls. Typed Video effects pass captured native paths and immutable settings
+to host-owned workers. The host discovers/probes tools, hashes and verifies
+sources, runs bounded FFmpeg processes and publishes through shared guarded
+output helpers. No I/O occurs during rendering. Workers are tied to the live
+binding, use bounded progress/result storage and cannot activate their owner.
+Closing/disabling cancels work; a fresh window cannot receive retired results.
+Executable overrides are optional normal configuration preferences, with no
+configuration-version change. No conversion cache or external plugin ABI is added.
+
+Video settings discover and verify encoders in a separate owner-bound worker,
+without scanning sources. Capabilities are cached only for unchanged tool
+identities within the plugin session. Processing selection, Match source controls
+and Advanced settings share the same draft. Automatic preserves compatible stream
+copy and otherwise prefers verified hardware H.264; a running job never silently
+changes encoder. Private speed samples use the same conversion argument builder
+and cannot publish files. Typed FFmpeg records feed a monotonic host clock;
+painting only reads prepared elapsed/remaining/final timing snapshots.
+
+## Bluetooth transfers
+
+The `bluetooth_transfers` plugin is enabled by default, but opens no radio service until explicitly requested. Its typed effects are
+restricted to its live binding and request generation. The host owns the worker,
+paired-device enumeration, OBEX streams, captured native sources, per-file offers,
+cancellation and guarded publication. The plugin receives prepared snapshots and
+never touches files or devices while painting. Closing/retiring its document
+cancels the job; inactive completions update no other owner and do not steal focus.
+A private SDP UUID distinguishes DN receivers while using standard OBEX framing.
+Queue and device state are session-only. No Bluetooth-specific preferences or
+configuration version change are introduced. Acoustic behavior is unchanged.

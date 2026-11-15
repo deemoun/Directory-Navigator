@@ -1,6 +1,6 @@
 [package]
 name = "directory-navigator"
-version = "1.1.13"
+version = "1.1.14"
 edition = "2021"
 description = "Native terminal file manager inspired by DOS Navigator"
 authors = ["Dmitry Yarygin"]
@@ -23,8 +23,11 @@ path = "src/main.rs"
 [features]
 default = ["audio"]
 audio = ["dep:rodio", "dep:symphonia-core", "dep:symphonia-metadata"]
+acoustic = ["dep:ggwave", "dep:cpal", "dep:snow"]
 
 [dependencies]
+ggwave = { version = "=0.1.0", optional = true }
+snow = { version = "=0.10.0", optional = true }
 turbo-vision = { version = "=4.1.0", default-features = false }
 toml = "1"
 crossterm = "0.28"
@@ -61,14 +64,22 @@ unicode-normalization = "0.1.26"
 libc = "0.2"
 
 [target.'cfg(any(target_os = "macos", target_os = "linux", target_os = "windows"))'.dependencies]
+cpal = { version = "=0.17.3", optional = true }
 rodio = { version = "=0.22.2", optional = true, default-features = false, features = ["playback", "mp3", "flac", "wav", "vorbis"] }
 symphonia-core = { version = "=0.5.5", optional = true }
 symphonia-metadata = { version = "=0.5.5", optional = true }
+[target.'cfg(target_os = "linux")'.dependencies]
+zbus = { version = "5", default-features = false, features = ["blocking-api", "tokio"] }
+
 [target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-foundation = { version = "0.3.2", features = ["NSPropertyList", "NSData", "NSArray", "NSString"] }
+objc2-io-bluetooth = "0.3.2"
+objc2-core-foundation = { version = "0.3.2", features = ["CFRunLoop"] }
 trash = "5.2.9"
 
 [target.'cfg(windows)'.dependencies]
-windows = { version = "0.62", features = ["Win32_Storage_FileSystem", "Win32_System_Com", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
+windows = { version = "0.62", features = ["Win32_Storage_FileSystem", "Win32_System_Com", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging", "Win32_Devices_Bluetooth", "Win32_Networking_WinSock", "Win32_System_LibraryLoader"] }
 
 [profile.release]
 lto = "thin"

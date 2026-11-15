@@ -2077,9 +2077,29 @@ fn properties_permission_apply_cancel_and_terminal_restoration() -> io::Result<(
 }
 
 fn nearby_open(s: &mut Session) -> io::Result<()> {
-    s.send(b"\x1bu\x1b[B\x1b[B\r", "Nearby transfers", |s| {
-        s.text().contains("Manual connection details") && s.text().contains("Use panel selection")
-    })
+    nearby_open_localized(s, dn::localization::Language::English)
+}
+fn nearby_open_localized(s: &mut Session, language: dn::localization::Language) -> io::Result<()> {
+    use unicode_width::UnicodeWidthStr;
+    let label = language.text("Nearby transfers...");
+    s.send(b"\x1bu", "Utilities menu", |s| s.text().contains(label))?;
+    let text = s.text();
+    let (row, line) = text
+        .lines()
+        .enumerate()
+        .find(|(_, line)| line.contains(label))
+        .ok_or_else(|| io::Error::other(format!("Missing Nearby menu item: {text}")))?;
+    let x = line[..line.find(label).unwrap()].width() + 1;
+    let y = row + 1;
+    s.send(
+        format!("\x1b[<0;{x};{y}M\x1b[<0;{x};{y}m").as_bytes(),
+        "Nearby transfers",
+        |s| {
+            s.text()
+                .contains(language.text("Manual connection details"))
+                && s.text().contains(language.text("Use panel selection"))
+        },
+    )
 }
 fn nearby_click(
     s: &mut Session,
@@ -2191,10 +2211,7 @@ fn nearby_text_composer_owned_cancel_edit_resize_and_terminal_restoration() -> i
         session.wait("manager", |s| {
             s.command_prompt_active() && s.text().contains("item-000.")
         })?;
-        session.send(b"\x1bu\x1b[B\x1b[B\r", "open Nearby", |s| {
-            s.text()
-                .contains(language.text("Manual connection details"))
-        })?;
+        nearby_open_localized(&mut session, language)?;
         let row = session
             .text()
             .lines()

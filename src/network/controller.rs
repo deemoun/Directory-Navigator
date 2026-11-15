@@ -458,3 +458,85 @@ impl State {
         self.pending.is_some()
     }
 }
+
+/// Captured pane/session, never the active pane at completion time.
+#[derive(Clone)]
+pub(crate) struct ReconnectTarget {
+    pub panel: usize,
+    pub generation: u64,
+    pub connection: Arc<Connection>,
+    pub reason: Option<super::status::Failure>,
+}
+impl ReconnectTarget {
+    pub fn profile(&self, app: &App) -> Option<super::remote::Profile> {
+        let r = app.panels.get(self.panel)?.remote()?;
+        if r.generation != self.generation || !Arc::ptr_eq(&r.connection, &self.connection) {
+            return None;
+        }
+        let mut p = r.connection.profile.clone();
+        p.directory = r.directory.clone();
+        Some(p)
+    }
+}
+pub(crate) fn reconnect(app: &mut App) {
+    if !app
+        .config
+        .plugin_enabled(crate::plugins::REMOTE_CONNECTIONS)
+        || crate::windowing::blocked(app)
+    {
+        return;
+    }
+    let Some(r) = app.panels[app.active].remote() else {
+        return;
+    };
+    if app.panels[app.active].loading || r.connection.busy() {
+        app.error("Wait for the current remote operation, or cancel it in Transfer Center.");
+        return;
+    }
+    let target = ReconnectTarget {
+        panel: app.active,
+        generation: r.generation,
+        connection: r.connection.clone(),
+        reason: r.issue.clone().or_else(|| r.status.error.clone()),
+    };
+    let profile = target.profile(app).expect("captured remote pane");
+    crate::plugins::host::open(app, crate::plugins::REMOTE_CONNECTIONS);
+    if let Some(b) = app
+        .desktop
+        .plugins
+        .binding(crate::plugins::REMOTE_CONNECTIONS)
+    {
+        crate::plugins::host::dispatch(
+            app,
+            b,
+            crate::plugins::Event::RemoteReconnect { profile, target },
+        );
+    }
+}
+pub(crate) fn reconnected(
+    app: &mut App,
+    target: ReconnectTarget,
+    connection: Arc<Connection>,
+) -> io::Result<()> {
+    let old = target.profile(app).ok_or_else(|| {
+        io::Error::other("Remote pane changed; the new connection was not applied")
+    })?;
+    let new = &connection.profile;
+    if old.host != new.host
+        || old.port != new.port
+        || old.user != new.user
+        || old.protocol != new.protocol
+        || old.fingerprint != new.fingerprint
+    {
+        return Err(io::Error::other(
+            "Reconnect must use the same server, account and trusted host key",
+        ));
+    }
+    if target.connection.busy() {
+        return Err(io::Error::new(
+            io::ErrorKind::WouldBlock,
+            "Wait for the current remote operation, or cancel it in Transfer Center.",
+        ));
+    }
+    app.panels[target.panel].reconnect_remote(connection)
+}

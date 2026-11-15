@@ -1333,7 +1333,7 @@ Configuration file	Configuration file
 Recovery directory	Recovery directory
 Temp Drive directory	Temp Drive directory
 Operation	Operation
-Remote connections: SFTP over SSH, explicit FTPS, or unencrypted FTP.\nEnter host, port, username, initial absolute remote directory and password or SSH key.\nUnknown SSH host keys require explicit verification before authentication; changed pinned keys are refused. FTPS validates certificates and never falls back to plain FTP.\nSave profile stores connection metadata and trusted fingerprint, never passwords or key passphrases.\nProfiles opens a saved-profile list: Select, Edit, Delete or New. Save profile applies edits and renames. Deleting a profile does not close open connections.\nEach pane can browse a remote directory. Enter navigates, F3 previews, F4 edits a private working copy, F5 transfers selections.\nCtrl+PgUp disconnects; the shell working directory always remains local.\nRemote operations are cancellable and never run during drawing.	Remote connections: SFTP over SSH, explicit FTPS, or unencrypted FTP.\nEnter host, port, username, initial absolute remote directory and password or SSH key.\nUnknown SSH host keys require explicit verification before authentication; changed pinned keys are refused. FTPS validates certificates and never falls back to plain FTP.\nSave profile stores connection metadata and trusted fingerprint, never passwords or key passphrases.\nProfiles opens a saved-profile list: Select, Edit, Delete or New. Save profile applies edits and renames. Deleting a profile does not close open connections.\nEach pane can browse a remote directory. Enter navigates, F3 previews, F4 edits a private working copy, F5 transfers selections.\nCtrl+PgUp disconnects; the shell working directory always remains local.\nRemote operations are cancellable and never run during drawing.
+Remote connections: SFTP over SSH, explicit FTPS, or unencrypted FTP.\nEnter host, port, username, initial absolute remote directory and password or SSH key.\nUnknown SSH host keys require explicit verification before authentication; changed pinned keys are refused. FTPS validates certificates and never falls back to plain FTP.\nSave profile stores connection metadata and trusted fingerprint, never passwords or key passphrases.\nProfiles opens a saved-profile list: Select, Edit, Delete or New. Save profile applies edits and renames. Deleting a profile does not close open connections.\nEach pane can browse a remote directory. Enter navigates, F3 previews, F4 edits a private working copy, F5 transfers selections.\nPanel > Reconnect opens a credential prompt for the same server and remote directory. Passwords are requested again, never saved. Reconnecting retains the filter, cursor, marks and scroll where still valid; only its captured pane changes. Accepted transfers keep their original session and are not restarted.\nA failed or cancelled listing retains the remote location and cached view. Esc stops loading; Ctrl+PgUp explicitly disconnects. The shell working directory always remains local.\nConnection status reflects observed operations, not a continuous connectivity probe. Permission and missing-path errors do not mean a dropped connection. Help in the connection dialog includes the last connection cause.\nRemote operations are cancellable and never run during drawing.	Remote connections: SFTP over SSH, explicit FTPS, or unencrypted FTP.\nEnter host, port, username, initial absolute remote directory and password or SSH key.\nUnknown SSH host keys require explicit verification before authentication; changed pinned keys are refused. FTPS validates certificates and never falls back to plain FTP.\nSave profile stores connection metadata and trusted fingerprint, never passwords or key passphrases.\nProfiles opens a saved-profile list: Select, Edit, Delete or New. Save profile applies edits and renames. Deleting a profile does not close open connections.\nEach pane can browse a remote directory. Enter navigates, F3 previews, F4 edits a private working copy, F5 transfers selections.\nPanel > Reconnect opens a credential prompt for the same server and remote directory. Passwords are requested again, never saved. Reconnecting retains the filter, cursor, marks and scroll where still valid; only its captured pane changes. Accepted transfers keep their original session and are not restarted.\nA failed or cancelled listing retains the remote location and cached view. Esc stops loading; Ctrl+PgUp explicitly disconnects. The shell working directory always remains local.\nConnection status reflects observed operations, not a continuous connectivity probe. Permission and missing-path errors do not mean a dropped connection. Help in the connection dialog includes the last connection cause.\nRemote operations are cancellable and never run during drawing.
 Remote deletion is permanent; system Trash is unavailable.	Remote deletion is permanent; system Trash is unavailable.
 Remote pane · F3 view · F4 edit · F5 copy · Ctrl+PgUp disconnect	Remote pane · F3 view · F4 edit · F5 copy · Ctrl+PgUp disconnect
 Copy archive members to disk before uploading	Copy archive members to disk before uploading
@@ -1566,3 +1566,230 @@ Invalid text payload	Invalid text payload
 Text preview is no longer available	Text preview is no longer available
 Invalid text-offer response	Invalid text-offer response
 Missing text receipt	Missing text receipt
+DOS launcher (Experimental)	DOS launcher (Experimental)
+Acoustic transfers (Experimental)	Acoustic transfers (Experimental)
+DOS launcher (Experimental)...	DOS launcher (Experimental)...
+Acoustic transfers (Experimental)...	Acoustic transfers (Experimental)...
+Run in DOSBox...	Run in DOSBox...
+Open DOS programs with DOSBox	Open DOS programs with DOSBox
+DOSBox Staging executable (blank: discover automatically)	DOSBox Staging executable (blank: discover automatically)
+DOSBox opens its own graphical window. BAT files require Run in DOSBox. No emulator is bundled.	DOSBox opens its own graphical window. BAT files require Run in DOSBox. No emulator is bundled.
+Audible modem · max 1 KiB · both devices need microphones · minutes, not LAN speed	Audible modem · max 1 KiB · both devices need microphones · minutes, not LAN speed
+File mode	File mode
+Use current file	Use current file
+Paste text	Paste text
+Input / output levels:	Input / output levels:
+Devices closed	Devices closed
+Acoustic support is unavailable in this build; rebuild with --features acoustic.	Acoustic support is unavailable in this build; rebuild with --features acoustic.
+Devices closed. Send/Receive opens the system defaults.	Devices closed. Send/Receive opens the system defaults.
+Compare code on both devices:	Compare code on both devices:
+Cancel pairing	Cancel pairing
+Incoming offer:	Incoming offer:
+Text limit is 1 KiB; nothing inserted.	Text limit is 1 KiB; nothing inserted.
+Acoustic session ended	Acoustic session ended
+Compare the eight-digit code on both devices before confirming.	Compare the eight-digit code on both devices before confirming.
+Opening default microphone and speakers; establishing acoustic pairing…	Opening default microphone and speakers; establishing acoustic pairing…
+Waiting for receiver approval…	Waiting for receiver approval…
+Sending encrypted payload; tiny transfers may take minutes…	Sending encrypted payload; tiny transfers may take minutes…
+Acoustic session stopped; completed publications remain.	Acoustic session stopped; completed publications remain.
+Delivery confirmed by receiver.	Delivery confirmed by receiver.
+Receiver skipped the file; nothing published.	Receiver skipped the file; nothing published.
+File skipped; nothing published.	File skipped; nothing published.
+File published. Delivery receipt acknowledged.	File published. Delivery receipt acknowledged.
+Text retained in this window. Delivery receipt acknowledged.	Text retained in this window. Delivery receipt acknowledged.
+File published. Delivery receipt pending.	File published. Delivery receipt pending.
+Text retained in this window. Delivery receipt pending.	Text retained in this window. Delivery receipt pending.
+Enter 1–1024 UTF-8 bytes.	Enter 1–1024 UTF-8 bytes.
+Use current file first.	Use current file first.
+Acoustic file limit is 1 KiB	Acoustic file limit is 1 KiB
+Extract or download a regular file first	Extract or download a regular file first
+Acoustic transfers accept only one file	Acoustic transfers accept only one file
+Select one regular file, at most 1 KiB	Select one regular file, at most 1 KiB
+Acoustic filename must be Unicode	Acoustic filename must be Unicode
+Acoustic filename is not portable	Acoustic filename is not portable
+No default microphone; both sides need audio input for acknowledgements	No default microphone; both sides need audio input for acknowledgements
+No default audio output	No default audio output
+Audio device was lost or stopped; retry Send/Receive	Audio device was lost or stopped; retry Send/Receive
+Audio input overrun; stop other audio processing and retry	Audio input overrun; stop other audio processing and retry
+Choose an existing local directory	Choose an existing local directory
+Checking DOS program and DOSBox Staging…	Checking DOS program and DOSBox Staging…
+DOSBox launched in its own window.	DOSBox launched in its own window.
+This is not an eligible DOS program.	This is not an eligible DOS program.
+Enable the experimental DOS launcher and choose a COM, DOS EXE or BAT file	Enable the experimental DOS launcher and choose a COM, DOS EXE or BAT file
+Select a regular DOS program first	Select a regular DOS program first
+Install DOSBox Staging or set its executable path in the DOS launcher	Install DOSBox Staging or set its executable path in the DOS launcher
+DOSBox needs a graphical display; a text console alone cannot show its window	DOSBox needs a graphical display; a text console alone cannot show its window
+Choose DOSBox Staging; this executable did not identify itself as Staging	Choose DOSBox Staging; this executable did not identify itself as Staging
+Incompatible DOSBox Staging: install a version supporting --nolocalconf	Incompatible DOSBox Staging: install a version supporting --nolocalconf
+File changed before DOSBox launch; refresh and try again	File changed before DOSBox launch; refresh and try again
+DOSBox exited unsuccessfully; check graphical output and its global configuration.	DOSBox exited unsuccessfully; check graphical output and its global configuration.
+DOS launcher preferences applied.	DOS launcher preferences applied.
+DOS launcher Help	DOS launcher Help
+Acoustic transfers Help	Acoustic transfers Help
+Acoustic text preview	Acoustic text preview
+Experimental DOS launcher: install DOSBox Staging separately, enable the plugin in Options > Configuration > Plugins, and choose File > Run in DOSBox for the current regular COM, DOS EXE or BAT file.\nThe separate Open DOS programs with DOSBox preference allows Enter/double-click on COM and DOS MZ executables. PE/NE/LE/LX Windows executables are excluded; BAT is always explicit. Ctrl+Enter and Open with default app bypass DOS handling.\nSet a DOSBox Staging executable path here or leave it blank for discovery. OK applies; Cancel/Esc discards. The selected file is rechecked before launch. No host shell or folder-local DOSBox configuration is used. Games open in DOSBox's graphical window, not inside DN; a graphical session is required.\nClosing or disabling the plugin cancels pending launches but does not terminate a game that has already started.	Experimental DOS launcher: install DOSBox Staging separately, enable the plugin in Options > Configuration > Plugins, and choose File > Run in DOSBox for the current regular COM, DOS EXE or BAT file.\nThe separate Open DOS programs with DOSBox preference allows Enter/double-click on COM and DOS MZ executables. PE/NE/LE/LX Windows executables are excluded; BAT is always explicit. Ctrl+Enter and Open with default app bypass DOS handling.\nSet a DOSBox Staging executable path here or leave it blank for discovery. OK applies; Cancel/Esc discards. The selected file is rechecked before launch. No host shell or folder-local DOSBox configuration is used. Games open in DOSBox's graphical window, not inside DN; a graphical session is required.\nClosing or disabling the plugin cancels pending launches but does not terminate a game that has already started.
+Experimental acoustic transfers require a build with --features acoustic and explicit activation in Options > Configuration > Plugins. No audio device opens until Send or Receive. Both devices need microphones for acknowledgements. The default input/output devices are used, with audible tones; DN never changes system volume.\nText is limited to 1 KiB of UTF-8; File mode accepts one regular file of at most 1 KiB. Use current file captures the cursor entry. Folders, links, archive and remote members are excluded. Extract/download first. Transfers can take minutes; this is not a replacement for Nearby LAN transfers.\nChoose Send on one device and Receive on the other. Compare the eight-digit code on both screens and confirm only if they match. Noise XX encrypts and authenticates the session; approval is required again for each offer. Identities and previews are session-only. There is no automatic acceptance.\nReceivers can retain and Copy text using DN's clipboard bridge. Files require a destination; Tree selects it. Existing files use guarded Replace/Skip/Cancel handling; Skip is the safe default. Completed publications remain after cancellation. Delivery is confirmed only by the final receipt; missing receipts mean unconfirmed delivery.\nStop or closing this window closes devices. Music paused by this session resumes only if its state has not changed. Audio-device loss and exhausted retries stop the session. Reliability depends on the room, devices and audio processing and is not established without hardware testing.	Experimental acoustic transfers require a build with --features acoustic and explicit activation in Options > Configuration > Plugins. No audio device opens until Send or Receive. Both devices need microphones for acknowledgements. The default input/output devices are used, with audible tones; DN never changes system volume.\nText is limited to 1 KiB of UTF-8; File mode accepts one regular file of at most 1 KiB. Use current file captures the cursor entry. Folders, links, archive and remote members are excluded. Extract/download first. Transfers can take minutes; this is not a replacement for Nearby LAN transfers.\nChoose Send on one device and Receive on the other. Compare the eight-digit code on both screens and confirm only if they match. Noise XX encrypts and authenticates the session; approval is required again for each offer. Identities and previews are session-only. There is no automatic acceptance.\nReceivers can retain and Copy text using DN's clipboard bridge. Files require a destination; Tree selects it. Existing files use guarded Replace/Skip/Cancel handling; Skip is the safe default. Completed publications remain after cancellation. Delivery is confirmed only by the final receipt; missing receipts mean unconfirmed delivery.\nStop or closing this window closes devices. Music paused by this session resumes only if its state has not changed. Audio-device loss and exhausted retries stop the session. Reliability depends on the room, devices and audio processing and is not established without hardware testing.
+Packets sent / received:	Packets sent / received:
+Acoustic worker stopped unexpectedly; delivery may be unconfirmed.	Acoustic worker stopped unexpectedly; delivery may be unconfirmed.
+Choose the DOSBox Staging executable, not a BAT/CMD wrapper	Choose the DOSBox Staging executable, not a BAT/CMD wrapper
+Delivery confirmed by receiver; receipt acknowledgement unconfirmed.	Delivery confirmed by receiver; receipt acknowledgement unconfirmed.
+Receiver skipped the file; receipt acknowledgement unconfirmed.	Receiver skipped the file; receipt acknowledgement unconfirmed.
+Video Merge	Video Merge
+Video Merge...	Video Merge...
+Merge videos...	Merge videos...
+Clips in merge order	Clips in merge order
+Add file	Add file
+Add folder	Add folder
+Move up	Move up
+Move down	Move down
+Output MP4	Output MP4
+Include subfolders	Include subfolders
+Export timeline CSV	Export timeline CSV
+Replace output?	Replace output?
+An output file already exists. Replace only this file?	An output file already exists. Replace only this file?
+Existing data remains until the completed output is published.	Existing data remains until the completed output is published.
+Stop video job?	Stop video job?
+Stop the active job? Temporary work will be removed. Close again after cancellation finishes.	Stop the active job? Temporary work will be removed. Close again after cancellation finishes.
+Video Merge settings	Video Merge settings
+Width (blank: source)	Width (blank: source)
+Height (blank: source)	Height (blank: source)
+FPS (blank: source)	FPS (blank: source)
+CRF (blank: codec default)	CRF (blank: codec default)
+Hardware bitrate (kbps)	Hardware bitrate (kbps)
+FFmpeg path (blank: PATH)	FFmpeg path (blank: PATH)
+FFprobe path (blank: PATH)	FFprobe path (blank: PATH)
+Codec: Auto	Codec: Auto
+Codec: H.264	Codec: H.264
+Codec: H.265	Codec: H.265
+Preset: Fast	Preset: Fast
+Preset: Medium	Preset: Medium
+Preset: Slow	Preset: Slow
+Encoder: Software	Encoder: Software
+Hardware	Hardware
+Keep audio	Keep audio
+Analyze to detect encoders. Hardware support is checked before Start.	Analyze to detect encoders. Hardware support is checked before Start.
+Preparing video job	Preparing video job
+Review settings and clip order, then Start	Review settings and clip order, then Start
+Cancelled; completed publications remain	Cancelled; completed publications remain
+Video worker stopped unexpectedly	Video worker stopped unexpectedly
+Scanning	Scanning
+Checking duplicates	Checking duplicates
+Probing	Probing
+Converting	Converting
+Joining	Joining
+Validating	Validating
+Processing	Processing
+Stream copy: no re-encoding	Stream copy: no re-encoding
+Conversion required	Conversion required
+duplicates excluded	duplicates excluded
+Video job stopped	Video job stopped
+Video published:	Video published:
+Video Merge uses separately installed FFmpeg and FFprobe. Enable this plugin in Options > Configuration > Plugins. Select regular files/folders and choose File > Merge videos, or add sources here. Folder scanning is nonrecursive unless Include subfolders is checked. Links are never followed.\nAnalyze scans, hashes, excludes exact duplicates and probes clips. Review the displayed order and conversion summary before Start. Move up/down changes the order. Auto joins compatible MP4 streams without re-encoding; otherwise the first clip proposes the dimensions and exact FPS. Explicit codecs or changed dimensions/FPS request conversion. HDR/10-bit converts automatically to SDR (BT.709) when conversion is needed; compatible stream copy retains HDR. Software H.264 uses CRF 18; H.265 uses CRF 20. Hardware encoders use the displayed bitrate and may be unavailable on the current device. Failed clips stop the job.\nOutput is MP4. FFmpeg writes private staging files; existing outputs require confirmation and remain until publication. Stop removes owned temporary work; completed output remains. Timeline CSV is optional and includes only clip names, order and times, never GPS or full paths. Jobs have no persistent resume cache.\nSettings uses a Processing selector and Match source controls. Advanced contains CRF, software speed, hardware bitrate in Mbps and tool paths. Encoder discovery starts when Settings opens; Automatic prefers verified hardware when conversion is needed. Test speed compares a private sample without publishing it. Elapsed time includes the whole job; remaining time estimates conversion only, with joining and validation shown separately. Completion retains total elapsed time. Settings OK applies executable overrides through normal configuration saving; Cancel discards. Blank paths discover tools on PATH. No shell or automatic installation is used. Scans are limited to 10,000 clips, 100,000 entries and 512 levels; process captures to 8 MiB and processes to 24 hours. Missing tools are reported. Automatic can select software before Start if hardware is unavailable; explicit encoders never silently switch. Disable audio to produce silent output.	Video Merge uses separately installed FFmpeg and FFprobe. Enable this plugin in Options > Configuration > Plugins. Select regular files/folders and choose File > Merge videos, or add sources here. Folder scanning is nonrecursive unless Include subfolders is checked. Links are never followed.\nAnalyze scans, hashes, excludes exact duplicates and probes clips. Review the displayed order and conversion summary before Start. Move up/down changes the order. Auto joins compatible MP4 streams without re-encoding; otherwise the first clip proposes the dimensions and exact FPS. Explicit codecs or changed dimensions/FPS request conversion. HDR/10-bit converts automatically to SDR (BT.709) when conversion is needed; compatible stream copy retains HDR. Software H.264 uses CRF 18; H.265 uses CRF 20. Hardware encoders use the displayed bitrate and may be unavailable on the current device. Failed clips stop the job.\nOutput is MP4. FFmpeg writes private staging files; existing outputs require confirmation and remain until publication. Stop removes owned temporary work; completed output remains. Timeline CSV is optional and includes only clip names, order and times, never GPS or full paths. Jobs have no persistent resume cache.\nSettings uses a Processing selector and Match source controls. Advanced contains CRF, software speed, hardware bitrate in Mbps and tool paths. Encoder discovery starts when Settings opens; Automatic prefers verified hardware when conversion is needed. Test speed compares a private sample without publishing it. Elapsed time includes the whole job; remaining time estimates conversion only, with joining and validation shown separately. Completion retains total elapsed time. Settings OK applies executable overrides through normal configuration saving; Cancel discards. Blank paths discover tools on PATH. No shell or automatic installation is used. Scans are limited to 10,000 clips, 100,000 entries and 512 levels; process captures to 8 MiB and processes to 24 hours. Missing tools are reported. Automatic can select software before Start if hardware is unavailable; explicit encoders never silently switch. Disable audio to produce silent output.
+Required encoder is unavailable	Required encoder is unavailable
+Directory synchronization warning	Directory synchronization warning
+Timeline CSV published; directory synchronization failed	Timeline CSV published; directory synchronization failed
+Video published; timeline CSV was not published	Video published; timeline CSV was not published
+Analyze before starting a new merge	Analyze before starting a new merge
+HDR/10-bit → SDR (BT.709)	HDR/10-bit → SDR (BT.709)
+HDR/10-bit will be converted to SDR. Ready to merge.	HDR/10-bit will be converted to SDR. Ready to merge.
+Output color metadata differs from the source	Output color metadata differs from the source
+Automatic — recommended	Automatic — recommended
+Software H.264	Software H.264
+Software H.265	Software H.265
+Apple hardware H.264	Apple hardware H.264
+Apple hardware H.265	Apple hardware H.265
+NVIDIA hardware H.264	NVIDIA hardware H.264
+NVIDIA hardware H.265	NVIDIA hardware H.265
+Intel hardware H.264	Intel hardware H.264
+Intel hardware H.265	Intel hardware H.265
+Processing:	Processing:
+Match source resolution	Match source resolution
+Match source frame rate	Match source frame rate
+Frames per second	Frames per second
+Width	Width
+Height	Height
+Advanced…	Advanced…
+Back to basic settings	Back to basic settings
+Check tools	Check tools
+Checking encoders…	Checking encoders…
+Encoder detection complete	Encoder detection complete
+Software quality (CRF; lower is better)	Software quality (CRF; lower is better)
+Hardware bitrate (Mbps; blank: Auto)	Hardware bitrate (Mbps; blank: Auto)
+Software speed: Fast	Software speed: Fast
+Software speed: Medium	Software speed: Medium
+Software speed: Slow	Software speed: Slow
+Selected encoder is unavailable	Selected encoder is unavailable
+Available	Available
+Not included in this FFmpeg build	Not included in this FFmpeg build
+Elapsed:	Elapsed:
+Remaining:	Remaining:
+Conversion remaining:	Conversion remaining:
+Calculating…	Calculating…
+Estimating…	Estimating…
+Waiting for confirmation	Waiting for confirmation
+Completed in	Completed in
+Stopped after	Stopped after
+Failed after	Failed after
+Test speed	Test speed
+Testing speed	Testing speed
+conversion only	conversion only
+Incomplete sample	Incomplete sample
+Hardware unavailable for this output; using software	Hardware unavailable for this output; using software
+Default CRF: H.264 18 / H.265 20	Default CRF: H.264 18 / H.265 20
+Size varies	Size varies
+HDR → SDR	HDR → SDR
+clips	clips
+Reconnect remote panel...	Reconnect remote panel...
+Reconnect remote panel	Reconnect remote panel
+Reconnect	Reconnect
+Reconnect retains this pane's directory, filter, cursor and marks. Enter credentials again.	Reconnect retains this pane's directory, filter, cursor and marks. Enter credentials again.
+Connecting to server…	Connecting to server…
+Resolving server address…	Resolving server address…
+Authenticating…	Authenticating…
+Validating TLS connection…	Validating TLS connection…
+Opening SFTP session…	Opening SFTP session…
+Cannot load the remote directory. The remote location is retained.	Cannot load the remote directory. The remote location is retained.
+Use Panel → Reconnect to sign in again. Accepted transfers are not restarted automatically.	Use Panel → Reconnect to sign in again. Accepted transfers are not restarted automatically.
+Check remote directory permissions or choose another directory.	Check remote directory permissions or choose another directory.
+The remote directory may have moved. Go to its parent or choose another remote path.	The remote directory may have moved. Go to its parent or choose another remote path.
+Wait for the current remote operation, or cancel it in Transfer Center.	Wait for the current remote operation, or cancel it in Transfer Center.
+The remote location and its previous listing are retained.	The remote location and its previous listing are retained.
+Refresh the remote directory, or use Panel → Reconnect if the session is no longer usable.	Refresh the remote directory, or use Panel → Reconnect if the session is no longer usable.
+Remote directory request failed; the view is retained.	Remote directory request failed; the view is retained.
+Loading remote directory…	Loading remote directory…
+Disconnected · Panel → Reconnect	Disconnected · Panel → Reconnect
+Remote connection busy	Remote connection busy
+Access denied · view retained	Access denied · view retained
+Directory missing · view retained	Directory missing · view retained
+Cancelled · view retained	Cancelled · view retained
+Remote error · view retained	Remote error · view retained
+Connected · F3 view · F4 edit · F5 copy	Connected · F3 view · F4 edit · F5 copy
+Connection could not be established.	Connection could not be established.
+Check the server address, port, credentials and server identity before retrying.	Check the server address, port, credentials and server identity before retrying.
+Bluetooth transfers	Bluetooth transfers
+Bluetooth transfers...	Bluetooth transfers...
+Paired Bluetooth devices	Paired Bluetooth devices
+Files in send order	Files in send order
+Use selected files	Use selected files
+Send queue	Send queue
+Bluetooth destination directory	Bluetooth destination directory
+Incoming Bluetooth file	Incoming Bluetooth file
+Choose a local directory and explicitly approve reception.	Choose a local directory and explicitly approve reception.
+Existing Bluetooth destination	Existing Bluetooth destination
+Replace requires confirmation; Skip keeps the existing file.	Replace requires confirmation; Skip keeps the existing file.
+Reading paired Bluetooth devices	Reading paired Bluetooth devices
+Connecting Bluetooth device	Connecting Bluetooth device
+Starting Bluetooth receiver	Starting Bluetooth receiver
+Waiting for Bluetooth sender	Waiting for Bluetooth sender
+Sending Bluetooth file	Sending Bluetooth file
+Receiving Bluetooth file	Receiving Bluetooth file
+Waiting for receiver approval	Waiting for receiver approval
+Bluetooth stopped	Bluetooth stopped
+Bluetooth operation failed	Bluetooth operation failed
+Bluetooth worker stopped	Bluetooth worker stopped
+Bluetooth queue captured	Bluetooth queue captured
+Pair devices in system settings, then select a receiver	Pair devices in system settings, then select a receiver
+Select regular files before sending	Select regular files before sending
+Download or extract files to disk before Bluetooth transfer	Download or extract files to disk before Bluetooth transfer
+Bluetooth transfers uses standard OBEX Object Push over Bluetooth Classic, without Wi-Fi or internet.\nThe plugin is enabled by default; a saved disabled choice is preserved. Pair the computers in system Bluetooth settings, then open Bluetooth transfers in both DN instances. Refresh lists paired devices; it does not change discoverability or pair devices automatically.\nUse selected files captures visible marked native files, or the current file. Only regular files are supported: no folders, links, archive or remote members. The queue is session-only, up to 256 files, each at most 4 GiB minus one byte.\nStart Receive on the destination DN, select its paired device on the sender, then Send queue. Review each incoming filename and size and explicitly Accept or Decline. Device names do not prove identity; verify system pairing.\nChoose an existing local destination directory. Existing regular files use shared replacement confirmation; links and directory conflicts are refused. Incomplete files are staged privately and cleaned up on failure or Stop. Completed files remain.\nClosing this window or disabling the plugin stops listening and cancels active work. Switching documents leaves it running. There is no automatic retry or resume. A lost final acknowledgement means delivery is unconfirmed: check the destination before retrying.\nLinux requires BlueZ and its system D-Bus service, including in tty mode. macOS requires Bluetooth access for the terminal running DN. Windows requires a Bluetooth Classic adapter and its system drivers. BLE-only adapters are insufficient.\nDN uses a private discovery service identifier with standard OBEX framing, so this version connects only to another DN receiver. System/Android interoperability is a later milestone. Bluetooth transfers is separate from Nearby and Acoustic transfers. Android compatibility and actual hardware/platform reliability require separate testing; iPhone OBEX compatibility is not promised.	Bluetooth transfers uses standard OBEX Object Push over Bluetooth Classic, without Wi-Fi or internet.\nThe plugin is enabled by default; a saved disabled choice is preserved. Pair the computers in system Bluetooth settings, then open Bluetooth transfers in both DN instances. Refresh lists paired devices; it does not change discoverability or pair devices automatically.\nUse selected files captures visible marked native files, or the current file. Only regular files are supported: no folders, links, archive or remote members. The queue is session-only, up to 256 files, each at most 4 GiB minus one byte.\nStart Receive on the destination DN, select its paired device on the sender, then Send queue. Review each incoming filename and size and explicitly Accept or Decline. Device names do not prove identity; verify system pairing.\nChoose an existing local destination directory. Existing regular files use shared replacement confirmation; links and directory conflicts are refused. Incomplete files are staged privately and cleaned up on failure or Stop. Completed files remain.\nClosing this window or disabling the plugin stops listening and cancels active work. Switching documents leaves it running. There is no automatic retry or resume. A lost final acknowledgement means delivery is unconfirmed: check the destination before retrying.\nLinux requires BlueZ and its system D-Bus service, including in tty mode. macOS requires Bluetooth access for the terminal running DN. Windows requires a Bluetooth Classic adapter and its system drivers. BLE-only adapters are insufficient.\nDN uses a private discovery service identifier with standard OBEX framing, so this version connects only to another DN receiver. System/Android interoperability is a later milestone. Bluetooth transfers is separate from Nearby and Acoustic transfers. Android compatibility and actual hardware/platform reliability require separate testing; iPhone OBEX compatibility is not promised.
+Bluetooth transfers Help	Bluetooth transfers Help

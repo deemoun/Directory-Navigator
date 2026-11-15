@@ -25,4 +25,12 @@ jobs:
       - run: cargo test --locked
       - name: Test without audio
         run: cargo test --locked --no-default-features --test mp3_player --test plugin_settings
+      - name: Check optional acoustic support
+        run: cargo clippy --locked --all-targets --features acoustic -- -D warnings
+      - name: Test acoustic protocol without audio hardware
+        run: cargo test --locked --features acoustic --lib acoustic
+      - name: Test experimental plugin settings and UI
+        run: cargo test --locked --features acoustic --test experimental_plugins --test ui_refactor_parity
+      - name: Check acoustic support without music playback
+        run: cargo check --locked --no-default-features --features acoustic
       - run: cargo build --release --locked

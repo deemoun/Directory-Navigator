@@ -37,6 +37,14 @@ impl Mailbox {
         }
     }
     pub fn ask(&self, conflict: &Conflict, cancel: &AtomicBool) -> io::Result<Decision> {
+        self.ask_pumping(conflict, cancel, || Ok(()))
+    }
+    pub fn ask_pumping(
+        &self,
+        conflict: &Conflict,
+        cancel: &AtomicBool,
+        mut pump: impl FnMut() -> io::Result<()>,
+    ) -> io::Result<Decision> {
         check(cancel)?;
         let (answer, receive) = mpsc::sync_channel(1);
         *self.0.lock().unwrap() = Some(Pending {
@@ -49,7 +57,11 @@ impl Mailbox {
             }
             match receive.recv_timeout(Duration::from_millis(20)) {
                 Ok(d) => break Ok(d),
-                Err(mpsc::RecvTimeoutError::Timeout) => {}
+                Err(mpsc::RecvTimeoutError::Timeout) => {
+                    if let Err(e) = pump() {
+                        break Err(e);
+                    }
+                }
                 Err(_) => break Err(io::Error::other("Conflict prompt closed")),
             }
         };

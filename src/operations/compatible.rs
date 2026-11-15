@@ -4,6 +4,20 @@
 use super::*;
 use std::io::Seek;
 
+/// Only constructed after a compatibility output has been committed.
+#[derive(Debug)]
+pub(super) struct PublishedWarning(io::Error);
+impl std::fmt::Display for PublishedWarning {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+impl std::error::Error for PublishedWarning {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(&self.0)
+    }
+}
+
 pub(super) fn publish(
     stage: &crate::publication::StagedFile,
     target: &Path,
@@ -71,7 +85,7 @@ impl Output {
             return Err(io::Error::other("Copy output changed during publication"));
         }
         self.committed = true;
-        sync_parent(&self.path)
+        sync_parent(&self.path).map_err(|e| io::Error::new(e.kind(), PublishedWarning(e)))
     }
 }
 pub(super) enum Destination {

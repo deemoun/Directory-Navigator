@@ -537,7 +537,11 @@ Important DN/system paths remain in **System Information**.
 connection dialog. Browse remote directories in either pane, use F3 to preview,
 F4 to edit and save back, F5 to download/upload, F7 to create directories, and F8
 to permanently delete after confirmation. Rename operates on one remote item.
-Ctrl+PgUp disconnects and restores the original local directory.
+Ctrl+PgUp disconnects and restores the original local directory. Failed or cancelled
+listings retain the cached remote view. **Panel → Reconnect remote panel…** requests
+credentials again and retains directory, filter, cursor, marks and scroll where
+still valid. Accepted transfers are not restarted; connection status reflects
+observed operations rather than a continuous probe.
 
 Profiles store connection details and approved SSH fingerprints beside DN's
 configuration, never passwords or key passphrases. The Profiles list supports selection,
@@ -598,6 +602,83 @@ receivers whose addresses fall outside connected LANs. Manual details retain usa
 addresses and translate IPv6 scopes locally; they do not enable routed/NAT-only paths. One peer session is supported at a time. Links and special files,
 remote browsing and restart/resume are not supported. See the
 [guide](docs/USER_GUIDE.md#nearby-dn-transfers) for bounds and delivery guarantees.
+
+## Experimental DOS and acoustic plugins
+
+Both plugins are **disabled by default**, including upgrades without an explicit
+saved choice. Enable them in **Options → Configuration → Plugins**. Enabling
+alone starts no emulator, opens no audio devices and starts no networking.
+
+- **DOS launcher (Experimental)** uses a separately installed
+  [DOSBox Staging](https://www.dosbox-staging.org/). Configure its executable in
+  **Utilities → DOS launcher…**, or leave the path blank for automatic discovery.
+  **File → Run in DOSBox…** launches the current regular COM, DOS EXE or BAT in
+  its own graphical window. The separate **Open DOS programs with DOSBox** option
+  enables Enter/double-click for COM and DOS MZ executables before associations;
+  Windows PE/NE/LE/LX executables are excluded and BAT stays explicit. Ctrl+Enter
+  and **Open with default app** bypass DOS handling. Folder-local configuration
+  loading is disabled; DOSBox's global configuration is retained. No emulator is
+  bundled; a graphical session is required.
+- **Acoustic transfers (Experimental)** additionally requires a build with
+  `cargo build --release --locked --features acoustic` from this checkout. The feature is off
+  by default and independent of music playback. **Utilities → Acoustic transfers…**
+  sends **1 KiB of UTF-8 text or one regular file up to 1 KiB** using audible tones.
+  Both devices need microphones for acknowledgements. Compare the eight-digit
+  code on both screens; both users confirm, then the receiver approves each
+  offer. Noise XX encrypts the session; identities, drafts and previews are
+  session-only. Text has Preview/Copy/Dismiss; files use guarded destination and
+  replacement handling. Stop/close releases devices; completed files remain.
+  Missing final receipts mean **unconfirmed delivery**. Tiny payloads can take
+  minutes, and real speaker/microphone reliability remains unverified.
+
+See the [experimental-plugin guide](docs/USER_GUIDE.md#experimental-dos-and-acoustic-plugins)
+for activation, safeguards and hardware limitations.
+
+## Video Merge
+
+Enable **Video Merge** in **Options → Configuration → Plugins**;
+it is disabled by default. Select local videos/folders and choose **File → Merge
+videos…**, or open **Utilities → Video Merge…**. Install `ffmpeg` and `ffprobe`
+separately and put them on PATH, or set their paths in the plugin's Settings.
+
+**Analyze** checks clips and exact-content duplicates. Review their order and
+output settings, then **Start**. Auto joins compatible streams without re-encoding;
+otherwise it proposes the first clip's dimensions and exact FPS. Output is MP4,
+with H.264/H.265 conversion, optional detected hardware encoders and audio controls.
+HDR/10-bit inputs convert automatically to SDR (BT.709) when needed; compatible
+stream copy retains HDR. The conversion is shown as a notice, without blocking.
+Existing outputs require confirmation; failed clips stop the job. Optional timeline CSV
+contains names and times, not GPS or full paths. No persistent conversion cache.
+See the [guide](docs/USER_GUIDE.md#video-merge).
+
+Automatic processing prefers verified hardware when conversion is needed. Settings
+has a readable Processing list, Match source controls and an Advanced page. Live
+progress shows elapsed time, estimated conversion remaining and final total time.
+Test speed compares private samples without publishing them.
+
+## Bluetooth transfers
+
+Open **Utilities → Bluetooth transfers…** on both computers. This built-in plugin
+is enabled by default; it can be disabled under Plugins. It does not activate
+Bluetooth at startup. Pair the computers in system Bluetooth settings first.
+On the destination choose **Receive**; on the sender refresh the paired-device
+list and **Send queue**. Opening the tool captures marked native files or the
+current file; **Use selected files** recaptures them. Each incoming file requires
+approval and a local destination. Existing files require replacement confirmation.
+
+The session-only queue supports 256 regular files, each smaller than 4 GiB.
+Folders, links and archive/remote members are excluded. Closing the window stops
+work; switching documents does not. Completed files remain after cancellation;
+missing final receipts are reported as unconfirmed delivery.
+
+Native adapters target macOS IOBluetooth, Linux BlueZ/system D-Bus (also in tty),
+and Windows Bluetooth Classic. macOS may require Bluetooth permission for the
+terminal. DN uses standard OBEX with a private DN discovery identifier; this
+milestone connects two DN instances, not Android/iPhone or system file receivers.
+A Bluetooth Classic adapter is required; BLE alone is insufficient. Hardware
+interoperability must be verified separately from protocol and UI tests.
+See the [guide](docs/USER_GUIDE.md#bluetooth-transfers). Acoustic remains an
+independent optional build feature, off in normal builds.
 
 ## License
 

@@ -28,6 +28,14 @@ fn hash(text: &str) -> u64 {
 }
 #[test]
 fn shared_logic_preserves_native_frames() -> io::Result<()> {
+    let acoustic_available = cfg!(all(
+        feature = "acoustic",
+        any(
+            target_os = "macos",
+            target_os = "linux",
+            target_os = "windows"
+        )
+    ));
     let fixture = support::Fixture::new("logic-parity")?;
     let mut captures = String::new();
     for language in [Language::English, Language::Russian] {
@@ -193,12 +201,52 @@ fn shared_logic_preserves_native_frames() -> io::Result<()> {
                                 && r.width >= 60));
                         }
                         if case == 4 {
+                            assert!(
+                                result
+                                    .hit_regions()
+                                    .iter()
+                                    .any(|(_, t)| *t == dn::mouse::Target::Setting(8)),
+                                "Video Merge must have a reachable activation checkbox"
+                            );
+                            assert!(!a
+                                .modals
+                                .settings()
+                                .unwrap()
+                                .draft
+                                .plugin_enabled(dn::plugins::VIDEO_MERGE));
+
+                            assert!(
+                                result
+                                    .hit_regions()
+                                    .iter()
+                                    .any(|(_, target)| *target == dn::mouse::Target::Setting(9)),
+                                "Bluetooth must have a reachable enable/disable checkbox"
+                            );
+                            assert!(a
+                                .modals
+                                .settings()
+                                .unwrap()
+                                .draft
+                                .plugin_enabled(dn::plugins::BLUETOOTH_TRANSFERS));
+                            assert_eq!(
+                                result
+                                    .hit_regions()
+                                    .iter()
+                                    .any(|(_, target)| *target == dn::mouse::Target::Setting(7)),
+                                acoustic_available,
+                                "Acoustic activation checkbox must reflect build availability"
+                            );
                             let buffer = Buffer::rendered(ui::render(&a, &snapshot));
                             let text = buffer
                                 .content
                                 .iter()
                                 .map(|c| c.symbol())
                                 .collect::<String>();
+                            assert!(
+                                text.contains(language.text("Video Merge"))
+                                    && text.contains(language.text("Bluetooth transfers")),
+                                "{text}"
+                            );
                             assert!(text.contains(language.text("Remote connections")), "{text}");
                             assert!(text.contains(language.text("Nearby transfers")), "{text}");
                             assert!(
@@ -286,6 +334,22 @@ fn shared_logic_preserves_native_frames() -> io::Result<()> {
                     line.split(": ").next().unwrap().rsplit('/').next().unwrap(),
                     "17" | "18"
                 )
+        })
+        .map(|line| {
+            // Availability changes this checkbox's colors and mouse target, not other UI.
+            let key = line.split_once(": ").unwrap().0;
+            if acoustic_available && key.ends_with("/4") {
+                include_str!("fixtures/acoustic_plugin_frames.txt")
+                    .lines()
+                    .find(|candidate| {
+                        candidate
+                            .split_once(": ")
+                            .is_some_and(|(name, _)| name == key)
+                    })
+                    .expect("explicit acoustic Plugins fixture")
+            } else {
+                line
+            }
         })
         .collect::<Vec<_>>()
         .join("\n")

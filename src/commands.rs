@@ -501,12 +501,24 @@ pub(crate) fn manager_available(app: &App, action: Action) -> bool {
                 | Action::ExportList
                 | Action::FileInfo
                 | Action::AddMp3
+                | Action::RunDos
+                | Action::MergeVideos
                 | Action::SendNearby
         )
     {
         return false;
     }
     match action {
+        Action::ReconnectRemote => {
+            app.panels[app.active]
+                .remote()
+                .is_some_and(|r| r.status.phase != crate::network::status::Phase::Busy)
+                && !app.panels[app.active].loading
+                && app
+                    .config
+                    .plugin_enabled(crate::plugins::REMOTE_CONNECTIONS)
+                && !crate::windowing::blocked(app)
+        }
         Action::CreateArchive => {
             !app.panels[app.active].loading
                 && !app.panels[app.active].targets().is_empty()
@@ -515,7 +527,19 @@ pub(crate) fn manager_available(app: &App, action: Action) -> bool {
         Action::TempDrive | Action::CopyToTempDrive => crate::temp_drive::available(app, false),
         Action::ClearTempDrive => crate::temp_drive::available(app, true),
         Action::SmartPad => !crate::windowing::blocked(app) && !app.blocking_operation(),
-        Action::Plugin(id) => app.config.plugin_enabled(id),
+        Action::Plugin(id) => {
+            app.config.plugin_enabled(id)
+                && (id != crate::plugins::ACOUSTIC_TRANSFERS || crate::acoustic::available())
+        }
+        Action::MergeVideos => {
+            app.config.plugin_enabled(crate::plugins::VIDEO_MERGE)
+                && !app.panels[app.active].loading
+                && !app.panels[app.active].targets().is_empty()
+        }
+        Action::RunDos => {
+            app.config.plugin_enabled(crate::plugins::DOS_LAUNCHER)
+                && !app.panels[app.active].loading
+        }
         Action::SendNearby => {
             app.config.plugin_enabled(crate::plugins::NEARBY_TRANSFERS)
                 && !app.panels[app.active].loading

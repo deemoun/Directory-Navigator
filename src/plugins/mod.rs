@@ -1,11 +1,15 @@
 //! Built-in tools. Internal Rust API: no binary ABI, loader or third-party SDK.
+pub(crate) mod acoustic_transfers;
 pub(crate) mod apk_workshop;
+pub(crate) mod bluetooth_transfers;
 pub(crate) mod calculator;
+pub(crate) mod dos_launcher;
 pub(crate) mod host;
 pub(crate) mod mp3_player;
 pub(crate) mod nearby_transfers;
 pub(crate) mod remote_connections;
 pub(crate) mod tetris;
+pub(crate) mod video_merge;
 
 use crate::{
     desktop::WindowId,
@@ -26,6 +30,10 @@ use std::{
 };
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct PluginId(pub &'static str);
+pub const BLUETOOTH_TRANSFERS: PluginId = PluginId("bluetooth_transfers");
+pub const VIDEO_MERGE: PluginId = PluginId("video_merge");
+pub const DOS_LAUNCHER: PluginId = PluginId("dos_launcher");
+pub const ACOUSTIC_TRANSFERS: PluginId = PluginId("acoustic_transfers");
 pub const NEARBY_TRANSFERS: PluginId = PluginId("nearby_transfers");
 pub const REMOTE_CONNECTIONS: PluginId = PluginId("remote_connections");
 pub const CALCULATOR: PluginId = PluginId("calculator");
@@ -47,7 +55,13 @@ pub(crate) const fn music_playback_available() -> bool {
 /// Compiled-in defaults are separate from explicit user overrides. Unknown tools
 /// retain the original enabled default; experimental built-ins opt out here.
 pub fn enabled_by_default(id: PluginId) -> bool {
-    const DEFAULT_DISABLED: &[PluginId] = &[MP3_PLAYER, APK_WORKSHOP];
+    const DEFAULT_DISABLED: &[PluginId] = &[
+        MP3_PLAYER,
+        APK_WORKSHOP,
+        DOS_LAUNCHER,
+        ACOUSTIC_TRANSFERS,
+        VIDEO_MERGE,
+    ];
     !DEFAULT_DISABLED.contains(&id)
 }
 
@@ -106,6 +120,11 @@ pub(crate) struct Context {
     pub now: Instant,
     pub storage: Option<PathBuf>,
     pub mp3: crate::config::Mp3Preferences,
+    pub dos: crate::dos::Preferences,
+    pub video_preferences: crate::video::Preferences,
+    pub video: crate::video::Snapshot,
+    pub acoustic: crate::acoustic::Snapshot,
+    pub bluetooth: crate::bluetooth::Snapshot,
     pub nearby: crate::peer::Snapshot,
 }
 impl Context {
@@ -146,7 +165,17 @@ pub(crate) enum Event<'a> {
         token: ClipboardToken,
         message: String,
     },
+    RemoteReconnect {
+        profile: crate::network::remote::Profile,
+        target: crate::network::ReconnectTarget,
+    },
     NearbyDirectory(PathBuf),
+    AcousticDirectory(PathBuf),
+    VideoFolder(PathBuf),
+    VideoSources {
+        sources: Vec<PathBuf>,
+        base: PathBuf,
+    },
     OpenApk(PathBuf),
     ApkContext {
         base: PathBuf,
@@ -169,8 +198,25 @@ pub(crate) enum Event<'a> {
     },
 }
 pub(crate) enum Effect {
+    Bluetooth {
+        generation: u64,
+        action: crate::bluetooth::Action,
+    },
+    Video {
+        generation: u64,
+        action: crate::video::Action,
+    },
+    DosSetup(crate::dos::Preferences),
+    Acoustic {
+        generation: u64,
+        action: crate::acoustic::Action,
+    },
     Nearby(crate::peer::Action),
     RemoteConnected(std::sync::Arc<crate::network::remote::Connection>),
+    RemoteReconnected {
+        connection: std::sync::Arc<crate::network::remote::Connection>,
+        target: crate::network::ReconnectTarget,
+    },
     RemoteTerminal(crate::network::remote::Profile),
     ApkPreview {
         unicode: bool,
@@ -237,6 +283,11 @@ pub(crate) trait ToolPlugin: Any {
     fn zoom_action(&self) -> Option<ActionId> {
         None
     }
+    /// Tools with active work can route the native title close through their
+    /// ordinary owned confirmation controls before retiring the document.
+    fn close_action(&self) -> Option<ActionId> {
+        None
+    }
     fn prepare(&mut self, _ctx: &Context) {}
     fn native_input_page(&self) -> Option<u64> {
         None
@@ -268,6 +319,8 @@ impl Default for Runtime {
             entries: BTreeMap::new(),
             now: Instant::now(),
         };
+        s.register(Box::<bluetooth_transfers::BluetoothTransfers>::default())
+            .expect("Bluetooth ID");
         s.register(Box::<nearby_transfers::NearbyTransfers>::default())
             .expect("nearby transfers ID");
         s.register(Box::<remote_connections::RemoteConnections>::default())
@@ -278,12 +331,27 @@ impl Default for Runtime {
             .expect("calculator ID");
         s.register(Box::<mp3_player::Mp3Player>::default())
             .expect("MP3 player ID");
+        s.register(Box::<dos_launcher::DosLauncher>::default())
+            .expect("DOS launcher ID");
+        s.register(Box::<acoustic_transfers::AcousticTransfers>::default())
+            .expect("acoustic ID");
+        s.register(Box::<video_merge::VideoMerge>::default())
+            .expect("video ID");
         s.register(Box::<tetris::TetrisPlugin>::default())
             .expect("tetris ID");
         s
     }
 }
 impl Runtime {
+    #[cfg(feature = "acoustic")]
+    pub(crate) fn acoustic_music(&mut self) -> Option<&mut mp3_player::Mp3Player> {
+        self.entries
+            .get_mut(&MP3_PLAYER)?
+            .tool
+            .as_any_mut()
+            .downcast_mut()
+    }
+
     pub(crate) fn register(&mut self, tool: Box<dyn ToolPlugin>) -> Result<(), &'static str> {
         let id = tool.definition().id;
         if self.entries.contains_key(&id) {
@@ -310,7 +378,13 @@ impl Runtime {
             CALCULATOR => 0,
             MP3_PLAYER => 1,
             TETRIS => 2,
-            _ => 3,
+            APK_WORKSHOP => 3,
+            NEARBY_TRANSFERS => 4,
+            REMOTE_CONNECTIONS => 5,
+            DOS_LAUNCHER => 6,
+            ACOUSTIC_TRANSFERS => 7,
+            VIDEO_MERGE => 8,
+            _ => 9,
         });
         definitions.into_iter()
     }

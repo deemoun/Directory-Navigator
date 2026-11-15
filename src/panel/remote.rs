@@ -18,6 +18,9 @@ pub struct Remote {
     pub revision: u64,
     pub hidden: bool,
     pub members: HashMap<OsString, Member>,
+    pub status: crate::network::status::Snapshot,
+    pub issue: Option<crate::network::status::Failure>,
+    pub failed_path: Option<RemotePath>,
     pending: Option<Task<io::Result<Vec<Member>>>>,
     target: RemotePath,
     origin: Origin,
@@ -76,6 +79,9 @@ impl Panel {
         static NEXT: AtomicU64 = AtomicU64::new(1);
         let generation = NEXT.fetch_add(1, Ordering::Relaxed);
         self.location = Location::Remote(Box::new(Remote {
+            status: connection.snapshot(),
+            issue: None,
+            failed_path: None,
             connection,
             directory: directory.clone(),
             target: directory.clone(),
@@ -99,9 +105,18 @@ impl Panel {
     fn remote_request(&mut self, path: RemotePath) -> io::Result<()> {
         let connection = self.remote().expect("remote pane").connection.clone();
         let target = path.clone();
-        let task = Task::spawn(&self.scope, "dn-remote-directory", move |cancel| {
+        let task = match Task::spawn(&self.scope, "dn-remote-directory", move |cancel| {
             connection.with(|backend| backend.list(&target, &cancel))
-        })?;
+        }) {
+            Ok(task) => task,
+            Err(e) => {
+                let r = self.remote_mut().unwrap();
+                r.issue = Some(crate::network::status::Failure::new(&e));
+                r.failed_path = Some(path);
+                self.revision = self.revision.wrapping_add(1);
+                return Err(e);
+            }
+        };
         let remote = self.remote_mut().unwrap();
         remote.pending = Some(task);
         remote.target = path;
@@ -110,6 +125,14 @@ impl Panel {
         Ok(())
     }
     pub(crate) fn remote_poll(&mut self) -> Option<String> {
+        let status = self.remote()?.connection.snapshot();
+        if self.remote()?.status != status {
+            self.remote_mut()?.status = status;
+            self.revision = self.revision.wrapping_add(1);
+        }
+        if let Some(error) = self.refresh_error.take() {
+            return Some(error);
+        }
         let reply = {
             let remote = self.remote_mut()?;
             let task = remote.pending.as_ref()?;
@@ -122,17 +145,20 @@ impl Panel {
             }
         }?;
         self.loading = false;
-        let no_entries = self.entries.is_empty();
         let remote = self.remote_mut().unwrap();
         remote.pending = None;
+        // The worker may finish between the initial snapshot and receiving its
+        // result. Publish the matching connection state in this same update.
+        remote.status = remote.connection.snapshot();
         match reply {
             Err(e) => {
+                remote.issue = Some(crate::network::status::Failure::new(&e));
+                remote.failed_path = Some(remote.target.clone());
                 let label = remote.connection.label(&remote.target);
-                let first = remote.members.is_empty() && no_entries;
-                let hidden = remote.hidden;
-                if first {
-                    self.leave_remote(hidden);
+                if self.entries.is_empty() {
+                    self.entries.push(parent_entry());
                 }
+                self.revision = self.revision.wrapping_add(1);
                 Some(format!("{label}: {e}"))
             }
             Ok(members) => {
@@ -141,11 +167,18 @@ impl Panel {
                     if member.path.parent() != remote.target
                         || !unique.insert(member.path.name().to_owned())
                     {
-                        return Some(
-                            "Remote listing contains duplicate or redirected names".into(),
+                        let e = io::Error::new(
+                            io::ErrorKind::InvalidData,
+                            "Remote listing contains duplicate or redirected names",
                         );
+                        remote.issue = Some(crate::network::status::Failure::new(&e));
+                        remote.failed_path = Some(remote.target.clone());
+                        self.revision = self.revision.wrapping_add(1);
+                        return Some(e.to_string());
                     }
                 }
+                remote.issue = None;
+                remote.failed_path = None;
                 let same_directory = remote.directory == remote.target;
                 let selected_name = self.entries.get(self.cursor).map(|e| e.name.clone());
                 let old_offset = self.offset;
@@ -153,17 +186,7 @@ impl Panel {
                 remote.directory = remote.target.clone();
                 remote.revision += 1;
                 remote.members.clear();
-                let mut entries = vec![Entry {
-                    file_type: None,
-                    name: "..".into(),
-                    path: PathBuf::new(),
-                    directory: true,
-                    symlink: false,
-                    size: None,
-                    parent: true,
-                    modified: None,
-                    executable: false,
-                }];
+                let mut entries = vec![parent_entry()];
                 for member in members {
                     if !remote.hidden && member.path.name().starts_with('.') {
                         continue;
@@ -216,6 +239,7 @@ impl Panel {
                     self.offset = old_offset;
                 }
                 self.revision += 1;
+                self.refresh_error = None;
                 None
             }
         }
@@ -270,6 +294,53 @@ impl Panel {
             self.refresh_error = Some(e.to_string());
         }
     }
+    pub(crate) fn remote_cancel(&mut self) {
+        let Some(remote) = self.remote_mut() else {
+            return;
+        };
+        remote.pending = None;
+        remote.target = remote.directory.clone();
+        remote.revision = remote.revision.wrapping_add(1);
+        remote.issue = Some(crate::network::status::Failure::new(&io::Error::new(
+            io::ErrorKind::Interrupted,
+            "Remote directory request cancelled",
+        )));
+        self.loading = false;
+        self.revision = self.revision.wrapping_add(1);
+        if self.entries.is_empty() {
+            self.entries.push(parent_entry());
+        }
+    }
+    pub(crate) fn reconnect_remote(&mut self, connection: Arc<Connection>) -> io::Result<()> {
+        let Some(remote) = self.remote_mut() else {
+            return Err(io::Error::other("Remote pane is no longer open"));
+        };
+        let directory = remote.directory.clone();
+        remote.pending = None;
+        remote.connection = connection;
+        remote.status = remote.connection.snapshot();
+        remote.issue = None;
+        remote.failed_path = None;
+        // Preserve this pane's identity/view; old tasks are invalidated by a new lease.
+        self.remote_request(directory)
+    }
+    pub(crate) fn remote_error_report(&self, language: crate::localization::Language) -> String {
+        let r = self.remote().expect("remote error");
+        let issue = r.issue.as_ref();
+        crate::error_report::Report::new(
+            "Cannot load the remote directory. The remote location is retained.",
+            issue.map_or("", |i| i.cause.as_str()),
+            issue
+                .map_or(crate::network::status::Problem::Other, |i| i.problem)
+                .advice(),
+        )
+        .text(
+            "Remote directory",
+            &r.connection
+                .label(r.failed_path.as_ref().unwrap_or(&r.directory)),
+        )
+        .render(language)
+    }
     pub fn leave_remote(&mut self, hidden: bool) {
         if !self.is_remote() {
             return;
@@ -321,5 +392,19 @@ impl Panel {
             filter: r.origin.filter.clone(),
             offset: r.origin.offset,
         })
+    }
+}
+
+fn parent_entry() -> Entry {
+    Entry {
+        file_type: None,
+        name: "..".into(),
+        path: PathBuf::new(),
+        directory: true,
+        symlink: false,
+        size: None,
+        parent: true,
+        modified: None,
+        executable: false,
     }
 }

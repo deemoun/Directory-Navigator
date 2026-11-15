@@ -68,6 +68,15 @@ pub(crate) fn context(app: &App, b: Binding, area: Rect, now: Instant) -> Option
         now,
         storage: app.config_store.path().ok().map(PathBuf::from),
         mp3: app.config.mp3,
+        dos: app.config.dos.clone(),
+        video_preferences: app.config.video.clone(),
+        video: if b.plugin == VIDEO_MERGE {
+            app.video.view.clone()
+        } else {
+            Default::default()
+        },
+        acoustic: app.acoustic.view.clone(),
+        bluetooth: app.bluetooth.view.clone(),
         nearby: if b.plugin == NEARBY_TRANSFERS {
             app.peer.view.clone()
         } else {
@@ -102,6 +111,17 @@ pub(crate) fn open(app: &mut App, id: PluginId) {
         }
         return;
     }
+    // Capture marks before installing/activating the document. Utilities opens
+    // an empty tool without marks; File's explicit action also passes the cursor.
+    let video_sources = (id == VIDEO_MERGE).then(|| {
+        let panel = &app.panels[app.active];
+        let sources = if panel.selected.is_empty() {
+            Vec::new()
+        } else {
+            panel.targets()
+        };
+        (sources, panel.path.clone())
+    });
     let owner = match definition.presentation {
         Presentation::Dialog => {
             app.modals.set_plugin_dialog(Some(id));
@@ -123,6 +143,15 @@ pub(crate) fn open(app: &mut App, id: PluginId) {
     };
     let b = Binding { plugin: id, owner };
     app.desktop.plugins.bind(b);
+    if id == BLUETOOTH_TRANSFERS {
+        crate::bluetooth::opened(app, b);
+    }
+    if id == VIDEO_MERGE {
+        crate::video::opened(app);
+    }
+    if id == ACOUSTIC_TRANSFERS {
+        crate::acoustic::opened(app);
+    }
     if let Some(ctx) = context(
         app,
         b,
@@ -136,6 +165,16 @@ pub(crate) fn open(app: &mut App, id: PluginId) {
             .unwrap()
             .tool
             .open(&ctx);
+    }
+    if id == ACOUSTIC_TRANSFERS && !app.panels[app.active].is_virtual() {
+        dispatch(
+            app,
+            b,
+            Event::AcousticDirectory(app.panels[app.active].path.clone()),
+        );
+    }
+    if let Some((sources, base)) = video_sources {
+        dispatch(app, b, Event::VideoSources { sources, base });
     }
     if id == NEARBY_TRANSFERS {
         crate::peer::opened(app, b);
@@ -232,11 +271,34 @@ fn apply(app: &mut App, b: Binding, effects: Vec<Effect>) {
             continue;
         }
         match effect {
+            Effect::Bluetooth { generation, action } if b.plugin == BLUETOOTH_TRANSFERS => {
+                crate::bluetooth::action(app, b, generation, action)
+            }
+            Effect::Bluetooth { .. } => (),
+            Effect::Video { generation, action } if b.plugin == VIDEO_MERGE => {
+                crate::video::action(app, b, generation, action)
+            }
+            Effect::Video { .. } => (),
+            Effect::DosSetup(preferences) => crate::dos::setup(app, b, preferences),
+            Effect::Acoustic { generation, action } => {
+                crate::acoustic::action(app, b, generation, action)
+            }
             Effect::RemoteTerminal(profile) => {
                 if b.plugin != REMOTE_CONNECTIONS {
                     continue;
                 }
                 if let Err(e) = crate::network::terminal(app, profile) {
+                    app.error(e.to_string());
+                }
+            }
+            Effect::RemoteReconnected { connection, target } => {
+                if b.plugin != REMOTE_CONNECTIONS {
+                    continue;
+                }
+                let result = crate::network::reconnected(app, target, connection);
+                app.modals.set_plugin_dialog(None);
+                app.sync_modals();
+                if let Err(e) = result {
                     app.error(e.to_string());
                 }
             }
@@ -361,6 +423,29 @@ fn apply(app: &mut App, b: Binding, effects: Vec<Effect>) {
             }),
         }
     }
+}
+/// Route native close through a tool’s ordinary owned confirmation controls.
+pub(crate) fn request_close(app: &mut App, window: crate::desktop::WindowId) -> bool {
+    let Some(binding) = app
+        .desktop
+        .plugins
+        .bound()
+        .into_iter()
+        .find(|b| b.owner == Owner::Document(window))
+    else {
+        return false;
+    };
+    let Some(action) = app
+        .desktop
+        .plugins
+        .entries
+        .get(&binding.plugin)
+        .and_then(|e| e.tool.close_action())
+    else {
+        return false;
+    };
+    dispatch(app, binding, Event::Action(action));
+    true
 }
 /// Route plugin presentation toggles through the same owned action path as controls.
 pub(crate) fn zoom(app: &mut App, surface: crate::windowing::geometry::SurfaceId) -> bool {

@@ -57,7 +57,14 @@ enum Transport {
     Paused,
 }
 
+#[cfg(feature = "acoustic")]
+pub(crate) struct AcousticPause {
+    serial: u64,
+    generation: u64,
+}
 pub(crate) struct Mp3Player {
+    #[cfg(feature = "acoustic")]
+    acoustic_serial: u64,
     playlist: playlist::Playlist,
     expanded: bool,
     preferences: crate::config::Mp3Preferences,
@@ -85,6 +92,8 @@ pub(crate) struct Mp3Player {
 impl Default for Mp3Player {
     fn default() -> Self {
         Self {
+            #[cfg(feature = "acoustic")]
+            acoustic_serial: 0,
             playlist: playlist::Playlist::default(),
             expanded: false,
             preferences: Default::default(),
@@ -115,6 +124,31 @@ impl Default for Mp3Player {
     }
 }
 impl Mp3Player {
+    #[cfg(feature = "acoustic")]
+    pub(crate) fn pause_for_acoustic(&mut self) -> Option<AcousticPause> {
+        if self.transport != Transport::Playing {
+            return None;
+        }
+        self.request.paused = true;
+        self.transport = Transport::Paused;
+        self.submit();
+        Some(AcousticPause {
+            serial: self.acoustic_serial,
+            generation: self.request.generation,
+        })
+    }
+    #[cfg(feature = "acoustic")]
+    pub(crate) fn resume_after_acoustic(&mut self, token: AcousticPause) {
+        if self.acoustic_serial == token.serial
+            && self.request.generation == token.generation
+            && self.transport == Transport::Paused
+            && self.request.paused
+        {
+            self.request.paused = false;
+            self.transport = Transport::Playing;
+            self.submit();
+        }
+    }
     fn bounds(&self, ctx: &Context) -> Rect {
         crate::turbo::dialog_spec::centered(
             ctx.area,
@@ -426,6 +460,13 @@ impl Mp3Player {
         }]
     }
     fn action(&mut self, id: usize, ctx: &Context) -> Vec<Effect> {
+        #[cfg(feature = "acoustic")]
+        if matches!(
+            id,
+            0..=6 | 10 | 11 | 14 | 606 | playlist::PLAY_TRACK | playlist::DELETE
+        ) {
+            self.acoustic_serial = self.acoustic_serial.wrapping_add(1);
+        }
         if id == HELP {
             return vec![Effect::Help {
                 title: " Music Player Help ",
@@ -1387,8 +1428,37 @@ mod tests {
             now: Instant::now(),
             storage: None,
             mp3: Default::default(),
+            dos: Default::default(),
+            video: Default::default(),
+            video_preferences: Default::default(),
+            acoustic: Default::default(),
+            bluetooth: Default::default(),
             nearby: Default::default(),
         }
+    }
+    #[cfg(feature = "acoustic")]
+    #[test]
+    fn acoustic_pause_resumes_only_the_unchanged_original_playback() {
+        let (mut p, _) = player();
+        let ctx = context();
+        p.start(ctx.now);
+        let token = p.pause_for_acoustic().expect("playing");
+        assert_eq!(p.transport, Transport::Paused);
+        let _ = p.action(HELP, &ctx);
+        p.resume_after_acoustic(token);
+        assert_eq!(p.transport, Transport::Playing);
+        let token = p.pause_for_acoustic().unwrap();
+        let _ = p.action(PLAY, &ctx);
+        let _ = p.action(PLAY, &ctx);
+        p.resume_after_acoustic(token);
+        assert_eq!(p.transport, Transport::Paused);
+        let token = p.pause_for_acoustic();
+        assert!(token.is_none());
+        p.start(ctx.now);
+        let token = p.pause_for_acoustic().unwrap();
+        p.close();
+        p.resume_after_acoustic(token);
+        assert_eq!(p.transport, Transport::Stopped);
     }
     fn player() -> (Mp3Player, Rc<RefCell<FakeState>>) {
         let fake = Rc::new(RefCell::new(FakeState::default()));

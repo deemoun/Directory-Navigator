@@ -155,6 +155,9 @@ pub struct Member {
     pub modified: Option<SystemTime>,
 }
 pub trait Backend: Send {
+    fn disconnected(&self) -> bool {
+        false
+    }
     fn stat(&mut self, path: &RemotePath, cancel: &Cancellation) -> io::Result<Option<Member>> {
         Ok(self
             .list(&path.parent(), cancel)?
@@ -183,19 +186,79 @@ pub trait Backend: Send {
 pub struct Connection {
     pub profile: Profile,
     backend: Mutex<Box<dyn Backend>>,
+    status: Mutex<super::status::Snapshot>,
 }
 impl Connection {
     pub fn with<T>(&self, run: impl FnOnce(&mut dyn Backend) -> io::Result<T>) -> io::Result<T> {
-        let mut b = self.backend.try_lock().map_err(|e| match e {
-            std::sync::TryLockError::WouldBlock => io::Error::new(
-                io::ErrorKind::WouldBlock,
-                "Remote connection is busy; retry after the current transfer finishes",
-            ),
-            std::sync::TryLockError::Poisoned(_) => {
-                io::Error::other("Remote connection worker stopped")
+        use super::status::{transport, Failure, Phase};
+        let prior = self.snapshot();
+        if prior.phase == Phase::Disconnected {
+            return Err(transport(io::Error::new(
+                io::ErrorKind::NotConnected,
+                prior
+                    .error
+                    .map_or_else(|| "Remote connection is disconnected".into(), |e| e.cause),
+            )));
+        }
+        let mut b = match self.backend.try_lock() {
+            Ok(b) => b,
+            Err(std::sync::TryLockError::WouldBlock) => {
+                return Err(io::Error::new(
+                    io::ErrorKind::WouldBlock,
+                    "Remote connection is busy; retry after the current transfer finishes",
+                ))
             }
-        })?;
-        run(b.as_mut())
+            Err(_) => {
+                let e = transport(io::Error::new(
+                    io::ErrorKind::NotConnected,
+                    "Remote connection worker stopped",
+                ));
+                self.observe(Phase::Disconnected, Some(Failure::new(&e)));
+                return Err(e);
+            }
+        };
+        self.observe(Phase::Busy, prior.error);
+        let result = run(b.as_mut()).map_err(|e| if b.disconnected() { transport(e) } else { e });
+        let failure = result.as_ref().err().map(Failure::new);
+        let offline = result
+            .as_ref()
+            .err()
+            .is_some_and(super::status::transport_failure);
+        self.observe(
+            if offline {
+                Phase::Disconnected
+            } else {
+                Phase::Ready
+            },
+            failure,
+        );
+        result
+    }
+    fn observe(&self, phase: super::status::Phase, error: Option<super::status::Failure>) {
+        let mut s = self.status.lock().unwrap_or_else(|e| e.into_inner());
+        s.phase = phase;
+        s.error = error;
+        s.revision = s.revision.wrapping_add(1);
+    }
+    pub fn snapshot(&self) -> super::status::Snapshot {
+        let mut state = self.status.lock().unwrap_or_else(|e| e.into_inner());
+        if self.backend.is_poisoned() && state.phase != super::status::Phase::Disconnected {
+            state.phase = super::status::Phase::Disconnected;
+            state.error = Some(super::status::Failure::new(&super::status::transport(
+                io::Error::new(
+                    io::ErrorKind::NotConnected,
+                    "Remote connection worker stopped",
+                ),
+            )));
+            state.revision = state.revision.wrapping_add(1);
+        }
+        state.clone()
+    }
+    pub(crate) fn busy(&self) -> bool {
+        matches!(
+            self.backend.try_lock(),
+            Err(std::sync::TryLockError::WouldBlock)
+        )
     }
     pub fn label(&self, path: &RemotePath) -> String {
         format!("{}{}", self.profile.label(), path.as_str())
@@ -241,10 +304,75 @@ struct Sftp {
 fn err(e: impl std::fmt::Display) -> io::Error {
     io::Error::other(e.to_string())
 }
+fn sftp_error(error: russh_sftp::client::error::Error) -> io::Error {
+    use super::status::transport;
+    use russh_sftp::client::error::Error as E;
+    let kind = match &error {
+        E::Timeout => io::ErrorKind::TimedOut,
+        E::IO(_) => io::ErrorKind::ConnectionAborted,
+        E::Status(s) => match s.status_code {
+            StatusCode::NoSuchFile => io::ErrorKind::NotFound,
+            StatusCode::PermissionDenied => io::ErrorKind::PermissionDenied,
+            StatusCode::NoConnection => io::ErrorKind::NotConnected,
+            StatusCode::ConnectionLost => io::ErrorKind::ConnectionReset,
+            _ => io::ErrorKind::Other,
+        },
+        E::UnexpectedPacket => io::ErrorKind::InvalidData,
+        _ => io::ErrorKind::Other,
+    };
+    let disconnected = matches!(&error, E::Timeout | E::IO(_))
+        || matches!(&error,E::Status(s) if matches!(s.status_code,StatusCode::NoConnection|StatusCode::ConnectionLost));
+    let result = io::Error::new(kind, error);
+    if disconnected {
+        transport(result)
+    } else {
+        result
+    }
+}
+fn ftp_error(error: suppaftp::FtpError) -> io::Error {
+    use super::status::transport;
+    use suppaftp::{FtpError as E, Status as S};
+    match error {
+        E::ConnectionError(e) => transport(e),
+        E::UnexpectedResponse(r)
+            if matches!(
+                r.status,
+                S::NotAvailable | S::NotLoggedIn | S::InvalidCredentials
+            ) =>
+        {
+            transport(io::Error::new(
+                if r.status == S::NotAvailable {
+                    io::ErrorKind::NotConnected
+                } else {
+                    io::ErrorKind::PermissionDenied
+                },
+                E::UnexpectedResponse(r),
+            ))
+        }
+        other => io::Error::other(other),
+    }
+}
+struct Wire<T>(T);
+impl<T: Read> Read for Wire<T> {
+    fn read(&mut self, b: &mut [u8]) -> io::Result<usize> {
+        self.0.read(b).map_err(super::status::transport)
+    }
+}
+impl<T: Write> Write for Wire<T> {
+    fn write(&mut self, b: &[u8]) -> io::Result<usize> {
+        self.0.write(b).map_err(super::status::transport)
+    }
+    fn flush(&mut self) -> io::Result<()> {
+        self.0.flush().map_err(super::status::transport)
+    }
+}
 fn eof(e: &russh_sftp::client::error::Error) -> bool {
     matches!(e,russh_sftp::client::error::Error::Status(s) if s.status_code==StatusCode::Eof)
 }
 impl Backend for Sftp {
+    fn disconnected(&self) -> bool {
+        self._ssh.is_closed()
+    }
     fn stat(&mut self, path: &RemotePath, cancel: &Cancellation) -> io::Result<Option<Member>> {
         cancel.check()?;
         match self.runtime.block_on(self.session.lstat(path.as_str())) {
@@ -274,7 +402,7 @@ impl Backend for Sftp {
                 .session
                 .opendir(path.as_str())
                 .await
-                .map_err(err)?
+                .map_err(sftp_error)?
                 .handle;
             let result = async {
                 let mut out = Vec::new();
@@ -284,7 +412,7 @@ impl Backend for Sftp {
                     let page = match self.session.readdir(&handle).await {
                         Ok(p) => p,
                         Err(e) if eof(&e) => break,
-                        Err(e) => return Err(err(e)),
+                        Err(e) => return Err(sftp_error(e)),
                     };
                     if page.files.is_empty() {
                         return Err(err("Empty nonterminal SFTP listing"));
@@ -311,7 +439,7 @@ impl Backend for Sftp {
                 Ok(out)
             }
             .await;
-            let closed = self.session.close(handle).await.map_err(err);
+            let closed = self.session.close(handle).await.map_err(sftp_error);
             match result {
                 Ok(v) => {
                     closed?;
@@ -333,7 +461,7 @@ impl Backend for Sftp {
                 .session
                 .open(path.as_str(), OpenFlags::READ, FileAttributes::default())
                 .await
-                .map_err(err)?
+                .map_err(sftp_error)?
                 .handle;
             let result = async {
                 let mut offset = 0;
@@ -342,7 +470,7 @@ impl Backend for Sftp {
                     let chunk = match self.session.read(&handle, offset, 32768).await {
                         Ok(d) => d.data,
                         Err(e) if eof(&e) => break,
-                        Err(e) => return Err(err(e)),
+                        Err(e) => return Err(sftp_error(e)),
                     };
                     if chunk.is_empty() {
                         return Err(io::Error::new(
@@ -364,7 +492,7 @@ impl Backend for Sftp {
                 Ok(offset)
             }
             .await;
-            let closed = self.session.close(handle).await.map_err(err);
+            let closed = self.session.close(handle).await.map_err(sftp_error);
             match result {
                 Ok(n) => {
                     closed?;
@@ -389,7 +517,7 @@ impl Backend for Sftp {
                     FileAttributes::default(),
                 )
                 .await
-                .map_err(err)?
+                .map_err(sftp_error)?
                 .handle;
             let result = async {
                 let mut offset = 0;
@@ -403,13 +531,13 @@ impl Backend for Sftp {
                     self.session
                         .write(&handle, offset, bytes[..n].to_vec())
                         .await
-                        .map_err(err)?;
+                        .map_err(sftp_error)?;
                     offset += n as u64;
                 }
                 Ok(offset)
             }
             .await;
-            let closed = self.session.close(handle).await.map_err(err);
+            let closed = self.session.close(handle).await.map_err(sftp_error);
             match result {
                 Ok(n) => {
                     closed?;
@@ -436,7 +564,7 @@ impl Backend for Sftp {
         match self
             .runtime
             .block_on(self.session.extended("posix-rename@openssh.com", data))
-            .map_err(err)?
+            .map_err(sftp_error)?
         {
             russh_sftp::protocol::Packet::Status(status)
                 if status.status_code == StatusCode::Ok =>
@@ -456,7 +584,7 @@ impl Backend for Sftp {
                 },
             ))
             .map(|_| ())
-            .map_err(err)
+            .map_err(sftp_error)
     }
     fn remove(&mut self, path: &RemotePath, directory: bool) -> io::Result<()> {
         self.runtime
@@ -468,13 +596,13 @@ impl Backend for Sftp {
                 }
             })
             .map(|_| ())
-            .map_err(err)
+            .map_err(sftp_error)
     }
     fn rename(&mut self, from: &RemotePath, to: &RemotePath) -> io::Result<()> {
         self.runtime
             .block_on(self.session.rename(from.as_str(), to.as_str()))
             .map(|_| ())
-            .map_err(err)
+            .map_err(sftp_error)
     }
 }
 struct Ftp<T: suppaftp::TlsStream> {
@@ -489,10 +617,10 @@ impl<T: suppaftp::TlsStream + Send> Backend for Ftp<T> {
                 format!("MLSD {}", path.as_str()),
                 &[suppaftp::Status::AboutToSend, suppaftp::Status::AlreadyOpen],
             )
-            .map_err(err)?;
+            .map_err(ftp_error)?;
         let mut bytes = Vec::new();
-        let result = copy_bounded(&mut stream, &mut bytes, cancel, LIST_BYTES);
-        let finished = stream.finish().map_err(err);
+        let result = copy_bounded(&mut Wire(&mut stream), &mut bytes, cancel, LIST_BYTES);
+        let finished = stream.finish().map_err(ftp_error);
         result?;
         finished?;
         let text = std::str::from_utf8(&bytes).map_err(err)?;
@@ -524,9 +652,9 @@ impl<T: suppaftp::TlsStream + Send> Backend for Ftp<T> {
         cancel: &Cancellation,
         limit: u64,
     ) -> io::Result<u64> {
-        let mut stream = self.ftp.retr_as_stream(path.as_str()).map_err(err)?;
-        let result = copy_bounded(&mut stream, writer, cancel, limit);
-        let finished = stream.finish().map_err(err);
+        let mut stream = self.ftp.retr_as_stream(path.as_str()).map_err(ftp_error)?;
+        let result = copy_bounded(&mut Wire(&mut stream), writer, cancel, limit);
+        let finished = stream.finish().map_err(ftp_error);
         let n = result?;
         finished?;
         Ok(n)
@@ -540,15 +668,20 @@ impl<T: suppaftp::TlsStream + Send> Backend for Ftp<T> {
         if !self.reserved.contains(&path.parent()) {
             return Err(err("FTP uploads require an owned staging directory"));
         }
-        let mut stream = self.ftp.put_with_stream(path.as_str()).map_err(err)?;
-        let result = copy_bounded(reader, &mut stream, cancel, 64 * 1024 * 1024 * 1024);
-        let finished = stream.finish().map_err(err);
+        let mut stream = self.ftp.put_with_stream(path.as_str()).map_err(ftp_error)?;
+        let result = copy_bounded(
+            reader,
+            &mut Wire(&mut stream),
+            cancel,
+            64 * 1024 * 1024 * 1024,
+        );
+        let finished = stream.finish().map_err(ftp_error);
         let n = result?;
         finished?;
         Ok(n)
     }
     fn mkdir(&mut self, path: &RemotePath) -> io::Result<()> {
-        self.ftp.mkdir(path.as_str()).map_err(err)?;
+        self.ftp.mkdir(path.as_str()).map_err(ftp_error)?;
         self.reserved.insert(path.clone());
         Ok(())
     }
@@ -561,14 +694,16 @@ impl<T: suppaftp::TlsStream + Send> Backend for Ftp<T> {
         } else {
             self.ftp.rm(path.as_str())
         }
-        .map_err(err)?;
+        .map_err(ftp_error)?;
         if directory {
             self.reserved.remove(path);
         }
         Ok(())
     }
     fn rename(&mut self, from: &RemotePath, to: &RemotePath) -> io::Result<()> {
-        self.ftp.rename(from.as_str(), to.as_str()).map_err(err)
+        self.ftp
+            .rename(from.as_str(), to.as_str())
+            .map_err(ftp_error)
     }
 }
 pub fn copy_bounded(
@@ -597,10 +732,38 @@ pub fn copy_bounded(
         writer.write_all(&chunk[..n])?;
     }
 }
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum ConnectPhase {
+    #[default]
+    Connecting,
+    Resolving,
+    Authenticating,
+    Securing,
+    OpeningSftp,
+}
+impl ConnectPhase {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Connecting => "Connecting to server…",
+            Self::Resolving => "Resolving server address…",
+            Self::Authenticating => "Authenticating…",
+            Self::Securing => "Validating TLS connection…",
+            Self::OpeningSftp => "Opening SFTP session…",
+        }
+    }
+}
 pub fn connect(
     credentials: Credentials,
     cancel: &Cancellation,
 ) -> Result<Arc<Connection>, ConnectError> {
+    connect_progress(credentials, cancel, &mut |_| {})
+}
+pub(crate) fn connect_progress(
+    credentials: Credentials,
+    cancel: &Cancellation,
+    progress: &mut impl FnMut(ConnectPhase),
+) -> Result<Arc<Connection>, ConnectError> {
+    progress(ConnectPhase::Connecting);
     credentials.profile.validate()?;
     cancel.check()?;
     let profile = credentials.profile;
@@ -612,69 +775,77 @@ pub fn connect(
             let observed = Arc::new(Mutex::new(None));
             let seen = observed.clone();
             let result = runtime.block_on(async {
-                let handler = HostKey {
-                    expected: profile.fingerprint.clone(),
-                    observed: seen,
-                };
-                let config = russh::client::Config {
-                    inactivity_timeout: Some(Duration::from_secs(60)),
-                    ..Default::default()
-                };
-                let mut ssh = tokio::time::timeout(
-                    TIMEOUT,
-                    russh::client::connect(
-                        Arc::new(config),
-                        (profile.host.as_str(), profile.port),
-                        handler,
-                    ),
-                )
-                .await
-                .map_err(err)?
-                .map_err(err)?;
-                cancel.check()?;
-                let auth = if let Some(path) = &profile.key {
-                    let file = crate::filesystem::open_regular(path)?;
-                    let mut text = zeroize::Zeroizing::new(String::new());
-                    file.take(1024 * 1024 + 1).read_to_string(&mut text)?;
-                    if text.len() > 1024 * 1024 {
-                        return Err(err("SSH key exceeds 1 MiB"));
-                    }
-                    let key = russh::keys::decode_secret_key(
-                        &text,
-                        (!credentials.password.is_empty()).then_some(credentials.password.as_str()),
-                    )
-                    .map_err(err)?;
-                    let hash = ssh.best_supported_rsa_hash().await.map_err(err)?.flatten();
-                    ssh.authenticate_publickey(
-                        &profile.user,
-                        russh::keys::PrivateKeyWithHashAlg::new(Arc::new(key), hash),
+                tokio::time::timeout(Duration::from_secs(45), async {
+                    let handler = HostKey {
+                        expected: profile.fingerprint.clone(),
+                        observed: seen,
+                    };
+                    let config = russh::client::Config {
+                        inactivity_timeout: None,
+                        ..Default::default()
+                    };
+                    let mut ssh = tokio::time::timeout(
+                        TIMEOUT,
+                        russh::client::connect(
+                            Arc::new(config),
+                            (profile.host.as_str(), profile.port),
+                            handler,
+                        ),
                     )
                     .await
                     .map_err(err)?
-                } else {
-                    ssh.authenticate_password(&profile.user, credentials.password.as_str())
+                    .map_err(err)?;
+                    cancel.check()?;
+                    progress(ConnectPhase::Authenticating);
+                    let auth = if let Some(path) = &profile.key {
+                        let file = crate::filesystem::open_regular(path)?;
+                        let mut text = zeroize::Zeroizing::new(String::new());
+                        file.take(1024 * 1024 + 1).read_to_string(&mut text)?;
+                        if text.len() > 1024 * 1024 {
+                            return Err(err("SSH key exceeds 1 MiB"));
+                        }
+                        let key = russh::keys::decode_secret_key(
+                            &text,
+                            (!credentials.password.is_empty())
+                                .then_some(credentials.password.as_str()),
+                        )
+                        .map_err(err)?;
+                        let hash = ssh.best_supported_rsa_hash().await.map_err(err)?.flatten();
+                        ssh.authenticate_publickey(
+                            &profile.user,
+                            russh::keys::PrivateKeyWithHashAlg::new(Arc::new(key), hash),
+                        )
                         .await
                         .map_err(err)?
-                };
-                if !auth.success() {
-                    return Err(io::Error::new(
-                        io::ErrorKind::PermissionDenied,
-                        "SSH authentication failed",
-                    ));
-                }
-                let channel = ssh.channel_open_session().await.map_err(err)?;
-                channel.request_subsystem(true, "sftp").await.map_err(err)?;
-                let sftp = RawSftpSession::new_with_config(
-                    channel.into_stream(),
-                    russh_sftp::client::Config {
-                        max_concurrent_reads: 1,
-                        max_concurrent_writes: 1,
-                        ..Default::default()
-                    },
-                );
-                let version = sftp.init().await.map_err(err)?;
-                let atomic_replace = version.extensions.contains_key("posix-rename@openssh.com");
-                Ok((ssh, sftp, atomic_replace))
+                    } else {
+                        ssh.authenticate_password(&profile.user, credentials.password.as_str())
+                            .await
+                            .map_err(err)?
+                    };
+                    if !auth.success() {
+                        return Err(io::Error::new(
+                            io::ErrorKind::PermissionDenied,
+                            "SSH authentication failed",
+                        ));
+                    }
+                    progress(ConnectPhase::OpeningSftp);
+                    let channel = ssh.channel_open_session().await.map_err(err)?;
+                    channel.request_subsystem(true, "sftp").await.map_err(err)?;
+                    let sftp = RawSftpSession::new_with_config(
+                        channel.into_stream(),
+                        russh_sftp::client::Config {
+                            max_concurrent_reads: 1,
+                            max_concurrent_writes: 1,
+                            ..Default::default()
+                        },
+                    );
+                    let version = sftp.init().await.map_err(err)?;
+                    let atomic_replace =
+                        version.extensions.contains_key("posix-rename@openssh.com");
+                    Ok((ssh, sftp, atomic_replace))
+                })
+                .await
+                .map_err(|e| io::Error::new(io::ErrorKind::TimedOut, e))?
             });
             match result {
                 Ok((ssh, session, atomic_replace)) => Box::new(Sftp {
@@ -700,10 +871,12 @@ pub fn connect(
             }
         }
         protocol => {
+            progress(ConnectPhase::Resolving);
             let addr = (profile.host.as_str(), profile.port)
                 .to_socket_addrs()?
                 .next()
                 .ok_or_else(|| err("Host has no address"))?;
+            progress(ConnectPhase::Connecting);
             let socket = TcpStream::connect_timeout(&addr, TIMEOUT)?;
             socket.set_read_timeout(Some(TIMEOUT))?;
             socket.set_write_timeout(Some(TIMEOUT))?;
@@ -719,6 +892,7 @@ pub fn connect(
                     Ok(s)
                 });
             let mut ftp = if protocol == Protocol::Ftps {
+                progress(ConnectPhase::Securing);
                 let roots = rustls::RootCertStore::from_iter(
                     webpki_roots::TLS_SERVER_ROOTS.iter().cloned(),
                 );
@@ -739,6 +913,7 @@ pub fn connect(
             };
             ftp.set_passive_nat_workaround(true);
             cancel.check()?;
+            progress(ConnectPhase::Authenticating);
             ftp.login(profile.user.as_str(), credentials.password.as_str())
                 .map_err(err)?;
             ftp.transfer_type(suppaftp::types::FileType::Binary)
@@ -752,6 +927,7 @@ pub fn connect(
     Ok(Arc::new(Connection {
         profile,
         backend: Mutex::new(backend),
+        status: Mutex::new(Default::default()),
     }))
 }
 
@@ -761,6 +937,7 @@ impl Connection {
         Arc::new(Self {
             profile,
             backend: Mutex::new(Box::new(backend)),
+            status: Mutex::new(Default::default()),
         })
     }
 }

@@ -13,7 +13,11 @@ mod modals;
 mod polling;
 
 pub struct App {
+    pub(crate) dos: crate::dos::State,
+    pub(crate) video: crate::video::State,
+    pub(crate) acoustic: crate::acoustic::State,
     pub(crate) peer: crate::peer::State,
+    pub(crate) bluetooth: crate::bluetooth::State,
     pub(crate) session: crate::session::Runtime,
     #[cfg(target_os = "linux")]
     pub(crate) console_mouse: crate::terminal::gpm::Snapshot,
@@ -73,7 +77,11 @@ impl App {
     pub fn new(path: PathBuf) -> io::Result<Self> {
         let config = Config::default();
         let mut app = Self {
+            dos: Default::default(),
+            video: Default::default(),
+            acoustic: Default::default(),
             peer: Default::default(),
+            bluetooth: Default::default(),
             #[cfg(target_os = "linux")]
             console_mouse: Default::default(),
             session: Default::default(),

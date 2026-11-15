@@ -482,7 +482,12 @@ fn close(app: &mut App, surface: Surface) {
                 Some(WindowKind::Viewer) => {
                     crate::viewer::action(app, crate::viewer::Action::Close)
                 }
-                Some(WindowKind::Plugin(_) | WindowKind::Tool(_)) => {
+                Some(WindowKind::Plugin(_)) => {
+                    if !crate::plugins::host::request_close(app, id) {
+                        app.retire_document(id);
+                    }
+                }
+                Some(WindowKind::Tool(_)) => {
                     app.retire_document(id);
                 }
                 _ => {}

@@ -42,6 +42,22 @@ fn records(config: &Config) -> Vec<(&'static str, String, Value)> {
         "default_volume",
         i64::from(config.mp3.default_volume)
     );
+    add!(
+        "plugins.dos_launcher",
+        "open_on_enter",
+        config.dos.open_on_enter
+    );
+    add!(
+        "plugins.dos_launcher",
+        "executable",
+        config.dos.executable.clone()
+    );
+    add!("plugins.video_merge", "ffmpeg", config.video.ffmpeg.clone());
+    add!(
+        "plugins.video_merge",
+        "ffprobe",
+        config.video.ffprobe.clone()
+    );
     add!("application", "shortcuts", config.shortcuts.key());
     add!("interface", "palette", config.palette.key());
     add!("regional", "language", config.language.key());
@@ -126,6 +142,17 @@ fn checked(group: &str, key: &str, value: &Value, default: &Value) -> io::Result
     {
         return Err(invalid("Invalid MP3 default volume"));
     }
+    if (group, key) == ("plugins.dos_launcher", "executable")
+        && (text.len() > 4096 || text.chars().any(char::is_control))
+    {
+        return Err(invalid("Invalid DOSBox executable path"));
+    }
+    if group == "plugins.video_merge"
+        && matches!(key, "ffmpeg" | "ffprobe")
+        && (text.len() > 4096 || text.chars().any(char::is_control))
+    {
+        return Err(invalid("Invalid video executable path"));
+    }
     if text.contains(['\n', '\r'])
         || allowed.is_some_and(|values| !values.contains(&text.as_str()))
         || (group, key) == ("editor", "tab_size")
@@ -159,6 +186,23 @@ fn assign(config: &mut Config, group: &str, key: &str, text: &str) -> io::Result
     }
     let index = usize::from(group == "panels.right");
     match (group, key) {
+        ("plugins.video_merge", key @ ("ffmpeg" | "ffprobe")) => {
+            if text.len() > 4096 || text.chars().any(char::is_control) {
+                return Err(invalid("Invalid video executable path"));
+            }
+            if key == "ffmpeg" {
+                config.video.ffmpeg = text.to_owned();
+            } else {
+                config.video.ffprobe = text.to_owned();
+            }
+        }
+        ("plugins.dos_launcher", "open_on_enter") => config.dos.open_on_enter = text == "true",
+        ("plugins.dos_launcher", "executable") => {
+            if text.len() > 4096 || text.chars().any(char::is_control) {
+                return Err(invalid("Invalid DOSBox executable path"));
+            }
+            config.dos.executable = text.to_owned();
+        }
         ("plugins.mp3_player", "play_on_enter") => config.mp3.play_on_enter = text == "true",
         ("plugins.mp3_player", "seek_seconds") => {
             config.mp3.seek_seconds = text.parse().map_err(|_| invalid("Invalid MP3 seek step"))?

@@ -1,0 +1,16 @@
+English/ClassicDn/ClassicDn/80x25/4: 55041a3d208a4ea0
+English/ClassicDn/ClassicDn/132x40/4: 4d2f6792b5b744f6
+English/ClassicDn/Mac/80x25/4: b468e7714c8cf2c4
+English/ClassicDn/Mac/132x40/4: 527cbf9f3d74dd62
+English/Terminal/ClassicDn/80x25/4: acdd18c2736bc0d9
+English/Terminal/ClassicDn/132x40/4: bc2d20d7ea5d5b3d
+English/Terminal/Mac/80x25/4: 480010d4bb852ba1
+English/Terminal/Mac/132x40/4: 6e0806c90ea32359
+Russian/ClassicDn/ClassicDn/80x25/4: 371dd5f51df4688d
+Russian/ClassicDn/ClassicDn/132x40/4: d109b523f3089bb3
+Russian/ClassicDn/Mac/80x25/4: cb84b0abb8bb7b95
+Russian/ClassicDn/Mac/132x40/4: 05c481ccfae2ecb3
+Russian/Terminal/ClassicDn/80x25/4: 6fd1018929e467a6
+Russian/Terminal/ClassicDn/132x40/4: 8fa35e526ca12d86
+Russian/Terminal/Mac/80x25/4: f8928f4396ae5658
+Russian/Terminal/Mac/132x40/4: c8994948c6298dac

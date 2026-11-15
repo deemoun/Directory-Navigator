@@ -809,6 +809,11 @@ mod tests {
             now: Instant::now(),
             storage: None,
             mp3: Default::default(),
+            dos: Default::default(),
+            video: Default::default(),
+            video_preferences: Default::default(),
+            acoustic: Default::default(),
+            bluetooth: Default::default(),
             nearby: Default::default(),
         }
     }

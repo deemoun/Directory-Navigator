@@ -237,7 +237,7 @@ fn handle_key(app: &mut App, key: KeyEvent) {
         && app.panels[app.active].is_remote()
         && app.panels[app.active].loading
     {
-        app.panels[app.active].leave_remote(app.config.show_hidden);
+        app.panels[app.active].remote_cancel();
         return;
     }
     if focus == Focus::Manager && key.code == KeyCode::Esc && app.panels[app.active].is_archive() {

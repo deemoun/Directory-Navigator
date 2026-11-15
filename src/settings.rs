@@ -70,6 +70,9 @@ impl Settings {
             if *id == crate::plugins::MP3_PLAYER {
                 rows.push(self.plugins.len());
             }
+            if *id == crate::plugins::DOS_LAUNCHER {
+                rows.push(self.plugins.len() + 1);
+            }
         }
         rows
     }
@@ -129,7 +132,16 @@ impl Settings {
                 self.cursor = index;
                 self.draft.mp3.play_on_enter = !self.draft.mp3.play_on_enter;
             }
+            if index == self.plugins.len() + 1
+                && self.draft.plugin_enabled(crate::plugins::DOS_LAUNCHER)
+            {
+                self.cursor = index;
+                self.draft.dos.open_on_enter = !self.draft.dos.open_on_enter;
+            }
             if let Some((id, _)) = self.plugins.get(index) {
+                if *id == crate::plugins::ACOUSTIC_TRANSFERS && !crate::acoustic::available() {
+                    return;
+                }
                 self.cursor = index;
                 self.draft
                     .set_plugin_enabled(*id, !self.draft.plugin_enabled(*id));

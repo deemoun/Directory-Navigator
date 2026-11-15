@@ -181,13 +181,31 @@ fn space_line(space: Space, language: Language, normal: u8, numbers: u8, compact
     ])
 }
 pub fn space(panel: &Panel, config: &Config, width: u16) -> Line {
-    if panel.is_remote() {
+    if let Some(r) = panel.remote() {
+        use crate::network::status::{Phase, Problem};
+        let label = if panel.loading {
+            "Loading remote directory…"
+        } else if r.status.phase == Phase::Disconnected {
+            "Disconnected · Panel → Reconnect"
+        } else if r.status.phase == Phase::Busy {
+            "Remote connection busy"
+        } else {
+            match r.issue.as_ref().map(|i| i.problem) {
+                Some(Problem::Permission) => "Access denied · view retained",
+                Some(Problem::Missing) => "Directory missing · view retained",
+                Some(Problem::Cancelled) => "Cancelled · view retained",
+                Some(Problem::Busy) => "Remote connection busy",
+                Some(_) => "Remote error · view retained",
+                None => "Connected · F3 view · F4 edit · F5 copy",
+            }
+        };
         return Line::from(Span::styled(
-            config
-                .language
-                .text("Remote pane · F3 view · F4 edit · F5 copy · Ctrl+PgUp disconnect")
-                .to_owned(),
-            0x87,
+            config.language.text(label),
+            if r.status.phase == Phase::Disconnected {
+                0x8e
+            } else {
+                0x87
+            },
         ));
     }
     let language = config.language;

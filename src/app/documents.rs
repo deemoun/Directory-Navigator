@@ -82,12 +82,15 @@ impl App {
     }
 
     pub fn open_current(&mut self) {
-        self.open_current_with(true);
+        self.open_current_with(true, true);
     }
     pub fn open_external_current(&mut self) {
-        self.open_current_with(false);
+        self.open_current_with(false, false);
     }
-    fn open_current_with(&mut self, browse: bool) {
+    pub(crate) fn open_current_after_dos(&mut self) {
+        self.open_current_with(true, false);
+    }
+    fn open_current_with(&mut self, browse: bool, dos: bool) {
         if self.panels[self.active].is_remote() {
             if !browse {
                 self.error(crate::network::NATIVE_REQUIRED);
@@ -144,6 +147,9 @@ impl App {
                     && (crate::plugins::host::open_apk(self, path.clone())
                         || crate::plugins::host::play_mp3(self, path.clone()))
                 {
+                    return;
+                }
+                if dos && crate::dos::open(self, path.clone(), true) {
                     return;
                 }
                 if crate::associations::open(self, path) {
