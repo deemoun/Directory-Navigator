@@ -50,12 +50,29 @@ fn wait_for<R: Read>(
     needle: &[u8],
     stage: &str,
     timeout: Duration,
+    child_status: impl FnMut() -> io::Result<Option<String>>,
+) -> io::Result<()> {
+    wait_for_condition(
+        master,
+        output,
+        stage,
+        timeout,
+        |output| Ok(output.windows(needle.len()).any(|w| w == needle)),
+        child_status,
+    )
+}
+fn wait_for_condition<R: Read>(
+    master: &mut R,
+    output: &mut Vec<u8>,
+    stage: &str,
+    timeout: Duration,
+    mut ready: impl FnMut(&[u8]) -> io::Result<bool>,
     mut child_status: impl FnMut() -> io::Result<Option<String>>,
 ) -> io::Result<()> {
     let deadline = Instant::now() + timeout;
     let mut exited = None;
     loop {
-        if output.windows(needle.len()).any(|w| w == needle) {
+        if ready(output)? {
             return Ok(());
         }
         if Instant::now() >= deadline {
@@ -137,6 +154,32 @@ fn until(
     )
 }
 
+fn manager_ready(output: &[u8], diagnostics: &str) -> bool {
+    output.windows(4).any(|w| w == b"Quit")
+        && diagnostics.lines().next().is_some_and(|line| {
+            line.contains("kind: Manager")
+                && line.contains("focus=Manager")
+                && line.ends_with("viewport=(170, 54)")
+        })
+        && diagnostics
+            .lines()
+            .any(|line| line == "panels_loading=[false, false]")
+        && diagnostics.lines().any(|line| line == "modals=[]")
+        && diagnostics
+            .lines()
+            .any(|line| line.starts_with("input_events="))
+}
+fn diagnostic_error(error: io::Error, path: &std::path::Path) -> io::Error {
+    let state = fs::read_to_string(path).unwrap_or_default();
+    io::Error::new(
+        error.kind(),
+        format!(
+            "{error}\napplication diagnostics:\n{}",
+            state.chars().take(8192).collect::<String>()
+        ),
+    )
+}
+
 #[test]
 fn delayed_fragmented_mouse_release_does_not_leak_to_shell() -> io::Result<()> {
     static NEXT: AtomicU64 = AtomicU64::new(0);
@@ -197,9 +240,12 @@ fn delayed_fragmented_mouse_release_does_not_leak_to_shell() -> io::Result<()> {
                 return Err(io::Error::last_os_error());
             }
         }
+        let diagnostics = directory.join("config/dn/diagnostics.txt");
+        let binary =
+            std::env::var_os("DN_WALK_BINARY").unwrap_or_else(|| env!("CARGO_BIN_EXE_dn").into());
         let mut command = Command::new("/bin/sh");
-        command.args(["-c", "\"$1\"; dn_status=$?; printf '\\nDN_STATUS:%s\\n' \"$dn_status\"; [ \"$dn_status\" -eq 0 ] || exit \"$dn_status\"; printf 'DN_EXIT_READY\\n'; IFS= read -r reply || exit 90; printf 'DN_INPUT:%s\\n' \"$reply\"", "dn-test", env!("CARGO_BIN_EXE_dn")])
-            .current_dir(&directory).env("TERM","xterm-256color").env("XDG_CONFIG_HOME",directory.join("config"))
+        command.args(["-c", "\"$1\"; dn_status=$?; printf '\\nDN_STATUS:%s\\n' \"$dn_status\"; [ \"$dn_status\" -eq 0 ] || exit \"$dn_status\"; printf 'DN_EXIT_READY\\n'; IFS= read -r reply || exit 90; printf 'DN_INPUT:%s\\n' \"$reply\"", "dn-test"]).arg(binary)
+            .current_dir(&directory).env("TERM","xterm-256color").env("XDG_CONFIG_HOME",directory.join("config")).env("DN_TEST_DIAGNOSTICS", &diagnostics)
             .stdin(Stdio::from(slave.try_clone()?)).stdout(Stdio::from(slave.try_clone()?)).stderr(Stdio::from(slave.try_clone()?));
         // SAFETY: only async-signal-safe session/terminal calls run between fork and exec.
         unsafe {
@@ -218,13 +264,18 @@ fn delayed_fragmented_mouse_release_does_not_leak_to_shell() -> io::Result<()> {
             None if mouse => "mouse exit (incomplete release)".to_owned(),
             None => "keyboard exit".to_owned(),
         };
-        until(
+        wait_for_condition(
             &mut master,
             &mut output,
-            b"Quit",
             &format!("{scenario}: manager ready"),
-            &mut fixture.child,
-        )?;
+            Duration::from_secs(10),
+            |output| {
+                let state = fs::read_to_string(&diagnostics).unwrap_or_default();
+                Ok(manager_ready(output, &state))
+            },
+            || fixture.child.try_wait().map(|s| s.map(|s| s.to_string())),
+        )
+        .map_err(|e| diagnostic_error(e, &diagnostics))?;
         if mouse {
             master.write_all(b"\x1b[<0;168;54M")?;
             if let Some(delay) = release_delay {
@@ -245,7 +296,8 @@ fn delayed_fragmented_mouse_release_does_not_leak_to_shell() -> io::Result<()> {
             b"DN_EXIT_READY",
             &format!("{scenario}: shell handoff"),
             &mut fixture.child,
-        )?;
+        )
+        .map_err(|e| diagnostic_error(e, &diagnostics))?;
         assert!(output
             .windows(b"DN_STATUS:0".len())
             .any(|w| w == b"DN_STATUS:0"));
@@ -295,6 +347,22 @@ mod waiting_tests {
                 Err(error) => Err(error),
             }
         }
+    }
+
+    #[test]
+    fn quit_text_requires_a_committed_settled_manager_frame() {
+        let ready = "active=WindowInfo { id: WindowId(0), kind: Manager } focus=Manager layout_revision=1 viewport=(170, 54)\npanels_loading=[false, false]\nmodals=[]\ninput_events=0\n";
+        assert!(!manager_ready(b"Quit", ""));
+        assert!(!manager_ready(
+            b"Quit",
+            &ready.replace("false, false", "true, false")
+        ));
+        assert!(!manager_ready(
+            b"Quit",
+            &ready.replace("input_events=0\n", "")
+        ));
+        assert!(!manager_ready(b"partial frame", ready));
+        assert!(manager_ready(b"F10 Quit", ready));
     }
 
     #[test]

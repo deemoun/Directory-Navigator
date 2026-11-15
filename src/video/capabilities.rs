@@ -172,7 +172,10 @@ mod tests {
     use super::*;
     #[test]
     fn cache_is_bound_to_both_native_tool_identities_and_explicit_paths() -> io::Result<()> {
-        let path = std::env::current_exe()?;
+        let requested = std::env::current_exe()?;
+        // Production discovery stores canonical native paths (including the
+        // Windows verbatim prefix). Seed the cache in that same representation.
+        let path = fs::canonicalize(&requested)?;
         let metadata = fs::metadata(&path)?;
         let stamp = (
             crate::platform_fs::entry_identity(&path)?,
@@ -188,16 +191,29 @@ mod tests {
             }],
         };
         let p = Preferences {
-            ffmpeg: path.to_string_lossy().into(),
-            ffprobe: path.to_string_lossy().into(),
+            ffmpeg: requested.to_string_lossy().into(),
+            ffprobe: requested.to_string_lossy().into(),
         };
         let result = discover(&p, Some(&cached), &AtomicBool::new(false))?;
         // Running this test executable with -version would fail. A cache hit
         // performs no subprocess work and retains the verified result.
         assert_eq!(result.encoders[0].name, "libx264");
-        let mut changed = cached.clone();
-        changed.stamps[0].1 += 1;
-        assert_ne!(result.stamps, changed.stamps);
+        assert_eq!(result.tools, (path.clone(), path.clone()));
+        assert!(result.unchanged());
+        // Both requested and canonical explicit spellings must hit the cache.
+        let normalized = Preferences {
+            ffmpeg: path.to_string_lossy().into(),
+            ffprobe: path.to_string_lossy().into(),
+        };
+        assert_eq!(
+            discover(&normalized, Some(&cached), &AtomicBool::new(false))?.tools,
+            result.tools
+        );
+        for index in 0..2 {
+            let mut changed = cached.clone();
+            changed.stamps[index].1 += 1;
+            assert!(!changed.unchanged(), "Both tool stamps must be checked");
+        }
         assert!(!Encoder {
             name: "h264_videotoolbox".into(),
             reason: "Access denied".into()
