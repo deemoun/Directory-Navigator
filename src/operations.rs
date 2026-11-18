@@ -125,6 +125,7 @@ pub enum Phase {
     Preparing,
     Calculating,
     WaitingPeer,
+    WaitingBluetooth,
     #[default]
     Copying,
     Verifying,
@@ -137,6 +138,7 @@ impl Phase {
             Self::Preparing => "Preparing",
             Self::Calculating => "Calculating totals",
             Self::WaitingPeer => "Awaiting peer approval",
+            Self::WaitingBluetooth => "Awaiting Bluetooth peer",
             Self::Copying => "Copying",
             Self::Verifying => "Verifying",
             Self::Renaming => "Renaming",

@@ -41,140 +41,152 @@ fn run() -> io::Result<()> {
         Err(e) => app.error(format!("Editor recovery unavailable: {e}")),
     }
     let (session, mut terminal) = Session::start()?;
-    terminal.bind_desktop(app.desktop.native());
-    let mut dirty = true;
-    let mut showing_output = false;
-    let mut exit_settings_saved = false;
-    loop {
-        #[cfg(target_os = "linux")]
-        {
-            dirty |= session.sync_console(&mut app);
-        }
-        dirty |= app.poll();
-        if app.output_visible != showing_output {
-            if app.output_visible {
-                session.reveal_output()?;
-            } else {
-                session.resume(&mut terminal)?;
-                dirty = true;
-            }
-            showing_output = app.output_visible;
-        }
-        app.desktop
-            .native()
-            .set_scope(dn::turbo::desktop::Scope::for_app(&app));
-        if dirty && !showing_output {
-            session.cursor_style(dn::focus::current(&app) == dn::focus::Focus::Manager)?;
-            terminal.draw_app(&mut app)?;
-
-            dirty = false;
-        }
-        diagnostics.snapshot(&app);
-        if !app.quit {
-            exit_settings_saved = false;
-        }
-        if app.quit {
-            if !exit_settings_saved {
-                exit_settings_saved = app.save_settings_on_exit();
-            }
-            if exit_settings_saved && dn::editor::recovery::finish(&mut app) {
-                break;
-            }
-            dirty = true;
-            continue;
-        }
-        let pending = if showing_output {
-            None
-        } else {
-            app.user_menu
-                .pending
-                .take()
-                .or_else(|| app.associations.pending.take())
-                .or_else(|| app.command_line.pending.take())
-        };
-        if let Some(plan) = pending {
-            dn::editor::recovery::checkpoint_now(&mut app);
-            session.suspend();
-            let result = dn::user_menu::runner::run(&plan);
-            match &result {
-                Ok(status) => println!("\nCommand finished: {status}"),
-                Err(e) => println!("\nCannot run command: {e}"),
-            }
-            session.prepare_output_input()?;
-            println!("Press Enter to return to DN. Esc / Ctrl+O also return.\r");
-            app.output_visible = true;
-            showing_output = true;
-            app.screensaver.activity(std::time::Instant::now());
-            app.refresh();
-            if let Err(e) = result {
-                app.error(e.to_string());
-            }
-            dirty = true;
-            continue;
-        }
-        let timeout = app.wait_duration(std::time::Instant::now());
-        let event = session.poll(&mut terminal, timeout)?;
-        #[cfg(target_os = "linux")]
-        {
-            dirty |= session.sync_console(&mut app);
-        }
-        if let Some(event) = event {
-            diagnostics.event(&event);
-            if matches!(&event, Event::Key(_) | Event::Paste(_))
-                || matches!(&event,Event::Mouse(e) if matches!(e.kind,MouseEventKind::Down(_)|MouseEventKind::ScrollUp|MouseEventKind::ScrollDown))
+    let result = (|| -> io::Result<()> {
+        terminal.bind_desktop(app.desktop.native());
+        let mut dirty = true;
+        let mut showing_output = false;
+        let mut exit_settings_saved = false;
+        loop {
+            #[cfg(target_os = "linux")]
             {
-                dn::session::user_interaction(&mut app);
+                dirty |= session.sync_console(&mut app);
             }
-            if showing_output {
-                dn::terminal_output::event(&mut app, &event);
-                continue;
+            dirty |= app.poll();
+            if app.output_visible != showing_output {
+                if app.output_visible {
+                    session.reveal_output()?;
+                } else {
+                    session.resume(&mut terminal)?;
+                    dirty = true;
+                }
+                showing_output = app.output_visible;
             }
-            if dn::screensaver::event(&mut app, &event, std::time::Instant::now()) {
+            app.desktop
+                .native()
+                .set_scope(dn::turbo::desktop::Scope::for_app(&app));
+            if dirty && !showing_output {
+                session.cursor_style(dn::focus::current(&app) == dn::focus::Focus::Manager)?;
+                terminal.draw_app(&mut app)?;
+
+                dirty = false;
+            }
+            diagnostics.snapshot(&app);
+            if !app.quit {
+                exit_settings_saved = false;
+            }
+            if app.quit {
+                if !exit_settings_saved {
+                    exit_settings_saved = app.save_settings_on_exit();
+                }
+                if exit_settings_saved && dn::editor::recovery::finish(&mut app) {
+                    break;
+                }
                 dirty = true;
                 continue;
             }
-            if let Event::Mouse(mouse) = &event {
-                session.mouse_event(mouse.kind);
-            }
-            if app.desktop.native().dispatch().is_none_or(|receipt| {
-                receipt.window != app.desktop.active()
-                    || receipt.scope != dn::turbo::desktop::Scope::for_app(&app)
-            }) {
+            let pending = if showing_output {
+                None
+            } else {
+                app.user_menu
+                    .pending
+                    .take()
+                    .or_else(|| app.associations.pending.take())
+                    .or_else(|| app.command_line.pending.take())
+            };
+            if let Some(plan) = pending {
+                dn::editor::recovery::checkpoint_now(&mut app);
+                session.suspend();
+                let result = dn::user_menu::runner::run(&plan);
+                match &result {
+                    Ok(status) => println!("\nCommand finished: {status}"),
+                    Err(e) => println!("\nCannot run command: {e}"),
+                }
+                session.prepare_output_input()?;
+                println!("Press Enter to return to DN. Esc / Ctrl+O also return.\r");
+                app.output_visible = true;
+                showing_output = true;
+                app.screensaver.activity(std::time::Instant::now());
+                app.refresh();
+                if let Err(e) = result {
+                    app.error(e.to_string());
+                }
+                dirty = true;
                 continue;
             }
-            match event {
-                Event::Key(key) => {
-                    input::handle_ui(&mut app, key);
-                    dirty = true;
-                }
-                Event::Resize(_, _) => {
-                    input::cancel_feedback(&mut app);
-                    app.shortcuts.clear();
-                    app.mouse.scrollbar_drag = None;
-                    dirty = true;
-                }
-                Event::Paste(text) => {
-                    input::paste(&mut app, &text);
-                    dirty = true;
-                }
-                Event::Mouse(event)
-                    if matches!(
-                        event.kind,
-                        MouseEventKind::Down(_)
-                            | MouseEventKind::Drag(crossterm::event::MouseButton::Left)
-                            | MouseEventKind::Up(crossterm::event::MouseButton::Left)
-                            | MouseEventKind::ScrollUp
-                            | MouseEventKind::ScrollDown
-                    ) =>
-                {
-                    mouse::handle_ui(&mut app, event);
-                    dirty = true;
-                }
-                _ => {}
+            let timeout = app.wait_duration(std::time::Instant::now());
+            let event = session.poll(&mut terminal, timeout)?;
+            #[cfg(target_os = "linux")]
+            {
+                dirty |= session.sync_console(&mut app);
             }
+            if let Some(event) = event {
+                diagnostics.event(&event);
+                if matches!(&event, Event::Key(_) | Event::Paste(_))
+                    || matches!(&event,Event::Mouse(e) if matches!(e.kind,MouseEventKind::Down(_)|MouseEventKind::ScrollUp|MouseEventKind::ScrollDown))
+                {
+                    dn::session::user_interaction(&mut app);
+                }
+                if showing_output {
+                    dn::terminal_output::event(&mut app, &event);
+                    continue;
+                }
+                if dn::screensaver::event(&mut app, &event, std::time::Instant::now()) {
+                    dirty = true;
+                    continue;
+                }
+                if let Event::Mouse(mouse) = &event {
+                    session.mouse_event(mouse.kind);
+                }
+                if app.desktop.native().dispatch().is_none_or(|receipt| {
+                    receipt.window != app.desktop.active()
+                        || receipt.scope != dn::turbo::desktop::Scope::for_app(&app)
+                }) {
+                    continue;
+                }
+                match event {
+                    Event::Key(key) => {
+                        input::handle_ui(&mut app, key);
+                        dirty = true;
+                    }
+                    Event::Resize(_, _) => {
+                        input::cancel_feedback(&mut app);
+                        app.shortcuts.clear();
+                        app.mouse.scrollbar_drag = None;
+                        dirty = true;
+                    }
+                    Event::Paste(text) => {
+                        input::paste(&mut app, &text);
+                        dirty = true;
+                    }
+                    Event::Mouse(event)
+                        if matches!(
+                            event.kind,
+                            MouseEventKind::Down(_)
+                                | MouseEventKind::Drag(crossterm::event::MouseButton::Left)
+                                | MouseEventKind::Up(crossterm::event::MouseButton::Left)
+                                | MouseEventKind::ScrollUp
+                                | MouseEventKind::ScrollDown
+                        ) =>
+                    {
+                        mouse::handle_ui(&mut app, event);
+                        dirty = true;
+                    }
+                    _ => {}
+                }
+            }
+        }
+        Ok(())
+    })();
+    // Error exits bypass the normal quit guards. Restore terminal ownership
+    // before polling cancellation/cleanup; never abandon owned child processes
+    // merely because the drawing/input loop failed.
+    if !app.poll_background_shutdown() {
+        session.suspend();
+        while !app.poll_background_shutdown() {
+            std::thread::sleep(std::time::Duration::from_millis(20));
         }
     }
-    Ok(())
+    result
 }
 
 fn main() {

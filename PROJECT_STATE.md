@@ -1,8 +1,53 @@
 # Directory Navigator
 
-## Current status — preparing stable 1.1.14
+## Unreleased — one-way acoustic experiment
 
-Directory Navigator 1.1.14 is being prepared; it has not been published. Video
+Acoustic protocol 2 replaces bidirectional pairing/acknowledgements with an
+output-only sender and input-only receiver. Numbered encrypted blocks repeat in
+a carousel; receivers collect missing blocks without transmitting. Session-only
+passphrases use Argon2id and XChaCha20-Poly1305. Text/single-file limits are 1 MiB,
+with beneficial compression, three audible speeds, finite/continuous repeats,
+playback estimates and bounded progress. Streaming WAV/RF64 export and recorded
+WAV import need no audio devices. Only authenticated complete data reaches local
+review and guarded file publication. The sender cannot confirm delivery.
+
+The feature and plugin remain off by default; DN version remains 1.1.15. The
+previously prepared 1.1.15 crate predates these changes and must be regenerated
+before publishing the updated source. Historical acoustic results below describe
+the old protocol; they are not fresh evidence for the new implementation.
+Real speaker/microphone, two-device and platform runtime coverage remains separate
+from synthetic waveforms and protocol tests.
+
+## Unreleased — shared workers and Bluetooth Transfer Center integration
+
+Video Merge and Bluetooth use a bounded, nonblocking worker supervisor. Bluetooth
+send queues and accepted incoming files now belong to Transfer Center; closing
+Bluetooth stops new offers while accepted work continues. Per-file approval stays
+in Bluetooth, and replacement/cancellation belong to Transfer Center. Queued
+receivers retain the negotiated decision timeout. Lost final receipts remain
+explicitly unconfirmed, and completed publications survive cancellation. Version
+is being prepared as 1.1.15. Real two-device Bluetooth validation remains separate from private
+protocol tests and cross-compilation; the historical coverage below is unchanged.
+
+### Unreleased DOS launcher corrections
+
+The launcher supports DOSBox Staging, DOSBox-X and classic DOSBox. Find emulators
+builds a selectable installed list; automatic selection prefers that order.
+Discovery includes native installation locations and Linux exported Snap/Flatpak
+launchers. Variant-specific arguments retain global settings while preventing
+automatic game-local configuration loading.
+Check DOSBox verifies an unsaved path draft without committing it. Launch errors
+include bounded stdout/stderr diagnostics in owned dialogs and the launcher;
+inactive failures retain their result without stealing focus. Native arguments,
+source identity checks and default-disabled behavior remain intact.
+Real Linux desktop/emulator execution still requires validation;
+private mock launch and terminal tests are separate evidence.
+
+## Current status — preparing stable 1.1.15
+
+Directory Navigator 1.1.15 is being prepared; it has not been published. This
+release includes the shared-worker, Bluetooth Transfer Center and DOSBox fixes
+described above. Video
 Merge no longer carries the Experimental label and remains opt-in. Bluetooth
 transfers is enabled by default, preserving explicitly saved disabled choices;
 startup does not open Bluetooth devices or start receiving. Acoustic remains an

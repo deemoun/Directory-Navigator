@@ -12,6 +12,9 @@ use std::{
 #[derive(Clone, Default)]
 pub struct Cancellation(Arc<AtomicBool>);
 impl Cancellation {
+    pub(crate) fn flag(&self) -> Arc<AtomicBool> {
+        self.0.clone()
+    }
     pub(crate) fn from_flag(flag: Arc<AtomicBool>) -> Self {
         Self(flag)
     }

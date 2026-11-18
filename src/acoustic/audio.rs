@@ -1,50 +1,102 @@
-//! Streams live exclusively on the worker. Callbacks never block or access DN state.
-use super::protocol::Radio;
+//! One direction per stream: speakers never inspect input devices; microphones
+//! never inspect output devices. Audio callbacks stay bounded and nonblocking.
+use super::{model::Speed, protocol::Prepared};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use std::{
-    collections::VecDeque,
+    collections::{BTreeMap, VecDeque},
     io,
     sync::{
-        atomic::{AtomicBool, AtomicU32, Ordering},
+        atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
         mpsc, Arc,
     },
     time::{Duration, Instant},
 };
-pub struct Meters {
+#[derive(Default)]
+pub(super) struct Meters {
     pub sent: AtomicU32,
     pub received: AtomicU32,
     pub input: AtomicU32,
     pub output: AtomicU32,
     pub failed: AtomicBool,
     pub overflow: AtomicBool,
-}
-impl Default for Meters {
-    fn default() -> Self {
-        Self {
-            sent: AtomicU32::new(0),
-            received: AtomicU32::new(0),
-            input: AtomicU32::new(0),
-            output: AtomicU32::new(0),
-            failed: AtomicBool::new(false),
-            overflow: AtomicBool::new(false),
-        }
-    }
+    pub dropped: AtomicU32,
+    pub completed: AtomicU64,
+    pub total: AtomicU64,
 }
 fn error(e: impl std::fmt::Display) -> io::Error {
     io::Error::other(e.to_string())
 }
-pub struct Audio {
-    pub devices: String,
-    _input: cpal::Stream,
-    _output: cpal::Stream,
-    samples: mpsc::Receiver<[f32; 1024]>,
-    waves: mpsc::SyncSender<(Vec<f32>, Arc<AtomicBool>)>,
-    meters: Arc<Meters>,
-    cancel: Arc<AtomicBool>,
+pub(super) fn check(cancel: &AtomicBool, meters: &Meters) -> io::Result<()> {
+    if cancel.load(Ordering::Relaxed) {
+        return Err(io::Error::new(
+            io::ErrorKind::Interrupted,
+            "Acoustic operation stopped; no delivery confirmation is available",
+        ));
+    }
+    if meters.failed.load(Ordering::Relaxed) {
+        return Err(error(
+            "Audio device was lost or stopped; retry Send/Receive",
+        ));
+    }
+    Ok(())
+}
+pub(super) struct Codec {
     encoder: ggwave::Encoder,
-    decoder: ggwave::Decoder,
-    ready: VecDeque<Vec<u8>>,
-    role: bool,
+    speed: Speed,
+    rate: u32,
+    lengths: BTreeMap<usize, usize>,
+}
+impl Codec {
+    pub fn new(rate: u32, speed: Speed) -> io::Result<Self> {
+        Ok(Self {
+            encoder: ggwave::Encoder::new(ggwave::Parameters {
+                sample_rate_out: rate as f32,
+                ..Default::default()
+            })
+            .map_err(error)?,
+            speed,
+            rate,
+            lengths: BTreeMap::new(),
+        })
+    }
+    pub fn encode(&mut self, packet: &[u8]) -> io::Result<Vec<f32>> {
+        let mut wave = self
+            .encoder
+            .encode(packet, self.speed.protocol(), 10)
+            .map_err(error)?;
+        wave.resize(wave.len() + self.rate as usize / 10, 0.);
+        Ok(wave)
+    }
+    pub fn plan(
+        &mut self,
+        prepared: &Prepared,
+        repeats: u8,
+        cancel: &AtomicBool,
+    ) -> io::Result<(u64, u64)> {
+        let mut samples = 0_u64;
+        let mut frames = 0;
+        for frame in prepared.frames() {
+            if cancel.load(Ordering::Relaxed) {
+                return Err(io::ErrorKind::Interrupted.into());
+            }
+            let n = frame.len();
+            let count = if let Some(v) = self.lengths.get(&n) {
+                *v
+            } else {
+                let v = self.encode(&vec![0; n])?.len();
+                self.lengths.insert(n, v);
+                v
+            };
+            samples = samples
+                .checked_add(count as u64)
+                .ok_or_else(|| error("Acoustic duration overflow"))?;
+            frames += 1;
+        }
+        Ok((
+            samples * u64::from(repeats.max(1)),
+            frames * u64::from(repeats),
+        ))
+    }
 }
 fn input<T>(
     device: &cpal::Device,
@@ -138,121 +190,141 @@ where
         )
         .map_err(error)
 }
-impl Audio {
-    pub fn open(cancel: Arc<AtomicBool>, meters: Arc<Meters>, role: bool) -> io::Result<Self> {
+
+pub(super) struct Speaker {
+    pub devices: String,
+    _stream: cpal::Stream,
+    waves: mpsc::SyncSender<(Vec<f32>, Arc<AtomicBool>)>,
+    meters: Arc<Meters>,
+    cancel: Arc<AtomicBool>,
+    codec: Codec,
+}
+impl Speaker {
+    pub fn open(cancel: Arc<AtomicBool>, meters: Arc<Meters>, speed: Speed) -> io::Result<Self> {
+        check(&cancel, &meters)?;
         let host = cpal::default_host();
-        let input_device = host.default_input_device().ok_or_else(|| {
-            error("No default microphone; both sides need audio input for acknowledgements")
-        })?;
-        let output_device = host
+        let device = host
             .default_output_device()
             .ok_or_else(|| error("No default audio output"))?;
-        let devices = format!(
-            "{} → {}",
-            input_device.description().map_err(error)?.name(),
-            output_device.description().map_err(error)?.name()
-        );
-        let ic = input_device.default_input_config().map_err(error)?;
-        let oc = output_device.default_output_config().map_err(error)?;
-        if ic.channels() == 0 || oc.channels() == 0 {
-            return Err(error("Default audio device has no channels"));
+        let devices = device.description().map_err(error)?.name().to_owned();
+        let config = device.default_output_config().map_err(error)?;
+        if config.channels() == 0 {
+            return Err(error("Default audio output has no channels"));
         }
-        let (tx, samples) = mpsc::sync_channel(32);
         let (waves, rx) = mpsc::sync_channel(1);
-        let input = match ic.sample_format() {
-            cpal::SampleFormat::F32 => {
-                input::<f32>(&input_device, &ic.config(), tx, meters.clone())
-            }
-            cpal::SampleFormat::I16 => {
-                input::<i16>(&input_device, &ic.config(), tx, meters.clone())
-            }
-            cpal::SampleFormat::U16 => {
-                input::<u16>(&input_device, &ic.config(), tx, meters.clone())
-            }
-            _ => Err(error("Unsupported default microphone sample format")),
-        }?;
-        let output = match oc.sample_format() {
-            cpal::SampleFormat::F32 => {
-                output::<f32>(&output_device, &oc.config(), rx, meters.clone())
-            }
-            cpal::SampleFormat::I16 => {
-                output::<i16>(&output_device, &oc.config(), rx, meters.clone())
-            }
-            cpal::SampleFormat::U16 => {
-                output::<u16>(&output_device, &oc.config(), rx, meters.clone())
-            }
+        let stream = match config.sample_format() {
+            cpal::SampleFormat::F32 => output::<f32>(&device, &config.config(), rx, meters.clone()),
+            cpal::SampleFormat::I16 => output::<i16>(&device, &config.config(), rx, meters.clone()),
+            cpal::SampleFormat::U16 => output::<u16>(&device, &config.config(), rx, meters.clone()),
             _ => Err(error("Unsupported default output sample format")),
         }?;
-        let encoder = ggwave::Encoder::new(ggwave::Parameters {
-            sample_rate_out: oc.sample_rate() as f32,
-            ..Default::default()
-        })
-        .map_err(error)?;
-        let decoder = ggwave::Decoder::with_protocols(
-            ggwave::Parameters {
-                sample_rate_inp: ic.sample_rate() as f32,
-                ..Default::default()
-            },
-            &[ggwave::Protocol::AudibleNormal],
-        )
-        .map_err(error)?;
-        input.play().map_err(error)?;
-        output.play().map_err(error)?;
+        let codec = Codec::new(config.sample_rate(), speed)?;
+        stream.play().map_err(error)?;
         Ok(Self {
             devices,
-            _input: input,
-            _output: output,
-            samples,
+            _stream: stream,
             waves,
             meters,
             cancel,
-            encoder,
-            decoder,
-            ready: VecDeque::new(),
-            role,
+            codec,
         })
     }
-    fn check(&self) -> io::Result<()> {
-        if self.cancel.load(Ordering::Relaxed) {
-            return Err(io::Error::new(
-                io::ErrorKind::Interrupted,
-                "Acoustic session stopped",
-            ));
+    pub fn send(&mut self, packet: &[u8]) -> io::Result<()> {
+        check(&self.cancel, &self.meters)?;
+        let wave = self.codec.encode(packet)?;
+        let seconds = wave.len() as f64 / f64::from(self.codec.rate);
+        let completion = Arc::new(AtomicBool::new(false));
+        self.waves
+            .try_send((wave, completion.clone()))
+            .map_err(error)?;
+        let until = Instant::now() + Duration::from_secs_f64(seconds + 10.);
+        while !completion.load(Ordering::Acquire) {
+            check(&self.cancel, &self.meters)?;
+            if Instant::now() >= until {
+                return Err(error("Audio output stalled"));
+            }
+            std::thread::sleep(Duration::from_millis(10));
         }
-        if self.meters.failed.load(Ordering::Relaxed) {
-            return Err(error(
-                "Audio device was lost or stopped; retry Send/Receive",
-            ));
-        }
-        if self.meters.overflow.swap(false, Ordering::Relaxed) {
-            return Err(error(
-                "Audio input overrun; stop other audio processing and retry",
-            ));
-        }
+        self.meters.sent.fetch_add(1, Ordering::Relaxed);
         Ok(())
     }
-    fn decode(&mut self, samples: &[f32]) -> io::Result<()> {
-        self.check()?;
-        if let Some(packet) = self.decoder.push(samples) {
-            if packet.len() >= 6 && &packet[..4] == b"DNAC" && (packet[5] & 1 != 0) != self.role {
-                if self.ready.len() >= 8 {
-                    return Err(error("Acoustic packet queue limit"));
+}
+pub(super) struct Microphone {
+    pub devices: String,
+    _stream: cpal::Stream,
+    samples: mpsc::Receiver<[f32; 1024]>,
+    meters: Arc<Meters>,
+    cancel: Arc<AtomicBool>,
+    decoder: ggwave::Decoder,
+    rate: u32,
+    ready: VecDeque<Vec<u8>>,
+}
+fn decoder(rate: u32) -> io::Result<ggwave::Decoder> {
+    ggwave::Decoder::with_protocols(
+        ggwave::Parameters {
+            sample_rate_inp: rate as f32,
+            ..Default::default()
+        },
+        &[
+            ggwave::Protocol::AudibleNormal,
+            ggwave::Protocol::AudibleFast,
+            ggwave::Protocol::AudibleFastest,
+        ],
+    )
+    .map_err(error)
+}
+impl Microphone {
+    pub fn open(cancel: Arc<AtomicBool>, meters: Arc<Meters>) -> io::Result<Self> {
+        check(&cancel, &meters)?;
+        let host = cpal::default_host();
+        let device = host
+            .default_input_device()
+            .ok_or_else(|| error("No default microphone"))?;
+        let devices = device.description().map_err(error)?.name().to_owned();
+        let config = device.default_input_config().map_err(error)?;
+        if config.channels() == 0 {
+            return Err(error("Default microphone has no channels"));
+        }
+        let (tx, samples) = mpsc::sync_channel(32);
+        let stream = match config.sample_format() {
+            cpal::SampleFormat::F32 => input::<f32>(&device, &config.config(), tx, meters.clone()),
+            cpal::SampleFormat::I16 => input::<i16>(&device, &config.config(), tx, meters.clone()),
+            cpal::SampleFormat::U16 => input::<u16>(&device, &config.config(), tx, meters.clone()),
+            _ => Err(error("Unsupported default microphone sample format")),
+        }?;
+        let rate = config.sample_rate();
+        let decoder = decoder(rate)?;
+        stream.play().map_err(error)?;
+        Ok(Self {
+            devices,
+            _stream: stream,
+            samples,
+            meters,
+            cancel,
+            decoder,
+            rate,
+            ready: VecDeque::new(),
+        })
+    }
+    pub fn receive(&mut self, wait: Duration) -> io::Result<Option<Vec<u8>>> {
+        check(&self.cancel, &self.meters)?;
+        if self.meters.overflow.swap(false, Ordering::Relaxed) {
+            self.meters.dropped.fetch_add(1, Ordering::Relaxed);
+            self.decoder = decoder(self.rate)?;
+            for _ in 0..32 {
+                if self.samples.try_recv().is_err() {
+                    break;
                 }
-                self.meters.received.fetch_add(1, Ordering::Relaxed);
-                self.ready.push_back(packet);
             }
         }
-        Ok(())
-    }
-    fn pump(&mut self, wait: Duration) -> io::Result<()> {
-        self.check()?;
+        if let Some(p) = self.ready.pop_front() {
+            return Ok(Some(p));
+        }
         match self.samples.recv_timeout(wait) {
             Ok(samples) => self.decode(&samples)?,
             Err(mpsc::RecvTimeoutError::Timeout) => {}
             Err(e) => return Err(error(e)),
         }
-        // A conflict prompt polls at 20 ms; 96 kHz input produces buffers faster.
-        // Drain its bounded backlog rather than falling behind while awaiting a user.
         for _ in 0..31 {
             match self.samples.try_recv() {
                 Ok(samples) => self.decode(&samples)?,
@@ -260,37 +332,18 @@ impl Audio {
                 Err(e) => return Err(error(e)),
             }
         }
-        Ok(())
+        Ok(self.ready.pop_front())
     }
-}
-impl Radio for Audio {
-    fn send(&mut self, packet: &[u8]) -> io::Result<()> {
-        self.check()?;
-        let mut wave = self
-            .encoder
-            .encode(packet, ggwave::Protocol::AudibleNormal, 10)
-            .map_err(error)?;
-        wave.resize(wave.len() + 4800, 0.);
-        self.meters.sent.fetch_add(1, Ordering::Relaxed);
-        let completion = Arc::new(AtomicBool::new(false));
-        self.waves
-            .try_send((wave, completion.clone()))
-            .map_err(error)?;
-        let until = Instant::now() + Duration::from_secs(25);
-        while !completion.load(Ordering::Acquire) {
-            self.pump(Duration::from_millis(20))?;
-            if Instant::now() >= until {
-                return Err(error("Audio output stalled"));
+    fn decode(&mut self, samples: &[f32]) -> io::Result<()> {
+        if let Some(p) = self.decoder.push(samples) {
+            if p.starts_with(b"DNA2") {
+                if self.ready.len() == 8 {
+                    return Err(error("Acoustic packet queue limit"));
+                }
+                self.meters.received.fetch_add(1, Ordering::Relaxed);
+                self.ready.push_back(p);
             }
         }
         Ok(())
-    }
-    fn receive(&mut self, wait: Duration) -> io::Result<Option<Vec<u8>>> {
-        self.check()?;
-        if let Some(p) = self.ready.pop_front() {
-            return Ok(Some(p));
-        }
-        self.pump(wait)?;
-        Ok(self.ready.pop_front())
     }
 }

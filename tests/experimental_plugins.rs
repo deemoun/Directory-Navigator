@@ -132,7 +132,18 @@ fn owned_plugin_forms_fit_and_redraw_immutably_without_devices() -> io::Result<(
                         .unwrap();
                     draw(&mut a, 80, 25)?;
                     click(&mut a, Target::Plugin(id, ActionId(3)));
-                    assert!(support::text(&mut a, 80, 25)?.contains("tiny.txt"));
+                    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+                    loop {
+                        a.poll();
+                        if support::text(&mut a, 80, 25)?.contains("tiny.txt (") {
+                            break;
+                        }
+                        assert!(
+                            std::time::Instant::now() < deadline,
+                            "acoustic capture did not finish"
+                        );
+                        std::thread::sleep(std::time::Duration::from_millis(1));
+                    }
                     click(&mut a, Target::Plugin(id, ActionId(2)));
                     draw(&mut a, 80, 25)?;
                     click(&mut a, Target::Plugin(id, ActionId(0)));

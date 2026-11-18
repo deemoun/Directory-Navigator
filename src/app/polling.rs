@@ -10,6 +10,7 @@ impl App {
     pub fn poll(&mut self) -> bool {
         // Retire closed owners and orphaned children before polling any reply.
         self.sync_modals();
+        let workers_changed = self.workers.poll();
         let experiments_changed =
             crate::dos::poll(self) | crate::acoustic::poll(self) | crate::video::poll(self);
         let peer_changed = crate::peer::poll(self) | crate::bluetooth::poll(self);
@@ -28,7 +29,8 @@ impl App {
         let recovery_changed = crate::editor::recovery::poll(self, std::time::Instant::now());
         let mut changed = crate::config_import::poll(self);
         changed |= crate::plugins::host::poll(self, std::time::Instant::now());
-        changed |= experiments_changed
+        changed |= workers_changed
+            | experiments_changed
             | peer_changed
             | clipboard_changed
             | saver_changed
@@ -79,6 +81,15 @@ impl App {
         changed |= crate::tool_windows::poll(self);
         self.sync_modals();
         changed |= crate::session::poll(self);
+        if self.exit_pending
+            && self.job.is_none()
+            && !self.transfers.has_work()
+            && !self.file_tools.busy()
+            && !self.workers.pending()
+        {
+            self.request_exit();
+            changed = true;
+        }
         changed
             | crate::windowing::poll(self)
             | crate::button_feedback::poll(self, std::time::Instant::now())
@@ -151,9 +162,10 @@ impl App {
                 .as_ref()
                 .is_some_and(|i| i.loading());
         if pending
+            || self.workers.pending()
             || crate::peer::active(self)
             || crate::acoustic::active(self)
-            || self.dos.view.busy
+            || crate::dos::active(self)
             || self.video.view.busy
             || self.video.view.checking
             || self.clipboard.pending()

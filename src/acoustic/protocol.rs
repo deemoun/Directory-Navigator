@@ -1,546 +1,484 @@
-//! Stop-and-wait framing. Retries reuse exact bytes; replay filtering precedes Noise.
-use std::{
-    collections::VecDeque,
-    io,
-    time::{Duration, Instant},
+//! Version 2 simplex carousel. No handshakes, acknowledgements or peer replies.
+//! CRC filters damaged frames; the complete bounded envelope is authenticated
+//! before decompression, filenames, offers or plaintext reach the host.
+use super::model::{Options, MAX_BYTES};
+use chacha20poly1305::{
+    aead::{Aead, Payload as AeadPayload},
+    KeyInit, XChaCha20Poly1305,
 };
-pub const CHUNK: usize = 80;
-pub const MESSAGE_LIMIT: usize = 2048;
-const PAYLOAD_TIMEOUT: Duration = Duration::from_secs(20 * 60);
-const MAGIC: &[u8; 4] = b"DNAC";
-#[derive(Clone, Debug, PartialEq, Eq)]
-struct Frame {
-    session: [u8; 8],
-    role: bool,
-    ack: bool,
-    seq: u16,
-    part: u8,
-    total: u8,
-    payload: Vec<u8>,
+use std::io::{self, Read, Write};
+use zeroize::Zeroizing;
+pub(super) const CHUNK: usize = 112;
+const WIRE_LIMIT: usize = MAX_BYTES + 4096;
+const MAGIC: &[u8; 4] = b"DNA2";
+const AAD: &[u8] = b"Directory Navigator acoustic simplex 2";
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct Offer {
+    pub name: Option<String>,
+    pub size: usize,
+    pub hash: [u8; 32],
+    pub modified: Option<i64>,
+    compressed: bool,
 }
-impl Frame {
+impl Offer {
+    pub fn validate(&self) -> io::Result<()> {
+        if self.size > MAX_BYTES {
+            return Err(io::Error::other("Acoustic payload limit is 1 MiB"));
+        }
+        if let Some(name) = &self.name {
+            if name.len() > 255
+                || name.contains(['/', '\\'])
+                || crate::peer::manifest::relative(name).is_err()
+            {
+                return Err(io::Error::other("Acoustic filename is not portable"));
+            }
+        }
+        Ok(())
+    }
+}
+#[derive(Clone)]
+pub(super) struct Payload {
+    pub offer: Offer,
+    pub bytes: Zeroizing<Vec<u8>>,
+}
+impl Payload {
+    pub fn new(name: Option<String>, bytes: Vec<u8>, modified: Option<i64>) -> io::Result<Self> {
+        let offer = Offer {
+            name,
+            size: bytes.len(),
+            hash: *blake3::hash(&bytes).as_bytes(),
+            modified,
+            compressed: false,
+        };
+        offer.validate()?;
+        if offer.name.is_none() && std::str::from_utf8(&bytes).is_err() {
+            return Err(io::Error::other("Acoustic text must be UTF-8"));
+        }
+        Ok(Self {
+            offer,
+            bytes: Zeroizing::new(bytes),
+        })
+    }
+}
+#[derive(Clone, PartialEq, Eq)]
+struct Descriptor {
+    id: [u8; 8],
+    salt: [u8; 16],
+    nonce: [u8; 24],
+    len: u32,
+    hash: [u8; 32],
+}
+impl Descriptor {
     fn encode(&self) -> Vec<u8> {
-        let mut b = Vec::with_capacity(104);
-        b.extend(MAGIC);
-        b.push(1);
-        b.push(u8::from(self.role) | u8::from(self.ack) << 1);
-        b.extend(self.session);
-        b.extend(self.seq.to_le_bytes());
-        b.push(self.part);
-        b.push(self.total);
-        b.extend(&self.payload);
-        b.extend(crc32fast::hash(&b).to_le_bytes());
-        b
+        let mut out = Vec::from(MAGIC.as_slice());
+        out.push(0);
+        out.extend(self.id);
+        out.extend(self.salt);
+        out.extend(self.nonce);
+        out.extend(self.len.to_le_bytes());
+        out.extend(self.hash);
+        crc(out)
     }
     fn decode(b: &[u8]) -> Option<Self> {
-        if !(22..=CHUNK + 22).contains(&b.len()) || &b[..4] != MAGIC || b[4] != 1 || b[5] > 3 {
+        if b.len() != 93 || &b[..4] != MAGIC || b[4] != 0 || !valid_crc(b) {
             return None;
         }
-        let end = b.len() - 4;
-        if crc32fast::hash(&b[..end]) != u32::from_le_bytes(b[end..].try_into().ok()?) {
-            return None;
-        }
-        let f = Self {
-            session: b[6..14].try_into().ok()?,
-            role: b[5] & 1 != 0,
-            ack: b[5] & 2 != 0,
-            seq: u16::from_le_bytes(b[14..16].try_into().ok()?),
-            part: b[16],
-            total: b[17],
-            payload: b[18..end].to_vec(),
+        let v = Self {
+            id: b[5..13].try_into().ok()?,
+            salt: b[13..29].try_into().ok()?,
+            nonce: b[29..53].try_into().ok()?,
+            len: u32::from_le_bytes(b[53..57].try_into().ok()?),
+            hash: b[57..89].try_into().ok()?,
         };
-        if f.total == 0
-            || usize::from(f.total) > MESSAGE_LIMIT.div_ceil(CHUNK)
-            || f.part >= f.total
-            || (f.ack && f.payload.len() != 4)
-        {
-            return None;
-        }
-        Some(f)
+        (v.len >= 20 && v.len as usize <= WIRE_LIMIT).then_some(v)
     }
-    fn acknowledgement(&self) -> Self {
-        Self {
-            role: !self.role,
-            ack: true,
-            payload: crc32fast::hash(&self.payload).to_le_bytes().to_vec(),
-            ..self.clone()
-        }
+    fn aad(&self) -> Vec<u8> {
+        let mut v = AAD.to_vec();
+        v.extend(self.id);
+        v.extend(self.salt);
+        v
     }
 }
-pub trait Radio {
-    fn now(&self) -> Instant {
-        Instant::now()
-    }
-    fn send(&mut self, packet: &[u8]) -> io::Result<()>;
-    fn receive(&mut self, wait: Duration) -> io::Result<Option<Vec<u8>>>;
+fn crc(mut b: Vec<u8>) -> Vec<u8> {
+    let c = crc32fast::hash(&b);
+    b.extend(c.to_le_bytes());
+    b
 }
-pub struct Link<R: Radio> {
-    pub radio: R,
-    role: bool,
-    session: Option<[u8; 8]>,
-    send_seq: u16,
-    recv_seq: u16,
-    parts: Vec<Vec<u8>>,
-    last: Vec<Frame>,
-    ready: VecDeque<Vec<u8>>,
+fn valid_crc(b: &[u8]) -> bool {
+    b.len() >= 4
+        && crc32fast::hash(&b[..b.len() - 4])
+            == u32::from_le_bytes(b[b.len() - 4..].try_into().unwrap())
 }
-impl<R: Radio> Link<R> {
-    pub fn new(radio: R, initiator: bool, session: [u8; 8]) -> Self {
-        Self {
-            radio,
-            role: initiator,
-            session: initiator.then_some(session),
-            send_seq: 0,
-            recv_seq: 0,
-            parts: vec![],
-            last: vec![],
-            ready: VecDeque::new(),
+fn key(passphrase: &str, salt: &[u8]) -> io::Result<Zeroizing<[u8; 32]>> {
+    let mut out = Zeroizing::new([0; 32]);
+    argon2::Argon2::new(
+        argon2::Algorithm::Argon2id,
+        argon2::Version::V0x13,
+        argon2::Params::new(19 * 1024, 2, 1, Some(32))
+            .map_err(|_| io::Error::other("Invalid acoustic KDF parameters"))?,
+    )
+    .hash_password_into(passphrase.as_bytes(), salt, out.as_mut())
+    .map_err(|_| io::Error::other("Acoustic key derivation failed"))?;
+    Ok(out)
+}
+pub(super) struct Prepared {
+    descriptor: Descriptor,
+    encrypted: Vec<u8>,
+}
+impl Prepared {
+    pub fn new(payload: &Payload, options: &Options) -> io::Result<Self> {
+        options.validate()?;
+        payload.offer.validate()?;
+        let mut zipped = flate2::write::ZlibEncoder::new(Vec::new(), flate2::Compression::fast());
+        zipped.write_all(&payload.bytes)?;
+        let zipped = Zeroizing::new(zipped.finish()?);
+        let mut offer = payload.offer.clone();
+        offer.compressed = zipped.len() < payload.bytes.len();
+        let header = serde_json::to_vec(&offer).map_err(io::Error::other)?;
+        if header.len() > 2048 {
+            return Err(io::Error::other("Acoustic manifest too large"));
         }
-    }
-    fn ingest(&mut self, bytes: &[u8]) -> io::Result<Option<Frame>> {
-        let Some(f) = Frame::decode(bytes) else {
-            return Ok(None);
+        let mut plain = Zeroizing::new(Vec::with_capacity(4 + header.len() + payload.bytes.len()));
+        plain.extend((header.len() as u32).to_le_bytes());
+        plain.extend(header);
+        plain.extend_from_slice(if offer.compressed {
+            &zipped
+        } else {
+            &payload.bytes
+        });
+        let mut d = Descriptor {
+            id: [0; 8],
+            salt: [0; 16],
+            nonce: [0; 24],
+            len: 0,
+            hash: [0; 32],
         };
-        if f.role == self.role {
-            return Ok(None);
+        for random in [&mut d.id[..], &mut d.salt[..], &mut d.nonce[..]] {
+            getrandom::fill(random).map_err(io::Error::other)?;
         }
-        if self.session.is_none() && !f.ack && f.seq == 0 && f.part == 0 {
-            self.session = Some(f.session);
+        let key = key(&options.passphrase, &d.salt)?;
+        let encrypted = XChaCha20Poly1305::new(key.as_ref().into())
+            .encrypt(
+                (&d.nonce).into(),
+                AeadPayload {
+                    msg: &plain,
+                    aad: &d.aad(),
+                },
+            )
+            .map_err(|_| io::Error::other("Acoustic encryption failed"))?;
+        if encrypted.len() > WIRE_LIMIT {
+            return Err(io::Error::other("Acoustic envelope too large"));
         }
-        if self.session != Some(f.session) {
-            return Ok(None);
-        }
-        if f.ack {
-            return Ok(Some(f));
-        }
-        if f.seq != self.recv_seq {
-            if self.last.iter().any(|old| old == &f) {
-                self.radio.send(&f.acknowledgement().encode())?;
+        d.len = encrypted.len() as u32;
+        d.hash = *blake3::hash(&encrypted).as_bytes();
+        Ok(Self {
+            descriptor: d,
+            encrypted,
+        })
+    }
+    pub fn blocks(&self) -> usize {
+        self.encrypted.len().div_ceil(CHUNK)
+    }
+    /// A header every sixteen blocks permits joining in the middle of playback.
+    pub fn frames(&self) -> impl Iterator<Item = Vec<u8>> + '_ {
+        (0..self.blocks())
+            .flat_map(|index| {
+                let mut out = Vec::from(MAGIC.as_slice());
+                out.push(1);
+                out.extend(self.descriptor.id);
+                out.extend((index as u32).to_le_bytes());
+                out.extend_from_slice(
+                    &self.encrypted[index * CHUNK..((index + 1) * CHUNK).min(self.encrypted.len())],
+                );
+                (index % 16 == 0)
+                    .then(|| self.descriptor.encode())
+                    .into_iter()
+                    .chain(Some(crc(out)))
+            })
+            .chain(Some(self.descriptor.encode()))
+    }
+}
+#[derive(Default)]
+pub(super) struct Collector {
+    descriptor: Option<Descriptor>,
+    parts: Vec<Option<Vec<u8>>>,
+    received: usize,
+}
+impl Collector {
+    pub fn progress(&self) -> (u64, u64) {
+        (self.received as u64, self.parts.len() as u64)
+    }
+    pub fn ingest(&mut self, b: &[u8]) -> io::Result<bool> {
+        if let Some(d) = Descriptor::decode(b) {
+            if let Some(old) = &self.descriptor {
+                if old != &d {
+                    return Ok(false);
+                }
+            } else {
+                self.parts = vec![None; (d.len as usize).div_ceil(CHUNK)];
+                self.descriptor = Some(d);
             }
-            return Ok(None);
+            return Ok(false);
         }
-        if usize::from(f.part) < self.parts.len() {
-            if self.parts[usize::from(f.part)] == f.payload {
-                self.radio.send(&f.acknowledgement().encode())?;
-            }
-            return Ok(None);
-        }
-        if usize::from(f.part) != self.parts.len()
-            || self.parts.len() * CHUNK + f.payload.len() > MESSAGE_LIMIT
+        let Some(d) = &self.descriptor else {
+            return Ok(false);
+        };
+        if b.len() < 22
+            || b.len() > CHUNK + 21
+            || &b[..4] != MAGIC
+            || b[4] != 1
+            || b[5..13] != d.id
+            || !valid_crc(b)
         {
-            return Ok(None);
+            return Ok(false);
         }
-        if !self.last.is_empty() && self.last[0].seq == f.seq && self.last[0].total != f.total {
-            return Err(io::Error::other("Acoustic fragment count changed"));
+        let index = u32::from_le_bytes(b[13..17].try_into().unwrap()) as usize;
+        if index >= self.parts.len() {
+            return Ok(false);
         }
-        if f.part == 0 {
-            self.last.clear();
+        let data = &b[17..b.len() - 4];
+        if data.len() != CHUNK.min(d.len as usize - index * CHUNK) {
+            return Ok(false);
         }
-        self.parts.push(f.payload.clone());
-        self.last.push(f.clone());
-        self.radio.send(&f.acknowledgement().encode())?;
-        if self.parts.len() == usize::from(f.total) {
-            if self.ready.len() >= 2 {
-                return Err(io::Error::other("Acoustic receive queue limit"));
+        match &self.parts[index] {
+            Some(old) if old != data => {
+                return Err(io::Error::other(
+                    "Conflicting acoustic blocks; stop and receive again",
+                ))
             }
-            self.ready.push_back(self.parts.concat());
-            self.parts.clear();
-            self.recv_seq = self
-                .recv_seq
-                .checked_add(1)
-                .ok_or_else(|| io::Error::other("Acoustic sequence limit"))?;
-        }
-        Ok(None)
-    }
-    pub fn pump(&mut self, wait: Duration) -> io::Result<()> {
-        if let Some(bytes) = self.radio.receive(wait)? {
-            self.ingest(&bytes)?;
-        }
-        Ok(())
-    }
-    pub fn send(&mut self, message: &[u8]) -> io::Result<()> {
-        if message.is_empty() || message.len() > MESSAGE_LIMIT {
-            return Err(io::Error::other("Acoustic message size limit"));
-        }
-        let session = self
-            .session
-            .ok_or_else(|| io::Error::other("Acoustic session not established"))?;
-        for (part, payload) in message.chunks(CHUNK).enumerate() {
-            let f = Frame {
-                session,
-                role: self.role,
-                ack: false,
-                seq: self.send_seq,
-                part: part as u8,
-                total: message.len().div_ceil(CHUNK) as u8,
-                payload: payload.to_vec(),
-            };
-            let bytes = f.encode();
-            let expected = f.acknowledgement();
-            let mut acknowledged = false;
-            for _ in 0..3 {
-                self.radio.send(&bytes)?;
-                let until = self.radio.now() + Duration::from_secs(15);
-                while self.radio.now() < until {
-                    if let Some(packet) = self.radio.receive(Duration::from_millis(20))? {
-                        if self.ingest(&packet)?.as_ref() == Some(&expected) {
-                            acknowledged = true;
-                            break;
-                        }
-                    }
-                }
-                if acknowledged {
-                    break;
-                }
-            }
-            if !acknowledged {
-                return Err(io::Error::new(
-                    io::ErrorKind::TimedOut,
-                    "Acoustic acknowledgement timed out; delivery may be unconfirmed",
-                ));
+            Some(_) => return Ok(false),
+            None => {
+                self.parts[index] = Some(data.to_vec());
+                self.received += 1;
             }
         }
-        self.send_seq = self
-            .send_seq
-            .checked_add(1)
-            .ok_or_else(|| io::Error::other("Acoustic sequence limit"))?;
-        Ok(())
+        Ok(self.received == self.parts.len())
     }
-    pub fn receive(&mut self) -> io::Result<Vec<u8>> {
-        self.receive_for(Duration::from_secs(120))
-    }
-    fn receive_for(&mut self, timeout: Duration) -> io::Result<Vec<u8>> {
-        let until = Instant::now() + timeout;
-        loop {
-            if let Some(b) = self.ready.pop_front() {
-                return Ok(b);
-            }
-            if Instant::now() >= until {
-                return Err(io::Error::new(
-                    io::ErrorKind::TimedOut,
-                    "Acoustic reception timed out",
-                ));
-            }
-            self.pump(Duration::from_millis(20))?;
+    pub fn finish(self, options: &Options) -> io::Result<Payload> {
+        options.validate()?;
+        let d = self
+            .descriptor
+            .ok_or_else(|| io::Error::other("No acoustic header received"))?;
+        if self.received != self.parts.len() {
+            return Err(io::Error::other(
+                "Recording ended with missing blocks; nothing retained. Record another repetition.",
+            ));
         }
-    }
-}
-pub struct Secure<R: Radio> {
-    pub link: Link<R>,
-    noise: snow::TransportState,
-    pub code: String,
-}
-fn noise_error(e: snow::Error) -> io::Error {
-    io::Error::other(format!("Acoustic authentication: {e}"))
-}
-impl<R: Radio> Secure<R> {
-    pub fn handshake(radio: R, initiator: bool) -> io::Result<Self> {
-        let parameters = "Noise_XX_25519_ChaChaPoly_BLAKE2s"
-            .parse()
-            .map_err(noise_error)?;
-        let builder = snow::Builder::new(parameters)
-            .prologue(b"DN acoustic protocol 1")
-            .map_err(noise_error)?;
-        let key = builder.generate_keypair().map_err(noise_error)?;
-        let mut session = [0; 8];
-        session.copy_from_slice(&blake3::hash(&key.private).as_bytes()[..8]);
-        let builder = builder
-            .local_private_key(&key.private)
-            .map_err(noise_error)?;
-        let mut noise = if initiator {
-            builder.build_initiator()
-        } else {
-            builder.build_responder()
+        let bytes = self
+            .parts
+            .into_iter()
+            .flatten()
+            .flatten()
+            .collect::<Vec<_>>();
+        if blake3::hash(&bytes).as_bytes() != &d.hash {
+            return Err(io::Error::other(
+                "Acoustic checksum failed; nothing retained",
+            ));
         }
-        .map_err(noise_error)?;
-        let mut link = Link::new(radio, initiator, session);
-        let mut buffer = [0; MESSAGE_LIMIT];
-        if initiator {
-            let n = noise.write_message(&[], &mut buffer).map_err(noise_error)?;
-            link.send(&buffer[..n])?;
-            noise
-                .read_message(&link.receive()?, &mut buffer)
-                .map_err(noise_error)?;
-            let n = noise.write_message(&[], &mut buffer).map_err(noise_error)?;
-            link.send(&buffer[..n])?;
-        } else {
-            noise
-                .read_message(&link.receive()?, &mut buffer)
-                .map_err(noise_error)?;
-            let n = noise.write_message(&[], &mut buffer).map_err(noise_error)?;
-            link.send(&buffer[..n])?;
-            noise
-                .read_message(&link.receive()?, &mut buffer)
-                .map_err(noise_error)?;
-        }
-        let hash = blake3::derive_key(
-            "Directory Navigator acoustic comparison code v1",
-            noise.get_handshake_hash(),
+        let key = key(&options.passphrase, &d.salt)?;
+        let plain = Zeroizing::new(
+            XChaCha20Poly1305::new(key.as_ref().into())
+                .decrypt(
+                    (&d.nonce).into(),
+                    AeadPayload {
+                        msg: &bytes,
+                        aad: &d.aad(),
+                    },
+                )
+                .map_err(|_| {
+                    io::Error::other("Incorrect passphrase or damaged recording; nothing retained")
+                })?,
         );
-        let code = format!(
-            "{:08}",
-            u64::from_le_bytes(hash[..8].try_into().unwrap()) % 100_000_000
-        );
-        let noise = noise.into_transport_mode().map_err(noise_error)?;
-        Ok(Self { link, noise, code })
-    }
-    pub fn send(&mut self, plain: &[u8]) -> io::Result<()> {
-        let mut out = [0; MESSAGE_LIMIT];
-        let n = self
-            .noise
-            .write_message(plain, &mut out)
-            .map_err(noise_error)?;
-        self.link.send(&out[..n])
-    }
-    pub fn receive(&mut self) -> io::Result<Vec<u8>> {
-        self.receive_for(Duration::from_secs(120))
-    }
-    pub fn receive_payload(&mut self) -> io::Result<Vec<u8>> {
-        self.receive_for(PAYLOAD_TIMEOUT)
-    }
-    fn receive_for(&mut self, timeout: Duration) -> io::Result<Vec<u8>> {
-        let cipher = self.link.receive_for(timeout)?;
-        let mut plain = vec![0; MESSAGE_LIMIT];
-        let n = self
-            .noise
-            .read_message(&cipher, &mut plain)
-            .map_err(noise_error)?;
-        plain.truncate(n);
-        Ok(plain)
+        if plain.len() < 4 {
+            return Err(io::Error::other("Malformed acoustic envelope"));
+        }
+        let n = u32::from_le_bytes(plain[..4].try_into().unwrap()) as usize;
+        if n > 2048 || n > plain.len() - 4 {
+            return Err(io::Error::other("Invalid acoustic manifest length"));
+        }
+        let offer: Offer = serde_json::from_slice(&plain[4..4 + n]).map_err(io::Error::other)?;
+        offer.validate()?;
+        let data = &plain[4 + n..];
+        let bytes = if offer.compressed {
+            let mut decoder = flate2::read::ZlibDecoder::new(data);
+            let mut out = Zeroizing::new(Vec::new());
+            (&mut decoder)
+                .take((offer.size + 1) as u64)
+                .read_to_end(&mut out)?;
+            if decoder.total_in() as usize != data.len() {
+                return Err(io::Error::other("Invalid compressed acoustic payload"));
+            }
+            out
+        } else {
+            Zeroizing::new(data.to_vec())
+        };
+        if bytes.len() != offer.size || blake3::hash(&bytes).as_bytes() != &offer.hash {
+            return Err(io::Error::other(
+                "Acoustic payload checksum or size failed; nothing retained",
+            ));
+        }
+        if offer.name.is_none() {
+            std::str::from_utf8(&bytes).map_err(io::Error::other)?;
+        }
+        Ok(Payload { offer, bytes })
     }
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn options() -> Options {
+        Options {
+            passphrase: Zeroizing::new("private fixture passphrase".into()),
+            ..Default::default()
+        }
+    }
+    fn collect(p: &Prepared, o: &Options) -> io::Result<Payload> {
+        let mut c = Collector::default();
+        for frame in p.frames() {
+            c.ingest(&frame)?;
+        }
+        c.finish(o)
+    }
     #[test]
-    fn framing_is_bounded_and_detects_corruption() {
-        let f = Frame {
-            session: [3; 8],
-            role: true,
-            ack: false,
-            seq: 0,
-            part: 0,
-            total: 1,
-            payload: vec![2; 80],
-        };
-        let b = f.encode();
-        assert_eq!(Frame::decode(&b), Some(f));
-        for i in 0..b.len() {
-            let mut corrupt = b.clone();
-            corrupt[i] ^= 1;
-            assert!(Frame::decode(&corrupt).is_none());
-        }
-        assert!(Frame::decode(&[0; 200]).is_none());
-    }
-    struct Memory {
-        tx: std::sync::mpsc::Sender<Vec<u8>>,
-        rx: std::sync::mpsc::Receiver<Vec<u8>>,
-    }
-    impl Radio for Memory {
-        fn send(&mut self, b: &[u8]) -> io::Result<()> {
-            self.tx.send(b.to_vec()).map_err(io::Error::other)
-        }
-        fn receive(&mut self, d: Duration) -> io::Result<Option<Vec<u8>>> {
-            match self.rx.recv_timeout(d) {
-                Ok(b) => Ok(Some(b)),
-                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => Ok(None),
-                Err(e) => Err(io::Error::other(e)),
+    fn one_way_blocks_recover_late_join_loss_duplicates_and_reordering() -> io::Result<()> {
+        let o = options();
+        let bytes = (0_u32..4000).flat_map(u32::to_le_bytes).collect::<Vec<_>>();
+        let payload = Payload::new(Some("Ёжик.bin".into()), bytes.clone(), None)?;
+        let p = Prepared::new(&payload, &o)?;
+        let frames = p.frames().collect::<Vec<_>>();
+        assert!(frames
+            .iter()
+            .all(|f| f.len() <= ggwave::MAX_LENGTH_VARIABLE));
+        let mut c = Collector::default();
+        // Start mid-cycle: early data has no descriptor and is safely ignored.
+        for (i, f) in frames.iter().enumerate().skip(5) {
+            if i % 3 != 0 {
+                c.ingest(f)?;
+                c.ingest(f)?;
             }
         }
+        for f in frames.iter().rev() {
+            c.ingest(f)?;
+        }
+        assert_eq!(c.progress().0, c.progress().1);
+        let got = c.finish(&o)?;
+        assert_eq!(&*got.bytes, &bytes);
+        assert_eq!(got.offer.name.as_deref(), Some("Ёжик.bin"));
+        Ok(())
     }
     #[test]
-    fn encrypted_two_endpoints_compare_and_exchange() {
-        let (a, ar) = std::sync::mpsc::channel();
-        let (b, br) = std::sync::mpsc::channel();
-        let t = std::thread::spawn(move || {
-            let mut s = Secure::handshake(Memory { tx: b, rx: ar }, false).unwrap();
-            let code = s.code.clone();
-            assert_eq!(s.receive().unwrap(), b"confirmed");
-            s.send(b"confirmed").unwrap();
-            assert_eq!(s.receive().unwrap(), "Привет Ёё".as_bytes());
-            s.send(b"retained").unwrap();
-            code
-        });
-        let mut s = Secure::handshake(Memory { tx: a, rx: br }, true).unwrap();
-        s.send(b"confirmed").unwrap();
-        assert_eq!(s.receive().unwrap(), b"confirmed");
-        s.send("Привет Ёё".as_bytes()).unwrap();
-        assert_eq!(s.receive().unwrap(), b"retained");
-        assert_eq!(s.code, t.join().unwrap());
-    }
-}
-
-#[cfg(test)]
-mod resilience {
-    use super::*;
-    #[derive(Default)]
-    struct Recorder {
-        packets: Vec<Vec<u8>>,
-    }
-    impl Radio for Recorder {
-        fn send(&mut self, b: &[u8]) -> io::Result<()> {
-            self.packets.push(b.to_vec());
-            Ok(())
+    fn wrong_passphrase_and_corruption_never_return_plaintext() -> io::Result<()> {
+        let o = options();
+        let p = Prepared::new(&Payload::new(None, b"private text".to_vec(), None)?, &o)?;
+        let mut wrong = options();
+        wrong.passphrase = Zeroizing::new("different private password".into());
+        assert!(collect(&p, &wrong)
+            .err()
+            .unwrap()
+            .to_string()
+            .contains("passphrase"));
+        let mut c = Collector::default();
+        for mut f in p.frames() {
+            if f[4] == 1 {
+                f[17] ^= 1;
+                let n = f.len();
+                let hash = crc32fast::hash(&f[..n - 4]);
+                f[n - 4..].copy_from_slice(&hash.to_le_bytes());
+            }
+            c.ingest(&f)?;
         }
-        fn receive(&mut self, _: Duration) -> io::Result<Option<Vec<u8>>> {
-            Ok(None)
-        }
+        assert!(c.finish(&o).err().unwrap().to_string().contains("checksum"));
+        Ok(())
     }
     #[test]
-    fn duplicates_do_not_advance_message_or_encryption_sequence() {
-        let mut l = Link::new(Recorder::default(), false, [0; 8]);
-        let f = Frame {
-            session: [7; 8],
-            role: true,
-            ack: false,
-            seq: 0,
-            part: 0,
-            total: 2,
-            payload: vec![1; CHUNK],
-        };
-        l.ingest(&f.encode()).unwrap();
-        l.ingest(&f.encode()).unwrap();
-        assert_eq!(l.parts.len(), 1);
-        let mut changed = f.clone();
-        changed.payload[0] ^= 1;
-        l.ingest(&changed.encode()).unwrap();
-        assert_eq!(l.radio.packets.len(), 2);
-        let final_part = Frame {
-            part: 1,
-            payload: vec![9],
-            ..f.clone()
-        };
-        l.ingest(&final_part.encode()).unwrap();
-        assert_eq!(l.recv_seq, 1);
-        assert_eq!(l.ready.len(), 1);
-        l.ingest(&f.encode()).unwrap();
-        l.ingest(&final_part.encode()).unwrap();
-        assert_eq!(l.recv_seq, 1);
-        assert_eq!(l.ready.len(), 1);
-        assert_eq!(l.ready.pop_front().unwrap().len(), CHUNK + 1);
+    fn incomplete_invalid_and_foreign_frames_remain_bounded() -> io::Result<()> {
+        let o = options();
+        let p = Prepared::new(
+            &Payload::new(Some("test.bin".into()), vec![1; 20_000], None)?,
+            &o,
+        )?;
+        let mut c = Collector::default();
+        let header = p.descriptor.encode();
+        c.ingest(&header)?;
+        for n in 0..header.len() {
+            assert!(!c.ingest(&header[..n])?);
+        }
+        let mut oversized = p.descriptor.clone();
+        oversized.len = u32::MAX;
+        assert!(Descriptor::decode(&oversized.encode()).is_none());
+        assert!(c.progress().1 <= WIRE_LIMIT.div_ceil(CHUNK) as u64);
+        let foreign = Prepared::new(&Payload::new(None, b"foreign".to_vec(), None)?, &o)?;
+        for f in foreign.frames() {
+            assert!(!c.ingest(&f)?);
+        }
+        assert_eq!(c.progress().0, 0);
+        assert!(c
+            .finish(&o)
+            .err()
+            .unwrap()
+            .to_string()
+            .contains("missing blocks"));
+        Ok(())
     }
     #[test]
-    fn rejects_out_of_order_wrong_session_and_conflicting_fragments() {
-        let mut l = Link::new(Recorder::default(), false, [0; 8]);
-        let mut f = Frame {
-            session: [3; 8],
-            role: true,
-            ack: false,
-            seq: 0,
-            part: 0,
-            total: 2,
-            payload: vec![4; CHUNK],
-        };
-        l.ingest(&f.encode()).unwrap();
-        f.session = [9; 8];
-        f.part = 1;
-        l.ingest(&f.encode()).unwrap();
-        assert_eq!(l.parts.len(), 1);
-        f.session = [3; 8];
-        f.total = 3;
-        assert!(l.ingest(&f.encode()).is_err());
-    }
-    struct Retry {
-        now: Instant,
-        sends: Vec<Vec<u8>>,
-        ack: bool,
-    }
-    impl Radio for Retry {
-        fn now(&self) -> Instant {
-            self.now
+    fn larger_payloads_compress_and_roundtrip_without_raising_decoded_limits() -> io::Result<()> {
+        let o = options();
+        let bytes = "Ёжик\r\n"
+            .as_bytes()
+            .iter()
+            .copied()
+            .cycle()
+            .take(MAX_BYTES - 8)
+            .collect::<Vec<_>>();
+        let payload = Payload::new(Some("large.txt".into()), bytes.clone(), Some(123))?;
+        let p = Prepared::new(&payload, &o)?;
+        assert!(p.encrypted.len() < bytes.len() / 10);
+        let got = collect(&p, &o)?;
+        assert_eq!(&*got.bytes, &bytes);
+        assert_eq!(got.offer.modified, Some(123));
+        assert!(Payload::new(Some("big".into()), vec![0; MAX_BYTES + 1], None).is_err());
+        for name in ["../bad", "a/b", "a\\b", "CON", "."] {
+            assert!(Payload::new(Some(name.into()), vec![], None).is_err());
         }
-        fn send(&mut self, b: &[u8]) -> io::Result<()> {
-            self.sends.push(b.to_vec());
-            Ok(())
-        }
-        fn receive(&mut self, _: Duration) -> io::Result<Option<Vec<u8>>> {
-            self.now += Duration::from_secs(16);
-            Ok(if self.ack && self.sends.len() == 2 {
-                Some(
-                    Frame::decode(self.sends.last().unwrap())
-                        .unwrap()
-                        .acknowledgement()
-                        .encode(),
-                )
-            } else {
-                None
-            })
-        }
+        let empty = Payload::new(Some("empty.bin".into()), vec![], None)?;
+        assert!(collect(&Prepared::new(&empty, &o)?, &o)?.bytes.is_empty());
+        Ok(())
     }
     #[test]
-    fn retries_identical_bytes_and_stops_after_finite_attempts() {
-        let mut l = Link::new(
-            Retry {
-                now: Instant::now(),
-                sends: vec![],
-                ack: true,
-            },
-            true,
-            [2; 8],
-        );
-        l.send(b"encrypted packet").unwrap();
-        assert_eq!(l.radio.sends.len(), 2);
-        assert_eq!(l.radio.sends[0], l.radio.sends[1]);
-        let mut l = Link::new(
-            Retry {
-                now: Instant::now(),
-                sends: vec![],
-                ack: false,
-            },
-            true,
-            [2; 8],
-        );
-        assert_eq!(l.send(b"lost").unwrap_err().kind(), io::ErrorKind::TimedOut);
-        assert_eq!(l.radio.sends.len(), 3);
-    }
-    #[test]
-    fn ggwave_round_trip_survives_fragmented_audio_without_hardware() {
-        let payload = b"DNAC audible interoperability fixture";
-        let e = ggwave::Encoder::new(Default::default()).unwrap();
-        let mut d =
-            ggwave::Decoder::with_protocols(Default::default(), &[ggwave::Protocol::AudibleNormal])
-                .unwrap();
-        let mut samples = e
-            .encode(payload, ggwave::Protocol::AudibleNormal, 10)
+    fn malformed_authenticated_manifests_and_compression_bombs_are_refused() -> io::Result<()> {
+        let o = options();
+        let payload = Payload::new(Some("file.bin".into()), vec![0; 64_000], None)?;
+        let mut p = Prepared::new(&payload, &o)?;
+        let mut offer = payload.offer.clone();
+        offer.size = 1;
+        offer.compressed = true;
+        let json = serde_json::to_vec(&offer).unwrap();
+        let mut encoder = flate2::write::ZlibEncoder::new(Vec::new(), flate2::Compression::fast());
+        encoder.write_all(&payload.bytes)?;
+        let mut plain = (json.len() as u32).to_le_bytes().to_vec();
+        plain.extend(json);
+        plain.extend(encoder.finish()?);
+        let k = key(&o.passphrase, &p.descriptor.salt)?;
+        p.encrypted = XChaCha20Poly1305::new(k.as_ref().into())
+            .encrypt(
+                (&p.descriptor.nonce).into(),
+                AeadPayload {
+                    msg: &plain,
+                    aad: &p.descriptor.aad(),
+                },
+            )
             .unwrap();
-        samples.resize(samples.len() + 16 * 1024, 0.);
-        let found = samples.chunks(317).find_map(|samples| d.push(samples));
-        assert_eq!(found.as_deref(), Some(payload.as_slice()));
+        p.descriptor.len = p.encrypted.len() as u32;
+        p.descriptor.hash = *blake3::hash(&p.encrypted).as_bytes();
+        assert!(collect(&p, &o).is_err());
+        Ok(())
     }
-}
-
-#[cfg(test)]
-mod payload_deadline {
-    use super::*;
     #[test]
-    fn payload_deadline_covers_a_full_offer_at_actual_encoded_wire_length() {
-        // Account for three complete attempts per fragment plus ACKs and output padding.
-        // This checks waveform sample counts, never elapsed benchmark time.
-        let encoder = ggwave::Encoder::new(Default::default()).unwrap();
-        let mut seconds = 0.;
-        let payload = vec![0; 1024 + 1 + 16];
-        for (part, chunk) in payload.chunks(CHUNK).enumerate() {
-            let f = Frame {
-                session: [1; 8],
-                role: true,
-                ack: false,
-                seq: 3,
-                part: part as u8,
-                total: payload.len().div_ceil(CHUNK) as u8,
-                payload: chunk.to_vec(),
-            };
-            let data = encoder
-                .encode(&f.encode(), ggwave::Protocol::AudibleNormal, 10)
-                .unwrap();
-            let ack = encoder
-                .encode(
-                    &f.acknowledgement().encode(),
-                    ggwave::Protocol::AudibleNormal,
-                    10,
-                )
-                .unwrap();
-            seconds += (data.len() + ack.len() + 9600) as f64 / 48000.;
-        }
-        assert!(PAYLOAD_TIMEOUT.as_secs_f64() > seconds * 3.);
+    fn old_bidirectional_packets_are_not_interpreted_as_simplex() {
+        let mut c = Collector::default();
+        assert!(!c.ingest(b"DNAC\x01old protocol reply").unwrap());
+        assert_eq!(c.progress(), (0, 0));
     }
 }

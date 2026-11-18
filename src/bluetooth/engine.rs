@@ -14,6 +14,7 @@ pub struct JobContext {
     pub progress: Arc<Mutex<Progress>>,
     pub approvals: mpsc::Receiver<(u64, bool, PathBuf)>,
     pub conflicts: crate::operations::conflict::Mailbox,
+    pub(super) flow: super::transfer::Flow,
 }
 impl JobContext {
     pub fn update(&self, phase: &str, done: u64, total: u64) {
@@ -21,6 +22,18 @@ impl JobContext {
         p.phase = phase.into();
         p.done = done;
         p.total = total;
+    }
+    pub fn waiting(&self, phase: &str, total: u64) {
+        self.update(phase, 0, total);
+        self.progress
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .operation = crate::operations::Phase::WaitingBluetooth;
+    }
+    fn advance(&self, n: u64) {
+        let mut p = self.progress.lock().unwrap_or_else(|e| e.into_inner());
+        p.bytes = p.bytes.saturating_add(n);
+        p.operation = crate::operations::Phase::Copying;
     }
     fn completed(&self) {
         let mut p = self.progress.lock().unwrap_or_else(|e| e.into_inner());
@@ -44,9 +57,16 @@ impl JobContext {
             size,
             peer: peer.chars().take(256).collect(),
         });
-        self.update("Waiting for receiver approval", 0, size);
+        self.progress
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .member = Some(name);
+        self.waiting("Waiting for receiver approval", size);
         let answer = loop {
             obex::check(&self.cancel)?;
+            if !self.flow.allows(id) {
+                break Ok(None);
+            }
             if let Err(e) = pump() {
                 break Err(e);
             }
@@ -62,6 +82,13 @@ impl JobContext {
             .lock()
             .unwrap_or_else(|e| e.into_inner())
             .offer = None;
+        if answer.as_ref().is_ok_and(|p| p.is_some()) {
+            while !self.flow.ready() {
+                obex::check(&self.cancel)?;
+                pump()?;
+                std::thread::sleep(Duration::from_millis(20));
+            }
+        }
         answer
     }
 }
@@ -163,7 +190,11 @@ pub fn send(link: &mut dyn Link, files: &[Source], ctx: &JobContext) -> io::Resu
                 "Filename exceeds receiver's OBEX packet size",
             ));
         }
-        ctx.update("Waiting for receiver approval", 0, file.metadata.len());
+        ctx.progress
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .member = Some(file.name.clone());
+        ctx.waiting("Waiting for receiver approval", file.metadata.len());
         obex::write(link, 0x02, &head, &ctx.cancel)?;
         let response = decision_response(link, &ctx.cancel, capabilities.waiting)?;
         if response == 0xc3 {
@@ -211,15 +242,16 @@ pub fn send(link: &mut dyn Link, files: &[Source], ctx: &JobContext) -> io::Resu
                 &ctx.cancel,
             )
             .and_then(|()| {
+                ctx.advance(count as u64);
                 obex::response(link, &ctx.cancel, if final_packet { 0xa0 } else { 0x90 })
                     .map(|_| ())
             });
             if let Err(error) = result {
                 if final_packet {
-                    let message = format!(
-                        "Delivery unconfirmed: the receiver may have published this file. {error}"
-                    );
-                    return Err(io::Error::new(error.kind(), message));
+                    return Err(io::Error::new(
+                        error.kind(),
+                        super::transfer::Unconfirmed(error),
+                    ));
                 }
                 return Err(error);
             }
@@ -257,7 +289,24 @@ pub fn receive(link: &mut dyn Link, peer: &str, ctx: &JobContext) -> io::Result<
     obex::write(link, 0xa0, &greeting, &ctx.cancel)?;
     let mut count = 0;
     loop {
-        let (mut opcode, body) = obex::read(link, &ctx.cancel, obex::MTU)?;
+        if !ctx.flow.open() {
+            return Ok(());
+        }
+        ctx.waiting("Waiting for Bluetooth sender", 0);
+        let (mut opcode, body) = match obex::read_while(link, &ctx.cancel, obex::MTU, || {
+            if ctx.flow.open() {
+                Ok(())
+            } else {
+                Err(io::ErrorKind::Interrupted.into())
+            }
+        }) {
+            Err(_)
+                if !ctx.flow.open() && !ctx.cancel.load(std::sync::atomic::Ordering::Relaxed) =>
+            {
+                return Ok(())
+            }
+            result => result?,
+        };
         if opcode == 0x81 {
             obex::write(link, 0xa0, &[], &ctx.cancel)?;
             return Ok(());
@@ -342,6 +391,7 @@ pub fn receive(link: &mut dyn Link, peer: &str, ctx: &JobContext) -> io::Result<
                 return Err(obex::invalid("Bluetooth payload exceeds declared length"));
             }
             stage.file.write_all(&h.body)?;
+            ctx.advance(h.body.len() as u64);
             ctx.update("Receiving Bluetooth file", done, size);
             if opcode == 0x82 && !h.end {
                 return Err(obex::invalid("Final OBEX packet has no end-of-body header"));

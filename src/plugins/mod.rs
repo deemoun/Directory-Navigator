@@ -121,6 +121,7 @@ pub(crate) struct Context {
     pub storage: Option<PathBuf>,
     pub mp3: crate::config::Mp3Preferences,
     pub dos: crate::dos::Preferences,
+    pub dos_status: crate::dos::Snapshot,
     pub video_preferences: crate::video::Preferences,
     pub video: crate::video::Snapshot,
     pub acoustic: crate::acoustic::Snapshot,
@@ -207,6 +208,9 @@ pub(crate) enum Effect {
         action: crate::video::Action,
     },
     DosSetup(crate::dos::Preferences),
+    DosCheck(crate::dos::Preferences),
+    DosDiscover,
+    DosStop,
     Acoustic {
         generation: u64,
         action: crate::acoustic::Action,

@@ -1,6 +1,8 @@
 use super::*;
 use std::{
     net::{TcpListener, TcpStream},
+    sync::atomic::Ordering,
+    thread,
     time::{Duration, Instant},
 };
 fn context() -> (engine::JobContext, mpsc::SyncSender<(u64, bool, PathBuf)>) {
@@ -11,6 +13,7 @@ fn context() -> (engine::JobContext, mpsc::SyncSender<(u64, bool, PathBuf)>) {
             progress: Default::default(),
             approvals: receive,
             conflicts: Default::default(),
+            flow: Default::default(),
         },
         send,
     )
@@ -225,7 +228,13 @@ fn plugin_defaults_on_captures_marks_and_draws_immutable_owned_controls() -> io:
         }
         Err(io::ErrorKind::Interrupted.into())
     });
-    let cancellation = app.bluetooth.job.as_ref().unwrap().cancel.clone();
+    let cancellation = app
+        .bluetooth
+        .job
+        .as_ref()
+        .unwrap()
+        .worker
+        .cancellation_flag();
     if let Owner::Document(id) = binding.owner {
         app.desktop.close(id);
     }
@@ -244,7 +253,13 @@ fn plugin_defaults_on_captures_marks_and_draws_immutable_owned_controls() -> io:
         }
         Err(io::ErrorKind::Interrupted.into())
     });
-    let cancellation = app.bluetooth.job.as_ref().unwrap().cancel.clone();
+    let cancellation = app
+        .bluetooth
+        .job
+        .as_ref()
+        .unwrap()
+        .worker
+        .cancellation_flag();
     let generation = app.bluetooth.view.generation;
     action(
         &mut app,
@@ -445,28 +460,16 @@ fn disconnected_worker_clears_pending_controls_and_rejects_old_actions() -> io::
     wait(&mut app, |a| !a.bluetooth.view.busy);
     let owner = app.desktop.plugins.binding(BLUETOOTH_TRANSFERS).unwrap();
     let generation = app.bluetooth.view.generation;
-    let (send, receive) = mpsc::channel();
-    drop(send);
-    let (approvals, _) = mpsc::sync_channel(1);
-    let progress = Progress {
-        offer: Some(Offer {
+    start(&mut app, owner, |ctx| {
+        ctx.progress.lock().unwrap().offer = Some(Offer {
             id: 1,
             name: "private.txt".into(),
             size: 0,
             peer: "peer".into(),
-        }),
-        ..Default::default()
-    };
-    app.bluetooth.job = Some(Job {
-        owner,
-        cancel: Default::default(),
-        receive,
-        progress: Arc::new(Mutex::new(progress)),
-        approvals,
-        conflicts: Default::default(),
+        });
+        panic!("intentional Bluetooth worker failure");
     });
-    app.bluetooth.view.busy = true;
-    assert!(poll(&mut app));
+    wait(&mut app, |a| !a.bluetooth.view.busy);
     assert!(!app.bluetooth.view.busy);
     assert!(app.bluetooth.view.progress.offer.is_none());
     assert!(app.bluetooth.view.conflict.is_none());
@@ -501,5 +504,517 @@ fn defaults_upgrade_and_explicit_disable_persist_without_starting_radio() -> io:
     assert!(app.bluetooth.job.is_none());
     assert!(!app.bluetooth.view.busy);
     assert!(app.bluetooth.view.devices.is_empty());
+    Ok(())
+}
+
+#[test]
+fn retired_cleanup_is_tracked_through_quit_and_cannot_update_reopened_bluetooth() -> io::Result<()>
+{
+    let work = crate::network::workspace::Workspace::create(std::env::temp_dir())?;
+    let mut app = App::new(work.root.clone())?;
+    app.config = crate::config::Config::default();
+    app.config.save_on_exit = false;
+    app.config_store = crate::config::Store::new(Some(work.root.join("config.conf")));
+    crate::plugins::host::open(&mut app, BLUETOOTH_TRANSFERS);
+    wait(&mut app, |a| !a.bluetooth.view.busy);
+    let owner = app.desktop.plugins.binding(BLUETOOTH_TRANSFERS).unwrap();
+    let (started, ready) = mpsc::sync_channel(1);
+    let (release, gate) = mpsc::sync_channel(1);
+    let target = work.root.join("never-published.txt");
+    let output = target.clone();
+    start(&mut app, owner, move |ctx| {
+        let mut stage = crate::publication::StagedFile::create(&output)?;
+        io::Write::write_all(&mut stage.file, b"private partial data")?;
+        started.send(stage.path().to_path_buf()).unwrap();
+        gate.recv_timeout(Duration::from_secs(5)).unwrap();
+        assert!(ctx.cancel.load(Ordering::Relaxed));
+        drop(stage);
+        Ok(Reply::Transferred)
+    });
+    let staging = ready.recv_timeout(Duration::from_secs(5)).unwrap();
+    let Owner::Document(id) = owner.owner else {
+        panic!("document");
+    };
+    app.desktop.close(id);
+    app.poll();
+    assert!(!app.bluetooth.view.busy);
+    assert!(app.workers.pending());
+    assert!(staging.exists());
+    crate::plugins::host::open(&mut app, BLUETOOTH_TRANSFERS);
+    let fresh = app.desktop.active().id;
+    assert_ne!(fresh, id);
+    let notice = app.bluetooth.view.notice.clone();
+    app.request_exit();
+    assert!(!app.quit && app.exit_pending);
+    assert!(app.wait_duration(Instant::now()) <= Duration::from_millis(50));
+    app.abort_quit();
+    assert!(!app.quit && !app.exit_pending);
+    app.request_exit();
+    assert!(!app.quit);
+    release.send(()).unwrap();
+    // Another admission/poll may already have reaped cleanup. Quit must not
+    // depend on observing that exact transition in App::poll.
+    let end = Instant::now() + Duration::from_secs(5);
+    while app.workers.pending() {
+        app.workers.poll();
+        assert!(Instant::now() < end);
+        thread::sleep(Duration::from_millis(1));
+    }
+    wait(&mut app, |a| a.quit);
+    assert!(!app.workers.pending());
+    assert!(!staging.exists() && !target.exists());
+    assert_eq!(app.desktop.active().id, fresh);
+    assert_eq!(app.bluetooth.view.notice, notice);
+    Ok(())
+}
+
+fn transfer_app(root: PathBuf) -> io::Result<(App, Binding)> {
+    let mut app = App::new(root.clone())?;
+    app.config = crate::config::Config::default();
+    app.config.save_on_exit = false;
+    app.config_store = crate::config::Store::new(Some(root.join("dn.conf")));
+    wait(&mut app, |a| a.panels.iter().all(|p| !p.loading));
+    crate::plugins::host::open(&mut app, BLUETOOTH_TRANSFERS);
+    wait(&mut app, |a| !a.bluetooth.view.busy);
+    let owner = app.desktop.plugins.binding(BLUETOOTH_TRANSFERS).unwrap();
+    Ok((app, owner))
+}
+fn receive_socket(app: &mut App, owner: Binding, mut receiver: TcpStream) -> io::Result<()> {
+    let job = make_job(app, owner, true, true, move |ctx| {
+        engine::receive(&mut receiver, "private peer", &ctx)?;
+        Ok(Reply::Transferred)
+    })?;
+    app.bluetooth.job = Some(job);
+    app.bluetooth.view.busy = true;
+    Ok(())
+}
+fn accept_current(app: &mut App, owner: Binding, destination: PathBuf) -> u64 {
+    wait(app, |a| a.bluetooth.view.progress.offer.is_some());
+    let offer = app.bluetooth.view.progress.offer.as_ref().unwrap().id;
+    action(
+        app,
+        owner,
+        app.bluetooth.view.generation,
+        Action::Approve {
+            offer,
+            accept: true,
+            destination,
+        },
+    );
+    offer
+}
+#[test]
+fn accepted_receiver_waits_for_queue_then_survives_close_without_accepting_more_files(
+) -> io::Result<()> {
+    use crate::transfers::{self, Status};
+    let work = crate::network::workspace::Workspace::create(std::env::temp_dir())?;
+    let input = work.root.join("input");
+    let output = work.root.join("output");
+    fs::create_dir(&input)?;
+    fs::create_dir(&output)?;
+    let first = input.join("Ёжик.txt");
+    let next = input.join("not-approved.txt");
+    fs::write(&first, b"private data")?;
+    fs::write(&next, b"not approved")?;
+    let files = capture(vec![first.clone(), next], &AtomicBool::new(false))?;
+    let (mut app, owner) = transfer_app(work.root.clone())?;
+    app.transfers.paused = true;
+    let filesystem = transfers::submit(
+        &mut app,
+        crate::operations::Plan {
+            kind: crate::operations::Kind::Copy,
+            sources: vec![first.clone()],
+            destination: work.root.clone(),
+        },
+        Default::default(),
+    )
+    .unwrap();
+    let (mut sender, receiver) = sockets()?;
+    receive_socket(&mut app, owner, receiver)?;
+    let (ctx, _) = context();
+    let sent = ctx.progress.clone();
+    let sending = thread::spawn(move || engine::send(&mut sender, &files, &ctx));
+    let offer = accept_current(&mut app, owner, output.clone());
+    let id = app.transfers.bluetooth_pending().unwrap();
+    assert!(app
+        .transfers
+        .bluetooth
+        .as_ref()
+        .unwrap()
+        .answer(offer, true, output.clone())
+        .is_err());
+    assert!(app.bluetooth.job.is_none());
+    app.poll();
+    assert_eq!(
+        app.transfers
+            .entries
+            .iter()
+            .find(|e| e.id == id)
+            .unwrap()
+            .status,
+        Status::Queued
+    );
+    assert_eq!(fs::read_dir(&output)?.count(), 0);
+    let Owner::Document(old) = owner.owner else {
+        unreachable!()
+    };
+    app.desktop.close(old);
+    app.poll();
+    crate::plugins::host::open(&mut app, BLUETOOTH_TRANSFERS);
+    let fresh = app.desktop.active().id;
+    assert_ne!(fresh, old);
+    let current = app.desktop.plugins.binding(BLUETOOTH_TRANSFERS).unwrap();
+    action(&mut app, owner, 0, Action::Stop); // Retired window cannot cancel accepted work.
+    assert!(!app
+        .transfers
+        .bluetooth
+        .as_ref()
+        .unwrap()
+        .inner
+        .worker
+        .cancellation_flag()
+        .load(Ordering::Relaxed));
+    transfers::action(&mut app, transfers::Action::Resume);
+    let end = Instant::now() + Duration::from_secs(5);
+    while !app
+        .transfers
+        .entries
+        .iter()
+        .find(|e| e.id == id)
+        .unwrap()
+        .status
+        .terminal()
+    {
+        app.poll();
+        if output.join("Ёжик.txt").exists() {
+            assert_eq!(
+                app.transfers
+                    .entries
+                    .iter()
+                    .find(|e| e.id == filesystem)
+                    .unwrap()
+                    .status,
+                Status::Completed
+            );
+        }
+        assert!(Instant::now() < end, "accepted receiver did not finish");
+        thread::sleep(Duration::from_millis(1));
+    }
+    assert_eq!(
+        app.transfers
+            .entries
+            .iter()
+            .find(|e| e.id == id)
+            .unwrap()
+            .status,
+        Status::Completed
+    );
+    assert_eq!(fs::read(output.join("Ёжик.txt"))?, b"private data");
+    assert!(!output.join("not-approved.txt").exists());
+    let _ = sending.join().unwrap();
+    assert_eq!(sent.lock().unwrap().completed, 1);
+    assert_eq!(app.desktop.active().id, fresh);
+    assert_eq!(
+        app.desktop.plugins.binding(BLUETOOTH_TRANSFERS),
+        Some(current)
+    );
+    Ok(())
+}
+#[test]
+fn accepted_receiver_replacement_prompt_is_owned_by_transfer_center_after_window_close(
+) -> io::Result<()> {
+    use crate::{
+        operations::conflict::Decision,
+        transfers::{self, Status},
+    };
+    let work = crate::network::workspace::Workspace::create(std::env::temp_dir())?;
+    let input = work.root.join("input");
+    let output = work.root.join("output");
+    fs::create_dir(&input)?;
+    fs::create_dir(&output)?;
+    fs::write(input.join("file.txt"), b"new")?;
+    fs::write(output.join("file.txt"), b"old")?;
+    let files = capture(vec![input.join("file.txt")], &AtomicBool::new(false))?;
+    let (mut app, owner) = transfer_app(work.root.clone())?;
+    let (mut sender, receiver) = sockets()?;
+    receive_socket(&mut app, owner, receiver)?;
+    let (ctx, _) = context();
+    let sending = thread::spawn(move || engine::send(&mut sender, &files, &ctx));
+    accept_current(&mut app, owner, output.clone());
+    let id = app.transfers.bluetooth_pending().unwrap();
+    let Owner::Document(old) = owner.owner else {
+        unreachable!()
+    };
+    app.desktop.close(old);
+    wait(&mut app, |a| a.transfers.conflict_prompt.is_some());
+    assert_eq!(fs::read(output.join("file.txt"))?, b"old");
+    assert!(crate::transfers::conflict_dialog(&app));
+    transfers::action(&mut app, transfers::Action::Conflict(id, Decision::Replace));
+    wait(&mut app, |a| {
+        a.transfers
+            .entries
+            .iter()
+            .any(|e| e.id == id && e.status.terminal())
+    });
+    sending.join().unwrap()?;
+    assert_eq!(
+        app.transfers
+            .entries
+            .iter()
+            .find(|e| e.id == id)
+            .unwrap()
+            .status,
+        Status::Completed
+    );
+    assert_eq!(fs::read(output.join("file.txt"))?, b"new");
+    assert!(app.transfers.conflict_prompt.is_none());
+    assert!(app.bluetooth.view.progress.offer.is_none());
+    Ok(())
+}
+#[test]
+fn queued_bluetooth_cancellation_waits_for_cleanup_and_terminal_outcomes_are_typed(
+) -> io::Result<()> {
+    use crate::transfers::{self, Status};
+    for expected in [
+        Status::Cancelled,
+        Status::Unconfirmed,
+        Status::Skipped,
+        Status::Failed,
+    ] {
+        let work = crate::network::workspace::Workspace::create(std::env::temp_dir())?;
+        let (mut app, owner) = transfer_app(work.root.clone())?;
+        app.transfers.paused = true;
+        let request = transfer::Transfer {
+            direction: transfer::Direction::Send,
+            device: Device {
+                name: "private peer".into(),
+                address: "01:23:45:67:89:AB".into(),
+            },
+            files: vec![],
+            name: String::new(),
+            destination: PathBuf::new(),
+        };
+        let id = transfers::submit_bluetooth(&mut app, request, false).unwrap();
+        let (release, gate) = mpsc::sync_channel(1);
+        let (started, ready) = mpsc::sync_channel(1);
+        let output = work.root.join("never-published.txt");
+        let target = output.clone();
+        let job = make_job(&mut app, owner, true, false, move |ctx| {
+            let stage = if expected == Status::Cancelled {
+                Some(crate::publication::StagedFile::create(&target)?)
+            } else {
+                None
+            };
+            started
+                .send(stage.as_ref().map(|s| s.path().to_path_buf()))
+                .map_err(io::Error::other)?;
+            gate.recv_timeout(Duration::from_secs(5))
+                .map_err(io::Error::other)?;
+            if expected == Status::Cancelled {
+                assert!(ctx.cancel.load(Ordering::Relaxed));
+                return Err(io::ErrorKind::Interrupted.into());
+            }
+            if expected == Status::Unconfirmed {
+                return Err(io::Error::new(
+                    io::ErrorKind::Interrupted,
+                    transfer::Unconfirmed(io::ErrorKind::BrokenPipe.into()),
+                ));
+            }
+            if expected == Status::Failed {
+                return Err(io::ErrorKind::PermissionDenied.into());
+            }
+            ctx.progress.lock().unwrap().skipped = 2;
+            Ok(Reply::Transferred)
+        })?;
+        app.transfers.bluetooth = Some(transfer::Job::adopt(id, job, None));
+        let staging = ready
+            .recv_timeout(Duration::from_secs(5))
+            .map_err(io::Error::other)?;
+        if expected == Status::Cancelled {
+            transfers::action(&mut app, transfers::Action::Cancel);
+            assert_eq!(app.transfers.entries[0].status, Status::Cancelling);
+            assert!(app.transfers.has_work());
+            assert!(staging.as_ref().unwrap().exists());
+        } else {
+            transfers::action(&mut app, transfers::Action::Resume);
+        }
+        release.send(()).unwrap();
+        wait(&mut app, |a| a.transfers.entries[0].status.terminal());
+        assert_eq!(app.transfers.entries[0].status, expected);
+        assert!(!app.transfers.has_work());
+        assert!(app.transfers.bluetooth.is_none());
+        assert!(!output.exists());
+        if let Some(staging) = staging {
+            assert!(!staging.exists());
+        }
+        if expected == Status::Unconfirmed {
+            assert!(app.transfers.entries[0]
+                .error
+                .as_ref()
+                .unwrap()
+                .contains("Delivery unconfirmed"));
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn closing_receiver_while_idle_finishes_accepted_job_without_waiting_for_another_packet(
+) -> io::Result<()> {
+    use std::io::{Read, Write};
+    struct HoldDisconnect {
+        socket: TcpStream,
+        reached: mpsc::SyncSender<()>,
+        resume: mpsc::Receiver<()>,
+    }
+    impl Read for HoldDisconnect {
+        fn read(&mut self, bytes: &mut [u8]) -> io::Result<usize> {
+            self.socket.read(bytes)
+        }
+    }
+    impl Write for HoldDisconnect {
+        fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+            if bytes.first() == Some(&0x81) {
+                self.reached.send(()).map_err(io::Error::other)?;
+                self.resume
+                    .recv_timeout(Duration::from_secs(5))
+                    .map_err(io::Error::other)?;
+            }
+            self.socket.write(bytes)
+        }
+        fn flush(&mut self) -> io::Result<()> {
+            self.socket.flush()
+        }
+    }
+    let work = crate::network::workspace::Workspace::create(std::env::temp_dir())?;
+    let input = work.root.join("private.txt");
+    let output = work.root.join("output");
+    fs::write(&input, b"private")?;
+    fs::create_dir(&output)?;
+    let files = capture(vec![input], &AtomicBool::new(false))?;
+    let (mut app, owner) = transfer_app(work.root.clone())?;
+    let (sender, receiver) = sockets()?;
+    receive_socket(&mut app, owner, receiver)?;
+    let (reached, waiting) = mpsc::sync_channel(1);
+    let (resume, gate) = mpsc::sync_channel(1);
+    let (ctx, _) = context();
+    let sending = thread::spawn(move || {
+        engine::send(
+            &mut HoldDisconnect {
+                socket: sender,
+                reached,
+                resume: gate,
+            },
+            &files,
+            &ctx,
+        )
+    });
+    accept_current(&mut app, owner, output.clone());
+    wait(&mut app, |a| a.bluetooth.view.progress.completed == 1);
+    waiting
+        .recv_timeout(Duration::from_secs(5))
+        .map_err(io::Error::other)?;
+    let id = app.transfers.bluetooth_pending().unwrap();
+    let Owner::Document(window) = owner.owner else {
+        unreachable!()
+    };
+    app.desktop.close(window);
+    wait(&mut app, |a| {
+        a.transfers
+            .entries
+            .iter()
+            .any(|e| e.id == id && e.status.terminal())
+    });
+    assert_eq!(
+        app.transfers.entries[0].status,
+        crate::transfers::Status::Completed
+    );
+    assert_eq!(app.transfers.entries[0].progress.files, 1);
+    assert_eq!(fs::read(output.join("private.txt"))?, b"private");
+    resume.send(()).unwrap();
+    sending.join().unwrap()?;
+    Ok(())
+}
+
+#[test]
+fn bluetooth_all_choices_cover_subsequent_explicitly_approved_files() -> io::Result<()> {
+    use crate::{
+        operations::conflict::Decision,
+        transfers::{self, Status},
+    };
+    for decision in [Decision::ReplaceAll, Decision::SkipAll] {
+        let work = crate::network::workspace::Workspace::create(std::env::temp_dir())?;
+        let input = work.root.join("input");
+        let output = work.root.join("output");
+        fs::create_dir(&input)?;
+        fs::create_dir(&output)?;
+        let mut paths = vec![];
+        for name in ["first.txt", "second.txt"] {
+            let path = input.join(name);
+            fs::write(&path, b"new")?;
+            fs::write(output.join(name), b"old")?;
+            paths.push(path);
+        }
+        let files = capture(paths, &AtomicBool::new(false))?;
+        let (mut app, owner) = transfer_app(work.root.clone())?;
+        let (mut sender, receiver) = sockets()?;
+        receive_socket(&mut app, owner, receiver)?;
+        let (ctx, _) = context();
+        let sending = thread::spawn(move || engine::send(&mut sender, &files, &ctx));
+        accept_current(&mut app, owner, output.clone());
+        let id = app.transfers.bluetooth_pending().unwrap();
+        transfers::open(&mut app);
+        wait(&mut app, |a| a.transfers.conflict_prompt.is_some());
+        transfers::action(&mut app, transfers::Action::Conflict(id, decision));
+        wait(&mut app, |a| {
+            a.bluetooth
+                .view
+                .progress
+                .offer
+                .as_ref()
+                .is_some_and(|o| o.name == "second.txt")
+        });
+        // Approval remains explicit even when replacement was approved for all.
+        assert_eq!(fs::read(output.join("second.txt"))?, b"old");
+        accept_current(&mut app, owner, output.clone());
+        wait(&mut app, |a| {
+            a.transfers
+                .entries
+                .iter()
+                .any(|e| e.id == id && e.status.terminal())
+        });
+        sending.join().unwrap()?;
+        assert_eq!(
+            app.transfers.entries[0].status,
+            if decision == Decision::ReplaceAll {
+                Status::Completed
+            } else {
+                Status::Skipped
+            }
+        );
+        assert_eq!(
+            app.transfers.entries[0].progress.files,
+            if decision == Decision::ReplaceAll {
+                2
+            } else {
+                0
+            }
+        );
+        assert_eq!(
+            app.transfers.entries[0].progress.skipped,
+            if decision == Decision::SkipAll { 2 } else { 0 }
+        );
+        assert!(app.transfers.conflict_prompt.is_none());
+        for name in ["first.txt", "second.txt"] {
+            assert_eq!(
+                fs::read(output.join(name))?,
+                if decision == Decision::ReplaceAll {
+                    b"new"
+                } else {
+                    b"old"
+                }
+            );
+        }
+    }
     Ok(())
 }

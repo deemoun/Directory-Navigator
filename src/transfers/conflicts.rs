@@ -14,6 +14,18 @@ pub(crate) fn conflict_dialog(app: &App) -> bool {
         .is_some_and(|(id, _)| app.modal_top().is_some_and(|m| m.id == id))
 }
 fn current(app: &App) -> Option<(TransferId, Conflict)> {
+    if let Some(job) = &app.transfers.bluetooth {
+        let id = job.id();
+        if app.transfers.active == Some(id)
+            && app
+                .transfers
+                .entries
+                .iter()
+                .any(|e| e.id == id && e.status != Status::Cancelling)
+        {
+            return Some((id, job.conflicts().pending()?));
+        }
+    }
     let job = app.job.as_ref()?;
     let id = job.transfer?;
     if app.transfers.active != Some(id) || job.cancel.load(Ordering::Relaxed) {
@@ -68,7 +80,9 @@ pub(super) fn answer(app: &mut App, id: TransferId, decision: Decision) {
     {
         return;
     }
-    if let Some(job) = &app.job {
+    if let Some(job) = app.transfers.bluetooth.as_ref().filter(|j| j.id() == id) {
+        job.answer_conflict(decision);
+    } else if let Some(job) = &app.job {
         job.conflicts.answer(decision);
     }
     if let Some((modal, _)) = app.transfers.conflict_prompt.take() {

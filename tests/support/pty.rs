@@ -88,6 +88,22 @@ impl Session {
         preferences: &str,
         terminal: &str,
     ) -> io::Result<Self> {
+        Self::with_environment_settings(label, checkpoint, preferences, terminal, &[])
+    }
+    pub fn with_preferences_environment(
+        label: &str,
+        preferences: &str,
+        environment: &[(&str, &str)],
+    ) -> io::Result<Self> {
+        Self::with_environment_settings(label, false, preferences, "xterm-256color", environment)
+    }
+    fn with_environment_settings(
+        label: &str,
+        checkpoint: bool,
+        preferences: &str,
+        terminal: &str,
+        environment: &[(&str, &str)],
+    ) -> io::Result<Self> {
         static NEXT: AtomicU64 = AtomicU64::new(0);
         let root = std::env::temp_dir().join(format!(
             "dn-walk-{label}-{}-{}",
@@ -122,7 +138,7 @@ impl Session {
                 },
             )?;
         }
-        Self::spawn(root, terminal, false)
+        Self::spawn_environment(root, terminal, false, environment)
     }
     /// Reopen an already-finished private session without replacing its settings.
     pub fn restart(mut self, no_session: bool) -> io::Result<Self> {
@@ -138,6 +154,14 @@ impl Session {
         Self::spawn(root, "xterm-256color", no_session)
     }
     fn spawn(root: PathBuf, terminal: &str, no_session: bool) -> io::Result<Self> {
+        Self::spawn_environment(root, terminal, no_session, &[])
+    }
+    fn spawn_environment(
+        root: PathBuf,
+        terminal: &str,
+        no_session: bool,
+        environment: &[(&str, &str)],
+    ) -> io::Result<Self> {
         let (mut master, mut slave) = (0, 0);
         let size = libc::winsize {
             ws_row: 25,
@@ -210,6 +234,7 @@ impl Session {
             .stdin(Stdio::from(slave.try_clone()?))
             .stdout(Stdio::from(slave.try_clone()?))
             .stderr(Stdio::from(slave.try_clone()?));
+        command.envs(environment.iter().copied());
         // SAFETY: only async-signal-safe calls are made between fork and exec.
         unsafe {
             command.pre_exec(|| {

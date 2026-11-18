@@ -126,3 +126,5 @@ pub mod network;
 pub mod video;
 
 pub(crate) mod bluetooth;
+
+pub(crate) mod workers;

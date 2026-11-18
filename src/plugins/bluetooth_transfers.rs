@@ -422,27 +422,34 @@ impl ToolPlugin for BluetoothTransfers {
                 enabled,
             );
         }
-        for (id, x, w, label, enabled) in [
+        let controls = [
             (
                 4,
-                2,
-                21,
                 "Send queue",
                 !v.busy && !v.queue.is_empty() && !v.devices.is_empty(),
             ),
-            (5, 26, 11, "Receive", !v.busy),
-            (6, 40, 9, "Stop", v.busy),
-            (7, 52, 8, "Help", true),
-            (0, 63, 10, "Close", true),
-        ] {
-            button(
-                &mut s,
-                ctx,
-                id,
-                Rect::new(r.x + x, r.y + 20, w, 1),
-                label,
-                enabled,
-            );
+            (5, "Receive", !v.busy),
+            (
+                6,
+                if v.transfer.is_some() {
+                    "Transfers"
+                } else {
+                    "Stop"
+                },
+                v.busy,
+            ),
+            (7, "Help", true),
+            (0, "Close", true),
+        ];
+        let labels = controls.map(|(_, label, _)| ctx.language.text(label));
+        let bounds = crate::dialog_theme::button_row(
+            Rect::new(r.x + 2, r.y + 20, r.width.saturating_sub(4), 1),
+            &labels,
+            10,
+            2,
+        );
+        for ((id, label, enabled), bounds) in controls.into_iter().zip(bounds) {
+            button(&mut s, ctx, id, bounds, label, enabled);
         }
         s
     }

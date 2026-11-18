@@ -2,6 +2,14 @@
 use super::{App, QuitReview};
 
 impl App {
+    /// Cooperative final cleanup for an embedder or a failed terminal loop.
+    /// Polling is nonblocking; worker destructors retain their own resources.
+    #[doc(hidden)]
+    pub fn poll_background_shutdown(&mut self) -> bool {
+        self.workers.cancel_all();
+        self.workers.poll();
+        !self.workers.pending()
+    }
     pub fn approve_quit(&mut self, id: crate::desktop::WindowId) {
         if self.quit_review.is_none() {
             return;
@@ -63,6 +71,10 @@ impl App {
             self.notice = "Finishing list export before exit…".into();
         } else if let Some(job) = &self.job {
             job.cancel();
+            self.exit_pending = true;
+            self.notice = "Cancelling operation before exit…".into();
+        } else if self.workers.pending() {
+            self.workers.cancel_all();
             self.exit_pending = true;
             self.notice = "Cancelling operation before exit…".into();
         } else {

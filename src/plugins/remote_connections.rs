@@ -546,6 +546,7 @@ mod tests {
             storage: None,
             mp3: Default::default(),
             dos: Default::default(),
+            dos_status: Default::default(),
             video: Default::default(),
             video_preferences: Default::default(),
             acoustic: Default::default(),

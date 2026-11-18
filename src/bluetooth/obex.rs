@@ -25,14 +25,16 @@ pub fn check(cancel: &AtomicBool) -> io::Result<()> {
         Ok(())
     }
 }
-pub fn read_exact(
+fn read_exact_while(
     link: &mut dyn Link,
     mut bytes: &mut [u8],
     cancel: &AtomicBool,
+    check_state: &mut impl FnMut() -> io::Result<()>,
 ) -> io::Result<()> {
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(120);
     while !bytes.is_empty() {
         check(cancel)?;
+        check_state()?;
         match link.read(bytes) {
             Ok(0) => {
                 return Err(io::Error::new(
@@ -55,14 +57,22 @@ pub fn read_exact(
     Ok(())
 }
 pub fn read(link: &mut dyn Link, cancel: &AtomicBool, limit: usize) -> io::Result<(u8, Vec<u8>)> {
+    read_while(link, cancel, limit, || Ok(()))
+}
+pub(super) fn read_while(
+    link: &mut dyn Link,
+    cancel: &AtomicBool,
+    limit: usize,
+    mut check_state: impl FnMut() -> io::Result<()>,
+) -> io::Result<(u8, Vec<u8>)> {
     let mut h = [0; 3];
-    read_exact(link, &mut h, cancel)?;
+    read_exact_while(link, &mut h, cancel, &mut check_state)?;
     let n = usize::from(u16::from_be_bytes([h[1], h[2]]));
     if !(3..=limit).contains(&n) {
         return Err(invalid("Invalid OBEX packet length"));
     }
     let mut body = vec![0; n - 3];
-    read_exact(link, &mut body, cancel)?;
+    read_exact_while(link, &mut body, cancel, &mut check_state)?;
     Ok((h[0], body))
 }
 pub fn write(link: &mut dyn Link, opcode: u8, body: &[u8], cancel: &AtomicBool) -> io::Result<()> {

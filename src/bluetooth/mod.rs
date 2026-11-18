@@ -10,13 +10,13 @@ use std::{
         atomic::{AtomicBool, Ordering},
         mpsc, Arc, Mutex,
     },
-    thread,
 };
 mod engine;
 mod obex;
 mod platform;
 #[cfg(test)]
 mod tests;
+pub(crate) mod transfer;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Device {
     pub name: String,
@@ -44,6 +44,10 @@ pub struct Progress {
     pub skipped: usize,
     pub offer: Option<Offer>,
     pub warning: String,
+    pub bytes: u64,
+    pub destinations: Vec<PathBuf>,
+    pub member: Option<String>,
+    pub operation: crate::operations::Phase,
 }
 #[derive(Default, Clone)]
 pub struct Snapshot {
@@ -55,6 +59,7 @@ pub struct Snapshot {
     pub destination: PathBuf,
     pub progress: Progress,
     pub conflict: Option<crate::operations::conflict::Conflict>,
+    pub transfer: Option<crate::transfers::TransferId>,
 }
 enum Reply {
     Devices(Vec<Device>),
@@ -63,15 +68,35 @@ enum Reply {
 }
 struct Job {
     owner: Binding,
-    cancel: obex::Cancel,
-    receive: mpsc::Receiver<io::Result<Reply>>,
+    worker: crate::workers::Worker<Reply>,
     progress: Arc<Mutex<Progress>>,
     approvals: mpsc::SyncSender<(u64, bool, PathBuf)>,
     conflicts: crate::operations::conflict::Mailbox,
+    flow: transfer::Flow,
+    receiving: bool,
 }
-impl Drop for Job {
-    fn drop(&mut self) {
-        self.cancel.store(true, Ordering::Relaxed);
+impl Job {
+    fn answer_offer(&self, id: u64, accept: bool, path: PathBuf) -> io::Result<()> {
+        if !self.flow.open() {
+            return Err(io::Error::other("Bluetooth offer is no longer pending"));
+        }
+        let mut progress = self.progress.lock().unwrap_or_else(|e| e.into_inner());
+        if progress.offer.as_ref().is_none_or(|o| o.id != id) {
+            return Err(io::Error::other("Bluetooth offer is no longer pending"));
+        }
+        let previous = self.flow.approved.load(Ordering::Acquire);
+        if accept {
+            self.flow.approved.store(id, Ordering::Release);
+        }
+        if let Err(error) = self.approvals.try_send((id, accept, path.clone())) {
+            self.flow.approved.store(previous, Ordering::Release);
+            return Err(io::Error::other(error));
+        }
+        if accept && progress.destinations.len() < 256 && !progress.destinations.contains(&path) {
+            progress.destinations.push(path);
+        }
+        progress.offer = None;
+        Ok(())
     }
 }
 #[derive(Default)]
@@ -79,6 +104,7 @@ pub struct State {
     pub view: Snapshot,
     queue: Vec<Source>,
     job: Option<Job>,
+    requests: crate::requests::RequestScope,
 }
 pub enum Action {
     Refresh,
@@ -94,7 +120,7 @@ pub enum Action {
     },
     Conflict(crate::operations::conflict::Decision),
 }
-pub const HELP:&str="Bluetooth transfers uses standard OBEX Object Push over Bluetooth Classic, without Wi-Fi or internet.\nThe plugin is enabled by default; a saved disabled choice is preserved. Pair the computers in system Bluetooth settings, then open Bluetooth transfers in both DN instances. Refresh lists paired devices; it does not change discoverability or pair devices automatically.\nUse selected files captures visible marked native files, or the current file. Only regular files are supported: no folders, links, archive or remote members. The queue is session-only, up to 256 files, each at most 4 GiB minus one byte.\nStart Receive on the destination DN, select its paired device on the sender, then Send queue. Review each incoming filename and size and explicitly Accept or Decline. Device names do not prove identity; verify system pairing.\nChoose an existing local destination directory. Existing regular files use shared replacement confirmation; links and directory conflicts are refused. Incomplete files are staged privately and cleaned up on failure or Stop. Completed files remain.\nClosing this window or disabling the plugin stops listening and cancels active work. Switching documents leaves it running. There is no automatic retry or resume. A lost final acknowledgement means delivery is unconfirmed: check the destination before retrying.\nLinux requires BlueZ and its system D-Bus service, including in tty mode. macOS requires Bluetooth access for the terminal running DN. Windows requires a Bluetooth Classic adapter and its system drivers. BLE-only adapters are insufficient.\nDN uses a private discovery service identifier with standard OBEX framing, so this version connects only to another DN receiver. System/Android interoperability is a later milestone. Bluetooth transfers is separate from Nearby and Acoustic transfers. Android compatibility and actual hardware/platform reliability require separate testing; iPhone OBEX compatibility is not promised.";
+pub const HELP:&str="Bluetooth transfers uses standard OBEX Object Push over Bluetooth Classic, without Wi-Fi or internet.\nThe plugin is enabled by default; a saved disabled choice is preserved. Pair the computers in system Bluetooth settings, then open Bluetooth transfers in both DN instances. Refresh lists paired devices; it does not change discoverability or pair devices automatically.\nUse selected files captures visible marked native files, or the current file. Only regular files are supported: no folders, links, archive or remote members. The queue is session-only, up to 256 files, each at most 4 GiB minus one byte.\nStart Receive on the destination DN, select its paired device on the sender, then Send queue. Review each incoming filename and size and explicitly Accept or Decline. Device names do not prove identity; verify system pairing.\nChoose an existing local destination directory. Existing regular files use shared replacement confirmation; links and directory conflicts are refused. Incomplete files are staged privately and cleaned up on failure or Stop. Completed files remain.\nSend queue and accepted incoming files run through Transfer Center. Closing this window or disabling the plugin stops new offers; accepted work continues. Use Transfers to open Transfer Center for progress, cancellation and replacement decisions. Incoming approval remains in this window. Waiting in the queue shares the receiver decision timeout. There is no automatic retry or resume. A lost final acknowledgement means delivery is unconfirmed: check the destination before retrying.\nLinux requires BlueZ and its system D-Bus service, including in tty mode. macOS requires Bluetooth access for the terminal running DN. Windows requires a Bluetooth Classic adapter and its system drivers. BLE-only adapters are insufficient.\nDN uses a private discovery service identifier with standard OBEX framing, so this version connects only to another DN receiver. System/Android interoperability is a later milestone. Bluetooth transfers is separate from Nearby and Acoustic transfers. Android compatibility and actual hardware/platform reliability require separate testing; iPhone OBEX compatibility is not promised.";
 fn alive(app: &App, b: Binding) -> bool {
     app.config.plugin_enabled(BLUETOOTH_TRANSFERS)
         && app.desktop.plugins.binding(BLUETOOTH_TRANSFERS) == Some(b)
@@ -163,45 +189,85 @@ fn start(
     if app.bluetooth.job.is_some() {
         return;
     }
-    let cancel = Arc::new(AtomicBool::new(false));
-    let progress = Arc::new(Mutex::new(Progress::default()));
-    let conflicts = crate::operations::conflict::Mailbox::default();
-    let (approvals, receiver) = mpsc::sync_channel(1);
-    let (send, receive) = mpsc::sync_channel(1);
-    let context = engine::JobContext {
-        cancel: cancel.clone(),
-        progress: progress.clone(),
-        approvals: receiver,
-        conflicts: conflicts.clone(),
-    };
-    match thread::Builder::new()
-        .name("dn-bluetooth".into())
-        .spawn(move || {
-            #[cfg(target_os = "macos")]
-            let result = objc2::rc::autoreleasepool(|_| run(context));
-            #[cfg(not(target_os = "macos"))]
-            let result = run(context);
-            let _ = send.send(result);
-        }) {
-        Ok(_) => {
+    match make_job(app, b, false, false, run) {
+        Ok(job) => {
             app.bluetooth.view.busy = true;
             app.bluetooth.view.notice.clear();
             app.bluetooth.view.progress = Default::default();
             app.bluetooth.view.generation = app.bluetooth.view.generation.wrapping_add(1);
-            app.bluetooth.job = Some(Job {
-                owner: b,
-                cancel,
-                receive,
-                progress,
-                approvals,
-                conflicts,
-            });
+            app.bluetooth.job = Some(job);
         }
-        Err(e) => app.bluetooth.view.notice = e.to_string(),
+        Err(e) => app.bluetooth.view.notice = app.config.language.message(&e.to_string()),
     }
+}
+fn make_job(
+    app: &mut App,
+    b: Binding,
+    workspace: bool,
+    receiving: bool,
+    run: impl FnOnce(engine::JobContext) -> io::Result<Reply> + Send + 'static,
+) -> io::Result<Job> {
+    let progress = Arc::new(Mutex::new(Progress::default()));
+    let conflicts = crate::operations::conflict::Mailbox::default();
+    let flow = if receiving {
+        transfer::Flow::receiver()
+    } else {
+        transfer::Flow::default()
+    };
+    let (approvals, receiver) = mpsc::sync_channel(1);
+    let (p, m, f) = (progress.clone(), conflicts.clone(), flow.clone());
+    let Owner::Document(owner) = b.owner else {
+        return Err(io::Error::other("Bluetooth requires a document owner"));
+    };
+    let scope = if workspace {
+        &app.transfers.requests
+    } else {
+        &app.bluetooth.requests
+    };
+    let owner = if workspace {
+        crate::requests::Owner::Workspace
+    } else {
+        crate::requests::Owner::Document(owner)
+    };
+    let worker = app.workers.spawn(
+        "dn-bluetooth",
+        scope,
+        owner,
+        if workspace {
+            "bluetooth-session"
+        } else {
+            "bluetooth-control"
+        },
+        move |cancel| {
+            let ctx = engine::JobContext {
+                cancel: cancel.flag(),
+                progress: p,
+                approvals: receiver,
+                conflicts: m,
+                flow: f,
+            };
+            #[cfg(target_os = "macos")]
+            let r = objc2::rc::autoreleasepool(|_| run(ctx));
+            #[cfg(not(target_os = "macos"))]
+            let r = run(ctx);
+            r
+        },
+    )?;
+    Ok(Job {
+        owner: b,
+        worker,
+        progress,
+        approvals,
+        conflicts,
+        flow,
+        receiving,
+    })
 }
 pub(crate) fn opened(app: &mut App, b: Binding) {
     app.bluetooth = State::default();
+    if app.transfers.bluetooth_pending().is_some() {
+        return;
+    }
     if !app.panels[app.active].is_virtual() {
         app.bluetooth.view.destination = app.panels[app.active].path.clone();
         if !app.panels[app.active].selected.is_empty()
@@ -219,9 +285,13 @@ pub(crate) fn action(app: &mut App, b: Binding, generation: u64, action: Action)
         return;
     }
     match action {
+        Action::Stop if app.transfers.bluetooth_pending().is_some() => {
+            app.transfers.selected = app.transfers.bluetooth_pending();
+            crate::transfers::open(app);
+        }
         Action::Stop => {
             if let Some(job) = &app.bluetooth.job {
-                job.cancel.store(true, Ordering::Relaxed);
+                job.worker.cancel();
             }
         }
         Action::Approve {
@@ -229,28 +299,65 @@ pub(crate) fn action(app: &mut App, b: Binding, generation: u64, action: Action)
             accept,
             destination,
         } => {
-            if app
+            let current = app
                 .bluetooth
                 .view
                 .progress
                 .offer
                 .as_ref()
-                .is_some_and(|o| o.id == offer)
-            {
-                if let Some(j) = &app.bluetooth.job {
-                    let _ = j.approvals.try_send((offer, accept, destination));
+                .is_some_and(|o| o.id == offer);
+            if !current {
+                return;
+            }
+            if let Some(job) = &app.transfers.bluetooth {
+                if !job.belongs_to(b) {
+                    return;
+                }
+                if let Err(e) = job.answer(offer, accept, destination) {
+                    app.bluetooth.view.notice = e.to_string();
+                }
+            } else if accept && app.bluetooth.job.as_ref().is_some_and(|j| j.receiving) {
+                let offered = app.bluetooth.view.progress.offer.clone().unwrap();
+                let request = transfer::Transfer {
+                    direction: transfer::Direction::Receive,
+                    device: Device {
+                        name: offered.peer.clone(),
+                        address: String::new(),
+                    },
+                    files: vec![],
+                    name: offered.name,
+                    destination: destination.clone(),
+                };
+                match crate::transfers::submit_bluetooth(app, request, false) {
+                    Ok(id) => {
+                        let job = app.bluetooth.job.take().unwrap();
+                        let job = transfer::Job::adopt(id, job, None);
+                        if let Err(e) = job.approve(offer, destination) {
+                            job.cancel();
+                            app.bluetooth.view.notice = e.to_string();
+                        }
+                        app.transfers.bluetooth = Some(job);
+                        app.bluetooth.view.progress.offer = None;
+                        app.bluetooth.view.generation =
+                            app.bluetooth.view.generation.wrapping_add(1);
+                    }
+                    Err(e) => app.bluetooth.view.notice = e,
+                }
+            } else if let Some(job) = &app.bluetooth.job {
+                if let Err(e) = job.answer_offer(offer, accept, destination) {
+                    app.bluetooth.view.notice = e.to_string();
                 }
             }
         }
         Action::Conflict(d) => {
             if let Some(j) = &app.bluetooth.job {
                 if d == crate::operations::conflict::Decision::Cancel {
-                    j.cancel.store(true, Ordering::Relaxed);
+                    j.worker.cancel();
                 }
                 j.conflicts.answer(d);
             }
         }
-        _ if app.bluetooth.view.busy => (),
+        _ if app.bluetooth.view.busy || app.transfers.bluetooth_pending().is_some() => (),
         Action::Refresh => start(app, b, |ctx| {
             ctx.update("Reading paired Bluetooth devices", 0, 0);
             platform::devices(&ctx.cancel).map(Reply::Devices)
@@ -282,30 +389,69 @@ pub(crate) fn action(app: &mut App, b: Binding, generation: u64, action: Action)
                 app.bluetooth.view.notice = "Select regular files before sending".into();
                 return;
             }
-            start(app, b, move |ctx| {
-                ctx.update("Connecting Bluetooth device", 0, 0);
-                let mut link = platform::connect(&device.address, &ctx.cancel)?;
-                engine::send(link.as_mut(), &files, &ctx)?;
-                Ok(Reply::Transferred)
-            });
+            let request = transfer::Transfer {
+                direction: transfer::Direction::Send,
+                device,
+                files,
+                name: String::new(),
+                destination: PathBuf::new(),
+            };
+            match crate::transfers::submit_bluetooth(app, request, true) {
+                Ok(id) => app.bluetooth.view.transfer = Some(id),
+                Err(e) => app.bluetooth.view.notice = e,
+            }
         }
-        Action::Receive => start(app, b, |ctx| {
-            ctx.update("Starting Bluetooth receiver", 0, 0);
-            let mut listener = platform::Listener::new(&ctx.cancel)?;
-            ctx.update("Waiting for Bluetooth sender", 0, 0);
-            let (mut link, peer) = listener.accept(&ctx.cancel)?;
-            engine::receive(link.as_mut(), &peer, &ctx)?;
-            Ok(Reply::Transferred)
-        }),
+        Action::Receive => {
+            match make_job(app, b, true, true, |ctx| {
+                ctx.waiting("Starting Bluetooth receiver", 0);
+                let mut listener = platform::Listener::new(&ctx.cancel)?;
+                ctx.waiting("Waiting for Bluetooth sender", 0);
+                let (mut link, peer) = listener.accept(&ctx.cancel)?;
+                engine::receive(link.as_mut(), &peer, &ctx)?;
+                Ok(Reply::Transferred)
+            }) {
+                Ok(job) => {
+                    app.bluetooth.job = Some(job);
+                    app.bluetooth.view.busy = true;
+                    app.bluetooth.view.generation = app.bluetooth.view.generation.wrapping_add(1);
+                }
+                Err(e) => app.bluetooth.view.notice = e.to_string(),
+            }
+        }
     }
 }
 pub(crate) fn poll(app: &mut App) -> bool {
+    if let Some(job) = &app.transfers.bluetooth {
+        job.stop_offers_if_closed(app);
+    }
+    let pending = app.transfers.bluetooth_pending();
+    let snapshot = app.transfers.bluetooth.as_ref().map(|j| j.snapshot());
+    let transfer_changed = app.bluetooth.view.transfer != pending;
+    app.bluetooth.view.transfer = pending;
+    if app.bluetooth.job.is_none() {
+        let changed = transfer_changed
+            || app.bluetooth.view.busy != pending.is_some()
+            || snapshot
+                .as_ref()
+                .is_some_and(|p| *p != app.bluetooth.view.progress);
+        app.bluetooth.view.busy = pending.is_some();
+        if let Some(p) = snapshot {
+            app.bluetooth.view.progress = p;
+        }
+        app.bluetooth.view.conflict = None;
+        if transfer_changed {
+            app.bluetooth.view.generation = app.bluetooth.view.generation.wrapping_add(1);
+        }
+        return changed;
+    }
     let Some(job) = &app.bluetooth.job else {
         return false;
     };
     if !alive(app, job.owner) {
         app.bluetooth.job = None;
         app.bluetooth.view.busy = false;
+        app.bluetooth.view.conflict = None;
+        app.bluetooth.view.progress.offer = None;
         app.bluetooth.view.generation = app.bluetooth.view.generation.wrapping_add(1);
         return true;
     }
@@ -319,7 +465,7 @@ pub(crate) fn poll(app: &mut App) -> bool {
         || conflict.is_some() != app.bluetooth.view.conflict.is_some();
     app.bluetooth.view.progress = progress;
     app.bluetooth.view.conflict = conflict;
-    match job.receive.try_recv() {
+    match job.worker.try_recv() {
         Ok(reply) => {
             // Completion may arrive after the snapshot taken above. Retain the
             // final counts/warnings from the same completed worker.

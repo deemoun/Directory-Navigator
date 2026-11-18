@@ -1971,45 +1971,74 @@ Both plugins are **disabled by default**, including upgrades without an explicit
 saved choice. Enable them in **Options → Configuration → Plugins**. Enabling
 alone starts no emulator, opens no audio devices and starts no networking.
 
-- **DOS launcher (Experimental)** uses a separately installed
-  [DOSBox Staging](https://www.dosbox-staging.org/). Configure its executable in
-  **Utilities → DOS launcher…**, or leave the path blank for automatic discovery.
-  **File → Run in DOSBox…** launches the current regular COM, DOS EXE or BAT in
-  its own graphical window. The separate **Open DOS programs with DOSBox** option
-  enables Enter/double-click for COM and DOS MZ executables before associations;
-  Windows PE/NE/LE/LX executables are excluded and BAT stays explicit. Ctrl+Enter
-  and **Open with default app** bypass DOS handling. Folder-local configuration
-  loading is disabled; DOSBox's global configuration is retained. No emulator is
-  bundled; a graphical session is required.
-- **Acoustic transfers (Experimental)** additionally requires a build with
-  `cargo build --release --locked --features acoustic` from this checkout. The feature is off
-  by default and independent of music playback. **Utilities → Acoustic transfers…**
-  sends **1 KiB of UTF-8 text or one regular file up to 1 KiB** using audible tones.
-  Both devices need microphones for acknowledgements. Compare the eight-digit
-  code on both screens; both users confirm, then the receiver approves each
-  offer. Noise XX encrypts the session; identities, drafts and previews are
-  session-only. Text has Preview/Copy/Dismiss; files use guarded destination and
-  replacement handling. Stop/close releases devices; completed files remain.
-  Missing final receipts mean **unconfirmed delivery**. Tiny payloads can take
-  minutes, and real speaker/microphone reliability remains unverified.
+- **DOS launcher (Experimental)** uses an installed **DOSBox, DOSBox-X or
+  [DOSBox Staging](https://www.dosbox-staging.org/)**. Open
+  **Utilities → DOS launcher…**, choose **Find emulators**, then select an installed
+  emulator or enter its executable path. A blank path selects automatically,
+  preferring Staging, then DOSBox-X, then classic DOSBox. Discovery checks PATH,
+  common installation locations, and Linux Snap/Flatpak exported launchers.
+  **File → Run in DOSBox…** starts the current regular COM, DOS EXE or BAT in
+  a separate graphical window. **Open DOS programs with DOSBox** enables
+  Enter/double-click for COM and DOS MZ before associations. Windows PE/NE/LE/LX
+  executables are excluded; BAT remains explicit. Ctrl+Enter and
+  **Open with default app** bypass DOS handling. Global emulator settings are
+  retained; automatic game-local configuration loading is disabled.
+  No emulator is bundled; a graphical session is required. **Check DOSBox**
+  checks the unsaved path draft without starting a game or testing graphical
+  output. Checks are cancellable and do not save preferences. Errors retain
+  bounded diagnostics in the launcher and Help; inactive results do not steal
+  focus. Closing the launcher cancels pending checks, not games already started.
+- **Acoustic transfers (Experimental)** requires a build with
+  `cargo build --release --locked --features acoustic` and is disabled by default.
+  **Send opens only the speaker; Receive opens only the microphone.** No return
+  audio or synchronized handshake is required. Enter the same strong passphrase
+  on both computers. Numbered blocks repeat in a carousel, so missing blocks can
+  be collected on later repetitions. Choose 1/2/3 repeats or Until Stop.
+  Send **UTF-8 text or one regular file up to 1 MiB**. Compression is used when
+  smaller; **Estimate** calculates playback time without opening devices.
+  Normal/Fast/Fastest profiles are available, but large files can take hours or
+  days. **Export WAV… / Receive WAV…** work without playback or audio devices.
+  Export streams standard WAV, using RF64 for large recordings; import accepts PCM16/24/32 or float32,
+  1–8 channels, 8–192 kHz, up to 64 GiB. Use finite repeats for export.
+  Argon2id and XChaCha20-Poly1305 protect the envelope. Only verified data reaches
+  local Accept/Save review; existing files retain guarded replacement handling.
+  The sender reports **Transmission finished**, never confirmed delivery.
+  Passphrases, drafts and previews are session-only. Protocol 2 requires updated
+  DN at both ends and is incompatible with the previous bidirectional modem.
+  Real speaker/microphone reliability remains unverified.
 
-The acoustic feature uses system-default input/output (CoreAudio on macOS,
-ALSA on Linux, WASAPI on Windows). Linux builds need the same pkg-config and ALSA
-development packages documented for audio; `--no-default-features --features
-acoustic` includes the modem without the music engine. No system volume is
-changed. Music paused by the modem resumes only if its player state remains
-unchanged. Closing the receiver rejects pending work and releases both streams.
+The acoustic feature uses CoreAudio on macOS, ALSA on Linux and WASAPI on
+Windows. Linux builds need the same pkg-config and ALSA development packages as
+music playback; `--no-default-features --features acoustic` builds the modem
+without the music engine. Neither Estimate nor WAV operations opens an audio
+device. Live audio pauses DN music and resumes it only if the original player
+state remains unchanged. No system volume is changed.
 
-Use a quiet room and keep speakers clear of clipping. Echo cancellation,
-noise suppression, microphone permissions and device loss can prevent reception.
-Framing uses bounded fragments, checksums, finite retries and duplicate filtering
-before Noise counters advance. Every new session uses fresh keys; acoustic trust
-is separate from Nearby/Iroh. There is no automatic acceptance, folders,
-multiselection, archive/remote sources or resume. Extract/download first.
+For live reception, start Receive before Send, or repeat long enough for a late
+receiver to collect every block. Corrupt frames are ignored; duplicate blocks do
+not inflate progress. An input overrun discards the damaged decoder state and
+allows subsequent repetitions to repair reception. Stop cancels collection.
+There are no return packets, receiver acknowledgements or delivery receipts.
+A completed receiver closes its microphone before local review. Accept retains
+text or saves the verified file; Decline discards it. Replay of a valid recording
+is possible: passphrases authenticate contents, not freshness or an independently
+verified sender identity. Choose a strong passphrase outside the audio channel.
 
-No acoustic or emulator hardware check is implied by a protocol test. The manual
-Rust-check workflow covers the optional feature without opening audio hardware;
-unified Intel release validation remains intentionally lighter.
+WAV export stages privately on the destination filesystem and uses the shared
+Replace/Skip/Cancel protections before publication. Cancellation cleans owned
+incomplete output; completed publications remain. Export is streamed rather than
+building an hours-long waveform in memory. Standard RIFF and RF64 recordings are
+read incrementally; compressed audio files must first be converted to supported
+PCM WAV. Live and recorded receivers use the same bounded authenticated protocol.
+
+One active collection retains at most a 1 MiB payload plus bounded framing and
+compression overhead. There is no folder/multiple-file support, archive/remote
+source handling, automatic acceptance, persistent trust or restart/resume cache.
+Extract/download first. Faster profiles are experimental; quiet-room tests and
+real devices are still needed. Echo cancellation, noise suppression, microphone
+permissions and clipping can prevent reception. Raising the size limit does not
+raise the modem's data rate. The manual Rust-check workflow covers the optional
+feature without audio hardware; unified Intel release validation stays lighter.
 
 
 ## Video Merge
@@ -2125,10 +2154,16 @@ filesystem and publish through the existing overwrite and compatibility guards.
 There is no automatic retry, persisted queue, move or resume support. Modification
 times and extended metadata are not exchanged in this first version.
 
-**Stop**, closing the window, disabling the plugin or exiting DN cancels owned
-work and removes incomplete private output; already completed publications remain.
-Switching documents leaves work running. Native calls may need to return before
-cancellation finishes. The window retains completed/skipped counts and errors.
+Before acceptance, **Stop** or closing Bluetooth cancels listening. Accepted
+incoming files and submitted send queues belong to **Transfer Center**: use
+**Transfers** to open their progress, cancellation and replacement prompts.
+Incoming per-file approval stays in Bluetooth. Closing that window or disabling
+the plugin rejects new offers while accepted work continues. Waiting reception
+shares the existing receiver-decision timeout; a paused queue cannot wait forever.
+Cancelling in Transfer Center removes incomplete owned output; completed files
+remain. Normal exit offers the shared wait/cancel choices. Native calls may need
+to return before cancellation finishes. Transfer history distinguishes completed,
+skipped, cancelled, failed and unconfirmed delivery.
 The sender reports success only after each file's final receipt. If that receipt
 is lost, delivery is **unconfirmed**, not proof that nothing was written.
 

@@ -69,6 +69,7 @@ pub(crate) fn context(app: &App, b: Binding, area: Rect, now: Instant) -> Option
         storage: app.config_store.path().ok().map(PathBuf::from),
         mp3: app.config.mp3,
         dos: app.config.dos.clone(),
+        dos_status: app.dos.view.clone(),
         video_preferences: app.config.video.clone(),
         video: if b.plugin == VIDEO_MERGE {
             app.video.view.clone()
@@ -280,6 +281,9 @@ fn apply(app: &mut App, b: Binding, effects: Vec<Effect>) {
             }
             Effect::Video { .. } => (),
             Effect::DosSetup(preferences) => crate::dos::setup(app, b, preferences),
+            Effect::DosCheck(preferences) => crate::dos::check(app, b, preferences),
+            Effect::DosDiscover => crate::dos::discover_emulators(app, b),
+            Effect::DosStop => crate::dos::stop(app, b),
             Effect::Acoustic { generation, action } => {
                 crate::acoustic::action(app, b, generation, action)
             }

@@ -4,6 +4,8 @@ use crate::{
     plugins::{Binding, Owner, ACOUSTIC_TRANSFERS},
 };
 use std::path::PathBuf;
+mod model;
+pub(crate) use model::{Input, Operation, Options, Request, Speed, MAX_BYTES, MAX_PASSWORD};
 #[cfg(all(
     feature = "acoustic",
     any(target_os = "macos", target_os = "linux", target_os = "windows")
@@ -19,6 +21,11 @@ mod protocol;
     any(target_os = "macos", target_os = "linux", target_os = "windows")
 ))]
 mod session;
+#[cfg(all(
+    feature = "acoustic",
+    any(target_os = "macos", target_os = "linux", target_os = "windows")
+))]
+mod wav;
 pub(crate) const fn available() -> bool {
     cfg!(all(
         feature = "acoustic",
@@ -35,8 +42,8 @@ pub(crate) struct Snapshot {
     pub busy: bool,
     pub notice: String,
     pub cause: Option<String>,
-    pub code: Option<String>,
     pub offer: Option<String>,
+    pub file_offer: bool,
     pub received: Option<String>,
     pub source: String,
     pub devices: String,
@@ -44,14 +51,18 @@ pub(crate) struct Snapshot {
     pub output: u8,
     pub packets: (u32, u32),
     pub conflict: Option<crate::operations::conflict::Conflict>,
+    pub completed: u64,
+    pub total: u64,
+    pub elapsed: u64,
+    pub remaining: Option<u64>,
+    pub estimate: Option<u64>,
+    pub plan_revision: u64,
+    pub dropped: u32,
 }
 pub(crate) enum Action {
     Capture,
-    SendText(String),
-    SendFile,
-    Receive,
+    Start(Request),
     Stop,
-    Confirm(bool),
     Approve { accept: bool, destination: PathBuf },
     Conflict(crate::operations::conflict::Decision),
     Dismiss,
@@ -69,7 +80,12 @@ pub(crate) struct State {
         feature = "acoustic",
         any(target_os = "macos", target_os = "linux", target_os = "windows")
     ))]
-    source: Option<session::Payload>,
+    source: Option<session::Captured>,
+    #[cfg(all(
+        feature = "acoustic",
+        any(target_os = "macos", target_os = "linux", target_os = "windows")
+    ))]
+    requests: crate::requests::RequestScope,
     #[cfg(all(
         feature = "acoustic",
         any(target_os = "macos", target_os = "linux", target_os = "windows")
@@ -117,18 +133,23 @@ pub(crate) fn action(app: &mut App, b: Binding, generation: u64, action: Action)
         any(target_os = "macos", target_os = "linux", target_os = "windows")
     )))]
     match action {
-        Action::SendText(text) => drop(text),
+        Action::Start(r) => {
+            let _ = (r.revision, r.options.speed, r.options);
+            if let Input::Text(text) = r.input {
+                drop(text);
+            }
+            if let Operation::Export(path) | Operation::Import(path) = r.operation {
+                drop(path);
+            }
+        }
         Action::Approve {
             accept,
             destination,
         } => {
             let _ = (accept, destination);
         }
-        Action::Confirm(v) => {
-            let _ = v;
-        }
-        Action::Conflict(v) => {
-            let _ = v;
+        Action::Conflict(value) => {
+            let _ = value;
         }
         _ => {}
     }

@@ -302,12 +302,42 @@ store and settings drafts. Typed effects ask the host to validate and launch;
 plugins do not execute a shell or write configuration themselves.
 
 The optional `acoustic` feature is off by default. The host owns the bounded
-service, audio streams, Noise keys, captured sources, receiver approvals and
+service, simplex audio streams, passphrase-derived keys, captured sources, local
+receiver approvals and
 shared guarded publication. The plugin owns only drafts and presentation.
 Closing/retiring a live owner cancels its service; old channels cannot update a
 reopened window. Clipboard actions use owned tokens and the existing bridge.
 No painting performs device, filesystem or crypto work.
+Acoustic jobs use the shared bounded worker supervisor. Sender and receiver types
+open only their respective output/input device. A v2 carousel replaces the v1
+stop-and-wait/Noise XX protocol. Passwords remain zeroizing session drafts;
+Argon2id parameters are fixed locally, and XChaCha20-Poly1305 authenticates the
+bounded envelope before decompression or any user-visible offer. Packet CRCs
+filter damaged blocks, with duplicate suppression and collection across loops.
+WAV/RF64 import/export stream on workers and reuse the same authenticated payload
+and guarded incoming-file publication. The microphone closes before local review;
+no acceptance, conflict or retention decision is sent back acoustically.
 
+
+
+DOS checks and launch preparation use the shared nonblocking worker supervisor
+with workspace request generations and captured document ownership. Normal quit
+waits for cancelled verification cleanup without opening late error dialogs.
+DOS checks use a typed host effect and a prepared status snapshot. Check reads
+the path draft without committing preferences. Find emulators returns a bounded,
+selectable list of DOSBox Staging, DOSBox-X and classic DOSBox. Automatic prefers
+that order; manual paths remain available. Discovery includes native installation
+locations and Linux exported Snap/Flatpak launchers. Windows version resources
+avoid GUI-only version prompts where available. Staging uses its advertised
+local-config flag; classic/X load user configuration plus an explicit empty
+configuration, preventing the automatic game-local fallback. DOSBox-X also
+suppresses its working-directory prompt. Source identity and literal arguments are
+preserved, with the game's directory as working directory. Emulator stdout/stderr
+are drained nonblockingly with an 8 KiB retained tail; Unix read ends use fcntl
+and Windows uses PeekNamedPipe. No reader threads or temporary runtime logs are
+needed. Failures show owned dialogs only while the originating document and
+activation are unchanged; the retained result is available in the launcher/Help.
+A launched game remains independent of the settings window.
 
 ### Video Merge
 
@@ -331,14 +361,46 @@ changes encoder. Private speed samples use the same conversion argument builder
 and cannot publish files. Typed FFmpeg records feed a monotonic host clock;
 painting only reads prepared elapsed/remaining/final timing snapshots.
 
+### Long-running worker lifecycle
+
+Video Merge processing, encoder discovery and Bluetooth use the workspace-owned
+`workers::Supervisor`. It admits at most eight dedicated workers, including
+cancelled workers whose cleanup is still running. It is separate from the
+short-I/O task pool and reuses request-scope identities and cancellation tokens.
+
+Dropping a worker handle cancels it and retires its request; it never joins a
+thread on the UI. The supervisor retains the thread record until completion,
+then releases the finished handle without joining. Queued completion values are
+bounded to one; stale owner/generation replies cannot update another document.
+Cancellation results still report established publication outcomes. Workers own
+subprocesses, sockets and staging cleanup; replies contain data, not cleanup that
+must block the UI.
+
+Normal quit requests cancellation and stays in the existing pending-exit event
+loop until cleanup finishes. Esc can abort the pending quit; already requested
+cancellations remain requested. Closing/reopening a tool never waits for retired
+workers. A temporarily exhausted worker budget reports a retryable error instead
+of accumulating unbounded detached workers. No networking, audio or executable
+probing starts merely because the supervisor exists. On terminal-loop failure,
+DN restores terminal ownership before polling final cancellation/cleanup; an
+embedder can use the nonblocking `App::poll_background_shutdown` hook before
+teardown. Acoustic is unchanged.
+
 ## Bluetooth transfers
 
 The `bluetooth_transfers` plugin is enabled by default, but opens no radio service until explicitly requested. Its typed effects are
 restricted to its live binding and request generation. The host owns the worker,
 paired-device enumeration, OBEX streams, captured native sources, per-file offers,
 cancellation and guarded publication. The plugin receives prepared snapshots and
-never touches files or devices while painting. Closing/retiring its document
-cancels the job; inactive completions update no other owner and do not steal focus.
+never touches files or devices while painting. Enumeration and unaccepted listening
+remain window-owned. Send admission and the first incoming approval create a typed
+Transfer Center request. Its shared worker lease belongs to the workspace, so
+closing/retiring the window stops new offers while accepted work continues.
+Only one Bluetooth session is admitted. A queued receiver pumps negotiated
+keepalives without publishing files before its queue turn; the existing decision
+budget still applies. Transfer Center routes conflicts by transfer identity and
+retains completed/skipped/cancelled/unconfirmed outcomes. Stale approvals are
+rejected by offer identity; inactive completions never steal focus.
 A private SDP UUID distinguishes DN receivers while using standard OBEX framing.
 Queue and device state are session-only. No Bluetooth-specific preferences or
 configuration version change are introduced. Acoustic behavior is unchanged.

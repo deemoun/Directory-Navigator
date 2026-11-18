@@ -609,27 +609,41 @@ Both plugins are **disabled by default**, including upgrades without an explicit
 saved choice. Enable them in **Options → Configuration → Plugins**. Enabling
 alone starts no emulator, opens no audio devices and starts no networking.
 
-- **DOS launcher (Experimental)** uses a separately installed
-  [DOSBox Staging](https://www.dosbox-staging.org/). Configure its executable in
-  **Utilities → DOS launcher…**, or leave the path blank for automatic discovery.
-  **File → Run in DOSBox…** launches the current regular COM, DOS EXE or BAT in
-  its own graphical window. The separate **Open DOS programs with DOSBox** option
-  enables Enter/double-click for COM and DOS MZ executables before associations;
-  Windows PE/NE/LE/LX executables are excluded and BAT stays explicit. Ctrl+Enter
-  and **Open with default app** bypass DOS handling. Folder-local configuration
-  loading is disabled; DOSBox's global configuration is retained. No emulator is
-  bundled; a graphical session is required.
-- **Acoustic transfers (Experimental)** additionally requires a build with
-  `cargo build --release --locked --features acoustic` from this checkout. The feature is off
-  by default and independent of music playback. **Utilities → Acoustic transfers…**
-  sends **1 KiB of UTF-8 text or one regular file up to 1 KiB** using audible tones.
-  Both devices need microphones for acknowledgements. Compare the eight-digit
-  code on both screens; both users confirm, then the receiver approves each
-  offer. Noise XX encrypts the session; identities, drafts and previews are
-  session-only. Text has Preview/Copy/Dismiss; files use guarded destination and
-  replacement handling. Stop/close releases devices; completed files remain.
-  Missing final receipts mean **unconfirmed delivery**. Tiny payloads can take
-  minutes, and real speaker/microphone reliability remains unverified.
+- **DOS launcher (Experimental)** uses an installed **DOSBox, DOSBox-X or
+  [DOSBox Staging](https://www.dosbox-staging.org/)**. Open
+  **Utilities → DOS launcher…**, choose **Find emulators**, then select an installed
+  emulator or enter its executable path. A blank path selects automatically,
+  preferring Staging, then DOSBox-X, then classic DOSBox. Discovery checks PATH,
+  common installation locations, and Linux Snap/Flatpak exported launchers.
+  **File → Run in DOSBox…** starts the current regular COM, DOS EXE or BAT in
+  a separate graphical window. **Open DOS programs with DOSBox** enables
+  Enter/double-click for COM and DOS MZ before associations. Windows PE/NE/LE/LX
+  executables are excluded; BAT remains explicit. Ctrl+Enter and
+  **Open with default app** bypass DOS handling. Global emulator settings are
+  retained; automatic game-local configuration loading is disabled.
+  No emulator is bundled; a graphical session is required. **Check DOSBox**
+  checks the unsaved path draft without starting a game or testing graphical
+  output. Checks are cancellable and do not save preferences. Errors retain
+  bounded diagnostics in the launcher and Help; inactive results do not steal
+  focus. Closing the launcher cancels pending checks, not games already started.
+- **Acoustic transfers (Experimental)** requires a build with
+  `cargo build --release --locked --features acoustic` and is disabled by default.
+  **Send opens only the speaker; Receive opens only the microphone.** No return
+  audio or synchronized handshake is required. Enter the same strong passphrase
+  on both computers. Numbered blocks repeat in a carousel, so missing blocks can
+  be collected on later repetitions. Choose 1/2/3 repeats or Until Stop.
+  Send **UTF-8 text or one regular file up to 1 MiB**. Compression is used when
+  smaller; **Estimate** calculates playback time without opening devices.
+  Normal/Fast/Fastest profiles are available, but large files can take hours or
+  days. **Export WAV… / Receive WAV…** work without playback or audio devices.
+  Export streams standard WAV, using RF64 for large recordings; import accepts PCM16/24/32 or float32,
+  1–8 channels, 8–192 kHz, up to 64 GiB. Use finite repeats for export.
+  Argon2id and XChaCha20-Poly1305 protect the envelope. Only verified data reaches
+  local Accept/Save review; existing files retain guarded replacement handling.
+  The sender reports **Transmission finished**, never confirmed delivery.
+  Passphrases, drafts and previews are session-only. Protocol 2 requires updated
+  DN at both ends and is incompatible with the previous bidirectional modem.
+  Real speaker/microphone reliability remains unverified.
 
 See the [experimental-plugin guide](docs/USER_GUIDE.md#experimental-dos-and-acoustic-plugins)
 for activation, safeguards and hardware limitations.
@@ -667,8 +681,11 @@ current file; **Use selected files** recaptures them. Each incoming file require
 approval and a local destination. Existing files require replacement confirmation.
 
 The session-only queue supports 256 regular files, each smaller than 4 GiB.
-Folders, links and archive/remote members are excluded. Closing the window stops
-work; switching documents does not. Completed files remain after cancellation;
+Folders, links and archive/remote members are excluded. Send queues and accepted
+incoming files appear in Transfer Center for progress, cancellation and replacement
+prompts. Incoming approval stays in Bluetooth. Closing Bluetooth stops new offers;
+accepted work continues. Queued reception shares the receiver decision timeout.
+Completed files remain after cancellation;
 missing final receipts are reported as unconfirmed delivery.
 
 Native adapters target macOS IOBluetooth, Linux BlueZ/system D-Bus (also in tty),

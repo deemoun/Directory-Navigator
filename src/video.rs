@@ -10,7 +10,6 @@ use std::{
         atomic::{AtomicBool, Ordering},
         mpsc, Arc, Mutex,
     },
-    thread,
 };
 mod color;
 mod engine;
@@ -161,19 +160,9 @@ enum Reply {
 struct Job {
     owner: Binding,
     generation: u64,
-    cancel: Arc<AtomicBool>,
-    result: mpsc::Receiver<io::Result<Reply>>,
+    worker: crate::workers::Worker<Reply>,
     progress: Arc<Mutex<Progress>>,
     conflicts: crate::operations::conflict::Mailbox,
-    thread: Option<thread::JoinHandle<()>>,
-}
-impl Drop for Job {
-    fn drop(&mut self) {
-        self.cancel.store(true, Ordering::Relaxed);
-        if self.thread.is_some() {
-            let _ = self.thread.take().unwrap().join();
-        }
-    }
 }
 #[derive(Default)]
 pub(crate) struct State {
@@ -181,52 +170,43 @@ pub(crate) struct State {
     plan: Option<engine::Plan>,
     job: Option<Job>,
     discovery: Option<Discovery>,
-    discovery_generation: u64,
+    requests: crate::requests::RequestScope,
     capabilities: Option<engine::Capabilities>,
     started: Option<Instant>,
     clock: Option<timing::Clock>,
 }
 struct Discovery {
     owner: Binding,
-    generation: u64,
-    cancel: Arc<AtomicBool>,
-    result: mpsc::Receiver<io::Result<engine::Capabilities>>,
-    thread: Option<thread::JoinHandle<()>>,
-}
-impl Drop for Discovery {
-    fn drop(&mut self) {
-        self.cancel.store(true, Ordering::Relaxed);
-        if let Some(t) = self.thread.take() {
-            let _ = t.join();
-        }
-    }
+    worker: crate::workers::Worker<engine::Capabilities>,
 }
 fn discovery(app: &mut App, b: Binding, p: Preferences) {
+    let cached = app.video.capabilities.clone();
+    spawn_discovery(app, b, move |cancel| {
+        engine::discover(&p, cached.as_ref(), cancel)
+    });
+}
+fn spawn_discovery(
+    app: &mut App,
+    b: Binding,
+    run: impl FnOnce(&AtomicBool) -> io::Result<engine::Capabilities> + Send + 'static,
+) {
     app.video.discovery = None;
-    app.video.discovery_generation = app.video.discovery_generation.wrapping_add(1);
     app.video.view.checking = true;
     app.video.view.discovery_error.clear();
-    let cancel = Arc::new(AtomicBool::new(false));
-    let c = cancel.clone();
-    let cached = app.video.capabilities.clone();
-    let (send, result) = mpsc::sync_channel(1);
-    match thread::Builder::new()
-        .name("dn-video-tools".into())
-        .spawn(move || {
-            let _ = send.send(engine::discover(&p, cached.as_ref(), &c));
-        }) {
-        Ok(t) => {
-            app.video.discovery = Some(Discovery {
-                owner: b,
-                generation: app.video.discovery_generation,
-                cancel,
-                result,
-                thread: Some(t),
-            })
-        }
+    let Owner::Document(owner) = b.owner else {
+        return;
+    };
+    match app.workers.spawn(
+        "dn-video-tools",
+        &app.video.requests,
+        crate::requests::Owner::Document(owner),
+        "video-tools",
+        move |cancel| run(&cancel.flag()),
+    ) {
+        Ok(worker) => app.video.discovery = Some(Discovery { owner: b, worker }),
         Err(e) => {
             app.video.view.checking = false;
-            app.video.view.discovery_error = e.to_string();
+            app.video.view.discovery_error = app.config.language.message(&e.to_string());
         }
     }
 }
@@ -234,12 +214,12 @@ fn poll_discovery(app: &mut App) -> bool {
     let Some(d) = &app.video.discovery else {
         return false;
     };
-    if !alive(app, d.owner) || d.generation != app.video.discovery_generation {
+    if !alive(app, d.owner) {
         app.video.discovery = None;
         app.video.view.checking = false;
         return true;
     }
-    match d.result.try_recv() {
+    match d.worker.try_recv() {
         Ok(result) => {
             app.video.view.checking = false;
             app.video.discovery = None;
@@ -258,7 +238,7 @@ fn poll_discovery(app: &mut App) -> bool {
                     app.video.view.encoders.clear();
                     app.video.view.capabilities.clear();
                     app.video.capabilities = None;
-                    app.video.view.discovery_error = e.to_string();
+                    app.video.view.discovery_error = app.config.language.message(&e.to_string());
                 }
             }
             true
@@ -292,7 +272,7 @@ pub(crate) fn action(app: &mut App, b: Binding, generation: u64, action: Action)
         }
         Action::Stop => {
             if let Some(j) = &app.video.job {
-                j.cancel.store(true, Ordering::Relaxed);
+                j.worker.cancel();
             }
         }
         Action::Conflict(d) => {
@@ -391,35 +371,37 @@ fn spawn(
         + Send
         + 'static,
 ) {
-    let cancel = Arc::new(AtomicBool::new(false));
     let progress = Arc::new(Mutex::new(Progress::default()));
     let conflicts = crate::operations::conflict::Mailbox::default();
-    let (send, result) = mpsc::sync_channel(1);
-    let (c, p, m) = (cancel.clone(), progress.clone(), conflicts.clone());
-    match thread::Builder::new()
-        .name("dn-video".into())
-        .spawn(move || {
-            let reply = run(&c, &m, &mut |s| {
-                *p.lock().unwrap() = s;
-            });
-            let _ = send.send(reply);
-        }) {
-        Ok(thread) => {
+    let (p, m) = (progress.clone(), conflicts.clone());
+    let Owner::Document(owner) = b.owner else {
+        return;
+    };
+    match app.workers.spawn(
+        "dn-video",
+        &app.video.requests,
+        crate::requests::Owner::Document(owner),
+        "video-job",
+        move |cancel| {
+            run(&cancel.flag(), &m, &mut |s| {
+                *p.lock().unwrap_or_else(|e| e.into_inner()) = s;
+            })
+        },
+    ) {
+        Ok(worker) => {
             app.video.view.generation = app.video.view.generation.wrapping_add(1);
             app.video.job = Some(Job {
                 generation: app.video.view.generation,
                 owner: b,
-                cancel,
-                result,
+                worker,
                 progress,
                 conflicts,
-                thread: Some(thread),
             });
             app.video.view.busy = true;
             app.video.view.notice = app.config.language.text("Preparing video job").into();
         }
         Err(e) => {
-            app.video.view.notice = e.to_string();
+            app.video.view.notice = app.config.language.message(&e.to_string());
             if let (Some(mut c), Some(start)) = (app.video.clock.take(), app.video.started.take()) {
                 c.finish(start.elapsed(), "Failed after");
                 app.video.view.timing = Some(c.view);
@@ -467,7 +449,7 @@ pub(crate) fn poll(app: &mut App) -> bool {
         app.video.view.conflict = conflict;
         changed = true;
     }
-    match job.result.try_recv() {
+    match job.worker.try_recv() {
         Ok(result) => {
             app.video.job = None;
             app.video.view.busy = false;
@@ -638,6 +620,8 @@ pub(crate) fn poll(app: &mut App) -> bool {
         Err(mpsc::TryRecvError::Disconnected) => {
             app.video.job = None;
             app.video.view.busy = false;
+            app.video.view.conflict = None;
+            app.video.view.generation = app.video.view.generation.wrapping_add(1);
             if let (Some(mut c), Some(start)) = (app.video.clock.take(), app.video.started.take()) {
                 c.finish(start.elapsed(), "Failed after");
                 app.video.view.timing = Some(c.view);
@@ -698,6 +682,141 @@ mod tests {
         fn drop(&mut self) {
             let _ = std::fs::remove_dir_all(&self.0);
         }
+    }
+    #[test]
+    fn retired_worker_does_not_block_ui_or_update_reopened_video() -> io::Result<()> {
+        let work = crate::network::workspace::Workspace::create(std::env::temp_dir())?;
+        let mut app = App::new(work.root.clone())?;
+        app.config = crate::config::Config::default();
+        app.config.save_on_exit = false;
+        app.config_store = crate::config::Store::new(Some(work.root.join("config.conf")));
+        app.config.set_plugin_enabled(VIDEO_MERGE, true);
+        crate::plugins::host::open(&mut app, VIDEO_MERGE);
+        let owner = app.desktop.plugins.binding(VIDEO_MERGE).unwrap();
+        let (started, ready) = mpsc::sync_channel(1);
+        let (release, gate) = mpsc::sync_channel(1);
+        let (continued, observed) = mpsc::sync_channel(1);
+        let watchdog = std::thread::spawn(move || {
+            let result = observed.recv_timeout(Duration::from_secs(3));
+            let _ = release.send(());
+            result
+        });
+        spawn(&mut app, owner, move |cancel, _, _| {
+            started.send(()).unwrap();
+            gate.recv_timeout(Duration::from_secs(5)).unwrap();
+            assert!(cancel.load(Ordering::Relaxed));
+            Err(io::ErrorKind::Interrupted.into())
+        });
+        ready.recv_timeout(Duration::from_secs(5)).unwrap();
+        let Owner::Document(id) = owner.owner else {
+            panic!("document");
+        };
+        app.desktop.close(id);
+        app.poll();
+        crate::plugins::host::open(&mut app, VIDEO_MERGE);
+        let fresh = app.desktop.active().id;
+        let notice = app.video.view.notice.clone();
+        assert!(!app.poll_background_shutdown());
+        let _ = continued.send(());
+        assert!(
+            watchdog.join().unwrap().is_ok(),
+            "UI retirement waited for the worker's cleanup gate"
+        );
+        let end = Instant::now() + Duration::from_secs(5);
+        while !app.poll_background_shutdown() {
+            assert!(Instant::now() < end);
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        app.poll();
+        assert_ne!(id, fresh);
+        assert_eq!(app.desktop.active().id, fresh);
+        assert_eq!(app.video.view.notice, notice);
+        Ok(())
+    }
+    #[test]
+    fn replacing_discovery_does_not_wait_or_deliver_the_old_reply() -> io::Result<()> {
+        let work = crate::network::workspace::Workspace::create(std::env::temp_dir())?;
+        let mut app = App::new(work.root.clone())?;
+        app.config = crate::config::Config::default();
+        app.config.save_on_exit = false;
+        app.config_store = crate::config::Store::new(Some(work.root.join("config.conf")));
+        app.config.set_plugin_enabled(VIDEO_MERGE, true);
+        crate::plugins::host::open(&mut app, VIDEO_MERGE);
+        let owner = app.desktop.plugins.binding(VIDEO_MERGE).unwrap();
+        let (started, ready) = mpsc::sync_channel(1);
+        let (release, gate) = mpsc::sync_channel(1);
+        let (continued, observed) = mpsc::sync_channel(1);
+        let watchdog = std::thread::spawn(move || {
+            let result = observed.recv_timeout(Duration::from_secs(3));
+            let _ = release.send(());
+            result
+        });
+        spawn_discovery(&mut app, owner, move |cancel| {
+            started.send(()).unwrap();
+            gate.recv_timeout(Duration::from_secs(5)).unwrap();
+            assert!(cancel.load(Ordering::Relaxed));
+            Err(io::Error::other("retired discovery"))
+        });
+        ready.recv_timeout(Duration::from_secs(5)).unwrap();
+        spawn_discovery(&mut app, owner, |_| {
+            Err(io::Error::other("current discovery"))
+        });
+        let _ = continued.send(());
+        assert!(
+            watchdog.join().unwrap().is_ok(),
+            "Replacing discovery joined a running worker"
+        );
+        let end = Instant::now() + Duration::from_secs(5);
+        while app.video.view.checking || app.workers.pending() {
+            app.poll();
+            assert!(Instant::now() < end);
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        assert_eq!(app.video.view.discovery_error, "current discovery");
+        Ok(())
+    }
+    #[test]
+    fn inactive_worker_failure_retires_controls_without_stealing_focus() -> io::Result<()> {
+        let work = crate::network::workspace::Workspace::create(std::env::temp_dir())?;
+        let mut app = App::new(work.root.clone())?;
+        app.config = crate::config::Config::default();
+        app.config.save_on_exit = false;
+        app.config_store = crate::config::Store::new(Some(work.root.join("config.conf")));
+        app.config.set_plugin_enabled(VIDEO_MERGE, true);
+        crate::plugins::host::open(&mut app, VIDEO_MERGE);
+        let owner = app.desktop.plugins.binding(VIDEO_MERGE).unwrap();
+        let target = work.root.join("private.mp4");
+        spawn(&mut app, owner, move |cancel, conflicts, _| {
+            conflicts.ask_pumping(
+                &crate::operations::conflict::Conflict {
+                    source: PathBuf::new(),
+                    source_label: Some("private output".into()),
+                    destination: target,
+                    destination_label: None,
+                    source_size: 0,
+                    destination_size: 0,
+                    source_modified: None,
+                    destination_modified: None,
+                },
+                cancel,
+                || panic!("intentional video worker failure"),
+            )?;
+            unreachable!("the injected worker must fail")
+        });
+        let generation = app.video.view.generation;
+        crate::utilities::open(&mut app, crate::utilities::Kind::Calculator);
+        let active = app.desktop.active().id;
+        let end = Instant::now() + Duration::from_secs(5);
+        while app.video.view.busy {
+            app.poll();
+            assert!(Instant::now() < end);
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        assert!(app.video.view.conflict.is_none());
+        assert_ne!(app.video.view.generation, generation);
+        assert_eq!(app.desktop.active().id, active);
+        assert!(app.video.view.notice.contains("worker stopped"));
+        Ok(())
     }
     #[test]
     fn settings_discover_before_analysis_show_hardware_and_timing_frames_are_immutable(

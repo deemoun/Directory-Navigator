@@ -13,6 +13,7 @@ mod modals;
 mod polling;
 
 pub struct App {
+    pub(crate) workers: crate::workers::Supervisor,
     pub(crate) dos: crate::dos::State,
     pub(crate) video: crate::video::State,
     pub(crate) acoustic: crate::acoustic::State,
@@ -77,6 +78,7 @@ impl App {
     pub fn new(path: PathBuf) -> io::Result<Self> {
         let config = Config::default();
         let mut app = Self {
+            workers: Default::default(),
             dos: Default::default(),
             video: Default::default(),
             acoustic: Default::default(),

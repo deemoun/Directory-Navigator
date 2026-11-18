@@ -1,5 +1,6 @@
 //! Workspace-owned transfer queue. The optional document is only a view; App.job
 //! remains the active-worker adapter for existing operation callers.
+mod bluetooth;
 mod conflicts;
 mod view;
 use crate::{
@@ -36,10 +37,15 @@ pub enum Status {
     Completed,
     Cancelled,
     Failed,
+    Skipped,
+    Unconfirmed,
 }
 impl Status {
     pub fn terminal(self) -> bool {
-        matches!(self, Self::Completed | Self::Cancelled | Self::Failed)
+        matches!(
+            self,
+            Self::Completed | Self::Cancelled | Self::Failed | Self::Skipped | Self::Unconfirmed
+        )
     }
     pub fn caption(self) -> &'static str {
         match self {
@@ -51,6 +57,8 @@ impl Status {
             Self::Completed => "Completed",
             Self::Cancelled => "Cancelled",
             Self::Failed => "Failed",
+            Self::Skipped => "Skipped",
+            Self::Unconfirmed => "Delivery unconfirmed",
         }
     }
 }
@@ -65,6 +73,7 @@ pub(crate) struct Origin {
 #[derive(Clone)]
 pub enum Request {
     Filesystem,
+    Bluetooth(crate::bluetooth::transfer::Transfer),
     Peer(crate::peer::session::Transfer),
     Remote(crate::network::transfer::Transfer),
     Create(crate::archive::create::Creation),
@@ -77,6 +86,7 @@ pub struct Entry {
     pub request: Request,
     pub extracting: bool,
     pub packing: bool,
+    bluetooth: Option<crate::bluetooth::transfer::Direction>,
     archive_summary: Option<String>,
     remote_destination: Option<String>,
     pub id: TransferId,
@@ -97,6 +107,9 @@ impl Entry {
     fn error_report(&self) -> Option<crate::error_report::Report> {
         use crate::error_report::{Outcome, Report};
         let cause = self.error.as_ref()?;
+        if self.bluetooth.is_some() {
+            return Some(Report::new("Bluetooth transfer did not finish.", cause.clone(), "Completed files are retained. Check the receiver before retrying; delivery may be unconfirmed.").text("Source", &self.source_summary()).text("Destination", &self.destination_summary()));
+        }
         let cancelled = self.status == Status::Cancelled;
         let summary = if cancelled {
             "Operation cancelled."
@@ -145,6 +158,12 @@ impl Entry {
         })
     }
     pub fn operation_caption(&self) -> &'static str {
+        if let Some(direction) = self.bluetooth {
+            return match direction {
+                crate::bluetooth::transfer::Direction::Send => "Bluetooth send",
+                crate::bluetooth::transfer::Direction::Receive => "Bluetooth receive",
+            };
+        }
         if self.packing {
             "Pack"
         } else if self.extracting {
@@ -243,7 +262,8 @@ pub struct State {
     pub(crate) now: Option<Instant>,
     pub(crate) active: Option<TransferId>,
     preparation: Option<(TransferId, Task<io::Result<operations::transfer::Prepared>>)>,
-    requests: RequestScope,
+    pub(crate) requests: RequestScope,
+    pub(crate) bluetooth: Option<crate::bluetooth::transfer::Job>,
     pub(crate) exit: ExitMode,
     pub(crate) quit_prompt: Option<crate::modals::ModalId>,
     pub(crate) quit_focus: usize,
@@ -251,11 +271,18 @@ pub struct State {
     pub(crate) conflict_focus: usize,
 }
 impl State {
+    pub(crate) fn bluetooth_pending(&self) -> Option<TransferId> {
+        self.entries
+            .iter()
+            .find(|e| e.bluetooth.is_some() && !e.status.terminal())
+            .map(|e| e.id)
+    }
     pub fn has_work(&self) -> bool {
         self.entries.iter().any(|e| !e.status.terminal())
     }
     pub(crate) fn pending_io(&self) -> bool {
-        self.active.is_some()
+        self.bluetooth.is_some()
+            || self.active.is_some()
             || self.preparation.is_some()
             || self.entries.iter().any(|e| e.status == Status::Preparing)
             || (!self.paused && self.has_work())
@@ -281,7 +308,11 @@ impl State {
             queued,
             if self.paused {
                 language.text("Paused")
-            } else if self.entries.iter().any(|e| e.status == Status::Failed) {
+            } else if self
+                .entries
+                .iter()
+                .any(|e| matches!(e.status, Status::Failed | Status::Unconfirmed))
+            {
                 language.text("Error")
             } else {
                 ""
@@ -452,8 +483,12 @@ fn submit_request_visible(
     };
     let archive = matches!(request, Request::Archive { .. });
     let packing = matches!(request, Request::Create(_));
-    let remote = matches!(request, Request::Remote(_) | Request::Peer(_));
+    let remote = matches!(
+        request,
+        Request::Remote(_) | Request::Peer(_) | Request::Bluetooth(_)
+    );
     let source_count = match &request {
+        Request::Bluetooth(t) => t.count(),
         Request::Peer(t) => t.session.manifest.entries.len(),
         Request::Archive { selection, .. } => selection.members.len(),
         Request::Remote(crate::network::transfer::Transfer::Download { members, .. }) => {
@@ -465,6 +500,7 @@ fn submit_request_visible(
         _ => plan.sources.len(),
     };
     let archive_summary = match &request {
+        Request::Bluetooth(request) => Some(request.summary()),
         Request::Peer(request) => Some(request.summary()),
         Request::Remote(request) => Some(request.summary()),
         Request::Archive { selection, .. } => Some(format!(
@@ -485,10 +521,15 @@ fn submit_request_visible(
         _ => None,
     };
     app.transfers.entries.push_back(Entry {
+        bluetooth: match &request {
+            Request::Bluetooth(t) => Some(t.direction()),
+            _ => None,
+        },
         extracting: archive,
         packing,
         archive_summary,
         remote_destination: match &request {
+            Request::Bluetooth(t) => t.destination_summary(),
             Request::Remote(crate::network::transfer::Transfer::Upload {
                 connection,
                 directory,
@@ -548,7 +589,7 @@ fn fail(app: &mut App, id: TransferId, error: io::Error, now: Instant) {
     }
 }
 fn start_next(app: &mut App, now: Instant) {
-    if app.job.is_some() || app.transfers.paused {
+    if app.job.is_some() || app.transfers.active.is_some() || app.transfers.paused {
         return;
     }
     let Some(index) = app
@@ -559,6 +600,10 @@ fn start_next(app: &mut App, now: Instant) {
     else {
         return;
     };
+    if matches!(app.transfers.entries[index].request, Request::Bluetooth(_)) {
+        bluetooth::start(app, index, now);
+        return;
+    }
     let e = &mut app.transfers.entries[index];
     if e.status == Status::Preparing
         && (app
@@ -574,6 +619,7 @@ fn start_next(app: &mut App, now: Instant) {
     // retain their earlier asynchronous identity snapshot before execution.
     let id = e.id;
     let result = match &e.request {
+        Request::Bluetooth(_) => unreachable!("Bluetooth has a workspace worker"),
         Request::Peer(request) => Job::start_peer(id, request.clone(), e.options, e.root.clone()),
         Request::Remote(request) => {
             Job::start_remote(id, request.clone(), e.options, e.root.clone())
@@ -803,6 +849,7 @@ pub(crate) fn poll(app: &mut App, now: Instant) -> bool {
     if app.transfers.exit == ExitMode::Cancel {
         app.transfers.paused = false;
     }
+    changed |= bluetooth::poll(app, now);
     conflicts::poll(app);
     start_next(app, now);
     if app.transfers.active.is_some() {
@@ -855,11 +902,14 @@ pub fn action(app: &mut App, action: Action) {
     }
     app.transfers.trim();
 }
-const HELP: &str = "Copy and Move run one at a time. Closing this window keeps transfers running. Cancel stops the selected request; completed items remain. Failure or cancellation pauses the queue. Resume queue starts waiting requests, without retrying failed work. Totals and remaining time are estimates. Existing files require confirmation by default. Ask merges existing folders and keeps unrelated contents. Explicit Refuse rejects existing top-level destinations; explicit Skip skips them without merging.";
+const HELP: &str = "Copy and Move run one at a time. Closing this window keeps transfers running. Cancel stops the selected request; completed items remain. Failure or cancellation pauses the queue. Resume queue starts waiting requests, without retrying failed work. Totals and remaining time are estimates. Existing files require confirmation by default. Ask merges existing folders and keeps unrelated contents. Explicit Refuse rejects existing top-level destinations; explicit Skip skips them without merging. Bluetooth send queues and accepted incoming files use this queue too. Incoming approval stays in the Bluetooth window; closing it stops new offers but keeps accepted work running. Lost final receipts mean delivery is unconfirmed; inspect the receiver before retrying.";
 fn cancel_selected(app: &mut App, now: Instant) {
     let Some(id) = app.transfers.selected else {
         return;
     };
+    if bluetooth::cancel(app, id) {
+        return;
+    }
     if app.transfers.active == Some(id) {
         if let Some(job) = &app.job {
             job.cancel();
@@ -904,9 +954,13 @@ fn begin_exit(app: &mut App, action: Action, now: Instant) {
     app.transfers.paused = false;
     if action == Action::QuitCancel {
         app.transfers.preparation = None;
+        let bluetooth = app.transfers.bluetooth.as_ref().map(|j| {
+            j.cancel();
+            j.id()
+        });
         for e in &mut app.transfers.entries {
             if !e.status.terminal() {
-                if Some(e.id) == app.transfers.active {
+                if Some(e.id) == app.transfers.active || Some(e.id) == bluetooth {
                     e.status = Status::Cancelling;
                 } else {
                     e.status = Status::Cancelled;
@@ -929,7 +983,9 @@ fn show_details(app: &mut App) {
         .is_some_and(|e| e.status == Status::Waiting)
     {
         conflicts::show(app);
-        return;
+        if app.transfers.conflict_prompt.is_some() {
+            return;
+        }
     }
     let Some(e) = app.transfers.selected() else {
         return;
@@ -940,22 +996,32 @@ fn show_details(app: &mut App) {
         e.id,
         lang.text(e.status.caption()),
         lang.text("Source"),
-        e.plan
-            .sources
-            .first()
-            .map(|p| format!(
-                "{} [{}]",
-                crate::filesystem::display_name(&p.to_string_lossy()),
-                e.source_count
-            ))
-            .unwrap_or_default(),
+        if e.bluetooth.is_some() {
+            format!("{} [{}]", e.source_summary(), e.source_count)
+        } else {
+            e.plan
+                .sources
+                .first()
+                .map(|p| {
+                    format!(
+                        "{} [{}]",
+                        crate::filesystem::display_name(&p.to_string_lossy()),
+                        e.source_count
+                    )
+                })
+                .unwrap_or_default()
+        },
         lang.text("Destination"),
-        crate::filesystem::display_name(&e.plan.destination.to_string_lossy()),
+        e.destination_summary(),
         lang.text("Items"),
         e.progress.files,
         lang.text("Skipped"),
         e.progress.skipped
     );
+    if e.bluetooth.is_some() && e.status == Status::Waiting {
+        text.push_str(lang.text("Review the incoming offer in the Bluetooth transfers window."));
+        text.push('\n');
+    }
     if let Some(report) = e.error_report() {
         text.push_str(&report.render(lang));
         text.push('\n');
@@ -980,6 +1046,7 @@ fn show_details(app: &mut App) {
                 "Transfer completed. Review the recorded details before repeating it."
             }
             Status::Cancelled => "The operation was cancelled. Completed items are retained.",
+            Status::Skipped => "All offered files were skipped; existing files are retained.",
             _ => "This request is queued or running; the displayed totals are provisional.",
         }));
     }
@@ -1116,6 +1183,32 @@ pub(crate) fn submit_peer(
         }
     }
     Ok(id)
+}
+
+pub(crate) fn submit_bluetooth(
+    app: &mut App,
+    request: crate::bluetooth::transfer::Transfer,
+    show: bool,
+) -> Result<TransferId, String> {
+    if app.transfers.bluetooth_pending().is_some()
+        || (request.direction() == crate::bluetooth::transfer::Direction::Send
+            && app.bluetooth.view.busy)
+    {
+        return Err("A Bluetooth transfer is already queued or running".into());
+    }
+    let plan = Plan {
+        kind: operations::Kind::Copy,
+        sources: request.sources(),
+        destination: request.destination(),
+    };
+    submit_request_visible(
+        app,
+        plan,
+        CopyOptions::default(),
+        None,
+        Request::Bluetooth(request),
+        show,
+    )
 }
 
 #[cfg(test)]
@@ -1353,6 +1446,7 @@ mod tests {
                 packing: false,
                 archive_summary: None,
                 remote_destination: None,
+                bluetooth: None,
                 request: Request::Filesystem,
                 id: TransferId(i),
                 source_count: plan.sources.len(),
