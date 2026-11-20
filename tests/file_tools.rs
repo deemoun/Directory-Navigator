@@ -679,8 +679,8 @@ fn directory_report_is_read_only_localized_navigable_and_owned() -> io::Result<(
         let mut app = t.app()?;
         app.config.show_clock = false;
         app.config.language = language;
-        for side in 0..2 {
-            app.panels[side].go_to(t.0.join(if side == 0 { "left" } else { "right" }), true);
+        for (panel, directory) in app.panels.iter_mut().zip(["left", "right"]) {
+            panel.go_to(t.0.join(directory), true);
         }
         wait(&mut app, |a| a.panels.iter().all(|p| !p.loading));
         app.panels[0].selected.insert("nested".into());
