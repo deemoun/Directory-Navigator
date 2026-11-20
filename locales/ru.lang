@@ -334,7 +334,7 @@ Global	Весь текст
 Include subdirectories	Включая подпапки
 Show hidden	Скрытые файлы
 No history in this session.	История сеанса пуста.
-Visible files only · No recursive or content reads	Только видимые файлы · Без подпапок и чтения содержимого
+Quick marks: visible metadata · Report: recursive byte comparison	Быстро: видимые метаданные · Подробно: все файлы и байты
 Compare size	Сравнить размер
 Compare time	Сравнить время
 Select differences (replace marks)	Отметить различия (заменить отметки)
@@ -1896,3 +1896,53 @@ Truncated WAV chunk	Обрезанный блок WAV
 Truncated RF64 container	Обрезанный контейнер RF64
 Acoustic text must be UTF-8	Акустический текст должен быть в UTF-8
 Invalid compressed acoustic payload	Неверные сжатые данные акустической передачи
+Directory comparison report	Подробное сравнение каталогов
+Report…	Подробно…
+Left only	Только слева
+Right only	Только справа
+Different	Различаются
+Identical	Одинаковые
+Not compared	Не сравнено
+Open left	Слева
+Open right	Справа
+Recursive byte comparison · Includes hidden entries · Read-only	Рекурсивное сравнение байтов · Со скрытыми файлами · Только чтение
+Comparing entries	Сравнение элементов
+Comparison complete	Сравнение завершено
+Stopped; partial comparison	Остановлено; сравнение неполное
+Partial comparison; review unexamined entries	Неполное сравнение; проверьте несравнённые элементы
+Comparison entry limit reached	Достигнут предел элементов сравнения
+Comparison worker stopped	Задача сравнения остановлена
+Directory depth limit reached	Достигнут предел вложенности каталогов
+Links and special files are not compared	Ссылки и специальные файлы не сравниваются
+Directory link or changed directory; not followed	Ссылка или изменённый каталог; переход отменён
+Directory changed during comparison	Каталог изменился во время сравнения
+File changed during comparison	Файл изменился во время сравнения
+Directory comparison requires two loaded local directories.	Для сравнения нужны два загруженных локальных каталога.
+Plugin diagnostics...	Диагностика плагинов...
+Plugin diagnostics	Диагностика плагинов
+Checks	Проверки
+Version checks only; no game or transfer started	Только проверка версий; игры и передачи не запускаются
+Music playback	Воспроизведение музыки
+Included; device opens only on Play	Включено в сборку; устройство открывается только при воспроизведении
+Unavailable in this build	Недоступно в этой сборке
+Acoustic support	Акустические передачи
+Included; experimental and disabled by default	Включено в сборку; экспериментально, выключено по умолчанию
+Not compiled; rebuild with --features acoustic	Не включено в сборку; пересоберите с --features acoustic
+Bluetooth requirements	Требования Bluetooth
+BlueZ system service and a Bluetooth Classic adapter; Refresh in Bluetooth transfers checks paired devices	Служба BlueZ и адаптер Bluetooth Classic; «Обновить» в Bluetooth проверяет сопряжённые устройства
+Bluetooth Classic adapter and system drivers; Refresh in Bluetooth transfers checks paired devices	Адаптер Bluetooth Classic и системные драйверы; «Обновить» в Bluetooth проверяет сопряжённые устройства
+Allow Bluetooth access for your terminal; Refresh in Bluetooth transfers checks paired devices	Разрешите терминалу доступ к Bluetooth; «Обновить» в Bluetooth проверяет сопряжённые устройства
+Bluetooth device	Устройство Bluetooth
+Not probed; open Bluetooth transfers and Refresh	Не проверено; откройте передачи Bluetooth и нажмите «Обновить»
+Bluetooth session status	Состояние сеанса Bluetooth
+Hardware encoders	Аппаратные кодировщики
+Open Video Merge Settings to verify encoders for your output	Откройте настройки Video Merge для проверки кодировщиков
+FFmpeg path	Путь FFmpeg
+FFprobe path	Путь FFprobe
+DOS emulator	Эмулятор DOS
+DOS emulator path	Путь эмулятора DOS
+Setup help	Настройка
+Configure executable paths in DOS launcher or Video Merge Settings; install missing tools through your system package manager	Укажите пути программ в настройках DOS launcher или Video Merge; установите недостающие программы средствами вашей системы
+File length does not match its contents	Размер файла не соответствует его содержимому
+This DOS program needs a DOSBox emulator.	Для этой DOS-программы нужен эмулятор DOSBox.
+DOSBox is not bundled with DN. Install DOSBox, DOSBox-X or DOSBox Staging. Enable DOS launcher in Options → Configuration → Plugins, then use File → Run in DOSBox… or enable Open DOS programs with DOSBox.	DOSBox не входит в состав DN. Установите DOSBox, DOSBox-X или DOSBox Staging. Включите плагин «Запуск DOS» в Параметры → Конфигурация → Плагины, затем выберите Файл → Запустить в DOSBox… или включите открытие DOS-программ через DOSBox.

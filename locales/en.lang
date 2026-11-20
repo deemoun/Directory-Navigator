@@ -334,7 +334,7 @@ Global	Global
 Include subdirectories	Include subdirectories
 Show hidden	Show hidden
 No history in this session.	No history in this session.
-Visible files only · No recursive or content reads	Visible files only · No recursive or content reads
+Quick marks: visible metadata · Report: recursive byte comparison	Quick marks: visible metadata · Report: recursive byte comparison
 Compare size	Compare size
 Compare time	Compare time
 Select differences (replace marks)	Select differences (replace marks)
@@ -1894,3 +1894,53 @@ Truncated WAV chunk	Truncated WAV chunk
 Truncated RF64 container	Truncated RF64 container
 Acoustic text must be UTF-8	Acoustic text must be UTF-8
 Invalid compressed acoustic payload	Invalid compressed acoustic payload
+Directory comparison report	Directory comparison report
+Report…	Report…
+Left only	Left only
+Right only	Right only
+Different	Different
+Identical	Identical
+Not compared	Not compared
+Open left	Open left
+Open right	Open right
+Recursive byte comparison · Includes hidden entries · Read-only	Recursive byte comparison · Includes hidden entries · Read-only
+Comparing entries	Comparing entries
+Comparison complete	Comparison complete
+Stopped; partial comparison	Stopped; partial comparison
+Partial comparison; review unexamined entries	Partial comparison; review unexamined entries
+Comparison entry limit reached	Comparison entry limit reached
+Comparison worker stopped	Comparison worker stopped
+Directory depth limit reached	Directory depth limit reached
+Links and special files are not compared	Links and special files are not compared
+Directory link or changed directory; not followed	Directory link or changed directory; not followed
+Directory changed during comparison	Directory changed during comparison
+File changed during comparison	File changed during comparison
+Directory comparison requires two loaded local directories.	Directory comparison requires two loaded local directories.
+Plugin diagnostics...	Plugin diagnostics...
+Plugin diagnostics	Plugin diagnostics
+Checks	Checks
+Version checks only; no game or transfer started	Version checks only; no game or transfer started
+Music playback	Music playback
+Included; device opens only on Play	Included; device opens only on Play
+Unavailable in this build	Unavailable in this build
+Acoustic support	Acoustic support
+Included; experimental and disabled by default	Included; experimental and disabled by default
+Not compiled; rebuild with --features acoustic	Not compiled; rebuild with --features acoustic
+Bluetooth requirements	Bluetooth requirements
+BlueZ system service and a Bluetooth Classic adapter; Refresh in Bluetooth transfers checks paired devices	BlueZ system service and a Bluetooth Classic adapter; Refresh in Bluetooth transfers checks paired devices
+Bluetooth Classic adapter and system drivers; Refresh in Bluetooth transfers checks paired devices	Bluetooth Classic adapter and system drivers; Refresh in Bluetooth transfers checks paired devices
+Allow Bluetooth access for your terminal; Refresh in Bluetooth transfers checks paired devices	Allow Bluetooth access for your terminal; Refresh in Bluetooth transfers checks paired devices
+Bluetooth device	Bluetooth device
+Not probed; open Bluetooth transfers and Refresh	Not probed; open Bluetooth transfers and Refresh
+Bluetooth session status	Bluetooth session status
+Hardware encoders	Hardware encoders
+Open Video Merge Settings to verify encoders for your output	Open Video Merge Settings to verify encoders for your output
+FFmpeg path	FFmpeg path
+FFprobe path	FFprobe path
+DOS emulator	DOS emulator
+DOS emulator path	DOS emulator path
+Setup help	Setup help
+Configure executable paths in DOS launcher or Video Merge Settings; install missing tools through your system package manager	Configure executable paths in DOS launcher or Video Merge Settings; install missing tools through your system package manager
+File length does not match its contents	File length does not match its contents
+This DOS program needs a DOSBox emulator.	This DOS program needs a DOSBox emulator.
+DOSBox is not bundled with DN. Install DOSBox, DOSBox-X or DOSBox Staging. Enable DOS launcher in Options → Configuration → Plugins, then use File → Run in DOSBox… or enable Open DOS programs with DOSBox.	DOSBox is not bundled with DN. Install DOSBox, DOSBox-X or DOSBox Staging. Enable DOS launcher in Options → Configuration → Plugins, then use File → Run in DOSBox… or enable Open DOS programs with DOSBox.

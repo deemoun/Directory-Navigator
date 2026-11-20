@@ -3,6 +3,7 @@ pub(crate) mod acoustic_transfers;
 pub(crate) mod apk_workshop;
 pub(crate) mod bluetooth_transfers;
 pub(crate) mod calculator;
+pub(crate) mod diagnostics;
 pub(crate) mod dos_launcher;
 pub(crate) mod host;
 pub(crate) mod mp3_player;

@@ -661,3 +661,78 @@ fn comparison_special_file_types_and_missing_timestamps() -> io::Result<()> {
     );
     Ok(())
 }
+
+#[test]
+fn directory_report_is_read_only_localized_navigable_and_owned() -> io::Result<()> {
+    use dn::{
+        localization::Language,
+        palette::{theme, PaletteProfile},
+    };
+    for language in [Language::English, Language::Russian] {
+        let t = Temp::new()?;
+        for side in ["left", "right"] {
+            fs::create_dir(t.0.join(side))?;
+            fs::create_dir(t.0.join(side).join("nested"))?;
+        }
+        fs::write(t.0.join("left/nested/Ёжик.txt"), b"left")?;
+        fs::write(t.0.join("right/nested/Ёжик.txt"), b"right")?;
+        let mut app = t.app()?;
+        app.config.show_clock = false;
+        app.config.language = language;
+        for side in 0..2 {
+            app.panels[side].go_to(t.0.join(if side == 0 { "left" } else { "right" }), true);
+        }
+        wait(&mut app, |a| a.panels.iter().all(|p| !p.loading));
+        app.panels[0].selected.insert("nested".into());
+        let marks = app.panels[0].selected.clone();
+        file_tools::open_compare(&mut app);
+        draw(&mut app, 80, 25)?;
+        if language == Language::English {
+            for _ in 0..6 {
+                key(&mut app, KeyCode::Tab, KeyModifiers::NONE);
+            }
+            key(&mut app, KeyCode::Enter, KeyModifiers::NONE);
+        } else {
+            click(&mut app, Target::Tool(ToolAction::Report));
+        }
+        let owner = app.desktop.active().id;
+        wait(
+            &mut app,
+            |a| matches!(a.file_tools(),Some(ToolDialog::Report(r))if !r.busy()),
+        );
+        assert_eq!(app.panels[0].selected, marks);
+        for profile in [
+            PaletteProfile::ClassicDn,
+            PaletteProfile::Custom(theme::DEFAULTS.map(|v| v ^ 1)),
+        ] {
+            app.config.palette = profile;
+            for (w, h) in [(80, 25), (120, 35), (40, 12), (80, 25)] {
+                let first = draw(&mut app, w, h)?;
+                let second = draw(&mut app, w, h)?;
+                assert_eq!(first, second);
+            }
+        }
+        draw(&mut app, 80, 25)?;
+        assert!(
+            matches!(app.file_tools(),Some(ToolDialog::Report(r))if r.result.entries.iter().any(|e|e.status==file_tools::report::Status::Different))
+        );
+        file_tools::action(&mut app, ToolAction::ReportRow(0));
+        file_tools::action(&mut app, ToolAction::ReportOpen(1));
+        wait(&mut app, |a| !a.panels[1].loading);
+        assert_eq!(
+            fs::canonicalize(&app.panels[1].path)?,
+            fs::canonicalize(t.0.join("right/nested"))?
+        );
+        assert_eq!(app.panels[1].entries[app.panels[1].cursor].name, "Ёжик.txt");
+        assert_eq!(
+            fs::canonicalize(&app.panels[0].path)?,
+            fs::canonicalize(t.0.join("left"))?
+        );
+        assert_eq!(app.panels[0].selected, marks);
+        assert!(app.desktop.contains(owner));
+        app.desktop.activate(owner);
+        file_tools::action(&mut app, ToolAction::Cancel);
+        wait(&mut app, |a| !a.desktop.contains(owner));
+    }
+    Ok(())
+}

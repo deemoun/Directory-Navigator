@@ -451,7 +451,32 @@ configuration files default to Name + Size. Chrono provides local date formattin
 Validation: `cargo fmt --check`, `cargo clippy -- -D warnings`, `cargo test`,
 `cargo build --release`. Testing so far is on macOS ARM64 only.
 
-Directory comparison uses visible cached file metadata, never file contents or recursive scans.
+Ctrl+C / Panel → Compare directories keeps the quick comparison of visible cached
+file metadata and its marking rules. Choose **Report…** for a separate read-only
+directory comparison window: it recursively compares regular-file bytes, includes
+hidden entries regardless of panel filters, and lists left-only, right-only,
+different, identical and unexamined entries. Empty directories are included;
+links and special files are not followed or compared. File/directory conflicts
+are differences. Names are compared exactly, including case; metadata such as
+permissions and timestamps is not part of byte equality. This is a snapshot, not
+a guarantee against changes after the scan.
+
+The report uses bounded background work (20,000 entries, 512 directory levels).
+Stop or the first Esc stops scanning and retains partial results; another Esc
+closes the report. Closing the title control cancels its work. Open left/right
+navigates that pane to the selected result; Enter/double-click prefers the left
+side when present. The report remains open and the other pane and marks stay
+unchanged. Navigation can be affected by the pane's existing filter or hidden-file
+visibility. No synchronization or file changes are performed.
+
+Utilities → **Plugin diagnostics…** opens a separate read-only snapshot of plugin
+enablement, build availability and detected FFmpeg/FFprobe and DOS emulator
+versions/paths. Explicit opening/Refresh runs the existing bounded version probes;
+it does not launch a game, open audio devices, start receivers, change pairing or
+verify hardware encoders. Bluetooth device state remains explicitly unprobed;
+use Refresh in Bluetooth transfers to check paired devices. Hardware encoder checks
+remain in Video Merge Settings. Missing tools and configured-path failures retain
+their causes, with setup guidance. Scroll or pan to read long paths and messages.
 List export refuses existing destinations and paths that cannot be represented as UTF-8 lines.
 Like saving a new editor file, complete list publication requires filesystem hard-link support.
 

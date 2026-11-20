@@ -872,6 +872,46 @@ fn inactive_preview_and_queued_extraction_do_not_retarget_panes() -> io::Result<
 }
 #[cfg(unix)]
 #[test]
+fn extraction_into_other_pane_through_volume_alias() -> io::Result<()> {
+    use std::os::unix::fs::symlink;
+    let t = Temp::new()?;
+    let path = t.0.join("clean.zip");
+    clean_zip(&path, false)?;
+    fs::create_dir(t.0.join("out"))?;
+    let alias = t.0.join("volume alias 世界");
+    symlink(&t.0, &alias)?;
+    let mut a = t.app()?;
+    a.panels[1].go_to(alias.join("out"), true);
+    wait(&mut a, |a| !a.panels[1].loading);
+    archive::open(&mut a, path);
+    finish(&mut a);
+    for name in ["docs", "root.txt", "empty"] {
+        select(&mut a, name);
+        a.panels[0].toggle_selection();
+    }
+    let other_path = a.panels[1].path.clone();
+    a.prompt_operation(dn::operations::Kind::Copy, false);
+    a.submit_prompt();
+    wait(&mut a, |a| !a.transfers.has_work());
+    assert_eq!(
+        a.transfers
+            .entries
+            .back()
+            .expect("extraction queued")
+            .status,
+        dn::transfers::Status::Completed,
+        "{:?}",
+        a.transfers.entries.back().unwrap().error
+    );
+    assert_eq!(fs::read(t.0.join("out/docs/a.txt"))?, b"alpha");
+    assert_eq!(fs::read(t.0.join("out/root.txt"))?, b"root");
+    assert!(t.0.join("out/empty").is_dir());
+    assert_eq!(a.panels[1].path, other_path);
+    assert!(a.panels[0].is_archive());
+    Ok(())
+}
+#[cfg(unix)]
+#[test]
 fn extraction_rejects_redirected_destinations_and_replaced_archive() -> io::Result<()> {
     use std::os::unix::fs::symlink;
     let t = Temp::new()?;

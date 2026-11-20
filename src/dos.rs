@@ -109,6 +109,13 @@ pub(crate) fn candidate(path: &Path) -> bool {
             .any(|x| e.eq_ignore_ascii_case(x))
     })
 }
+/// Classification only, called by the background system opener; never probes an emulator.
+pub(crate) fn program_for_open_hint(path: &Path) -> bool {
+    candidate(path)
+        && crate::filesystem::open_regular(path)
+            .and_then(|mut file| identify(&mut file, path, true))
+            .unwrap_or(false)
+}
 fn identify(file: &mut File, path: &Path, automatic: bool) -> io::Result<bool> {
     let extension = path
         .extension()
@@ -951,6 +958,22 @@ pub(crate) fn setup(app: &mut App, b: crate::plugins::Binding, preferences: Pref
     }
     app.config.dos = preferences;
     app.dos.view.notice = "DOS launcher preferences applied.".into();
+}
+
+pub(crate) fn diagnostics(
+    preferences: &Preferences,
+    cancel: &crate::task::Cancellation,
+) -> crate::utilities::information::Fields {
+    match verified_tool(preferences, cancel) {
+        Ok((path, verified)) => vec![
+            ("DOS emulator".into(), verified.version),
+            (
+                "DOS emulator path".into(),
+                path.to_string_lossy().into_owned(),
+            ),
+        ],
+        Err(e) => vec![("DOS emulator".into(), e.to_string())],
+    }
 }
 
 #[cfg(test)]

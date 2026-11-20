@@ -11,6 +11,7 @@ pub enum Kind {
     System,
     Memory,
     Network,
+    Plugins,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Action {
@@ -66,6 +67,7 @@ pub fn open(app: &mut App, kind: Kind) {
         Kind::System => crate::tool_windows::Kind::System,
         Kind::Memory => crate::tool_windows::Kind::Memory,
         Kind::Network => crate::tool_windows::Kind::Network,
+        Kind::Plugins => crate::tool_windows::Kind::PluginDiagnostics,
         Kind::Calculator => unreachable!(),
     };
     if !crate::tool_windows::open(app, tool, None) {
@@ -81,7 +83,10 @@ pub fn open(app: &mut App, kind: Kind) {
     app.utility_state_mut().notice.clear();
     app.utility_state_mut().focus = 0;
     app.utility_state_mut().chart.focus = 0;
-    if matches!(kind, Kind::System | Kind::Memory | Kind::Network) {
+    if matches!(
+        kind,
+        Kind::System | Kind::Memory | Kind::Network | Kind::Plugins
+    ) {
         app.utility_state_mut().information = None;
         refresh(app);
     } else {
@@ -101,20 +106,26 @@ fn refresh(app: &mut App) {
         Some(Kind::System) => information::Kind::System,
         Some(Kind::Memory) => information::Kind::Memory,
         Some(Kind::Network) => information::Kind::Network,
+        Some(Kind::Plugins) => information::Kind::Plugins,
         _ => return,
     };
-    match information::Information::open_with_config(
-        kind,
-        app.desktop.tool(app.desktop.target()).map_or_else(
-            || app.panels[app.active].path.clone(),
-            |t| t.source_directory.clone(),
-        ),
-        app.utilities.size,
-        app.config_store
-            .path()
-            .ok()
-            .map(std::path::Path::to_path_buf),
-    ) {
+    let request = if kind == information::Kind::Plugins {
+        information::Information::open_plugins(crate::plugins::diagnostics::Input::capture(app))
+    } else {
+        information::Information::open_with_config(
+            kind,
+            app.desktop.tool(app.desktop.target()).map_or_else(
+                || app.panels[app.active].path.clone(),
+                |t| t.source_directory.clone(),
+            ),
+            app.utilities.size,
+            app.config_store
+                .path()
+                .ok()
+                .map(std::path::Path::to_path_buf),
+        )
+    };
+    match request {
         Ok(mut info) => {
             if let Some(previous) = &app.utility_state().information {
                 info.retain_interface(previous);
@@ -308,7 +319,7 @@ pub fn key(app: &mut App, key: KeyEvent) {
                 _ => {}
             }
         }
-        Some(Kind::System | Kind::Memory | Kind::Network) => match key.code {
+        Some(Kind::System | Kind::Memory | Kind::Network | Kind::Plugins) => match key.code {
             KeyCode::Char('r') | KeyCode::F(5) => command = Some(Action::Refresh),
             code => {
                 if let Some(info) = &mut app.utility_state_mut().information {

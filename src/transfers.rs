@@ -399,8 +399,8 @@ pub(crate) fn submit_extraction(
     root: Option<crate::temp_drive::Root>,
 ) -> Result<TransferId, String> {
     selection.validate().map_err(|e| e.to_string())?;
-    let receipt =
-        crate::archive::extract::Destination::capture(&destination).map_err(|e| e.to_string())?;
+    let receipt = crate::archive::extract::Destination::capture_with_parent_alias(&destination)
+        .map_err(|e| e.to_string())?;
     let plan = Plan {
         kind: operations::Kind::Copy,
         sources: vec![selection.catalog.path.clone()],

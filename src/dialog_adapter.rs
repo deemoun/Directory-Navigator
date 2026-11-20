@@ -170,6 +170,10 @@ const ADAPTERS: &[Adapter] = &[
         mouse: crate::file_tools::mouse,
         spec: crate::ui::file_tools_spec,
         set_focus: |app, next| {
+            if let Some(crate::file_tools::ToolDialog::Report(r)) = app.file_tools_mut() {
+                r.focus = next;
+                return;
+            }
             if let Some(
                 crate::file_tools::ToolDialog::History { focus, .. }
                 | crate::file_tools::ToolDialog::Compare { focus }

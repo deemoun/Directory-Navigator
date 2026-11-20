@@ -20,10 +20,24 @@ use std::{
 #[derive(Clone)]
 pub struct Destination {
     path: PathBuf,
+    requested: Option<PathBuf>,
     ancestors: Vec<(PathBuf, crate::platform_fs::EntryIdentity)>,
     existed: bool,
 }
 impl Destination {
+    /// Extraction may target an already-open directory beneath a volume alias.
+    /// Other users retain the strict capture policy below.
+    pub fn capture_with_parent_alias(path: &Path) -> io::Result<Self> {
+        if !path.is_absolute() {
+            return Err(io::Error::other(
+                "Choose an absolute filesystem destination",
+            ));
+        }
+        // Pin ancestor aliases, never the final destination entry.
+        let mut receipt = Self::capture(&Self::resolve_parent(path)?)?;
+        receipt.requested = Some(path.to_path_buf());
+        Ok(receipt)
+    }
     pub fn capture(path: &Path) -> io::Result<Self> {
         if !path.is_absolute() {
             return Err(io::Error::other(
@@ -48,11 +62,17 @@ impl Destination {
         }
         Ok(Self {
             path: path.to_path_buf(),
+            requested: None,
             ancestors,
             existed: fs::symlink_metadata(path).is_ok(),
         })
     }
     pub fn validate(&self) -> io::Result<()> {
+        if let Some(requested) = &self.requested {
+            if Self::resolve_parent(requested)? != self.path {
+                return Err(io::Error::other("Extraction destination changed"));
+            }
+        }
         if !self.existed && fs::symlink_metadata(&self.path).is_ok() {
             return Err(io::Error::other("Queued destination appeared"));
         }
@@ -62,6 +82,12 @@ impl Destination {
             }
         }
         Ok(())
+    }
+    fn resolve_parent(path: &Path) -> io::Result<PathBuf> {
+        match (path.parent(), path.file_name()) {
+            (Some(parent), Some(name)) => Ok(fs::canonicalize(parent)?.join(name)),
+            _ => fs::canonicalize(path),
+        }
     }
 }
 struct Stage {
@@ -500,6 +526,35 @@ mod tests {
         selection.members[0].generation += 1;
         assert!(selection.validate().is_err());
         assert!(fs::read_dir(fixture.0.join("out"))?.next().is_none());
+        Ok(())
+    }
+    #[cfg(unix)]
+    #[test]
+    fn ancestor_alias_extracts_but_retargeting_and_final_links_are_rejected() -> io::Result<()> {
+        use std::os::unix::fs::symlink;
+        let (fixture, selection, _) = fixture()?;
+        let alias = fixture.0.join("volume alias 世界");
+        symlink(&fixture.0, &alias)?;
+        assert!(Destination::capture(&alias.join("out")).is_err());
+        let destination = Destination::capture_with_parent_alias(&alias.join("out"))?;
+        selection.run(
+            &destination,
+            CopyOptions::default(),
+            Arc::new(AtomicBool::new(false)),
+            |_| {},
+        )?;
+        assert_eq!(fs::metadata(fixture.0.join("out/large"))?.len(), 256 * 1024);
+        let final_link = fixture.0.join("destination-link");
+        symlink(fixture.0.join("out"), &final_link)?;
+        assert!(Destination::capture(&final_link).is_err());
+        assert!(Destination::capture_with_parent_alias(&final_link).is_err());
+        let other = fixture.0.join("other");
+        fs::create_dir(&other)?;
+        fs::create_dir(other.join("out"))?;
+        fs::remove_file(&alias)?;
+        symlink(&other, &alias)?;
+        assert!(destination.validate().is_err());
+        assert!(fs::read_dir(other.join("out"))?.next().is_none());
         Ok(())
     }
     #[test]

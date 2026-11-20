@@ -1,5 +1,18 @@
 # Directory Navigator
 
+## Unreleased — directory comparison and plugin diagnostics
+
+The existing quick directory comparison remains available. Its Report action opens
+a read-only recursive byte comparison with native paths, hidden entries, bounded
+background work, cancellation, explicit partial results and pane navigation.
+The report does not synchronize files, change marks or persist results.
+Utilities → Plugin diagnostics reuses the information document and existing bounded
+DOS/FFmpeg version probes. It reports plugin/build state and setup guidance without
+opening devices or starting receivers. Hardware/device availability is explicitly
+unprobed. No dependencies, configuration migration or version change.
+
+Validation for this change is reported separately; older counts below are historical.
+
 ## Unreleased — one-way acoustic experiment
 
 Acoustic protocol 2 replaces bidirectional pairing/acknowledgements with an

@@ -673,6 +673,13 @@ pub(crate) fn display(path: &Path) -> String {
         .collect()
 }
 
+pub(crate) fn diagnostics(
+    preferences: &Preferences,
+    cancel: &crate::task::Cancellation,
+) -> crate::utilities::information::Fields {
+    engine::diagnostics(preferences, &cancel.flag())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

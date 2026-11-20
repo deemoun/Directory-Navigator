@@ -199,6 +199,15 @@ impl App {
                         crate::filesystem::display_name(&result.path.to_string_lossy())
                     )
                 }
+                Err(error) if result.dos_program => self.error(
+                    crate::error_report::Report::new(
+                        "This DOS program needs a DOSBox emulator.",
+                        error.to_string(),
+                        "DOSBox is not bundled with DN. Install DOSBox, DOSBox-X or DOSBox Staging. Enable DOS launcher in Options → Configuration → Plugins, then use File → Run in DOSBox… or enable Open DOS programs with DOSBox.",
+                    )
+                    .path("Program", &result.path)
+                    .render(self.config.language),
+                ),
                 Err(error) => self.error(format!("Cannot open {}: {error}", result.path.display())),
             }
         }

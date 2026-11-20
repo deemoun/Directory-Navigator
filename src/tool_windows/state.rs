@@ -48,6 +48,9 @@ impl State {
                 job.bind(owner);
             }
         }
+        if let Some(crate::file_tools::ToolDialog::Report(r)) = &mut self.file_tools {
+            r.requests.bind(owner);
+        }
         if let Some(s) = &mut self.file_info {
             s.requests.bind(owner);
         }

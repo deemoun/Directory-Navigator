@@ -47,7 +47,8 @@ and modern filesystem handling.
 - Edit Unix permissions or Windows file attributes through File Attributes / Info (Alt+E).
 - Browse two folders side by side, mark files, and copy, move or rename them.
 - Create directories and send files to Trash with confirmation.
-- Find files, compare directories, calculate folder sizes and use bookmarks.
+- Find files, compare directories (quick marks or a read-only recursive byte report), calculate folder sizes and use bookmarks.
+- Inspect plugin status and detected external-tool versions in Utilities → Plugin diagnostics.
 - Preview text or hex, edit Unicode and legacy-encoded text files, and search or replace text.
 - Read formatted Markdown with F3, edit highlighted source with F4, and preview unsaved text with F5.
 - Keep multiple editors and viewers open, and switch between them with **Alt+0**.

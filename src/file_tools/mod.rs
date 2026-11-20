@@ -2,6 +2,7 @@ pub mod clipboard;
 pub mod compare;
 pub mod export;
 pub mod history;
+pub mod report;
 use crate::{
     app::App,
     dialog, menu,
@@ -31,6 +32,7 @@ pub enum ToolDialog {
         base: PathBuf,
         paths: Vec<PathBuf>,
     },
+    Report(Box<report::Report>),
     Busy,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -40,6 +42,10 @@ pub enum ToolAction {
     Choice(usize),
     HistoryRow(usize),
     Field,
+    Report,
+    ReportRow(usize),
+    ReportOpen(usize),
+    ReportStop,
 }
 #[derive(Default)]
 pub struct Tools {
@@ -104,6 +110,63 @@ pub fn open_compare(app: &mut App) {
     app.file_tools
         .modals
         .set_file_tools(Some(ToolDialog::Compare { focus: 0 }));
+}
+pub fn open_report(app: &mut App) {
+    if app.panels.iter().any(|p| p.is_virtual() || p.loading) {
+        app.error("Directory comparison requires two loaded local directories.");
+        return;
+    }
+    let roots = [app.panels[0].path.clone(), app.panels[1].path.clone()];
+    app.file_tools.modals.set_file_tools(None);
+    prepare(app);
+    if !crate::tool_windows::open(app, crate::tool_windows::Kind::DirectoryComparison, None) {
+        return;
+    }
+    match report::Report::open(roots, app.desktop.target()) {
+        Ok(report) => app.set_file_tools(Some(ToolDialog::Report(Box::new(report)))),
+        Err(e) => {
+            app.set_file_tools(None);
+            app.error(e.to_string());
+        }
+    }
+}
+pub(crate) fn poll_report(app: &mut App) -> bool {
+    match app.file_tools_mut() {
+        Some(ToolDialog::Report(report)) => report.poll(),
+        _ => false,
+    }
+}
+fn report_open(app: &mut App, side: usize) {
+    if side > 1 || app.panels[side].loading {
+        return;
+    }
+    let Some(ToolDialog::Report(report)) = app.file_tools() else {
+        return;
+    };
+    let Some(row) = report
+        .result
+        .entries
+        .get(report.cursor)
+        .filter(|r| r.present[side])
+    else {
+        return;
+    };
+    let path = report.roots[side].join(&row.path);
+    // Use the existing asynchronous panel navigation, preserving the other pane.
+    let directory = if row.path.as_os_str().is_empty() {
+        path.clone()
+    } else {
+        path.parent().unwrap_or(&path).to_path_buf()
+    };
+    let name = if row.path.as_os_str().is_empty() {
+        None
+    } else {
+        path.file_name().map(|n| n.to_os_string())
+    };
+    app.panels[side].go_to(directory, app.config.show_hidden);
+    app.panels[side].focus_after_refresh = name;
+    app.active = side;
+    crate::windowing::activate(app, crate::desktop::WindowId::MANAGER);
 }
 pub fn open_export(app: &mut App) {
     if !crate::archive::require_native(app) {
@@ -173,6 +236,15 @@ pub fn poll(app: &mut App) -> bool {
     true
 }
 pub fn accept(app: &mut App) {
+    if let Some(ToolDialog::Report(report)) = app.file_tools() {
+        let side = report
+            .result
+            .entries
+            .get(report.cursor)
+            .map_or(0, |r| usize::from(!r.present[0]));
+        report_open(app, side);
+        return;
+    }
     if let Some(ToolDialog::History {
         kind,
         paths,
@@ -285,8 +357,41 @@ pub fn accept(app: &mut App) {
 }
 pub fn action(app: &mut App, action: ToolAction) {
     match action {
+        ToolAction::Report => open_report(app),
+        ToolAction::ReportStop => {
+            if let Some(ToolDialog::Report(r)) = app.file_tools() {
+                r.stop();
+            }
+        }
+        ToolAction::ReportOpen(side) => report_open(app, side),
+        ToolAction::ReportRow(index) => {
+            let mut open = false;
+            if let Some(ToolDialog::Report(r)) = app.file_tools_mut() {
+                if index < r.result.entries.len() {
+                    let now = Instant::now();
+                    open = crate::list_state::ClickTracker::FILE_HISTORY.matches(
+                        r.last_click.as_ref(),
+                        &index,
+                        now,
+                    );
+                    r.cursor = index;
+                    r.focus = 0;
+                    r.last_click = Some((index, now));
+                    r.fit();
+                }
+            }
+            if open {
+                accept(app);
+            }
+        }
         ToolAction::Accept => accept(app),
         ToolAction::Cancel => {
+            if let Some(ToolDialog::Report(r)) = app.file_tools() {
+                if r.busy() {
+                    r.stop();
+                    return;
+                }
+            }
             if !app.file_tools.busy() {
                 app.set_file_tools(None);
             }
@@ -342,6 +447,10 @@ pub fn action(app: &mut App, action: ToolAction) {
     }
 }
 pub fn key(app: &mut App, key: KeyEvent) {
+    if let Some(ToolDialog::Report(r)) = app.file_tools_mut() {
+        r.last_click = None;
+    }
+
     if let Some(ToolDialog::History { last_click, .. }) = app.file_tools_mut() {
         *last_click = None;
     }
@@ -350,6 +459,22 @@ pub fn key(app: &mut App, key: KeyEvent) {
     }
     let mut choice = None;
     match app.file_tools_mut() {
+        Some(ToolDialog::Report(r)) if r.focus == 0 => {
+            let amount = match key.code {
+                KeyCode::Up => -1,
+                KeyCode::Down => 1,
+                KeyCode::PageUp => -(r.rows as isize),
+                KeyCode::PageDown => r.rows as isize,
+                KeyCode::Home => isize::MIN,
+                KeyCode::End => isize::MAX,
+                _ => 0,
+            };
+            r.cursor = r
+                .cursor
+                .saturating_add_signed(amount)
+                .min(r.result.entries.len().saturating_sub(1));
+            r.fit();
+        }
         Some(ToolDialog::History {
             cursor,
             paths,

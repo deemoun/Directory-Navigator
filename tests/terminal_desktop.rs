@@ -1020,6 +1020,7 @@ fn temp_drive_real_copy_cancel_clear_and_terminal_restoration() -> io::Result<()
 #[test]
 fn archive_pane_selected_extraction_and_return_restore_terminal() -> io::Result<()> {
     use std::io::Write;
+    use std::os::unix::fs::symlink;
     let mut s = Session::new("archive-pane-extraction")?;
     let path = s.root.join("fixture.zip");
     let mut archive = zip::ZipWriter::new(fs::File::create(&path)?);
@@ -1035,6 +1036,22 @@ fn archive_pane_selected_extraction_and_return_restore_terminal() -> io::Result<
     s.wait("initial manager", |s| {
         s.command_prompt_active() && s.text().contains("item-000.")
     })?;
+    // A real directory reached through a volume alias, as on macOS startup disks.
+    let alias = s.root.join("volume alias");
+    symlink(&s.root, &alias)?;
+    s.send(b"\t", "destination pane", |s| s.command_prompt_active())?;
+    s.send(b"\x0c", "destination directory", |s| {
+        s.text().contains("Go to directory")
+    })?;
+    s.send(
+        format!("\x1b[200~{}\x1b[201~", alias.join("inside").display()).as_bytes(),
+        "destination through volume alias",
+        |s| s.text().contains("volume alias"),
+    )?;
+    s.send(b"\r", "destination opened", |s| {
+        s.command_prompt_active() && s.text().contains("volume alias/inside")
+    })?;
+    s.send(b"\t", "archive source pane", |s| s.command_prompt_active())?;
     s.send(b"\x12", "refresh fixture", |s| {
         s.command_prompt_active() && s.text().contains("fixture.zip")
     })?;
@@ -1066,11 +1083,11 @@ fn archive_pane_selected_extraction_and_return_restore_terminal() -> io::Result<
     s.send(b"\r", "extraction completes", |s| {
         s.text().contains("Transfer Center")
             && s.text().contains("Completed")
-            && s.root.join("a.txt").exists()
-            && s.root.join("b.txt").exists()
+            && s.root.join("inside/a.txt").exists()
+            && s.root.join("inside/b.txt").exists()
     })?;
-    assert_eq!(fs::read(s.root.join("a.txt"))?, b"archive alpha\n");
-    assert_eq!(fs::read(s.root.join("b.txt"))?, b"archive beta\n");
+    assert_eq!(fs::read(s.root.join("inside/a.txt"))?, b"archive alpha\n");
+    assert_eq!(fs::read(s.root.join("inside/b.txt"))?, b"archive beta\n");
     s.send(b"\x1b", "close transfer center", |s| {
         s.command_prompt_active() && s.text().contains(" :: /docs")
     })?;

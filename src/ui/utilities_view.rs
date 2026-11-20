@@ -60,6 +60,7 @@ pub(crate) fn utility_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
         Kind::System => " System Information ",
         Kind::Memory => " Memory Information ",
         Kind::Network => " Network Information ",
+        Kind::Plugins => " Plugin diagnostics ",
     };
     let focus = if kind == Kind::Characters {
         app.utility_state().chart.focus
@@ -202,7 +203,7 @@ pub(crate) fn utility_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
                 Action::Close,
             );
         }
-        Kind::System | Kind::Memory | Kind::Network => {
+        Kind::System | Kind::Memory | Kind::Network | Kind::Plugins => {
             if let Some(info) = &app.utility_state().information {
                 if info.loading() {
                     text(

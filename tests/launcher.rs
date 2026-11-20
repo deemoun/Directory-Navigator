@@ -217,7 +217,8 @@ fn background_launch_preserves_native_request_panel_and_reports_backend_errors()
 #[test]
 fn opener_processes_do_not_block_further_requests_and_failures_are_reaped() -> io::Result<()> {
     let temp = Temp::new()?;
-    let path = temp.0.join("file");
+    let path = temp.0.join("program.COM");
+    fs::write(&path, b"\xcd\x20")?;
     let mut launcher = Launcher::default();
     launcher.request_with(1, path.clone(), |_| {
         std::process::Command::new("/bin/sh")
@@ -238,6 +239,7 @@ fn opener_processes_do_not_block_further_requests_and_failures_are_reaped() -> i
     loop {
         let replies = launcher.poll();
         if let Some(reply) = replies.into_iter().find(|r| r.result.is_err()) {
+            assert!(reply.dos_program);
             assert_eq!(reply.path, path);
             assert_eq!(reply.panel, 1);
             assert!(reply
@@ -250,6 +252,64 @@ fn opener_processes_do_not_block_further_requests_and_failures_are_reaped() -> i
         }
         assert!(Instant::now() < deadline);
         thread::sleep(Duration::from_millis(1));
+    }
+    Ok(())
+}
+
+#[test]
+fn dos_open_failure_explains_emulator_without_enabling_plugins() -> io::Result<()> {
+    use dn::localization::Language;
+    let temp = Temp::new()?;
+    let mut executable = vec![0u8; 100];
+    executable[..2].copy_from_slice(b"MZ");
+    executable[60..64].copy_from_slice(&80u32.to_le_bytes());
+    let mut windows = executable.clone();
+    windows[80..82].copy_from_slice(b"PE");
+    for language in [Language::English, Language::Russian] {
+        for (name, bytes, dos) in [
+            ("Ёжик.CoM", b"\xb4\x4c\xcd\x21".as_slice(), true),
+            ("dos.EXE", executable.as_slice(), true),
+            ("native.exe", windows.as_slice(), false),
+            ("readme.txt", b"text".as_slice(), false),
+            ("run.bat", b"echo hi".as_slice(), false),
+        ] {
+            let path = temp.0.join(name);
+            fs::write(&path, bytes)?;
+            let mut app = temp.app()?;
+            app.config.language = language;
+            app.config.show_clock = false;
+            app.launcher.request_with(0, path.clone(), |_| {
+                Err(io::Error::other("mock system opener failure"))
+            })?;
+            wait(&mut app, |a| !a.launcher.loading());
+            let message = app.last_dialog().unwrap().message.clone();
+            assert_eq!(message.contains("DOSBox"), dos, "{message}");
+            assert!(message.contains("mock system opener failure"));
+            if dos {
+                assert!(
+                    message.contains(if language == Language::Russian {
+                        "DOSBox не входит"
+                    } else {
+                        "DOSBox is not bundled"
+                    }),
+                    "{message}"
+                );
+                for (width, height) in [(80, 25), (120, 35), (60, 18), (80, 25)] {
+                    let mut terminal = Terminal::new(TestBackend::new(width, height))?;
+                    for _ in 0..3 {
+                        terminal.draw(|frame| ui::draw(frame, &mut app))?;
+                        assert_eq!(app.last_dialog().unwrap().message, message);
+                    }
+                }
+            }
+            assert!(!app.config.plugin_enabled(dn::plugins::DOS_LAUNCHER));
+            assert!(!app.config.dos.open_on_enter);
+            app.clear_dialogs();
+            app.launcher
+                .request_with(0, path, |_| Ok(dn::launcher::Launched::Submitted))?;
+            wait(&mut app, |a| !a.launcher.loading());
+            assert!(app.last_dialog().is_none());
+        }
     }
     Ok(())
 }

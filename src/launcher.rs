@@ -19,18 +19,25 @@ pub struct Completion {
     pub panel: usize,
     pub path: PathBuf,
     pub result: io::Result<Launched>,
+    pub dos_program: bool,
 }
 struct Pending {
     token: Option<crate::requests::RequestToken>,
     panel: usize,
     path: PathBuf,
-    task: Task<io::Result<Launched>>,
+    task: Task<(io::Result<Launched>, bool)>,
 }
 #[derive(Default)]
 pub struct Launcher {
     pub(crate) requests: crate::requests::RequestScope,
     pending: Option<Pending>,
-    children: Vec<(usize, PathBuf, Child, Option<crate::requests::RequestToken>)>,
+    children: Vec<(
+        usize,
+        PathBuf,
+        Child,
+        Option<crate::requests::RequestToken>,
+        bool,
+    )>,
 }
 impl Launcher {
     pub fn loading(&self) -> bool {
@@ -70,8 +77,11 @@ impl Launcher {
         }
         let source = path.clone();
         let task = self.requests.spawn("dn-open", move |cancel| {
-            cancel.check()?;
-            start(&source)
+            if let Err(error) = cancel.check() {
+                return (Err(error), false);
+            }
+            let dos_program = crate::dos::program_for_open_hint(&source);
+            (start(&source), dos_program)
         })?;
         self.pending = Some(Pending {
             token,
@@ -87,11 +97,14 @@ impl Launcher {
             let result = match pending.task.try_recv() {
                 Ok(result) => Some(result),
                 Err(TryRecvError::Empty) => None,
-                Err(TryRecvError::Disconnected) => Some(Err(io::Error::other(
-                    "Application launcher stopped unexpectedly",
-                ))),
+                Err(TryRecvError::Disconnected) => Some((
+                    Err(io::Error::other(
+                        "Application launcher stopped unexpectedly",
+                    )),
+                    false,
+                )),
             };
-            if let Some(result) = result {
+            if let Some((result, dos_program)) = result {
                 if let Some(pending) = self.pending.take() {
                     match result {
                         Ok(Launched::Process(child)) => {
@@ -100,15 +113,22 @@ impl Launcher {
                                 panel: pending.panel,
                                 path: pending.path.clone(),
                                 result: Ok(Launched::Submitted),
+                                dos_program,
                             });
-                            self.children
-                                .push((pending.panel, pending.path, child, pending.token));
+                            self.children.push((
+                                pending.panel,
+                                pending.path,
+                                child,
+                                pending.token,
+                                dos_program,
+                            ));
                         }
                         result => replies.push(Completion {
                             token: pending.token,
                             panel: pending.panel,
                             path: pending.path,
                             result,
+                            dos_program,
                         }),
                     }
                 }
@@ -122,12 +142,13 @@ impl Launcher {
                 Ok(Some(status))=>Err(io::Error::other(format!("The system opener failed ({status}). Check that a default application is configured for this file type."))),
                 Err(error)=>Err(error),
             };
-            let (panel, path, _, token) = self.children.swap_remove(index);
+            let (panel, path, _, token, dos_program) = self.children.swap_remove(index);
             replies.push(Completion {
                 token,
                 panel,
                 path,
                 result,
+                dos_program,
             });
         }
         replies

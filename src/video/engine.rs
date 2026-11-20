@@ -1148,6 +1148,52 @@ pub(super) fn execute(
     Ok(result)
 }
 
+pub(super) fn diagnostics(
+    preferences: &Preferences,
+    cancel: &AtomicBool,
+) -> crate::utilities::information::Fields {
+    let mut fields = Vec::new();
+    for (label, configured, name) in [
+        ("FFmpeg", &preferences.ffmpeg, "ffmpeg"),
+        ("FFprobe", &preferences.ffprobe, "ffprobe"),
+    ] {
+        if check(cancel).is_err() {
+            break;
+        }
+        let result = (|| -> io::Result<(PathBuf, String)> {
+            let path = tool(configured, name)?;
+            let work = Work::new(&std::env::temp_dir())?;
+            let output = run_bounded(
+                &path,
+                &args(&["-version"]),
+                &work,
+                cancel,
+                true,
+                Some(Duration::from_secs(3)),
+                &mut |_| {},
+            )?;
+            let line = output.lines().next().unwrap_or("").to_string();
+            if !line
+                .to_ascii_lowercase()
+                .starts_with(&format!("{name} version"))
+            {
+                return Err(error(
+                    "Executable did not identify as the requested FFmpeg tool",
+                ));
+            }
+            Ok((path, line))
+        })();
+        match result {
+            Ok((path, version)) => {
+                fields.push((label.into(), version));
+                fields.push((format!("{label} path"), path.to_string_lossy().into_owned()));
+            }
+            Err(e) => fields.push((label.into(), e.to_string())),
+        }
+    }
+    fields
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

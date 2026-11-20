@@ -121,6 +121,11 @@ pub const ROOTS: &[Root] = &[
                 Utility(crate::utilities::Kind::Network),
             ),
             line(),
+            item(
+                "Plugin diagnostics...",
+                "",
+                Utility(crate::utilities::Kind::Plugins),
+            ),
             item("~C~alculator", "Ctrl+K", Plugin(crate::plugins::CALCULATOR)),
             item("APK ~W~orkshop", "", Plugin(crate::plugins::APK_WORKSHOP)),
             item("Mu~s~ic Player", "", Plugin(crate::plugins::MP3_PLAYER)),

@@ -4,6 +4,7 @@ pub enum Kind {
     System,
     Memory,
     Network,
+    Plugins,
 }
 impl Kind {
     pub fn title(self) -> &'static str {
@@ -11,6 +12,7 @@ impl Kind {
             Self::System => " System Information ",
             Self::Memory => " Memory Information ",
             Self::Network => " Network Information ",
+            Self::Plugins => " Plugin diagnostics ",
         }
     }
 }
@@ -46,10 +48,24 @@ impl Information {
         size: (u16, u16),
         config: Option<PathBuf>,
     ) -> std::io::Result<Self> {
+        Self::open_request(kind, path, size, config, None)
+    }
+    pub(crate) fn open_plugins(input: crate::plugins::diagnostics::Input) -> std::io::Result<Self> {
+        Self::open_request(Kind::Plugins, PathBuf::new(), (0, 0), None, Some(input))
+    }
+    fn open_request(
+        kind: Kind,
+        path: PathBuf,
+        size: (u16, u16),
+        config: Option<PathBuf>,
+        input: Option<crate::plugins::diagnostics::Input>,
+    ) -> std::io::Result<Self> {
         let requests = crate::requests::RequestScope::default();
-        let receive = requests.spawn("dn-information", move |_| {
+        let receive = requests.spawn("dn-information", move |cancel| {
             let network = (kind == Kind::Network).then(crate::network::information::snapshot);
-            let mut fields = if let Some(network) = &network {
+            let mut fields = if kind == Kind::Plugins {
+                crate::plugins::diagnostics::collect(input.unwrap_or_default(), &cancel)
+            } else if let Some(network) = &network {
                 network.details(0)
             } else {
                 collect(kind, path, size)
@@ -342,12 +358,21 @@ pub(crate) fn display_value(
             | "Keyboard mode"
             | "Russian alphabet mappings"
             | "Console frame mappings"
+            | "Setup help"
+            | "Checks"
+            | "Music playback"
+            | "Acoustic support"
+            | "Bluetooth requirements"
+            | "Bluetooth device"
+            | "Hardware encoders"
     ) {
         if let Some((prefix, detail)) = value.split_once(": ") {
             format!("{}: {detail}", language.text(prefix))
         } else {
             language.text(value).to_owned()
         }
+    } else if matches!(value, "Enabled" | "Disabled") {
+        language.text(value).into()
     } else if let Some(detail) = value
         .strip_prefix("Unavailable: ")
         .filter(|_| matches!(name, "Terminal input" | "Terminal output"))

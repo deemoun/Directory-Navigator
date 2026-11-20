@@ -1264,3 +1264,64 @@ fn system_unicode_and_console_diagnostics_remain_reachable_across_pages() -> io:
     }
     Ok(())
 }
+
+#[test]
+fn plugin_diagnostics_are_owned_localized_read_only_and_refreshable() -> io::Result<()> {
+    let t = Temp::new()?;
+    let mut app = t.app()?;
+    // Explicit missing tools make this independent of installed programs/devices.
+    let missing =
+        t.0.join("missing executable")
+            .to_string_lossy()
+            .into_owned();
+    app.config.video.ffmpeg = missing.clone();
+    app.config.video.ffprobe = missing.clone();
+    app.config.dos.executable = missing;
+    let before = app.config.clone();
+    for language in [
+        dn::localization::Language::English,
+        dn::localization::Language::Russian,
+    ] {
+        app.config.language = language;
+        utilities::open(&mut app, Kind::Plugins);
+        let owner = app.desktop.active().id;
+        wait(&mut app, |a| {
+            a.utility_state()
+                .information
+                .as_ref()
+                .is_some_and(|i| !i.loading())
+        });
+        let fields = &app.utility_state().information.as_ref().unwrap().fields;
+        assert!(fields.iter().any(|(k, v)| k == "FFmpeg" && !v.is_empty()));
+        assert!(fields
+            .iter()
+            .any(|(k, v)| k == "Bluetooth device" && v.starts_with("Not probed")));
+        for (w, h) in [(80, 25), (120, 35), (40, 12), (80, 25)] {
+            let first = draw(&mut app, w, h)?;
+            assert_eq!(first, draw(&mut app, w, h)?);
+        }
+        utilities::action(&mut app, Action::Refresh);
+        // Complete while the manager is active: no focus stealing.
+        app.desktop.activate(dn::desktop::WindowId::MANAGER);
+        let end = Instant::now() + Duration::from_secs(5);
+        loop {
+            app.poll();
+            let done = app
+                .desktop
+                .tool(owner)
+                .and_then(|t| t.information())
+                .is_some_and(|i| !i.loading());
+            if done {
+                break;
+            }
+            assert!(Instant::now() < end);
+            thread::sleep(Duration::from_millis(1));
+        }
+        assert_eq!(app.desktop.active().id, dn::desktop::WindowId::MANAGER);
+        app.desktop.activate(owner);
+        utilities::action(&mut app, Action::Close);
+    }
+    app.config.language = before.language;
+    assert_eq!(app.config, before);
+    Ok(())
+}

@@ -20,10 +20,12 @@ pub enum Kind {
     System,
     Memory,
     Network,
+    PluginDiagnostics,
     Bookmarks,
     EditHistory,
     ViewHistory,
     DirectoryHistory,
+    DirectoryComparison,
     CommandHistory,
     Help,
 }
@@ -34,9 +36,16 @@ impl Kind {
             Self::Tree => Focus::Tree,
             Self::Find | Self::Sizes => Focus::Discovery,
             Self::FileInfo => Focus::FileInfo,
-            Self::Characters | Self::System | Self::Memory | Self::Network => Focus::Utility,
+            Self::Characters
+            | Self::System
+            | Self::Memory
+            | Self::Network
+            | Self::PluginDiagnostics => Focus::Utility,
             Self::Bookmarks => Focus::Navigation,
-            Self::EditHistory | Self::ViewHistory | Self::DirectoryHistory => Focus::FileTools,
+            Self::EditHistory
+            | Self::ViewHistory
+            | Self::DirectoryHistory
+            | Self::DirectoryComparison => Focus::FileTools,
             Self::CommandHistory => Focus::CommandHistory,
             Self::Help => Focus::Message,
         }
@@ -52,10 +61,12 @@ impl Kind {
             Self::System => "System information",
             Self::Memory => "Memory information",
             Self::Network => "Network information",
+            Self::PluginDiagnostics => "Plugin diagnostics",
             Self::Bookmarks => "Bookmarks",
             Self::EditHistory => "File Edit History",
             Self::ViewHistory => "File View History",
             Self::DirectoryHistory => "Directory history",
+            Self::DirectoryComparison => "Directory comparison report",
             Self::CommandHistory => "Command history",
             Self::Help => "Help",
         }
@@ -74,6 +85,9 @@ impl ToolWindow {
     pub(crate) fn set_help(&mut self, dialog: crate::dialog::Dialog) {
         self.state.started = true;
         self.state.help = Some(state::Help::new(dialog));
+    }
+    pub fn information(&self) -> Option<&crate::utilities::information::Information> {
+        self.utility.information.as_ref()
     }
     pub fn tree(&self) -> Option<&crate::directory_tree::Tree> {
         self.state.directory_tree()
@@ -368,6 +382,10 @@ pub(crate) fn prepare(app: &mut App, area: Rect) {
                 None,
             );
         }
+        if let Some(crate::file_tools::ToolDialog::Report(r)) = t.state.file_tools_mut() {
+            r.rows = usize::from(s.bounds.height.saturating_sub(11)).max(1);
+            r.fit();
+        }
         if let Some(info) = &mut t.utility.information {
             info.rows = usize::from(s.bounds.height.saturating_sub(7)).max(1);
             info.step(0);
@@ -402,8 +420,11 @@ pub(crate) fn poll(app: &mut App) -> bool {
             Kind::Tree => app.directory_tree_mut().is_some_and(|t| t.poll()),
             Kind::Find | Kind::Sizes => crate::discovery::poll(app),
             Kind::FileInfo => crate::file_info::poll(app),
+            Kind::DirectoryComparison => crate::file_tools::poll_report(app),
             Kind::Bookmarks => crate::navigation_tools::poll(app),
-            Kind::System | Kind::Memory | Kind::Network => crate::utilities::poll(app),
+            Kind::System | Kind::Memory | Kind::Network | Kind::PluginDiagnostics => {
+                crate::utilities::poll(app)
+            }
             Kind::CommandHistory => {
                 let history = app.command_line.history().to_vec();
                 app.command_history_mut()
