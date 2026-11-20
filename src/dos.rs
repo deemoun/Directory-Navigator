@@ -231,7 +231,7 @@ fn host_shell_script(path: &Path) -> bool {
             .extension()
             .is_some_and(|e| e.eq_ignore_ascii_case("bat") || e.eq_ignore_ascii_case("cmd"))
 }
-#[cfg(test)]
+#[cfg(all(test, unix))]
 fn verify(executable: &Path, cancel: &crate::task::Cancellation) -> io::Result<Verified> {
     verify_until(executable, cancel, Instant::now() + Duration::from_secs(8))
 }
