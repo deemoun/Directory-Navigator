@@ -115,7 +115,16 @@ jobs:
         run: cargo clippy --locked --all-targets --target ${{ matrix.target }} -- -D warnings
       - name: Test
         if: matrix.target != 'x86_64-apple-darwin'
-        run: cargo test --locked --target ${{ matrix.target }}
+        # Core safety checks; the full UI/PTY suite is in release-full-tests.yml.
+        run: >-
+          cargo test --locked --target ${{ matrix.target }} --lib
+          --test cli --test config_store --test config_v2
+          --test operations --test advanced_copy --test advanced_move
+          --test overwrite --test transfers --test archive
+          --test editor --test editor_recovery --test text_encoding
+          --test localization --test menu_definition --test windows_drives
+          --test file_tools --test plugin_settings --test plugin_availability
+          --test workflow_policy
       - name: Test without audio
         if: matrix.target != 'x86_64-apple-darwin'
         run: cargo test --locked --no-default-features --target ${{ matrix.target }} --test mp3_player --test plugin_settings

@@ -470,11 +470,19 @@ release → Run workflow**, choose the source branch and enter a version **witho
 `v`**, for example `1.0.0` or `1.1.0-beta.1`.
 
 The manual workflow builds all five targets: macOS Apple Silicon and Intel,
-Windows x86_64, and Linux x86_64 and ARM64. Apple Silicon, Windows and Linux run
-full Clippy and test suites, including no-audio tests. Intel macOS uses formatting,
+Windows x86_64, and Linux x86_64 and ARM64. Apple Silicon, Windows and Linux keep
+strict all-target Clippy, library unit tests and selected core safety tests covering
+files, transfers, archives, editing/recovery, encodings, configuration and localization,
+plus no-audio tests. UI/PTY walkthroughs and the complete integration suite are
+outside this release gate. Intel macOS uses formatting,
 a release build, CLI version/help smoke checks and package verification, avoiding
 extra development/test builds within the release timeout. The separate **Build all
-platforms** workflow retains full Intel tests when needed. The release workflow
+platforms** workflow also retains full Intel tests. For complete release validation,
+run **Actions → Unified Release Full Tests** with the same source branch and version:
+it runs full Clippy/tests on all five platforms, including Intel, and saves binary
+artifacts only. It cannot create a tag, draft or published release and may be rerun
+for an already published version. All suites remain available locally and through
+the manual full-check workflows. The normal release workflow
 embeds your version in the app, About and CLI, then creates an **unpublished draft release** tagged
 `v<version>`. Prerelease versions are marked automatically.
 

@@ -61,7 +61,32 @@ fn comparison_report_navigation_resize_and_restoration() -> io::Result<()> {
         s.text().contains("unique.txt")
     })?;
     click(&mut s, "Open left", "result navigation", |s| {
-        s.command_prompt_active() && s.text().contains("unique.txt")
+        // A retained floating report may cover the command cursor after resize.
+        // Its visibility is not evidence of which document owns keyboard input.
+        s.manager_document_ready()
+            && fs::read_to_string(s.root.join("settings/dn/diagnostics.txt"))
+                .is_ok_and(|state| state.contains("panels_loading=[false, false]"))
+    })?;
+    click(
+        &mut s,
+        "Directory comparison report",
+        "reactivate retained report",
+        |s| {
+            fs::read_to_string(s.root.join("settings/dn/diagnostics.txt")).is_ok_and(|state| {
+                state.contains(" focus=FileTools ")
+                    && state.contains("capture=None ")
+                    && state.contains("button=none")
+            })
+        },
+    )?;
+    s.send(b"\x1b", "close retained report", |s| {
+        s.command_prompt_active() && !s.text().contains("Directory comparison report")
+    })?;
+    s.send(b"\x1b[13~", "navigated result opens in viewer", |s| {
+        s.text().contains("private comparison fixture")
+    })?;
+    s.send(b"\x1b", "return from result viewer", |s| {
+        s.command_prompt_active()
     })?;
     assert_eq!(
         fs::read(s.root.join("inside/unique.txt"))?,

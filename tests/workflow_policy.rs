@@ -143,6 +143,125 @@ fn assert_release_policy(text: &str) {
     assert!(text.contains("type: string"));
     assert!(text.contains("git write-tree"));
     assert_release_validation_levels(&text);
+    let core = release_step(&text, "Test");
+    assert!(core.contains("--lib"), "Release keeps library unit tests");
+    for suite in [
+        "cli",
+        "config_store",
+        "config_v2",
+        "operations",
+        "advanced_copy",
+        "advanced_move",
+        "overwrite",
+        "transfers",
+        "archive",
+        "editor",
+        "editor_recovery",
+        "text_encoding",
+        "localization",
+        "menu_definition",
+        "windows_drives",
+        "file_tools",
+        "plugin_settings",
+        "plugin_availability",
+        "workflow_policy",
+    ] {
+        assert!(
+            core.contains(&format!("--test {suite}")),
+            "Missing release safety suite: {suite}"
+        );
+    }
+    assert!(
+        !core.contains("terminal_"),
+        "PTY walkthroughs belong to the full workflow"
+    );
+}
+
+fn assert_full_release_checks(text: &str) {
+    let text = text.replace("\r\n", "\n");
+    assert!(text.starts_with("name: Unified Release Full Tests\n"));
+    for target in [
+        "aarch64-apple-darwin",
+        "x86_64-apple-darwin",
+        "x86_64-pc-windows-msvc",
+        "x86_64-unknown-linux-gnu",
+        "aarch64-unknown-linux-gnu",
+    ] {
+        assert!(
+            text.contains(&format!("target: {target}\n")),
+            "Missing full-test target: {target}"
+        );
+    }
+    for name in ["Clippy", "Test", "Test without audio", "Build release"] {
+        assert!(
+            !release_step(&text, name)
+                .lines()
+                .any(|l| l.trim().starts_with("if:")),
+            "Full checks must cover every platform: {name}"
+        );
+    }
+    let test = release_step(&text, "Test");
+    assert!(test
+        .lines()
+        .any(|line| line.trim() == "run: cargo test --locked --target ${{ matrix.target }}"));
+    assert!(!test.contains("--test ") && !test.contains("--lib") && !test.contains("--skip"));
+    assert!(!text.contains("contents: write"));
+    assert!(
+        !text.contains("gh release ")
+            && !text.contains("cargo publish")
+            && !text.contains("git push")
+    );
+    assert!(text.contains("python -m unittest discover"));
+    assert!(text.contains("rustc --edition 2021 --test tests/workflow_policy.rs"));
+    assert!(text.contains("cargo clippy --locked --all-targets"));
+    assert!(text.contains("cargo build --release --locked --target"));
+    assert!(text.contains("name: full-tests-${{ matrix.target }}"));
+    assert!(text.contains("group: unified-full-tests-"));
+}
+
+#[test]
+fn full_release_checks_are_complete_read_only_and_line_ending_independent() -> io::Result<()> {
+    let path =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join(".github/workflows/release-full-tests.yml");
+    let text = fs::read_to_string(path)?.replace("\r\n", "\n");
+    for variant in line_ending_variants(&text) {
+        assert_full_release_checks(&variant);
+    }
+    for mutation in [
+        text.replace(
+            "run: cargo test --locked --target",
+            "run: cargo test --locked --test cli --target",
+        ),
+        text.replace("contents: read", "contents: write"),
+        text.replace(
+            "      - name: Test\n",
+            "      - name: Test\n        if: matrix.target != 'x86_64-apple-darwin'\n",
+        ),
+        text.replace("target: aarch64-unknown-linux-gnu", "target: unavailable"),
+    ] {
+        assert_ne!(text, mutation);
+        for variant in line_ending_variants(&mutation) {
+            assert!(std::panic::catch_unwind(|| assert_full_release_checks(&variant)).is_err());
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn release_core_checks_cannot_drop_file_safety_or_restore_full_pty_gating() -> io::Result<()> {
+    let text = release_workflow()?;
+    for mutation in [
+        text.replace("--test overwrite", ""),
+        text.replace("--test editor_recovery", ""),
+        text.replace("--test archive", "--test terminal_walkthrough"),
+        text.replace("--lib\n", "\n"),
+    ] {
+        assert_ne!(text, mutation);
+        for variant in line_ending_variants(&mutation) {
+            assert!(std::panic::catch_unwind(|| assert_release_policy(&variant)).is_err());
+        }
+    }
+    Ok(())
 }
 
 fn release_step<'a>(text: &'a str, name: &str) -> &'a str {

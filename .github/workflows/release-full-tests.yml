@@ -1,0 +1,134 @@
+name: Unified Release Full Tests
+run-name: Full release checks ${{ inputs.version }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'App version without v (for example 1.0.0 or 1.1.0-beta.1)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: unified-full-tests-${{ github.repository }}-${{ inputs.version }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  validate:
+    name: Validate release version
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      source_tree: ${{ steps.tree.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Test release helpers
+        run: python -m unittest discover -s scripts -p 'test_*.py'
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Check workflow policy before platform builds
+        run: |
+          set -euo pipefail
+          CARGO_MANIFEST_DIR="$PWD" rustc --edition 2021 --test tests/workflow_policy.rs -o "$RUNNER_TEMP/workflow-policy"
+          "$RUNNER_TEMP/workflow-policy"
+      - name: Set release source version
+        id: version
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: python scripts/release.py prepare "$RELEASE_VERSION" --github-output "$GITHUB_OUTPUT"
+      - name: Record versioned source tree
+        id: tree
+        run: |
+          git add Cargo.toml Cargo.lock
+          echo "sha=$(git write-tree)" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build ${{ matrix.target }}
+    needs: validate
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15
+            target: aarch64-apple-darwin
+          - os: macos-15-intel
+            target: x86_64-apple-darwin
+          - os: windows-2022
+            target: x86_64-pc-windows-msvc
+          - os: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+          - os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+    env:
+      RELEASE_VERSION: ${{ needs.validate.outputs.version }}
+      EXPECTED_TREE: ${{ needs.validate.outputs.source_tree }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install Linux audio build dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y pkg-config libasound2-dev
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+          components: rustfmt, clippy
+      - name: Prepare identical versioned sources
+        run: |
+          set -euo pipefail
+          python scripts/release.py prepare "$RELEASE_VERSION"
+          git add Cargo.toml Cargo.lock
+          test "$(git write-tree)" = "$EXPECTED_TREE"
+      - name: Check formatting
+        run: cargo fmt --check
+      - name: Clippy
+        run: cargo clippy --locked --all-targets --target ${{ matrix.target }} -- -D warnings
+      - name: Test
+        run: cargo test --locked --target ${{ matrix.target }}
+      - name: Test without audio
+        run: cargo test --locked --no-default-features --target ${{ matrix.target }} --test mp3_player --test plugin_settings
+      - name: Build release
+        run: cargo build --release --locked --target ${{ matrix.target }}
+      - name: Intel macOS CLI smoke checks
+        if: matrix.target == 'x86_64-apple-darwin'
+        env:
+          BUILD_TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          binary="target/${BUILD_TARGET}/release/dn"
+          test "$("$binary" --version)" = "Directory Navigator $RELEASE_VERSION"
+          "$binary" --help > "$RUNNER_TEMP/dn-intel-help.txt"
+          grep -F -- 'Usage: dn' "$RUNNER_TEMP/dn-intel-help.txt"
+      - name: Verify version and package
+        env:
+          BUILD_TARGET: ${{ matrix.target }}
+        run: python scripts/release.py package "$RELEASE_VERSION" --target "$BUILD_TARGET"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: full-tests-${{ matrix.target }}
+          path: dist/dn-*
+          if-no-files-found: error
+          retention-days: 30
+
