@@ -1207,7 +1207,14 @@ impl Mp3Player {
             Rect::new(r.x + 2, r.y + 13, 62, 1),
         );
         spec.caption(
-            Paragraph::new("─".repeat(64)).style(style(0x7f)),
+            Paragraph::new(if crate::plugins::music_playback_available() {
+                "─".repeat(64)
+            } else {
+                language
+                    .text("Use a build with audio support. F1 Help.")
+                    .into()
+            })
+            .style(style(0x7f)),
             Rect::new(r.x + 1, r.y + 14, 64, 1),
         );
         self.title_indicator(&mut spec, ctx);
@@ -1248,67 +1255,79 @@ impl Mp3Player {
                 Rect::new(x, r.y + 1, w, 1),
             );
         }
-        const DIGITS: [[&str; 3]; 10] = [
-            ["▄▄▄", "█ █", "█▄█"],
-            [" ▄ ", " █ ", "▄█▄"],
-            ["▄▄▄", " ▄█", "█▄▄"],
-            ["▄▄▄", " ▄█", "▄▄█"],
-            ["▄ ▄", "█▄█", "  █"],
-            ["▄▄▄", "█▄ ", "▄▄█"],
-            ["▄▄▄", "█▄ ", "█▄█"],
-            ["▄▄▄", "  █", "  █"],
-            ["▄▄▄", "█▄█", "█▄█"],
-            ["▄▄▄", "█▄█", "▄▄█"],
-        ];
-        let track = self.track_index().map_or(0, |i| i + 1);
-        let time = if self.remaining {
-            self.track_duration()
-                .map(|d| d.saturating_sub(self.snapshot.position))
+        if !crate::plugins::music_playback_available() {
+            spec.caption(
+                Paragraph::new(format!(
+                    "{}\n{}",
+                    language.text("Audio playback is not included in this build"),
+                    language.text("Use an audio build. F1 Help.")
+                ))
+                .wrap(crate::painting::Wrap { trim: false }),
+                Rect::new(r.x + 2, r.y + 2, 32, 3),
+            );
         } else {
-            Some(self.snapshot.position)
-        };
-        let seconds = time.unwrap_or_default().as_secs().min(5999);
-        let digits = [
-            track / 10,
-            track % 10,
-            (seconds / 600) as usize,
-            (seconds / 60 % 10) as usize,
-            (seconds / 10 % 6) as usize,
-            (seconds % 10) as usize,
-        ];
-        for (x, digit) in [r.x + 3, r.x + 7, r.x + 12, r.x + 16, r.x + 22, r.x + 26]
-            .into_iter()
-            .zip(digits)
-        {
-            for (row, text) in DIGITS[digit].into_iter().enumerate() {
+            const DIGITS: [[&str; 3]; 10] = [
+                ["▄▄▄", "█ █", "█▄█"],
+                [" ▄ ", " █ ", "▄█▄"],
+                ["▄▄▄", " ▄█", "█▄▄"],
+                ["▄▄▄", " ▄█", "▄▄█"],
+                ["▄ ▄", "█▄█", "  █"],
+                ["▄▄▄", "█▄ ", "▄▄█"],
+                ["▄▄▄", "█▄ ", "█▄█"],
+                ["▄▄▄", "  █", "  █"],
+                ["▄▄▄", "█▄█", "█▄█"],
+                ["▄▄▄", "█▄█", "▄▄█"],
+            ];
+            let track = self.track_index().map_or(0, |i| i + 1);
+            let time = if self.remaining {
+                self.track_duration()
+                    .map(|d| d.saturating_sub(self.snapshot.position))
+            } else {
+                Some(self.snapshot.position)
+            };
+            let seconds = time.unwrap_or_default().as_secs().min(5999);
+            let digits = [
+                track / 10,
+                track % 10,
+                (seconds / 600) as usize,
+                (seconds / 60 % 10) as usize,
+                (seconds / 10 % 6) as usize,
+                (seconds % 10) as usize,
+            ];
+            for (x, digit) in [r.x + 3, r.x + 7, r.x + 12, r.x + 16, r.x + 22, r.x + 26]
+                .into_iter()
+                .zip(digits)
+            {
+                for (row, text) in DIGITS[digit].into_iter().enumerate() {
+                    spec.caption(
+                        Paragraph::new(if x >= r.x + 12 && time.is_none() {
+                            "   "
+                        } else {
+                            text
+                        })
+                        .style(style(0x70)),
+                        Rect::new(x, r.y + 2 + row as u16, 3, 1),
+                    );
+                }
+            }
+            if time.is_none() {
                 spec.caption(
-                    Paragraph::new(if x >= r.x + 12 && time.is_none() {
-                        "   "
-                    } else {
-                        text
-                    })
-                    .style(style(0x70)),
-                    Rect::new(x, r.y + 2 + row as u16, 3, 1),
+                    Paragraph::new("--:--").style(style(0x70)),
+                    Rect::new(r.x + 17, r.y + 3, 5, 1),
                 );
             }
-        }
-        if time.is_none() {
-            spec.caption(
-                Paragraph::new("--:--").style(style(0x70)),
-                Rect::new(r.x + 17, r.y + 3, 5, 1),
-            );
-        }
-        for y in [r.y + 3, r.y + 4].into_iter().filter(|_| time.is_some()) {
-            spec.caption(
-                Paragraph::new("▪").style(style(0x70)),
-                Rect::new(r.x + 20, y, 1, 1),
-            );
-        }
-        for (row, text) in ["M", "U", "S"].into_iter().enumerate() {
-            spec.caption(
-                Paragraph::new(text).style(style(0x70)),
-                Rect::new(r.x + 32, r.y + 2 + row as u16, 1, 1),
-            );
+            for y in [r.y + 3, r.y + 4].into_iter().filter(|_| time.is_some()) {
+                spec.caption(
+                    Paragraph::new("▪").style(style(0x70)),
+                    Rect::new(r.x + 20, y, 1, 1),
+                );
+            }
+            for (row, text) in ["M", "U", "S"].into_iter().enumerate() {
+                spec.caption(
+                    Paragraph::new(text).style(style(0x70)),
+                    Rect::new(r.x + 32, r.y + 2 + row as u16, 1, 1),
+                );
+            }
         }
         let labels = [
             "◄◄".into(),

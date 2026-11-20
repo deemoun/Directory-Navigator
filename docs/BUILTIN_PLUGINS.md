@@ -34,6 +34,26 @@ explicit opt-ins, including default-off plugins. IDs cannot appear in both lists
 Unknown IDs in either list are retained on save. No configuration version change
 is required.
 
+## Availability
+
+Plugin windows explain their requirements locally. DOS launcher and Video Merge
+distinguish unchecked tools from a failed check; use Find emulators/Check DOSBox
+or Video Merge Settings → Advanced → Check tools. Checks use the existing owned
+background workers. FFmpeg/FFprobe check failures remain available in Video Merge
+Help, including the configured path and original cause.
+
+Bluetooth Refresh reads paired devices; an empty result does not prove adapter
+failure. Its window shows the platform's adapter/service or permission requirement.
+APK Workshop inspection needs no external tools. Tools… identifies unset paths
+and explains that ADB is for devices, while SDK build tools and Java are for signing.
+A set path is not a successful executable check. Remote file transfers are built
+in; the separate SSH terminal needs an installed OpenSSH client (`ssh` on PATH).
+Audio-disabled builds explain how to obtain playback in compact and expanded
+Music Player views. Nearby and Acoustic retain their existing readiness messages.
+
+These notices do not start radios, audio devices, receivers or emulators, install
+software, change plugin defaults or save settings.
+
 ## Contract
 
 `plugins::ToolPlugin` supplies a `Definition`, opening availability, open/event/close

@@ -484,12 +484,13 @@ pub(crate) fn poll(app: &mut App) -> bool {
             );
             match reply {
                 Ok(Reply::Devices(devices)) => {
+                    let message = if devices.is_empty() {
+                        "No paired Bluetooth devices reported. Pair in system settings, then Refresh."
+                    } else {
+                        "Pair devices in system settings, then select a receiver"
+                    };
                     app.bluetooth.view.devices = devices;
-                    app.bluetooth.view.notice = app
-                        .config
-                        .language
-                        .text("Pair devices in system settings, then select a receiver")
-                        .into();
+                    app.bluetooth.view.notice = app.config.language.text(message).into();
                 }
                 Ok(Reply::Sources(files)) => {
                     app.bluetooth.view.queue = files

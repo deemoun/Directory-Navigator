@@ -53,6 +53,35 @@ struct Form {
     encoders: Vec<String>,
 }
 impl VideoMerge {
+    fn status(&self, ctx: &Context) -> String {
+        if !self.notice.is_empty() {
+            return localized(ctx, &self.notice);
+        }
+        if (ctx.video.busy || ctx.video.timing.is_some() || ctx.video.ready)
+            && !ctx.video.notice.is_empty()
+        {
+            return localized(ctx, &ctx.video.notice);
+        }
+        if ctx.video.checking {
+            return ctx.language.text("Checking encoders…").into();
+        }
+        if !ctx.video.discovery_error.is_empty() {
+            return format!("{}\n{}", ctx.language.text("Tool check failed. Install FFmpeg/FFprobe; set paths in Settings > Advanced. F1: details."), localized(ctx, &ctx.video.discovery_error));
+        }
+        let availability = ctx
+            .language
+            .text(if ctx.video.capabilities.is_empty() {
+                "FFmpeg and FFprobe not checked. Open Settings to check tools."
+            } else {
+                "Last tool check succeeded. Analyze verifies the selected clips."
+            })
+            .to_owned();
+        if ctx.video.notice.is_empty() {
+            availability
+        } else {
+            format!("{availability}\n{}", localized(ctx, &ctx.video.notice))
+        }
+    }
     fn effect(a: A, ctx: &Context) -> Vec<Effect> {
         vec![Effect::Video {
             generation: ctx.video.generation,
@@ -408,17 +437,10 @@ impl VideoMerge {
                 return vec![Effect::Help {
                     title: " Video Merge Help ",
                     text: format!(
-                        "{}\n\n{}",
+                        "{}\n\n{}\n\n{}",
                         ctx.language.text(HELP),
-                        ctx.video
-                            .notice
-                            .chars()
-                            .map(|c| if c.is_control() && c != '\n' {
-                                '\u{fffd}'
-                            } else {
-                                c
-                            })
-                            .collect::<String>()
+                        safe_block(&localized(ctx, &ctx.video.notice)),
+                        safe_block(&localized(ctx, &ctx.video.discovery_error)),
                     ),
                 }]
             }
@@ -545,11 +567,7 @@ impl VideoMerge {
             "Test speed",
             ctx.video.ready && !ctx.video.busy,
         );
-        let notice = if self.notice.is_empty() {
-            &ctx.video.notice
-        } else {
-            &self.notice
-        };
+        let notice = self.status(ctx);
         let (notice_y, notice_h) = if let Some(t) = &ctx.video.timing {
             let status = if !t.outcome.is_empty() {
                 format!(
@@ -622,7 +640,7 @@ impl VideoMerge {
             (16, 4)
         };
         s.caption(
-            Paragraph::new(safe_block(&localized(ctx, notice))).wrap(Wrap { trim: false }),
+            Paragraph::new(safe_block(&notice)).wrap(Wrap { trim: false }),
             Rect::new(r.x + 2, r.y + notice_y, 73, notice_h),
         );
         for (id, label, x, w, enabled) in [
@@ -936,9 +954,17 @@ impl VideoMerge {
         let status = if ctx.video.checking {
             ctx.language.text("Checking encoders…").to_owned()
         } else if !ctx.video.discovery_error.is_empty() {
-            ctx.video.discovery_error.clone()
+            ctx.language
+                .text("Tool check failed. Install FFmpeg/FFprobe. F1: details.")
+                .into()
+        } else if ctx.video.capabilities.is_empty() {
+            ctx.language
+                .text("Not checked. Advanced > Check tools verifies the paths.")
+                .into()
         } else {
-            ctx.language.text("Encoder detection complete").into()
+            ctx.language
+                .text("Last tool check succeeded; Check tools verifies current paths.")
+                .into()
         };
         s.caption(
             Paragraph::new(status).wrap(Wrap { trim: false }),
@@ -947,6 +973,14 @@ impl VideoMerge {
         if !self.notice.is_empty() {
             s.caption(
                 Paragraph::new(localized(ctx, &self.notice)),
+                Rect::new(r.x + 2, r.y + 19, 70, 1),
+            );
+        } else if !ctx.video.discovery_error.is_empty() {
+            s.caption(
+                Paragraph::new(
+                    ctx.language
+                        .text("Set executable paths in Advanced, then Check tools."),
+                ),
                 Rect::new(r.x + 2, r.y + 19, 70, 1),
             );
         }

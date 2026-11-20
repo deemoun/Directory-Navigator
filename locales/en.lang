@@ -1944,3 +1944,27 @@ Configure executable paths in DOS launcher or Video Merge Settings; install miss
 File length does not match its contents	File length does not match its contents
 This DOS program needs a DOSBox emulator.	This DOS program needs a DOSBox emulator.
 DOSBox is not bundled with DN. Install DOSBox, DOSBox-X or DOSBox Staging. Enable DOS launcher in Options → Configuration → Plugins, then use File → Run in DOSBox… or enable Open DOS programs with DOSBox.	DOSBox is not bundled with DN. Install DOSBox, DOSBox-X or DOSBox Staging. Enable DOS launcher in Options → Configuration → Plugins, then use File → Run in DOSBox… or enable Open DOS programs with DOSBox.
+DOSBox is required and installed separately. Install DOSBox, DOSBox-X or DOSBox Staging, then Find emulators. Enter requires the checkbox above; BAT files use File > Run in DOSBox.	DOSBox is required and installed separately. Install DOSBox, DOSBox-X or DOSBox Staging, then Find emulators. Enter requires the checkbox above; BAT files use File > Run in DOSBox.
+Not checked. Use Find emulators or Check DOSBox.	Not checked. Use Find emulators or Check DOSBox.
+File transfers are built in. SSH terminal requires OpenSSH.	File transfers are built in. SSH terminal requires OpenSSH.
+Bluetooth not checked. Refresh reads paired devices.	Bluetooth not checked. Refresh reads paired devices.
+Needs BlueZ and a powered Bluetooth Classic adapter.	Needs BlueZ and a powered Bluetooth Classic adapter.
+Allow Bluetooth for this terminal in System Settings.	Allow Bluetooth for this terminal in System Settings.
+Needs a Bluetooth Classic adapter and working drivers.	Needs a Bluetooth Classic adapter and working drivers.
+No paired Bluetooth devices reported. Pair in system settings, then Refresh.	No paired Bluetooth devices reported. Pair in system settings, then Refresh.
+Tool check failed. Install FFmpeg/FFprobe; set paths in Settings > Advanced. F1: details.	Tool check failed. Install FFmpeg/FFprobe; set paths in Settings > Advanced. F1: details.
+FFmpeg and FFprobe not checked. Open Settings to check tools.	FFmpeg and FFprobe not checked. Open Settings to check tools.
+Last tool check succeeded. Analyze verifies the selected clips.	Last tool check succeeded. Analyze verifies the selected clips.
+Tool check failed. Install FFmpeg/FFprobe. F1: details.	Tool check failed. Install FFmpeg/FFprobe. F1: details.
+Not checked. Advanced > Check tools verifies the paths.	Not checked. Advanced > Check tools verifies the paths.
+Last tool check succeeded; Check tools verifies current paths.	Last tool check succeeded; Check tools verifies current paths.
+Set executable paths in Advanced, then Check tools.	Set executable paths in Advanced, then Check tools.
+Not configured	Not configured
+Path set; not verified	Path set; not verified
+Inspection works without external tools.	Inspection works without external tools.
+Device: ADB. Signing: zipalign, apksigner.jar and Java. Install SDK/JDK separately; enter paths above.	Device: ADB. Signing: zipalign, apksigner.jar and Java. Install SDK/JDK separately; enter paths above.
+ADB not configured. Tools… sets Android SDK paths.	ADB not configured. Tools… sets Android SDK paths.
+Signing needs SDK tools and Java. Tools… shows missing paths.	Signing needs SDK tools and Java. Tools… shows missing paths.
+Tool paths set; use the requested action to verify availability.	Tool paths set; use the requested action to verify availability.
+Use a build with audio support. F1 Help.	Use a build with audio support. F1 Help.
+Use an audio build. F1 Help.	Use an audio build. F1 Help.

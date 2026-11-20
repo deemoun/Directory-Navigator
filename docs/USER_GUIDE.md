@@ -477,6 +477,13 @@ verify hardware encoders. Bluetooth device state remains explicitly unprobed;
 use Refresh in Bluetooth transfers to check paired devices. Hardware encoder checks
 remain in Video Merge Settings. Missing tools and configured-path failures retain
 their causes, with setup guidance. Scroll or pan to read long paths and messages.
+Individual plugin windows also show requirements and next steps. An unchecked tool
+is not reported as missing: use DOS launcher's checks or Video Merge Settings to
+verify it. Video Merge Help retains tool-check causes and configured paths.
+Bluetooth lists paired devices after Refresh and shows platform setup guidance;
+an empty list alone does not prove a broken adapter. APK Tools… distinguishes
+missing paths from unverified configured paths and explains optional SDK/JDK roles.
+Music Player builds without audio explain the required build in both window sizes.
 List export refuses existing destinations and paths that cannot be represented as UTF-8 lines.
 Like saving a new editor file, complete list publication requires filesystem hard-link support.
 

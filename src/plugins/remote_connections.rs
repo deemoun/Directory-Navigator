@@ -6,7 +6,7 @@ use crate::{
         remote::{self, ConnectError, Connection, Credentials, Profile, Protocol, RemotePath},
         task::Task,
     },
-    painting::Paragraph,
+    painting::{Paragraph, Wrap},
     requests::RequestScope,
     turbo::dialog_spec::{centered, Control, ControlKind},
 };
@@ -469,7 +469,13 @@ impl ToolPlugin for RemoteConnections {
             }
         }
         s.caption(
-            Paragraph::new(ctx.language.text(&self.notice)).style(style(0x70)),
+            Paragraph::new(ctx.language.text(if self.notice.is_empty() {
+                "File transfers are built in. SSH terminal requires OpenSSH."
+            } else {
+                &self.notice
+            }))
+            .style(style(0x70))
+            .wrap(Wrap { trim: false }),
             Rect::new(r.x + 2, r.y + 16, r.width - 4, 2),
         );
         for (id, label, x, width, y) in [

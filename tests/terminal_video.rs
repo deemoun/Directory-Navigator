@@ -57,6 +57,44 @@ fn video_settings_cancel_picker_resize_and_terminal_restoration() -> io::Result<
     s.send(b"\x1b", "video closed", |s| s.command_prompt_active())?;
     s.finish()
 }
+
+#[test]
+fn missing_video_tools_explain_setup_and_preserve_the_cause() -> io::Result<()> {
+    let mut s = Session::with_preferences(
+        "video-missing-tools",
+        "[plugins]\nenabled=['video_merge']\n[plugins.video_merge]\nffmpeg='./missing-ffmpeg-fixture'\nffprobe='./missing-ffprobe-fixture'\n",
+    )?;
+    s.wait("manager ready", |s| s.command_prompt_active())?;
+    s.send(b"\x1bu", "Utilities menu", |s| {
+        s.text().contains("Video Merge")
+    })?;
+    click(&mut s, "Video Merge", "unchecked tools", |s| {
+        s.text().contains("FFmpeg and FFprobe not checked")
+    })?;
+    click(&mut s, "Settings", "check configured tools", |s| {
+        s.text()
+            .contains("Tool check failed. Install FFmpeg/FFprobe")
+    })?;
+    s.wait("setup next step", |s| {
+        s.text().contains("Set executable paths in Advanced")
+    })?;
+    click(&mut s, "Cancel", "return to merge window", |s| {
+        s.text().contains("Output MP4") && s.text().contains("Tool check failed")
+    })?;
+    s.send(b"\x1bOP", "tool check details", |s| {
+        s.text().contains("Video Merge Help")
+    })?;
+    s.send(b"\x1b[F", "original tool cause", |s| {
+        s.text().contains("missing-ffmpeg-fixture")
+    })?;
+    s.send(b"\x1b", "close details", |s| {
+        s.text().contains("Output MP4")
+    })?;
+    s.resize(100, 32)?;
+    s.resize(80, 25)?;
+    s.send(b"\x1b", "close Video Merge", |s| s.command_prompt_active())?;
+    s.finish()
+}
 #[test]
 fn video_utilities_capture_panel_marks_and_restore_terminal() -> io::Result<()> {
     let mut s = Session::with_preferences(
@@ -175,7 +213,7 @@ fn real_video_analysis_merge_and_terminal_restoration() -> io::Result<()> {
         s.text().contains("Match source resolution")
     })?;
     s.wait("encoder discovery without Analyze", |s| {
-        s.text().contains("Encoder detection complete")
+        s.text().contains("Last tool check succeeded")
     })?;
     click(&mut s, "Processing:", "processing list", |s| {
         s.text().contains("Software H.264")

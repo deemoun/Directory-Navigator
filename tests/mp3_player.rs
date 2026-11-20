@@ -86,10 +86,12 @@ fn no_audio_build_keeps_unavailable_window_and_normal_association_opening() -> i
     let mut a = f.app()?;
     a.config.mp3.play_on_enter = true; // Retain a preference from an audio build.
     let owner = open(&mut a);
-    support::draw(&mut a, 80, 25)?;
+    let compact = support::draw(&mut a, 80, 25)?;
+    assert!(text(&compact).contains("Use an audio build. F1 Help."));
     support::modified(&mut a, K::Char('z'), M::ALT);
     let b = support::draw(&mut a, 80, 25)?;
     assert!(text(&b).contains("Audio playback is not included in this build"));
+    assert!(text(&b).contains("Use a build with audio support. F1 Help."));
     for action in [2, 7, 8, 201] {
         assert!(!a
             .mouse

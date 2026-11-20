@@ -478,6 +478,33 @@ fn disconnected_worker_clears_pending_controls_and_rejects_old_actions() -> io::
 }
 
 #[test]
+fn empty_discovery_reports_no_paired_devices_without_claiming_adapter_failure() -> io::Result<()> {
+    let work = crate::network::workspace::Workspace::create(std::env::temp_dir())?;
+    let mut app = App::new(work.root.clone())?;
+    app.config.save_on_exit = false;
+    app.config_store = crate::config::Store::new(Some(work.root.join("private.conf")));
+    wait(&mut app, |a| a.panels.iter().all(|p| !p.loading));
+    crate::plugins::host::open(&mut app, BLUETOOTH_TRANSFERS);
+    let owner = app.desktop.plugins.binding(BLUETOOTH_TRANSFERS).unwrap();
+    for language in [
+        crate::localization::Language::English,
+        crate::localization::Language::Russian,
+    ] {
+        app.config.language = language;
+        start(&mut app, owner, |_| Ok(Reply::Devices(Vec::new())));
+        wait(&mut app, |a| !a.bluetooth.view.busy);
+        assert_eq!(
+            app.bluetooth.view.notice,
+            language.text(
+                "No paired Bluetooth devices reported. Pair in system settings, then Refresh."
+            )
+        );
+        assert!(app.bluetooth.view.devices.is_empty());
+    }
+    Ok(())
+}
+
+#[test]
 fn defaults_upgrade_and_explicit_disable_persist_without_starting_radio() -> io::Result<()> {
     let work = crate::network::workspace::Workspace::create(std::env::temp_dir())?;
     let path = work.root.join("private.conf");

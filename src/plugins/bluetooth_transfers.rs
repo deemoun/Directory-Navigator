@@ -401,12 +401,26 @@ impl ToolPlugin for BluetoothTransfers {
                 p.completed,
                 ctx.language.text("Completed")
             )
+        } else if v.notice.is_empty() {
+            ctx.language
+                .text("Bluetooth not checked. Refresh reads paired devices.")
+                .into()
         } else {
             safe(ctx.language.text(&v.notice))
         };
         s.caption(
             Paragraph::new(text).wrap(Wrap { trim: false }),
             Rect::new(r.x + 2, r.y + 14, r.width - 4, 3),
+        );
+        s.caption(
+            Paragraph::new(ctx.language.text(if cfg!(target_os = "linux") {
+                "Needs BlueZ and a powered Bluetooth Classic adapter."
+            } else if cfg!(target_os = "macos") {
+                "Allow Bluetooth for this terminal in System Settings."
+            } else {
+                "Needs a Bluetooth Classic adapter and working drivers."
+            })),
+            Rect::new(r.x + 2, r.y + 17, r.width - 4, 1),
         );
         for (id, x, w, label, enabled) in [
             (1, 2, 17, "Refresh", !v.busy),

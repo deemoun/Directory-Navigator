@@ -275,9 +275,16 @@ impl ToolPlugin for DosLauncher {
             },
             ctx.target(1),
         ));
-        s.caption(Paragraph::new(ctx.language.text("DOSBox opens a graphical window. Enter requires the checkbox above. Use File > Run in DOSBox for BAT files. No emulator is bundled.")).wrap(Wrap{trim:false}),Rect::new(r.x+3,r.y+12,r.width-6,3));
+        s.caption(Paragraph::new(ctx.language.text("DOSBox is required and installed separately. Install DOSBox, DOSBox-X or DOSBox Staging, then Find emulators. Enter requires the checkbox above; BAT files use File > Run in DOSBox.")).wrap(Wrap{trim:false}),Rect::new(r.x+3,r.y+12,r.width-6,3));
         s.caption(
-            Paragraph::new(ctx.language.message(&ctx.dos_status.notice)).wrap(Wrap { trim: false }),
+            Paragraph::new(if ctx.dos_status.notice.is_empty() {
+                ctx.language
+                    .text("Not checked. Use Find emulators or Check DOSBox.")
+                    .into()
+            } else {
+                ctx.language.message(&ctx.dos_status.notice)
+            })
+            .wrap(Wrap { trim: false }),
             Rect::new(r.x + 3, r.y + 16, r.width.saturating_sub(6), 3),
         );
         let controls = [

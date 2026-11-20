@@ -8,7 +8,7 @@ use crate::{
         tools::{Device, DeviceAction, Logcat, Tools},
         Package,
     },
-    painting::{NativeFrame, Paragraph},
+    painting::{NativeFrame, Paragraph, Wrap},
     task::Task,
     turbo::{
         dialog_spec::{centered, Control, ControlKind},
@@ -1421,6 +1421,17 @@ impl ApkWorkshop {
             })
             .collect();
         s.control(list);
+        let availability = if self.section == Section::Device && self.tools.adb.is_none() {
+            "ADB not configured. Tools… sets Android SDK paths."
+        } else if !self.tools.signing_available() {
+            "Signing needs SDK tools and Java. Tools… shows missing paths."
+        } else {
+            "Tool paths set; use the requested action to verify availability."
+        };
+        s.caption(
+            Paragraph::new(ctx.language.text(availability)).style(style(0x78)),
+            Rect::new(r.x + 2, r.y + 16, 73, 1),
+        );
         let main = [
             (10, "Open…"),
             (
@@ -1563,7 +1574,8 @@ impl ApkWorkshop {
     }
     fn form_spec(&self, ctx: &Context) -> DialogSpec<'static> {
         let f = self.form.as_ref().unwrap();
-        let height = (f.fields.len() * 2 + 6) as u16;
+        let height =
+            (f.fields.len() * 2 + 6 + if f.kind == FormKind::Tools { 3 } else { 0 }) as u16;
         let r = centered(ctx.area, 74, height);
         let style = ctx
             .palette
@@ -1578,7 +1590,20 @@ impl ApkWorkshop {
         for (i, (label, value)) in f.labels.iter().zip(&f.fields).enumerate() {
             let y = r.y + 2 + i as u16 * 2;
             s.caption(
-                Paragraph::new(ctx.language.text(label)).style(style(0x70)),
+                Paragraph::new(if f.kind == FormKind::Tools {
+                    format!(
+                        "{} — {}",
+                        ctx.language.text(label),
+                        ctx.language.text(if value.is_empty() {
+                            "Not configured"
+                        } else {
+                            "Path set; not verified"
+                        })
+                    )
+                } else {
+                    ctx.language.text(label).into()
+                })
+                .style(style(0x70)),
                 Rect::new(r.x + 2, y, 69, 1),
             );
             let value = if f.secret.is_some_and(|start| i >= start) {
@@ -1606,6 +1631,12 @@ impl ApkWorkshop {
             if f.focus == i {
                 s.cursor = Some((r.x + 2 + column.min(68) as u16, y + 1));
             }
+        }
+        if f.kind == FormKind::Tools {
+            s.caption(
+                Paragraph::new(format!("{}\n{}", ctx.language.text("Inspection works without external tools."), ctx.language.text("Device: ADB. Signing: zipalign, apksigner.jar and Java. Install SDK/JDK separately; enter paths above."))).wrap(Wrap { trim: false }),
+                Rect::new(r.x + 2, r.bottom() - 6, 69, 3),
+            );
         }
         s.caption(
             Paragraph::new(crate::formatting::tail(&f.error, 69)).style(style(0x74)),

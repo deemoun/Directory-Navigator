@@ -1946,3 +1946,27 @@ Configure executable paths in DOS launcher or Video Merge Settings; install miss
 File length does not match its contents	Размер файла не соответствует его содержимому
 This DOS program needs a DOSBox emulator.	Для этой DOS-программы нужен эмулятор DOSBox.
 DOSBox is not bundled with DN. Install DOSBox, DOSBox-X or DOSBox Staging. Enable DOS launcher in Options → Configuration → Plugins, then use File → Run in DOSBox… or enable Open DOS programs with DOSBox.	DOSBox не входит в состав DN. Установите DOSBox, DOSBox-X или DOSBox Staging. Включите плагин «Запуск DOS» в Параметры → Конфигурация → Плагины, затем выберите Файл → Запустить в DOSBox… или включите открытие DOS-программ через DOSBox.
+DOSBox is required and installed separately. Install DOSBox, DOSBox-X or DOSBox Staging, then Find emulators. Enter requires the checkbox above; BAT files use File > Run in DOSBox.	Нужен отдельно установленный DOSBox, DOSBox-X или DOSBox Staging. После установки нажмите «Найти эмуляторы». Для Enter включите флажок выше; BAT запускайте через меню «Файл».
+Not checked. Use Find emulators or Check DOSBox.	Не проверено. Найдите эмуляторы или нажмите «Проверить DOSBox».
+File transfers are built in. SSH terminal requires OpenSSH.	Передача файлов встроена. Для SSH-терминала нужен OpenSSH.
+Bluetooth not checked. Refresh reads paired devices.	Bluetooth не проверен. «Обновить» покажет сопряжённые устройства.
+Needs BlueZ and a powered Bluetooth Classic adapter.	Нужны BlueZ и включённый адаптер Bluetooth Classic.
+Allow Bluetooth for this terminal in System Settings.	Разрешите Bluetooth для терминала в настройках системы.
+Needs a Bluetooth Classic adapter and working drivers.	Нужны адаптер Bluetooth Classic и работающие драйверы.
+No paired Bluetooth devices reported. Pair in system settings, then Refresh.	Сопряжённых устройств не найдено. Сопрягите их в настройках системы и нажмите «Обновить».
+Tool check failed. Install FFmpeg/FFprobe; set paths in Settings > Advanced. F1: details.	Проверка не пройдена. Установите FFmpeg/FFprobe; укажите пути в Настройки > Дополнительно. F1: причина.
+FFmpeg and FFprobe not checked. Open Settings to check tools.	FFmpeg и FFprobe не проверены. Откройте «Настройки» для проверки.
+Last tool check succeeded. Analyze verifies the selected clips.	Последняя проверка успешна. «Анализ» проверит выбранные клипы.
+Tool check failed. Install FFmpeg/FFprobe. F1: details.	Проверка не пройдена. Нужны FFmpeg/FFprobe. F1: причина.
+Not checked. Advanced > Check tools verifies the paths.	Не проверено. Дополнительно > Проверить инструменты.
+Last tool check succeeded; Check tools verifies current paths.	Последняя проверка успешна. Проверьте текущие пути повторно.
+Set executable paths in Advanced, then Check tools.	Укажите пути в «Дополнительно» и проверьте инструменты.
+Not configured	Не настроено
+Path set; not verified	Путь задан; не проверен
+Inspection works without external tools.	Для просмотра APK внешние инструменты не нужны.
+Device: ADB. Signing: zipalign, apksigner.jar and Java. Install SDK/JDK separately; enter paths above.	Устройство: ADB. Подпись: zipalign, apksigner.jar и Java. Установите SDK/JDK отдельно и укажите пути выше.
+ADB not configured. Tools… sets Android SDK paths.	ADB не настроен. Укажите пути Android SDK в «Инструменты…».
+Signing needs SDK tools and Java. Tools… shows missing paths.	Подпись требует SDK и Java. Проверьте пути в «Инструменты…».
+Tool paths set; use the requested action to verify availability.	Пути заданы; доступность проверяется при выполнении действия.
+Use a build with audio support. F1 Help.	Установите сборку с поддержкой звука. F1: справка.
+Use an audio build. F1 Help.	Нужна сборка со звуком. F1.

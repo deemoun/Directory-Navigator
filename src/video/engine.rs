@@ -317,7 +317,15 @@ fn tool(value: &str, name: &str) -> io::Result<PathBuf> {
             return fs::canonicalize(found);
         }
     }
-    fs::canonicalize(path)
+    fs::canonicalize(&path).map_err(|cause| {
+        io::Error::new(
+            cause.kind(),
+            format!(
+                "{name}: {}: {cause}",
+                crate::filesystem::display_name(&path.to_string_lossy())
+            ),
+        )
+    })
 }
 struct Process(Child);
 impl Drop for Process {
