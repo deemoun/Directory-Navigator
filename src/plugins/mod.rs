@@ -172,6 +172,15 @@ pub(crate) enum Event<'a> {
         target: crate::network::ReconnectTarget,
     },
     NearbyDirectory(PathBuf),
+    DosDirectory(PathBuf),
+    DosMountFolder {
+        generation: u64,
+        path: PathBuf,
+    },
+    WindowsImagesSaved {
+        current: crate::dos::windows::Preferences,
+        images: Vec<crate::dos::windows::Preferences>,
+    },
     AcousticDirectory(PathBuf),
     VideoFolder(PathBuf),
     VideoSources {
@@ -210,6 +219,19 @@ pub(crate) enum Effect {
     },
     DosSetup(crate::dos::Preferences),
     DosCheck(crate::dos::Preferences),
+    WindowsBoot {
+        preferences: crate::dos::windows::Preferences,
+        boot: bool,
+    },
+    WindowsImagesSave {
+        expected: Vec<crate::dos::windows::Preferences>,
+        current: crate::dos::windows::Preferences,
+        images: Vec<crate::dos::windows::Preferences>,
+    },
+    DosMountTree {
+        generation: u64,
+        base: PathBuf,
+    },
     DosDiscover,
     DosStop,
     Acoustic {

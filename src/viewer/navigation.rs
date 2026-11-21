@@ -40,6 +40,12 @@ pub struct VisualRow {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Action {
     Help,
+    ImageFit,
+    ImageActual,
+    ImageZoomIn,
+    ImageZoomOut,
+    ImageRotate,
+    ImageAscii,
     Encoding,
     EncodingChoice(usize),
     EncodingAccept,
@@ -156,9 +162,9 @@ impl Viewer {
     }
 
     pub fn text_ready(&self) -> bool {
-        self.contents
-            .as_ref()
-            .is_some_and(|c| !c.binary && c.pdf.as_ref().is_none_or(|p| !p.locked))
+        self.contents.as_ref().is_some_and(|c| {
+            c.image.is_none() && !c.binary && c.pdf.as_ref().is_none_or(|p| !p.locked)
+        })
     }
     pub fn layout(&mut self, width: u16) {
         let width = usize::from(width.max(1));
@@ -405,6 +411,13 @@ pub fn action(app: &mut App, action: Action) {
     if super::pdf::password::action(app, action) {
         return;
     }
+    if action == Action::Help && app.desktop.active_viewer().is_some_and(|v| v.is_image()) {
+        app.push_dialog(crate::dialog::Dialog {
+            title: " Viewer Help ",
+            message: app.config.language.text(super::image::HELP).into(),
+        });
+        return;
+    }
     if action == Action::Help {
         if app
             .desktop
@@ -449,6 +462,10 @@ pub fn action(app: &mut App, action: Action) {
     let Some(viewer) = app.desktop.active_viewer_mut() else {
         return;
     };
+    if viewer.is_image() {
+        viewer.image_view.action(action);
+        return;
+    }
     if viewer.modals.viewer_encoding().is_some() {
         match action {
             Action::Cancel => {
@@ -556,7 +573,13 @@ pub fn action(app: &mut App, action: Action) {
                 viewer.notice = error;
             }
         }
-        Action::Close => {}
+        Action::Close
+        | Action::ImageFit
+        | Action::ImageActual
+        | Action::ImageZoomIn
+        | Action::ImageZoomOut
+        | Action::ImageRotate
+        | Action::ImageAscii => {}
     }
 }
 pub fn paste(app: &mut App, text: &str) {
@@ -685,6 +708,14 @@ pub fn key(app: &mut App, key: KeyEvent) {
         return;
     }
 
+    if viewer.is_image() {
+        if let Some(command) = crate::commands::image_key(key) {
+            action(app, command);
+        } else {
+            viewer.image_view.pan_key(key);
+        }
+        return;
+    }
     if let Some(command) = crate::commands::viewer_key(key) {
         if crate::commands::viewer_available(viewer, command) {
             action(app, command);

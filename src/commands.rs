@@ -129,7 +129,12 @@ pub(crate) fn mac_key(app: &mut App, c: char, key: KeyEvent) -> Option<KeyEvent>
             }
         }
         Screen::Viewer => {
-            if let Some(event) = prefix_binding(VIEWER_KEYS.iter(), c) {
+            let bindings = if app.desktop.active_viewer().is_some_and(|v| v.is_image()) {
+                IMAGE_KEYS
+            } else {
+                VIEWER_KEYS
+            };
+            if let Some(event) = prefix_binding(bindings.iter(), c) {
                 return Some(event);
             }
             match c {
@@ -410,6 +415,70 @@ const EDITOR_ALT_KEYS: &[Binding<E>] = &[
 pub(crate) fn editor_alt(key: K) -> Option<E> {
     Binding::resolve(EDITOR_ALT_KEYS, KeyEvent::new(key, M::ALT))
 }
+const IMAGE_KEYS: &[Binding<V>] = &[
+    bind(K::F(4), M::CONTROL, M::empty(), "Ctrl+F4", None, V::Close),
+    bind(K::F(1), M::empty(), M::empty(), "F1", Some("^O1"), V::Help),
+    bind(
+        K::F(2),
+        M::empty(),
+        M::empty(),
+        "F2",
+        Some("^O2"),
+        V::ImageFit,
+    ),
+    bind(
+        K::F(3),
+        M::empty(),
+        M::empty(),
+        "F3",
+        Some("^O3"),
+        V::ImageActual,
+    ),
+    bind(
+        K::F(4),
+        M::empty(),
+        M::empty(),
+        "F4",
+        Some("^O4"),
+        V::ImageRotate,
+    ),
+    bind(
+        K::F(5),
+        M::empty(),
+        M::empty(),
+        "F5",
+        Some("^O5"),
+        V::ImageZoomIn,
+    ),
+    bind(
+        K::F(6),
+        M::empty(),
+        M::empty(),
+        "F6",
+        Some("^O6"),
+        V::ImageZoomOut,
+    ),
+    bind(
+        K::F(8),
+        M::empty(),
+        M::empty(),
+        "F8",
+        Some("^O8"),
+        V::ImageAscii,
+    ),
+    bind(K::Esc, M::empty(), M::empty(), "Esc", None, V::Close),
+    bind(
+        K::F(10),
+        M::empty(),
+        M::empty(),
+        "F10",
+        Some("^O0"),
+        V::Close,
+    ),
+];
+pub(crate) fn image_key(key: KeyEvent) -> Option<V> {
+    Binding::resolve(IMAGE_KEYS, key)
+}
 const VIEWER_KEYS: &[Binding<V>] = &[
     bind(
         K::F(8),
@@ -568,6 +637,21 @@ pub(crate) fn editor_available(editor: &crate::editor::Editor, action: E) -> boo
     }
 }
 pub(crate) fn viewer_available(viewer: &crate::viewer::Viewer, action: V) -> bool {
+    let image_action = matches!(
+        action,
+        V::ImageFit
+            | V::ImageActual
+            | V::ImageZoomIn
+            | V::ImageZoomOut
+            | V::ImageRotate
+            | V::ImageAscii
+    );
+    if viewer.is_image() {
+        return image_action || matches!(action, V::Help | V::Close);
+    }
+    if image_action {
+        return false;
+    }
     if action == V::Encoding {
         viewer.encoding_available()
     } else if action == V::ToggleMarkdown {

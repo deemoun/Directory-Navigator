@@ -7,6 +7,7 @@ use std::{
 pub struct Workspace {
     pub root: PathBuf,
     identity: crate::platform_fs::EntryIdentity,
+    preserved: bool,
 }
 impl Workspace {
     pub fn create(parent: PathBuf) -> io::Result<Self> {
@@ -27,13 +28,21 @@ impl Workspace {
                 Ok(()) => {
                     let root = fs::canonicalize(root)?;
                     let identity = crate::platform_fs::entry_identity(&root)?;
-                    return Ok(Self { root, identity });
+                    return Ok(Self {
+                        root,
+                        identity,
+                        preserved: false,
+                    });
                 }
                 Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {}
                 Err(e) => return Err(e),
             }
         }
         Err(io::Error::other("Cannot create remote working directory"))
+    }
+    /// Keep resources needed by an external process that outlives DN.
+    pub(crate) fn preserve(mut self) {
+        self.preserved = true;
     }
     pub fn validate(&self) -> io::Result<()> {
         if crate::platform_fs::entry_identity(&self.root)? != self.identity {
@@ -44,7 +53,7 @@ impl Workspace {
 }
 impl Drop for Workspace {
     fn drop(&mut self) {
-        if self.validate().is_ok() {
+        if !self.preserved && self.validate().is_ok() {
             let _ = fs::remove_dir_all(&self.root);
         }
     }

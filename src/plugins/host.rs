@@ -167,6 +167,13 @@ pub(crate) fn open(app: &mut App, id: PluginId) {
             .tool
             .open(&ctx);
     }
+    if id == DOS_LAUNCHER && !app.panels[app.active].is_virtual() {
+        dispatch(
+            app,
+            b,
+            Event::DosDirectory(app.panels[app.active].path.clone()),
+        );
+    }
     if id == ACOUSTIC_TRANSFERS && !app.panels[app.active].is_virtual() {
         dispatch(
             app,
@@ -281,7 +288,18 @@ fn apply(app: &mut App, b: Binding, effects: Vec<Effect>) {
             }
             Effect::Video { .. } => (),
             Effect::DosSetup(preferences) => crate::dos::setup(app, b, preferences),
+            Effect::WindowsBoot { preferences, boot } => {
+                crate::dos::windows::request(app, b, preferences, boot)
+            }
             Effect::DosCheck(preferences) => crate::dos::check(app, b, preferences),
+            Effect::WindowsImagesSave {
+                expected,
+                current,
+                images,
+            } => crate::dos::windows::save_images(app, b, expected, current, images),
+            Effect::DosMountTree { generation, base } => {
+                crate::dos::mount::pick_folder(app, b, generation, base)
+            }
             Effect::DosDiscover => crate::dos::discover_emulators(app, b),
             Effect::DosStop => crate::dos::stop(app, b),
             Effect::Acoustic { generation, action } => {

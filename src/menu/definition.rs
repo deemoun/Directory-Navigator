@@ -593,6 +593,26 @@ pub const VIEWER_BAR: &[BarItem<V>] = &[
 ];
 
 pub fn viewer_bar(viewer: &crate::viewer::Viewer) -> Vec<BarItem<V>> {
+    if viewer.is_image() {
+        return [
+            ("F1", "Help", V::Help),
+            ("F2", "Fit", V::ImageFit),
+            ("F3", "100%", V::ImageActual),
+            ("F4", "Rotate", V::ImageRotate),
+            ("F5", "Zoom +", V::ImageZoomIn),
+            ("F6", "Zoom -", V::ImageZoomOut),
+            ("F8", "ASCII", V::ImageAscii),
+            ("F10", "Close", V::Close),
+        ]
+        .into_iter()
+        .map(|(key, label, action)| BarItem {
+            key,
+            label,
+            action: Some(action),
+            width: C::Min(1),
+        })
+        .collect();
+    }
     let extra = viewer.markdown_available() || viewer.preview_editor.is_some();
     VIEWER_BAR
         .iter()

@@ -148,6 +148,7 @@ pub struct Tree {
     pub panel: usize,
     pub(crate) destination_prompt: Option<crate::modals::ModalId>,
     pub(crate) destination_acoustic: Option<crate::desktop::WindowId>,
+    pub(crate) destination_dos: Option<(crate::plugins::Binding, u64)>,
     pub(crate) destination_video: Option<crate::desktop::WindowId>,
     pub(crate) destination_peer: Option<(crate::desktop::WindowId, u64)>,
     pub original: PathBuf,
@@ -175,6 +176,7 @@ impl Tree {
             destination_peer: None,
             destination_acoustic: None,
             destination_video: None,
+            destination_dos: None,
             original: path,
             root: None,
             rows: Vec::new(),
@@ -596,6 +598,15 @@ pub fn action(app: &mut App, command: Action) {
             let path = row.path.clone();
             let panel = tree.panel;
             let destination = tree.destination_prompt;
+            if let Some((binding, generation)) = tree.destination_dos {
+                app.set_directory_tree(None);
+                crate::plugins::host::dispatch(
+                    app,
+                    binding,
+                    crate::plugins::Event::DosMountFolder { generation, path },
+                );
+                return;
+            }
             if let Some(owner) = tree.destination_video {
                 app.set_directory_tree(None);
                 crate::video::picked(app, owner, path);

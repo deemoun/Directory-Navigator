@@ -1,3 +1,4 @@
+pub mod image;
 pub(crate) mod markdown;
 mod navigation;
 pub mod pdf;
@@ -25,6 +26,7 @@ pub enum ViewMode {
 
 #[derive(Clone)]
 pub struct Contents {
+    pub image: Option<std::sync::Arc<image::Decoded>>,
     pub stream: Option<std::sync::Arc<streaming::Window>>,
     pub pdf: Option<std::sync::Arc<pdf::Info>>,
     pub source: Option<std::sync::Arc<str>>,
@@ -62,7 +64,7 @@ fn load_mode_cancelled(
     let input = open_regular(&resolved)?;
     if resolve_link
         && input.metadata()?.len() > MAX_BYTES as u64
-        && !(mode == ViewMode::Auto && pdf::is_path(path))
+        && !(mode == ViewMode::Auto && (pdf::is_path(path) || image::is_path(path)))
     {
         return streaming::Source::open(&resolved, mode, cancel);
     }
@@ -76,6 +78,10 @@ fn load_mode_cancelled(
             break;
         }
         bytes.extend_from_slice(&chunk[..n]);
+    }
+    if resolve_link && mode == ViewMode::Auto && (image::is_path(path) || image::signature(&bytes))
+    {
+        return image::contents(bytes, cancel);
     }
     if resolve_link {
         pdf::document_bytes(bytes, mode, pdf::is_path(path), cancel)
@@ -167,6 +173,7 @@ pub(crate) fn from_remote_bytes(
         bytes.len()
     };
     Ok(Contents {
+        image: None,
         stream: None,
         pdf: None,
         raw_truncated,
@@ -242,6 +249,7 @@ fn text_contents_cancelled(text: &str, cancel: &crate::task::Cancellation) -> io
         lines.push(String::new());
     }
     Ok(Contents {
+        image: None,
         stream: None,
         pdf: None,
         source: Some(std::sync::Arc::from(text)),
@@ -257,6 +265,7 @@ fn text_contents_cancelled(text: &str, cancel: &crate::task::Cancellation) -> io
 }
 
 pub struct Viewer {
+    pub image_view: image::State,
     session_deferred_prompts: bool,
     pub(crate) requests: crate::requests::RequestScope,
     pub modals: crate::modals::ModalStack,
@@ -324,7 +333,9 @@ impl Viewer {
     }
     pub fn from_contents(path: PathBuf, contents: Contents) -> Self {
         let mut viewer = Self::empty(path, None);
-        viewer.requested_mode = if contents.binary {
+        viewer.requested_mode = if contents.image.is_some() {
+            ViewMode::Auto
+        } else if contents.binary {
             ViewMode::Hex
         } else {
             ViewMode::Text
@@ -336,6 +347,7 @@ impl Viewer {
     }
     fn empty(path: PathBuf, pending: Option<crate::task::Task<Result<Contents, String>>>) -> Self {
         Self {
+            image_view: Default::default(),
             path,
             memory_only: false,
             modals: Default::default(),
@@ -407,8 +419,9 @@ impl Viewer {
         }
         Some(match crate::task::take_reply(&mut self.pending)? {
             Ok(result) => result.map(|contents| {
+                self.image_view = Default::default();
                 self.wrap = contents.pdf.is_some();
-                if contents.pdf.is_some() {
+                if contents.pdf.is_some() || contents.image.is_some() {
                     self.markdown.hint = false;
                 }
                 if contents.stream.is_some() {
@@ -428,6 +441,9 @@ impl Viewer {
             return;
         }
         if let Some(c) = &self.contents {
+            if c.image.is_some() {
+                return;
+            }
             if let Some(pdf) = &c.pdf {
                 if pdf.locked && self.modals.viewer_pdf_password().is_none() {
                     if let Some(bytes) = &c.raw {
@@ -465,7 +481,7 @@ impl Viewer {
     pub fn encoding_available(&self) -> bool {
         self.contents
             .as_ref()
-            .is_some_and(|c| c.raw.is_some() && c.pdf.is_none())
+            .is_some_and(|c| c.raw.is_some() && c.pdf.is_none() && c.image.is_none())
     }
     pub(crate) fn apply_encoding(
         &mut self,

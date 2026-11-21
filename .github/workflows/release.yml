@@ -124,7 +124,7 @@ jobs:
           --test editor --test editor_recovery --test text_encoding
           --test localization --test menu_definition --test windows_drives
           --test file_tools --test command_line --test command_tools --test plugin_settings --test plugin_availability
-          --test workflow_policy
+          --test experimental_plugins --test image_viewer --test workflow_policy
       - name: Test without audio
         if: matrix.target != 'x86_64-apple-darwin'
         run: cargo test --locked --no-default-features --target ${{ matrix.target }} --test mp3_player --test plugin_settings

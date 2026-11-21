@@ -166,6 +166,8 @@ fn assert_release_policy(text: &str) {
         "command_tools",
         "plugin_settings",
         "plugin_availability",
+        "experimental_plugins",
+        "image_viewer",
         "workflow_policy",
     ] {
         assert!(
@@ -256,6 +258,8 @@ fn release_core_checks_cannot_drop_file_safety_or_restore_full_pty_gating() -> i
         text.replace("--test overwrite", ""),
         text.replace("--test command_tools", ""),
         text.replace("--test command_line", ""),
+        text.replace("--test experimental_plugins", ""),
+        text.replace("--test image_viewer", ""),
         text.replace("--test editor_recovery", ""),
         text.replace("--test archive", "--test terminal_walkthrough"),
         text.replace("--lib\n", "\n"),

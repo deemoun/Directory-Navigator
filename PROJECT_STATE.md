@@ -22,6 +22,145 @@ See the [English README](README.md), [Russian README](README.ru.md) and
 [user guide](docs/USER_GUIDE.md) for supported workflows, installation, controls,
 safeguards and limits.
 
+## Unreleased portable image viewer
+
+F3 disk-file viewing detects PNG, JPEG and WebP, decodes in bounded owned workers,
+and prepares portable colored-cell images through the existing viewer/native
+composition. Fit/100%, zoom, pan, transient rotation, alpha checkerboard and an
+ASCII fallback retain DN controls and terminal color conversion, including Linux
+tty. Image decoding is limited to 64 MiB input, 33,554,432 pixels and 32,768 pixels
+per side. Only the first frame is displayed. Enter associations, explicit text/hex,
+Quick View and archive previews retain their behavior. No terminal graphics
+protocols, image editing, new configuration fields or version changes are added.
+The `image` dependency enables only PNG/JPEG/WebP codecs.
+
+Reduced previews now use alpha-aware, area-filtered mipmaps prepared in the
+decoding worker, retaining bounded viewport sampling and cancellation. Native
+read-only terminal pixel measurements correct non-console cell proportions where
+available; missing/invalid measurements retain the 1:2 estimate. Measurements
+run only at startup, resize and terminal resume. Real Linux consoles retain the
+existing color/font fallback. No graphics protocol, dependency, setting or
+version change is introduced by this quality correction.
+
+The quality correction reproduced the skipped-pixel aliasing before the fix and
+passed its checkerboard, alpha, odd-edge, rotation and cell-metric regressions.
+The full native suite then passed on macOS ARM64, along with Rust 1.100 all-target
+Clippy, focused localization/menu/workflow tests, no-default-features, packaging
+helpers, formatting and diff checks. The rebuilt 1.1.15 executable passed image
+interaction and terminal-output restoration scenarios in private PTYs. Actual
+font proportions on other terminals and Linux/Windows runtime checks remain
+unverified; their whole-DN cross-checks still lack native C toolchains/SDK headers.
+
+Local macOS ARM64 validation covered all native test targets. The full run exposed
+a DOS walkthrough assumption about installed-emulator ordering; that test was
+corrected, its entire suite passed on rerun, and the scenario passed again against
+the release executable. All other native targets passed in the full run. Focused
+image/EXIF/limit/TTY-color, EN/RU, menu and workflow tests, Rust 1.100 all-target
+Clippy, no-default-features, packaging helpers, formatting and diff checks passed.
+The locked release build reports 1.1.15; its private image-terminal walkthrough
+covered zoom, pan, rotation, ASCII fallback, resizing and terminal restoration.
+The selected image decoder dependency independently cross-checked for Linux
+x86_64/ARM64 and Windows x86_64. Whole-DN cross-checks stopped in an existing
+dependency at missing Linux C cross-compilers / Windows SDK headers. Real Linux
+tty colors/fonts and Linux/Windows runtime behavior remain untested here. No CI
+run or publication was performed.
+
+## Unreleased DOS window resolution
+
+Ordinary DOS settings now include Automatic (inherited) and six fixed initial
+window sizes, from 640x480 to 1920x1080. The private configuration fragment uses
+Staging 0.83+'s `window_size` and older/classic/X `windowresolution`; unknown
+Staging versions reject explicit sizing. Renderer, fullscreen resolution and
+DOS video modes are unchanged. Surface-renderer and DPI/aspect limitations are
+explained in EN/RU. Nested drafts, reset and normal saving include the optional
+preference without a configuration-version or application-version change.
+
+Local follow-up validation: 29 DOS unit tests and the complete affected
+experimental-plugin, configuration, localization, floating-window and workflow
+policy suites passed. Strict Rust 1.100 all-target Clippy passed with default
+and acoustic features, along with no-default-features checking and 44 helper
+tests. Installed DOSBox-X 2026.10.01 on macOS ARM64 ran a private DOS program
+successfully with an explicit 800x600 OpenGL window setting; this smoke check
+is not a pixel-geometry guarantee. Linux/Windows runtime and other emulator
+runtime checks remain unavailable. The full native run recorded under mounting
+below predates this resolution addition; it was not rerun for this narrow change.
+Release was rebuilt and verified as 1.1.15; all 16 launcher terminal scenarios
+passed against it, including resolution selection, generated configuration and
+terminal restoration. Formatting and diff checks passed. No CI was triggered.
+
+## Unreleased extra DOS drive
+
+Ordinary DOS launches now optionally share DN Temp Drive or a real folder as
+D:–X:, through an owned DOS settings page and folder-tree picker. Off remains the
+default. The host resolves/checks directory identities on its worker, creates a
+missing persistent Temp Drive only on launch, and preserves data on emulator exit.
+The child uses the selected native working directory and `MOUNT <letter> .`,
+which was verified to avoid a reproduced DOSBox-X Cyrillic-root conversion issue.
+The program's absolute argument remains unchanged; its directory stays C:.
+Relative user autoexec paths resolve from the shared folder. Windows 9x booting
+is unchanged. No new dependencies, version bump or configuration migration.
+
+Local mounting validation on macOS ARM64: all 28 DOS unit tests and the
+experimental-plugin/Temp Drive suites passed; all 16 launcher terminal scenarios
+passed against the rebuilt 1.1.15 release, including mounted-folder launch and
+terminal restoration. Installed DOSBox-X 2026.10.01 also ran a private DOS program
+that wrote through the extra drive under a Cyrillic host folder. Classic DOSBox
+and Staging argument handling is covered by mocks, not new emulator runtime
+tests. Linux x86_64/ARM64 and Windows cross-checks stopped in `ring` because this
+Mac lacks their native C compilers/Windows SDK; runtime checks there remain
+unavailable. No CI workflow was run.
+
+The complete native run passed (1,434 tests; 14 existing opt-in tests ignored).
+Rust 1.100 all-target Clippy passed for default and acoustic-enabled builds;
+no-default-features checking, formatting, all 44 Python helpers, the 15 workflow
+policy tests, local documentation links and `git diff --check` also passed.
+
+## Unreleased Windows 9x saved-image profiles
+
+The DOS launcher now has a saved-image selector and a separate Windows 9x
+settings page. Up to 32 image profiles retain individual edition, RAM, DOSBox-X
+path and mouse/sound/fullscreen/Voodoo settings. Explicit Save profile uses the
+locked atomic configuration store immediately, including when save-on-exit is off,
+without persisting unrelated live drafts. The old single-image record is retained.
+Remove profile deletes only its configuration entry. Boot Windows has moved to
+the main launcher and uses the selected saved profile; editing does not boot.
+The existing DOSBox-X image checks, native arguments, cancellation, ownership,
+private-fragment lifetime and normal DOS behavior remain. No dependencies,
+configuration-version change or DN-version bump. Actual Windows guest boot and
+Linux/Windows runtime verification remain unavailable on this Mac.
+
+Local macOS ARM64 validation passed: full native suite, focused profile/configuration
+and EN/RU tests, Rust 1.100 all-target Clippy (default and acoustic-feature builds),
+no-default-features check, 44 Python helper tests, workflow policy, formatting and
+diff checks. The locked release rebuild reports 1.1.15. All 15 release launcher
+terminal scenarios pass, including saving profiles, restart loading, per-image RAM,
+booting from the main launcher and terminal restoration. Linux ARM64/x86_64 and
+Windows cross-checks remain blocked by missing cross-C compilers/Windows SDK
+headers while building ring; no native runtime coverage is claimed for them.
+
+## Unreleased shared DOS settings
+
+The opt-in experimental DOS launcher adds one shared CPU/memory/display profile,
+with inherited defaults and nested draft OK/Cancel. Explicit settings are loaded
+through a private per-launch fragment after emulator user settings; user/game
+configuration files are not edited. CPU keys are adapted to classic DOSBox,
+DOSBox-X and pre/post-0.82 Staging. Unknown Staging CPU dialects report an error.
+Fragment ownership follows the external process; detached live processes retain
+it for OS temporary cleanup. Existing command-history/comparison/transfer work is
+preserved, with no DN/configuration version or dependency change.
+
+Local macOS ARM64 validation covers typed profiles, configuration round trips,
+nested drafts, EN/RU layouts, immutable frames and portable mock-emulator fragment
+lifetime/cleanup. Five DOS scenarios passed against the rebuilt 1.1.15 release
+binary in private terminals, including profile checking, generated overrides and
+terminal restoration. Rust 1.100 core-release checks and all-target Clippy,
+the full native suite, no-default-features, packaging helpers, workflow-policy,
+formatting and diff checks passed. Existing opt-in tests remained ignored.
+Linux x86_64/ARM64 cross-checks remain blocked by missing native cross-compilers;
+Windows cross-checks remain blocked by missing SDK headers in a dependency.
+No real emulator/game or Linux/Windows runtime testing, publication or CI run was
+performed for this change.
+
 ## Unreleased everyday-usability work
 
 The checkout adds opt-in plain-text command history beside the actual configuration,

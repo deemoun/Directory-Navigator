@@ -41,6 +41,7 @@ fn run() -> io::Result<()> {
         Err(e) => app.error(format!("Editor recovery unavailable: {e}")),
     }
     let (session, mut terminal) = Session::start()?;
+    session.refresh_image_metrics(&mut app);
     let result = (|| -> io::Result<()> {
         terminal.bind_desktop(app.desktop.native());
         let mut dirty = true;
@@ -57,6 +58,7 @@ fn run() -> io::Result<()> {
                     session.reveal_output()?;
                 } else {
                     session.resume(&mut terminal)?;
+                    session.refresh_image_metrics(&mut app);
                     dirty = true;
                 }
                 showing_output = app.output_visible;
@@ -149,6 +151,7 @@ fn run() -> io::Result<()> {
                         dirty = true;
                     }
                     Event::Resize(_, _) => {
+                        session.refresh_image_metrics(&mut app);
                         input::cancel_feedback(&mut app);
                         app.shortcuts.clear();
                         app.mouse.scrollbar_drag = None;

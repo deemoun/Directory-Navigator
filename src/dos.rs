@@ -11,12 +11,20 @@ use std::{
     time::{Duration, Instant},
 };
 mod metadata;
+pub(crate) mod mount;
 mod process;
+mod profile;
+pub(crate) mod windows;
+pub use profile::{CpuSpeed, DisplayMode, Profile, Resolution};
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Preferences {
     pub open_on_enter: bool,
     pub executable: String,
+    pub profile: Profile,
+    pub mount: mount::Preferences,
+    pub windows: windows::Preferences,
+    pub windows_images: Vec<windows::Preferences>,
 }
 #[derive(Clone, Default)]
 pub(crate) struct Snapshot {
@@ -38,6 +46,7 @@ struct Pending {
 enum Reply {
     NotDos,
     Started(Box<process::Process>),
+    WindowsStarted(Box<process::Process>),
     Checked(String),
     Discovered(Vec<Tool>),
 }
@@ -256,7 +265,12 @@ fn verify_until(
                 } else {
                     ""
                 },
-                version: version.lines().take(2).collect::<Vec<_>>().join(" "),
+                version: version
+                    .lines()
+                    .take(3)
+                    .map(|line| line.chars().take(160).collect::<String>())
+                    .collect::<Vec<_>>()
+                    .join(" "),
             });
         }
     }
@@ -547,6 +561,7 @@ fn launch(
     preferences: &Preferences,
     captured: &fs::Metadata,
     automatic: bool,
+    config_path: Option<&Path>,
     cancel: &crate::task::Cancellation,
 ) -> io::Result<Reply> {
     let execute = || -> io::Result<Reply> {
@@ -574,6 +589,7 @@ fn launch(
         }
         let (executable, verified) = verified_tool(preferences, cancel)?;
         cancel.check()?;
+        let mounted = mount::prepare(&preferences.mount, config_path, true, cancel)?;
         let current = fs::symlink_metadata(path)?;
         if !crate::platform_fs::same_identity(&metadata, &current)
             || metadata.len() != current.len()
@@ -583,7 +599,37 @@ fn launch(
                 "File changed before DOSBox launch; refresh and try again",
             ));
         }
-        let child = process::Process::spawn(&executable, path, &flags(&verified))?;
+        let fragment_text = preferences.profile.render(&verified)?;
+        cancel.check()?;
+        let child = if fragment_text.is_empty() && mounted.is_none() {
+            process::Process::spawn(&executable, path, &flags(&verified))?
+        } else {
+            let fragment = if fragment_text.is_empty() {
+                None
+            } else {
+                Some(profile::Fragment::create(&fragment_text)?)
+            };
+            let mut arguments = fragment.as_ref().map_or_else(
+                || flags(&verified).into_iter().map(Into::into).collect(),
+                |f| profile::arguments(&verified, &f.path),
+            );
+            if let Some(mounted) = &mounted {
+                mounted.validate()?;
+                arguments.extend(mounted.arguments());
+            }
+            cancel.check()?;
+            if let Some(mounted) = &mounted {
+                process::Process::spawn_mounted(
+                    &executable,
+                    path,
+                    &arguments,
+                    fragment,
+                    mounted.path(),
+                )?
+            } else {
+                process::Process::spawn_config(&executable, path, &arguments, fragment)?
+            }
+        };
         Ok(Reply::Started(Box::new(child)))
     };
     execute()
@@ -625,12 +671,22 @@ pub(crate) fn open(app: &mut App, path: PathBuf, automatic: bool) -> bool {
     };
     let preferences = app.config.dos.clone();
     let source = path.clone();
+    let config_path = app.config_store.path().ok().map(Path::to_path_buf);
     match app.workers.spawn(
         "dn-dos-launch",
         &app.dos.requests,
         crate::requests::Owner::Workspace,
         "dos-launch",
-        move |cancel| launch(&source, &preferences, &captured, automatic, &cancel),
+        move |cancel| {
+            launch(
+                &source,
+                &preferences,
+                &captured,
+                automatic,
+                config_path.as_deref(),
+                &cancel,
+            )
+        },
     ) {
         Ok(task) => {
             app.dos.pending = Some(Pending {
@@ -723,7 +779,7 @@ pub(crate) fn poll(app: &mut App) -> bool {
     let pending = app.dos.pending.take().unwrap();
     app.dos.view.busy = false;
     match result {
-        Ok(Reply::Started(child)) => {
+        Ok(Reply::Started(child) | Reply::WindowsStarted(child)) => {
             app.dos.children.push(Running {
                 process: child,
                 origin: pending.origin,
@@ -913,6 +969,8 @@ pub(crate) fn check(app: &mut App, b: crate::plugins::Binding, preferences: Pref
         app.dos.view.notice = "Invalid DOSBox executable path".into();
         return;
     }
+    let config_path = app.config_store.path().ok().map(Path::to_path_buf);
+    let language = app.config.language;
     let epoch = app.desktop.activation_revision();
     match app.workers.spawn(
         "dn-dos-check",
@@ -921,12 +979,18 @@ pub(crate) fn check(app: &mut App, b: crate::plugins::Binding, preferences: Pref
         "dos-launch",
         move |cancel| {
             let (executable, verified) = verified_tool(&preferences, &cancel)?;
+            let fragment = preferences.profile.render(&verified)?;
+            let mounted=mount::prepare(&preferences.mount,config_path.as_deref(),false,&cancel)?;
+            let drives=mounted.map_or_else(||preferences.mount.summary(language),|m|format!("{}\n{}\n{}",preferences.mount.summary(language),crate::filesystem::display_name(&m.path().to_string_lossy()),m.commands().join("\n")));
             Ok(Reply::Checked(format!(
-                "{}\n{} · {}\n{}",
+                "{}\n{} · {}\n{}\n{}\n{}\n{}",
                 if verified.version == "Version unavailable" { "Emulator found; version verification was unavailable. Try launching a DOS program." } else { "DOSBox emulator verified. Game-local configuration loading is disabled." },
                 verified.kind.caption(),
                 verified.version,
-                crate::filesystem::display_name(&executable.to_string_lossy())
+                crate::filesystem::display_name(&executable.to_string_lossy()),
+                preferences.profile.summary(language),
+                fragment,
+                drives
             )))
         },
     ) {
@@ -954,6 +1018,16 @@ pub(crate) fn setup(app: &mut App, b: crate::plugins::Binding, preferences: Pref
     }
     if preferences.executable.len() > 4096 || preferences.executable.chars().any(char::is_control) {
         app.dos.view.notice = "Invalid DOSBox executable path".into();
+        return;
+    }
+    if let Err(error) = preferences
+        .profile
+        .validate()
+        .and_then(|()| preferences.windows.validate())
+        .and_then(|()| windows::validate_images(&preferences.windows_images))
+        .and_then(|()| preferences.mount.validate())
+    {
+        app.dos.view.notice = error.to_string();
         return;
     }
     app.config.dos = preferences;
@@ -1076,6 +1150,7 @@ mod tests {
             &Preferences::default(),
             &captured,
             false,
+            None,
             &Default::default(),
         );
         assert!(matches!(result,Err(ref e) if e.to_string().contains("changed")));
@@ -1157,6 +1232,7 @@ mod tests {
             Preferences {
                 executable: executable.to_string_lossy().into_owned(),
                 open_on_enter: true,
+                ..Default::default()
             },
         );
         settle(&mut app, |a| !a.dos.view.busy);

@@ -52,6 +52,86 @@ fn records(config: &Config) -> Vec<(&'static str, String, Value)> {
         "executable",
         config.dos.executable.clone()
     );
+    add!(
+        "plugins.dos_launcher",
+        "cpu_speed",
+        config.dos.profile.cpu.key()
+    );
+    add!(
+        "plugins.dos_launcher",
+        "cpu_cycles",
+        i64::from(config.dos.profile.cycles)
+    );
+    add!(
+        "plugins.dos_launcher",
+        "memory_mb",
+        i64::from(config.dos.profile.memory_mb)
+    );
+    add!(
+        "plugins.dos_launcher",
+        "display",
+        config.dos.profile.display.key()
+    );
+    add!(
+        "plugins.dos_launcher",
+        "window_resolution",
+        config.dos.profile.resolution.key()
+    );
+    add!(
+        "plugins.dos_launcher",
+        "mount_mode",
+        config.dos.mount.mode.key()
+    );
+    add!(
+        "plugins.dos_launcher",
+        "mount_folder",
+        config.dos.mount.folder.clone()
+    );
+    add!(
+        "plugins.dos_launcher",
+        "mount_drive",
+        char::from(config.dos.mount.drive).to_string()
+    );
+    add!(
+        "plugins.dos_launcher.windows9x",
+        "edition",
+        config.dos.windows.edition.key()
+    );
+    add!(
+        "plugins.dos_launcher.windows9x",
+        "image",
+        config.dos.windows.image.clone()
+    );
+    add!(
+        "plugins.dos_launcher.windows9x",
+        "executable",
+        config.dos.windows.executable.clone()
+    );
+    add!(
+        "plugins.dos_launcher.windows9x",
+        "memory_mb",
+        i64::from(config.dos.windows.memory_mb)
+    );
+    add!(
+        "plugins.dos_launcher.windows9x",
+        "mouse",
+        config.dos.windows.mouse
+    );
+    add!(
+        "plugins.dos_launcher.windows9x",
+        "sound",
+        config.dos.windows.sound
+    );
+    add!(
+        "plugins.dos_launcher.windows9x",
+        "fullscreen",
+        config.dos.windows.fullscreen
+    );
+    add!(
+        "plugins.dos_launcher.windows9x",
+        "voodoo",
+        config.dos.windows.voodoo
+    );
     add!("plugins.video_merge", "ffmpeg", config.video.ffmpeg.clone());
     add!(
         "plugins.video_merge",
@@ -122,6 +202,20 @@ fn checked(group: &str, key: &str, value: &Value, default: &Value) -> io::Result
         )));
     }
     let allowed: Option<&[&str]> = match (group, key) {
+        ("plugins.dos_launcher.windows9x", "edition") => Some(&["95", "95_osr2", "98"]),
+        ("plugins.dos_launcher.windows9x", "memory_mb") => Some(&["64", "128", "256", "512"]),
+        ("plugins.dos_launcher", "mount_mode") => Some(&["off", "temp_drive", "folder"]),
+        ("plugins.dos_launcher", "cpu_speed") => Some(&["emulator", "fixed", "maximum"]),
+        ("plugins.dos_launcher", "display") => Some(&["emulator", "windowed", "fullscreen"]),
+        ("plugins.dos_launcher", "window_resolution") => Some(&[
+            "automatic",
+            "640x480",
+            "800x600",
+            "1024x768",
+            "1280x960",
+            "1600x1200",
+            "1920x1080",
+        ]),
         ("plugins.mp3_player", "seek_seconds") => Some(&["1", "5", "10", "30"]),
         ("application", "shortcuts") => Some(&["auto", "classic_dn", "mac"]),
         ("interface", "palette") => Some(&["classic", "terminal"]),
@@ -142,10 +236,28 @@ fn checked(group: &str, key: &str, value: &Value, default: &Value) -> io::Result
     {
         return Err(invalid("Invalid MP3 default volume"));
     }
+    if group == "plugins.dos_launcher"
+        && (key == "cpu_cycles"
+            && !text
+                .parse::<u32>()
+                .is_ok_and(|n| (50..=2_000_000).contains(&n))
+            || key == "memory_mb"
+                && !text
+                    .parse::<u8>()
+                    .is_ok_and(|n| [0, 1, 2, 4, 8, 16, 32, 63].contains(&n)))
+    {
+        return Err(invalid("Invalid DOS settings"));
+    }
     if (group, key) == ("plugins.dos_launcher", "executable")
         && (text.len() > 4096 || text.chars().any(char::is_control))
     {
         return Err(invalid("Invalid DOSBox executable path"));
+    }
+    if group == "plugins.dos_launcher.windows9x"
+        && matches!(key, "image" | "executable")
+        && (text.len() > 4096 || text.chars().any(char::is_control))
+    {
+        return Err(invalid("Invalid Windows image or executable path"));
     }
     if group == "plugins.video_merge"
         && matches!(key, "ffmpeg" | "ffprobe")
@@ -195,6 +307,59 @@ fn assign(config: &mut Config, group: &str, key: &str, text: &str) -> io::Result
             } else {
                 config.video.ffprobe = text.to_owned();
             }
+        }
+        ("plugins.dos_launcher.windows9x", "edition") => {
+            config.dos.windows.edition = crate::dos::windows::Edition::parse(text)
+                .ok_or_else(|| invalid("Invalid Windows edition"))?
+        }
+        ("plugins.dos_launcher.windows9x", "image") => config.dos.windows.image = text.to_owned(),
+        ("plugins.dos_launcher.windows9x", "executable") => {
+            config.dos.windows.executable = text.to_owned()
+        }
+        ("plugins.dos_launcher.windows9x", "memory_mb") => {
+            config.dos.windows.memory_mb = text
+                .parse()
+                .map_err(|_| invalid("Invalid Windows memory"))?
+        }
+        ("plugins.dos_launcher.windows9x", "mouse") => config.dos.windows.mouse = text == "true",
+        ("plugins.dos_launcher.windows9x", "sound") => config.dos.windows.sound = text == "true",
+        ("plugins.dos_launcher.windows9x", "fullscreen") => {
+            config.dos.windows.fullscreen = text == "true"
+        }
+        ("plugins.dos_launcher.windows9x", "voodoo") => config.dos.windows.voodoo = text == "true",
+        ("plugins.dos_launcher", "window_resolution") => {
+            config.dos.profile.resolution = crate::dos::Resolution::parse(text)
+                .ok_or_else(|| invalid("Invalid DOS window resolution"))?;
+        }
+        ("plugins.dos_launcher", "mount_mode") => {
+            config.dos.mount.mode = crate::dos::mount::Mode::parse(text)
+                .ok_or_else(|| invalid("Invalid DOS mount mode"))?
+        }
+        ("plugins.dos_launcher", "mount_folder") => config.dos.mount.folder = text.to_owned(),
+        ("plugins.dos_launcher", "mount_drive") => {
+            config.dos.mount.drive =
+                if text.len() == 1 && (b'D'..=b'X').contains(&text.as_bytes()[0]) {
+                    text.as_bytes()[0]
+                } else {
+                    return Err(invalid("Invalid DOS mount drive"));
+                }
+        }
+        ("plugins.dos_launcher", "cpu_speed") => {
+            config.dos.profile.cpu =
+                crate::dos::CpuSpeed::parse(text).ok_or_else(|| invalid("Invalid DOS CPU speed"))?
+        }
+        ("plugins.dos_launcher", "cpu_cycles") => {
+            config.dos.profile.cycles = text
+                .parse()
+                .map_err(|_| invalid("Invalid DOS CPU cycles"))?
+        }
+        ("plugins.dos_launcher", "memory_mb") => {
+            config.dos.profile.memory_mb =
+                text.parse().map_err(|_| invalid("Invalid DOS memory"))?
+        }
+        ("plugins.dos_launcher", "display") => {
+            config.dos.profile.display = crate::dos::DisplayMode::parse(text)
+                .ok_or_else(|| invalid("Invalid DOS display mode"))?
         }
         ("plugins.dos_launcher", "open_on_enter") => config.dos.open_on_enter = text == "true",
         ("plugins.dos_launcher", "executable") => {
@@ -325,6 +490,39 @@ pub(super) fn parse(bytes: &[u8]) -> io::Result<Config> {
             )?;
         }
     }
+    config.dos.mount.validate()?;
+    config.dos.windows.validate()?;
+    if let Some(value) =
+        section(&root, "plugins.dos_launcher.windows9x")?.and_then(|t| t.get("images"))
+    {
+        let images = value
+            .as_array()
+            .filter(|a| a.len() <= crate::dos::windows::MAX_IMAGES)
+            .ok_or_else(|| invalid("Invalid Windows image profiles"))?;
+        for value in images {
+            let table = value
+                .as_table()
+                .ok_or_else(|| invalid("Invalid Windows image profile"))?;
+            let mut entry = Config::default();
+            for (group, key, default) in records(&Config::default())
+                .into_iter()
+                .filter(|(g, _, _)| *g == "plugins.dos_launcher.windows9x")
+            {
+                if let Some(value) = table.get(&key) {
+                    assign(
+                        &mut entry,
+                        group,
+                        &key,
+                        &checked(group, &key, value, &default)?,
+                    )?;
+                }
+            }
+            config.dos.windows_images.push(entry.dos.windows);
+        }
+    } else if !config.dos.windows.image.is_empty() {
+        config.dos.windows_images.push(config.dos.windows.clone());
+    }
+    crate::dos::windows::validate_images(&config.dos.windows_images)?;
     if let Some(value) = section(&root, "screensaver")?.and_then(|t| t.get("selected")) {
         let items = value
             .as_array()
@@ -400,6 +598,9 @@ pub(super) fn parse(bytes: &[u8]) -> io::Result<Config> {
     Ok(config)
 }
 pub(super) fn encode(config: &Config, previous: Option<&[u8]>) -> io::Result<Vec<u8>> {
+    config.dos.mount.validate()?;
+    config.dos.windows.validate()?;
+    crate::dos::windows::validate_images(&config.dos.windows_images)?;
     let mut root = match previous {
         Some(bytes) => {
             parse(bytes)?;
@@ -407,6 +608,38 @@ pub(super) fn encode(config: &Config, previous: Option<&[u8]>) -> io::Result<Vec
         }
         None => Table::new(),
     };
+    let old_images = section(&root, "plugins.dos_launcher.windows9x")?
+        .and_then(|t| t.get("images"))
+        .and_then(Value::as_array);
+    let images = config
+        .dos
+        .windows_images
+        .iter()
+        .map(|p| {
+            let mut table = old_images
+                .and_then(|a| {
+                    a.iter()
+                        .filter_map(Value::as_table)
+                        .find(|t| t.get("image").and_then(Value::as_str) == Some(p.image.as_str()))
+                })
+                .cloned()
+                .unwrap_or_default();
+            let mut entry = Config::default();
+            entry.dos.windows = p.clone();
+            for (group, key, value) in records(&entry) {
+                if group == "plugins.dos_launcher.windows9x" {
+                    table.insert(key, value);
+                }
+            }
+            Value::Table(table)
+        })
+        .collect();
+    set(
+        &mut root,
+        "plugins.dos_launcher.windows9x",
+        "images".into(),
+        Value::Array(images),
+    )?;
     root.insert("config_version".into(), Value::Integer(2));
     if root.get("session").is_some_and(|v| !v.is_table()) {
         root.remove("session");

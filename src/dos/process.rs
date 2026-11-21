@@ -77,14 +77,28 @@ macro_rules! pipe {
 pipe!(ChildStdout);
 pipe!(ChildStderr);
 
-pub(super) fn command(executable: &Path, path: &Path, flags: &[&str]) -> Command {
+pub(super) fn command<S: AsRef<std::ffi::OsStr>>(
+    executable: &Path,
+    path: &Path,
+    flags: &[S],
+) -> Command {
+    command_inner(executable, path, flags, true)
+}
+pub(super) fn command_inner<S: AsRef<std::ffi::OsStr>>(
+    executable: &Path,
+    path: &Path,
+    flags: &[S],
+    append_source: bool,
+) -> Command {
     let mut command = Command::new(executable);
     command
         .args(flags)
-        .arg(path)
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped());
+    if append_source {
+        command.arg(path);
+    }
     if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
         command.current_dir(parent);
     }
@@ -110,15 +124,57 @@ pub(super) fn command(executable: &Path, path: &Path, flags: &[&str]) -> Command
 
 pub(super) struct Process {
     child: Child,
+    fragment: Option<super::profile::Fragment>,
     out: Option<ChildStdout>,
     err: Option<ChildStderr>,
     tail: VecDeque<u8>,
     pub(super) executable: PathBuf,
     pub(super) source: PathBuf,
+    pub(super) windows_identity: Option<crate::platform_fs::EntryIdentity>,
 }
 impl Process {
     pub(super) fn spawn(executable: &Path, path: &Path, flags: &[&str]) -> io::Result<Self> {
-        let mut child = command(executable, path, flags).spawn()?;
+        Self::spawn_config(executable, path, flags, None)
+    }
+    pub(super) fn spawn_config<S: AsRef<std::ffi::OsStr>>(
+        executable: &Path,
+        path: &Path,
+        flags: &[S],
+        fragment: Option<super::profile::Fragment>,
+    ) -> io::Result<Self> {
+        Self::start(executable, path, command(executable, path, flags), fragment)
+    }
+    pub(super) fn spawn_image<S: AsRef<std::ffi::OsStr>>(
+        executable: &Path,
+        path: &Path,
+        flags: &[S],
+        fragment: super::profile::Fragment,
+    ) -> io::Result<Self> {
+        Self::start(
+            executable,
+            path,
+            command_inner(executable, path, flags, false),
+            Some(fragment),
+        )
+    }
+    pub(super) fn spawn_mounted<S: AsRef<std::ffi::OsStr>>(
+        executable: &Path,
+        path: &Path,
+        args: &[S],
+        fragment: Option<super::profile::Fragment>,
+        cwd: &Path,
+    ) -> io::Result<Self> {
+        let mut launch = command(executable, path, args);
+        launch.current_dir(cwd);
+        Self::start(executable, path, launch, fragment)
+    }
+    fn start(
+        executable: &Path,
+        path: &Path,
+        mut command: Command,
+        fragment: Option<super::profile::Fragment>,
+    ) -> io::Result<Self> {
+        let mut child = command.spawn()?;
         let out = child.stdout.take();
         let err = child.stderr.take();
         let prepared = (|| {
@@ -137,11 +193,13 @@ impl Process {
         }
         Ok(Self {
             child,
+            fragment,
             out,
             err,
             tail: VecDeque::new(),
             executable: executable.into(),
             source: path.into(),
+            windows_identity: None,
         })
     }
     pub(super) fn poll(&mut self) -> io::Result<Option<(ExitStatus, String)>> {
@@ -243,5 +301,146 @@ mod tests {
         }
         drain(&mut Some(Idle), &mut tail);
         assert_eq!(tail.len(), LIMIT);
+    }
+}
+
+impl Process {
+    fn preserve_live_fragment(&mut self) {
+        if !matches!(self.child.try_wait(), Ok(Some(_))) {
+            if let Some(fragment) = self.fragment.take() {
+                fragment.preserve();
+            }
+        }
+    }
+}
+impl Drop for Process {
+    fn drop(&mut self) {
+        self.preserve_live_fragment();
+    }
+}
+
+#[cfg(test)]
+mod fragment_tests {
+    use super::*;
+    use std::{
+        fs,
+        time::{Duration, Instant},
+    };
+    struct Temp(PathBuf);
+    impl Drop for Temp {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+    fn wait(ready: impl Fn() -> bool) {
+        let deadline = Instant::now() + Duration::from_secs(8);
+        while !ready() {
+            assert!(
+                Instant::now() < deadline,
+                "mock emulator did not reach requested state"
+            );
+            std::thread::sleep(Duration::from_millis(2));
+        }
+    }
+    #[test]
+    fn portable_emulator_reads_literal_fragment_and_retains_it_until_exit_or_detach(
+    ) -> io::Result<()> {
+        static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+        let root = std::env::temp_dir().join(format!(
+            "dn-dos-fragment-{}-{}",
+            std::process::id(),
+            NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+        ));
+        fs::create_dir(&root)?;
+        let fixture = Temp(root);
+        let source = fixture.0.join("emulator.rs");
+        let executable = fixture.0.join(if cfg!(windows) {
+            "mock-dosbox.exe"
+        } else {
+            "mock-dosbox"
+        });
+        fs::write(
+            &source,
+            r#"use std::{env,fs,thread,time::{Duration,Instant},path::PathBuf};
+fn main(){let a:Vec<_>=env::args_os().skip(1).collect();let source=PathBuf::from(a.last().unwrap());let root=source.parent().unwrap();
+let i=a.iter().rposition(|v| v=="--conf" || v=="-conf").unwrap();let config=PathBuf::from(&a[i+1]);
+let text=fs::read(&config).unwrap();fs::write(root.join("observed"),&text).unwrap();fs::write(root.join("ready"),b"ready").unwrap();
+let deadline=Instant::now()+Duration::from_secs(15);while !root.join("release").exists(){assert!(Instant::now()<deadline);assert_eq!(fs::read(&config).unwrap(),text);thread::sleep(Duration::from_millis(2));}}
+"#,
+        )?;
+        let output = Command::new("rustc")
+            .args(["--edition=2021", "--crate-name", "dn_dos_mock"])
+            .arg(&source)
+            .arg("-o")
+            .arg(&executable)
+            .output()?;
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        for detached in [false, true] {
+            let game = fixture.0.join(if detached {
+                "detached 世界"
+            } else {
+                "normal 世界"
+            });
+            fs::create_dir(&game)?;
+            let program = game.join("literal ; $ DOS.COM");
+            fs::write(&program, b"DOS fixture")?;
+            fs::write(game.join("dosbox.conf"), b"local settings unchanged")?;
+            let fragment = super::super::profile::Fragment::create("[dosbox]\nmemsize=32\n")?;
+            let path = fragment.path.clone();
+            let identity = crate::platform_fs::entry_identity(path.parent().unwrap())?;
+            let args: Vec<std::ffi::OsString> = vec![
+                "--nolocalconf".into(),
+                "--conf".into(),
+                path.as_os_str().to_owned(),
+            ];
+            let mut process = Process::spawn_config(&executable, &program, &args, Some(fragment))?;
+            let result = (|| -> io::Result<()> {
+                wait(|| game.join("ready").exists());
+                assert_eq!(fs::read(game.join("observed"))?, b"[dosbox]\nmemsize=32\n");
+                assert_eq!(
+                    fs::read(game.join("dosbox.conf"))?,
+                    b"local settings unchanged"
+                );
+                if detached {
+                    process.preserve_live_fragment();
+                    assert!(process.fragment.is_none());
+                }
+                assert!(path.exists());
+                fs::write(game.join("release"), b"release")?;
+                wait(|| game.join("release").exists());
+                assert!(process.child.wait()?.success());
+                Ok(())
+            })();
+            // Also reap on assertion-independent I/O failures.
+            let _ = process.child.kill();
+            let _ = process.child.wait();
+            drop(process);
+            result?;
+            if detached {
+                assert!(path.exists());
+                assert_eq!(
+                    crate::platform_fs::entry_identity(path.parent().unwrap())?,
+                    identity
+                );
+                fs::remove_dir_all(path.parent().unwrap())?;
+            } else {
+                assert!(!path.exists());
+            }
+        }
+        let fragment = super::super::profile::Fragment::create("[sdl]\nfullscreen=false\n")?;
+        let path = fragment.path.clone();
+        assert!(Process::spawn_config(
+            &fixture.0.join("missing"),
+            Path::new("test.COM"),
+            &["-conf"],
+            Some(fragment)
+        )
+        .is_err());
+        assert!(!path.exists());
+        Ok(())
     }
 }

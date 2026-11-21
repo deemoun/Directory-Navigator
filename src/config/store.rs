@@ -80,6 +80,33 @@ impl Store {
         self.loaded = Some(config.clone());
         Ok(config)
     }
+    /// Publish an explicit, narrowly scoped preference update against the loaded
+    /// disk baseline. Unrelated live drafts and the desktop snapshot stay untouched.
+    pub(crate) fn update_preferences(
+        &mut self,
+        update: impl FnOnce(&mut Config) -> io::Result<()>,
+    ) -> io::Result<Option<io::Error>> {
+        if self.loaded.is_none() {
+            self.load()?;
+        }
+        let mut saved = self.loaded.clone().expect("loaded preferences");
+        update(&mut saved)?;
+        match self.save(&saved, true) {
+            Ok(_) => Ok(None),
+            Err(error) => {
+                // Publication may have succeeded before parent synchronization
+                // failed. Only report retained data when a safe read confirms it.
+                if let Ok(Some(bytes)) = read_bytes(self.path()?) {
+                    if Config::parse(&bytes).is_ok_and(|present| present == saved) {
+                        self.disk = Some(bytes);
+                        self.loaded = Some(saved);
+                        return Ok(Some(error));
+                    }
+                }
+                Err(error)
+            }
+        }
+    }
     pub fn save(&mut self, config: &Config, force: bool) -> io::Result<bool> {
         if self.loaded.is_none() {
             self.load()?;
@@ -177,5 +204,40 @@ impl Drop for SaveLock {
         if crate::platform_fs::owns_file(&self.path, &self.file) {
             let _ = fs::remove_file(&self.path);
         }
+    }
+}
+
+#[cfg(test)]
+mod scoped_update_tests {
+    use super::*;
+    #[test]
+    fn failed_scoped_save_distinguishes_confirmed_disk_data_from_unwritten_edits() -> io::Result<()>
+    {
+        let w = crate::network::workspace::Workspace::create(std::env::temp_dir())?;
+        let path = w.root.join("config.conf");
+        Config::default().save(&path)?;
+        let mut store = Store::new(Some(path.clone()));
+        store.load()?;
+        struct Restore(PathBuf, fs::Permissions);
+        impl Drop for Restore {
+            fn drop(&mut self) {
+                let _ = fs::set_permissions(&self.0, self.1.clone());
+            }
+        }
+        let permissions = fs::metadata(&path)?.permissions();
+        let _restore = Restore(path.clone(), permissions.clone());
+        let mut readonly = permissions;
+        readonly.set_readonly(true);
+        fs::set_permissions(&path, readonly)?;
+        assert!(store.update_preferences(|_| Ok(()))?.is_some());
+        let before = read_bytes(&path)?;
+        assert!(store
+            .update_preferences(|c| {
+                c.show_clock = !c.show_clock;
+                Ok(())
+            })
+            .is_err());
+        assert_eq!(read_bytes(&path)?, before);
+        Ok(())
     }
 }

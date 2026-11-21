@@ -207,8 +207,13 @@ pub fn prepare_window(
                     .active_viewer()
                     .map_or(1, |v| crate::ui::viewer_footer_rows(app, v, area.width));
                 app.page_rows = usize::from(area.height.saturating_sub(2 + footer));
+                let ratio = app.image_cell_ratio;
                 if let Some(v) = app.desktop.active_viewer_mut() {
-                    v.layout(regions[1].width);
+                    if v.is_image() {
+                        v.prepare_image(area.width, area.height.saturating_sub(2 + footer), ratio);
+                    } else {
+                        v.layout(regions[1].width);
+                    }
                 }
             }
             _ => {
@@ -410,16 +415,21 @@ pub(crate) fn dialog_layout(
         return message_layout(area, language.text(dialog.title), &text);
     }
     let width = 64.min(area.width);
-    let height = 20.min(area.height.saturating_sub(3));
+    let height = 22.min(area.height.saturating_sub(3));
     let rect = crate::dialog_theme::centered(area, width, height);
     let mut lines = vec![String::new()];
-    for (index, line) in text.lines().enumerate() {
+    lines.extend(crate::dialog::ABOUT_LOGO.into_iter().map(str::to_owned));
+    lines.push(String::new());
+    for line in text.lines() {
         lines.extend(wrap(line, width.saturating_sub(4)));
-        if index == 0 || index == 2 {
-            lines.push(String::new());
-        }
     }
-    let visible = usize::from(height.saturating_sub(5));
+    // Use the spare row above OK for content unless a scroll hint needs it.
+    let available = usize::from(height.saturating_sub(4));
+    let visible = if lines.len() > available {
+        available.saturating_sub(1)
+    } else {
+        available
+    };
     let maximum = lines.len().saturating_sub(visible);
     MessageLayout {
         rect,

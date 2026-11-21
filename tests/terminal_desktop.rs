@@ -2612,3 +2612,36 @@ fn nearby_two_instances_pair_approve_stream_and_restore_terminals() -> io::Resul
     sender.finish()?;
     receiver.finish()
 }
+
+#[test]
+fn about_dn_logo_link_resize_and_terminal_restoration() -> io::Result<()> {
+    use dn::localization::Language;
+    for language in [Language::English, Language::Russian] {
+        let preferences = format!("[regional]\nlanguage='{}'\n", language.key());
+        let mut s = Session::with_preferences("about-dn-logo", &preferences)?;
+        s.wait("manager ready", Session::command_prompt_active)?;
+        // Application menu is the first item on the shared menu bar.
+        s.send(b"\x1b[<0;3;1M\x1b[<0;3;1m", "application menu", |s| {
+            s.text()
+                .contains(&language.text("~A~bout...").replace('~', ""))
+        })?;
+        s.send(b"\r", "About logo", |s| {
+            let t = s.text();
+            t.contains("██████╗ ███╗   ██╗")
+                && t.contains("https://github.com/deemoun/Directory-Navigator")
+                && t.contains("Dmitry Yarygin")
+        })?;
+        s.resize(120, 36)?;
+        s.resize(60, 18)?;
+        s.resize(80, 25)?;
+        s.wait("About restored", |s| {
+            let t = s.text();
+            t.contains("██████╗ ███╗   ██╗")
+                && t.contains("╚═════╝ ╚═╝  ╚═══╝")
+                && t.contains("https://github.com/deemoun/Directory-Navigator")
+        })?;
+        s.send(b"\x1b", "close About", Session::command_prompt_active)?;
+        s.finish()?;
+    }
+    Ok(())
+}

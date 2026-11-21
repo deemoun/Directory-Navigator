@@ -270,7 +270,11 @@ pub(crate) fn message_spec<'a>(
         {
             let bounds = Rect::new(rect.x + 2, rect.y + 1 + row as u16, rect.width - 4, 1);
             let link = line == crate::dialog::REPOSITORY_URL;
-            let style = if link {
+            let logo =
+                (1..=crate::dialog::ABOUT_LOGO.len()).contains(&(row + app.message_offset()));
+            let style = if logo {
+                profile.for_group(crate::palette::theme::Group::Dialogs, theme::HEADING)
+            } else if link {
                 profile
                     .dos(theme::HEADING)
                     .add_modifier(crate::presentation::style::Modifier::UNDERLINED)
@@ -313,7 +317,12 @@ pub(crate) fn message_spec<'a>(
         s.caption(
             Paragraph::new(app.config.language.text("↑↓ / PgUp/PgDn scroll"))
                 .style(profile.for_group(crate::palette::theme::Group::Dialogs, theme::TEXT)),
-            Rect::new(rect.x + 2, rect.bottom() - 3, rect.width - 4, 1),
+            Rect::new(
+                rect.x + 2,
+                rect.bottom() - if dialog.is_about() { 4 } else { 3 },
+                rect.width - 4,
+                1,
+            ),
         );
     }
     s.control(Control::new(

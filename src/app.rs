@@ -13,6 +13,7 @@ mod modals;
 mod polling;
 
 pub struct App {
+    pub(crate) image_cell_ratio: f64,
     pub(crate) workers: crate::workers::Supervisor,
     pub(crate) dos: crate::dos::State,
     pub(crate) video: crate::video::State,
@@ -78,6 +79,7 @@ impl App {
     pub fn new(path: PathBuf) -> io::Result<Self> {
         let config = Config::default();
         let mut app = Self {
+            image_cell_ratio: 1.0,
             workers: Default::default(),
             dos: Default::default(),
             video: Default::default(),

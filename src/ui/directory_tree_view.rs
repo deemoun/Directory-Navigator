@@ -221,7 +221,7 @@ pub(crate) fn tree_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
     for (index, label, command) in [
         (
             1,
-            if tree.destination_prompt.is_some() {
+            if tree.destination_prompt.is_some() || tree.destination_dos.is_some() {
                 "Select"
             } else {
                 "Open"

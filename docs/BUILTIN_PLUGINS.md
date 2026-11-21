@@ -359,6 +359,55 @@ needed. Failures show owned dialogs only while the originating document and
 activation are unchanged; the retained result is available in the launcher/Help.
 A launched game remains independent of the settings window.
 
+### Extra ordinary-DOS drive
+
+DOS settings owns an independent `mount_page` draft with mode Off/Temp Drive/
+Folder and a D:–X: letter. Typed `DosMountTree` effects open the shared owned tree;
+its binding and page generation guard the `DosMountFolder` result. No painting
+opens directories. Settings OK updates the launcher draft, preserving cancellation
+and normal configuration saving. Optional `mount_mode`, `mount_folder` and
+`mount_drive` values live under `[plugins.dos_launcher]`; old files default to Off.
+
+The launch worker captures the actual configuration path. Temp Drive reuses the
+existing safe persistent-root helper and is created only for a launch. Custom
+folders must be real, accessible directories; links/reparse points are rejected,
+identities captured and rechecked, and cancellation checked before spawning.
+The mounted folder becomes the child process's native working directory; literal
+`-c` commands select Z:, unmount the chosen extra letter and `MOUNT <letter> .`.
+This avoids DOSBox-X's Unicode host-root conversion problem, without introducing
+symlinks or temporary data copies. The program argument stays absolute and its
+folder is automatically mounted as C:. Relative user autoexec commands resolve
+from the new host working directory. C:, Y: and Z: are reserved. Mount data is
+persistent and writable, never deleted by process cleanup. Off retains the
+previous launch arguments and working directory. Windows image boot is separate.
+
+### Windows 9x boot profiles
+
+Windows preferences are independent of DOS overrides. The native `DosDirectory`
+context seeds the shared image picker; host-owned `WindowsBoot` checks or starts
+an image. The bounded `windows_images` library stores up to 32 profiles in
+`[plugins.dos_launcher.windows9x].images`, with one selected profile mirrored in
+existing fields. Missing arrays retain the previous single image. Known fields
+are validated; unknown per-image fields survive updates matched by image path.
+
+`WindowsImagesSave` captures the expected library and requested update. The host
+rejects stale bindings/libraries, updates only Windows preferences against the
+configuration store's loaded disk baseline, and uses its existing lock, identity,
+atomic publication and concurrent-instance checks. Successful saves update the
+live configuration and return a typed `WindowsImagesSaved` event. Failures retain
+edits; confirmed data found on disk after a save error is reported with a warning.
+Explicit Save profile works with save-on-exit disabled and never captures a new
+session or persists unrelated live preference drafts. Removing a profile never
+removes an image. Boot Windows belongs to the main launcher and uses the selected
+saved profile. Ordinary DOS settings keep their existing draft semantics.
+
+The host validates an existing writable partitioned FAT raw image, checks
+DOSBox-X and rechecks image identity before spawning. Literal mount/boot arguments
+and a private configuration fragment preserve safe launching, bounded diagnostics,
+normal-core compatibility, disabled guest networking/host-folder conversion and
+skipped user autoexec. Check is not proof of a working Windows installation.
+No installer, disk image or license is bundled. Guests can write their images.
+
 ### Video Merge
 
 `video_merge` is compiled on all supported platforms and disabled by default.
@@ -424,3 +473,13 @@ rejected by offer identity; inactive completions never steal focus.
 A private SDP UUID distinguishes DN receivers while using standard OBEX framing.
 Queue and device state are session-only. No Bluetooth-specific preferences or
 configuration version change are introduced. Acoustic behavior is unchanged.
+
+### Ordinary DOS window resolution
+
+The typed shared profile stores optional `window_resolution` under
+`plugins.dos_launcher`, defaulting to `automatic` with no generated override.
+Listed sizes emit only `[sdl] windowresolution` (classic, X, Staging before 0.83)
+or `window_size` (Staging 0.83+). Unknown Staging versions reject explicit sizes.
+No renderer or fullscreen resolution is changed. The emulator retains aspect,
+DPI and desktop constraints; classic/X surface output may ignore window sizing.
+The owned settings draft, reset and normal saving include the preference.

@@ -1,5 +1,8 @@
 //! Experimental external DOSBox launcher configuration. All effects are host-owned.
 use super::*;
+mod drives;
+mod settings;
+mod windows;
 use crate::{
     painting::{Paragraph, Wrap},
     turbo::dialog_spec::{centered, Control, ControlKind},
@@ -8,6 +11,17 @@ use crossterm::event::{KeyCode as K, MouseButton, MouseEventKind};
 #[derive(Default)]
 pub struct DosLauncher {
     focus: usize,
+    profile: crate::dos::Profile,
+    mount: crate::dos::mount::Preferences,
+    mount_page: Option<drives::Draft>,
+    windows: crate::dos::windows::Preferences,
+    images: Vec<crate::dos::windows::Preferences>,
+    image_choice: Option<usize>,
+    image_offset: usize,
+    win_page: Option<windows::Draft>,
+    picker: Option<crate::turbo::file_dialog::Picker>,
+    base: std::path::PathBuf,
+    settings: Option<settings::Draft>,
     path: String,
     cursor: usize,
     open_on_enter: bool,
@@ -63,12 +77,33 @@ impl ToolPlugin for DosLauncher {
         self
     }
     fn open(&mut self, ctx: &Context) {
+        self.profile = ctx.dos.profile.clone();
+        self.mount = ctx.dos.mount.clone();
+        self.mount_page = None;
+        self.windows = ctx.dos.windows.clone();
+        self.images = ctx.dos.windows_images.clone();
+        self.win_page = None;
+        self.image_choice = None;
+        self.picker = None;
+        self.base = ctx
+            .storage
+            .as_ref()
+            .and_then(|p| p.parent())
+            .map(std::path::Path::to_path_buf)
+            .unwrap_or_else(std::env::temp_dir);
+        self.settings = None;
         self.path = ctx.dos.executable.clone();
         self.cursor = self.path.len();
         self.open_on_enter = ctx.dos.open_on_enter;
         self.focus = 0;
     }
     fn prepare(&mut self, ctx: &Context) {
+        if let Some(p) = &mut self.picker {
+            p.prepare(
+                crate::presentation::layout::Size::new(ctx.area.width, ctx.area.height),
+                ctx.palette,
+            );
+        }
         if self.generation != ctx.dos_status.generation {
             self.generation = ctx.dos_status.generation;
             self.page = self.page.wrapping_add(1);
@@ -85,9 +120,40 @@ impl ToolPlugin for DosLauncher {
         self.offset = self.offset.min(self.row).max(self.row.saturating_sub(3));
     }
     fn native_input_page(&self) -> Option<u64> {
-        Some(self.page)
+        Some(
+            self.page
+                .wrapping_mul(8)
+                .wrapping_add(if self.mount_page.is_some() {
+                    5
+                } else if self.image_choice.is_some() {
+                    4
+                } else if self.picker.is_some() {
+                    3
+                } else if self.win_page.is_some() {
+                    2
+                } else if self.settings.is_some() {
+                    1
+                } else {
+                    0
+                }),
+        )
     }
     fn uses_controls(&self, key: KeyEvent) -> bool {
+        if self.mount_page.is_some() {
+            return !(self.focus == 302 && key.code == K::Char(' '));
+        }
+        if self.image_choice.is_some() {
+            return !matches!(
+                key.code,
+                K::Up | K::Down | K::Home | K::End | K::PageUp | K::PageDown
+            );
+        }
+        if self.picker.is_some() {
+            return false;
+        }
+        if self.win_page.is_some() {
+            return !(matches!(self.focus, 200 | 201) && key.code == K::Char(' '));
+        }
         if self.focus == 6
             && matches!(
                 key.code,
@@ -103,9 +169,56 @@ impl ToolPlugin for DosLauncher {
         {
             return false;
         }
-        !(self.focus == 0 && key.code == K::Char(' '))
+        !((self.focus == 0 || self.settings.is_some() && self.focus == 101)
+            && key.code == K::Char(' '))
     }
     fn event(&mut self, event: Event<'_>, ctx: &Context) -> Vec<Effect> {
+        if let Event::DosMountFolder { generation, path } = event {
+            if generation == self.page {
+                if let Some(d) = &mut self.mount_page {
+                    if let Some(s) = path.to_str() {
+                        d.preferences.folder = s.into();
+                        d.cursor = s.len();
+                        self.page = self.page.wrapping_add(1);
+                    } else {
+                        d.error =
+                            "This folder path cannot be represented as a Unicode DOS mount path."
+                                .into();
+                    }
+                }
+            }
+            return vec![];
+        }
+        if let Event::WindowsImagesSaved { current, images } = event {
+            self.windows = current.clone();
+            self.images = images;
+            if let Some(d) = &mut self.settings {
+                d.windows = current;
+            }
+            self.win_page = None;
+            self.focus = if self.settings.is_some() { 108 } else { 9 };
+            self.page = self.page.wrapping_add(1);
+            return vec![];
+        }
+        if let Event::DosDirectory(p) = event {
+            self.base = p;
+            return vec![];
+        }
+        if self.mount_page.is_some() {
+            return self.drives_event(event, ctx);
+        }
+        if self.image_choice.is_some() {
+            return self.images_event(event, ctx);
+        }
+        if self.picker.is_some() {
+            return self.picker_event(event, ctx);
+        }
+        if self.win_page.is_some() {
+            return self.windows_event(event, ctx);
+        }
+        if self.settings.is_some() {
+            return self.settings_event(event, ctx);
+        }
         let mut action = None;
         match event {
             Event::Focus(id) => self.focus = id,
@@ -159,12 +272,36 @@ impl ToolPlugin for DosLauncher {
             _ => {}
         }
         match action {
+            Some(9) => {
+                self.win_page = Some(windows::Draft::new(self.windows.clone()));
+                self.focus = 200;
+                self.page = self.page.wrapping_add(1);
+            }
+            Some(10) if !ctx.dos_status.busy && !self.windows.image.is_empty() => {
+                return vec![Effect::WindowsBoot {
+                    preferences: self.windows.clone(),
+                    boot: true,
+                }]
+            }
+            Some(8) => {
+                self.settings = Some(settings::Draft::new(
+                    self.profile.clone(),
+                    self.windows.clone(),
+                    self.mount.clone(),
+                ));
+                self.focus = 100;
+                self.page = self.page.wrapping_add(1);
+            }
             Some(1) => self.open_on_enter = !self.open_on_enter,
             Some(2) => {
                 return vec![
                     Effect::DosSetup(crate::dos::Preferences {
                         open_on_enter: self.open_on_enter,
                         executable: self.path.trim().to_owned(),
+                        profile: self.profile.clone(),
+                        mount: self.mount.clone(),
+                        windows: self.windows.clone(),
+                        windows_images: self.images.clone(),
                     }),
                     Effect::Close,
                 ]
@@ -182,6 +319,10 @@ impl ToolPlugin for DosLauncher {
                 return vec![Effect::DosCheck(crate::dos::Preferences {
                     open_on_enter: self.open_on_enter,
                     executable: self.path.trim().to_owned(),
+                    profile: self.profile.clone(),
+                    mount: self.mount.clone(),
+                    windows: self.windows.clone(),
+                    windows_images: self.images.clone(),
                 })]
             }
             Some(4) => {
@@ -200,6 +341,42 @@ impl ToolPlugin for DosLauncher {
         vec![]
     }
     fn controls(&self, ctx: &Context) -> DialogSpec<'_> {
+        if self.mount_page.is_some() {
+            self.drives_spec(ctx)
+        } else if self.image_choice.is_some() {
+            self.images_spec(ctx)
+        } else if self.picker.is_some() {
+            self.picker_spec(ctx)
+        } else if self.win_page.is_some() {
+            self.windows_spec(ctx)
+        } else if self.settings.is_some() {
+            self.settings_spec(ctx)
+        } else {
+            self.main_spec(ctx)
+        }
+    }
+    fn view(&self, ctx: &Context) -> View<'_> {
+        let mut spec = self.main_spec(ctx);
+        if self.settings.is_some() {
+            spec.overlay(self.settings_spec(ctx));
+        }
+        if self.win_page.is_some() {
+            spec.overlay(self.windows_spec(ctx));
+        }
+        if self.picker.is_some() {
+            spec.overlay(self.picker_spec(ctx));
+        }
+        if self.image_choice.is_some() {
+            spec.overlay(self.images_spec(ctx));
+        }
+        if self.mount_page.is_some() {
+            spec.overlay(self.drives_spec(ctx));
+        }
+        View::Dialog(Box::new(spec))
+    }
+}
+impl DosLauncher {
+    fn main_spec(&self, ctx: &Context) -> DialogSpec<'_> {
         let r = centered(ctx.area, 76, 23);
         let mut s = ctx.dialog(
             r,
@@ -275,7 +452,6 @@ impl ToolPlugin for DosLauncher {
             },
             ctx.target(1),
         ));
-        s.caption(Paragraph::new(ctx.language.text("DOSBox is required and installed separately. Install DOSBox, DOSBox-X or DOSBox Staging, then Find emulators. Enter requires the checkbox above; BAT files use File > Run in DOSBox.")).wrap(Wrap{trim:false}),Rect::new(r.x+3,r.y+12,r.width-6,3));
         s.caption(
             Paragraph::new(if ctx.dos_status.notice.is_empty() {
                 ctx.language
@@ -285,40 +461,91 @@ impl ToolPlugin for DosLauncher {
                 ctx.language.message(&ctx.dos_status.notice)
             })
             .wrap(Wrap { trim: false }),
-            Rect::new(r.x + 3, r.y + 16, r.width.saturating_sub(6), 3),
+            Rect::new(r.x + 3, r.y + 16, r.width.saturating_sub(6), 2),
         );
-        let controls = [
-            (2, "OK"),
-            (3, "Cancel"),
-            (5, "Check DOSBox"),
-            (
-                7,
-                if ctx.dos_status.busy {
-                    "Stop"
-                } else {
-                    "Find emulators"
-                },
-            ),
-            (4, "Help"),
+        s.caption(
+            Paragraph::new(if self.windows.image.is_empty() {
+                ctx.language
+                    .text("Requires an installed DOSBox emulator.")
+                    .into()
+            } else {
+                format!(
+                    "Windows: {} · {} MiB",
+                    crate::filesystem::display_name(
+                        std::path::Path::new(&self.windows.image)
+                            .file_name()
+                            .unwrap_or_default()
+                            .to_string_lossy()
+                            .as_ref()
+                    ),
+                    self.windows.memory_mb
+                )
+            }),
+            Rect::new(r.x + 3, r.y + 11, r.width - 6, 1),
+        );
+        s.caption(
+            Paragraph::new(self.profile.summary(ctx.language)).wrap(Wrap { trim: false }),
+            Rect::new(r.x + 3, r.y + 12, r.width - 6, 2),
+        );
+        let labels = [
+            ctx.language.text("Windows 9x…"),
+            ctx.language.text("Boot Windows"),
         ];
-        let labels = controls.map(|(_, label)| ctx.language.text(label));
         let bounds = crate::dialog_theme::button_row(
-            Rect::new(r.x + 3, r.y + 20, r.width.saturating_sub(6), 1),
+            Rect::new(r.x + 3, r.y + 14, r.width - 6, 1),
             &labels,
-            10,
+            14,
             1,
         );
-        for ((id, label), bounds) in controls.into_iter().zip(bounds) {
+        for ((id, label), bounds) in [9, 10].into_iter().zip(labels).zip(bounds) {
             let mut c = Control::new(
                 id,
                 bounds,
-                ControlKind::Button(ctx.language.text(label).into()),
+                ControlKind::Button(label.into()),
                 ctx.target(id),
             );
-            c.enabled = id != 5 || !ctx.dos_status.busy;
+            c.enabled = !ctx.dos_status.busy && (id != 10 || !self.windows.image.is_empty());
             s.control(c);
+        }
+        for (y, controls) in [
+            (
+                18,
+                [
+                    (8, "DOS settings…"),
+                    (5, "Check DOSBox"),
+                    (
+                        7,
+                        if ctx.dos_status.busy {
+                            "Stop"
+                        } else {
+                            "Find emulators"
+                        },
+                    ),
+                ],
+            ),
+            (20, [(2, "OK"), (3, "Cancel"), (4, "Help")]),
+        ] {
+            let labels = controls.map(|(_, label)| ctx.language.text(label));
+            let bounds = crate::dialog_theme::button_row(
+                Rect::new(r.x + 3, r.y + y, r.width - 6, 1),
+                &labels,
+                12,
+                1,
+            );
+            for ((id, _), (label, bounds)) in
+                controls.into_iter().zip(labels.into_iter().zip(bounds))
+            {
+                let mut control = Control::new(
+                    id,
+                    bounds,
+                    ControlKind::Button(label.into()),
+                    ctx.target(id),
+                );
+                control.enabled = !matches!(id, 5 | 8) || !ctx.dos_status.busy;
+                s.control(control);
+            }
         }
         s
     }
 }
-pub const HELP: &str = "Experimental DOS launcher: install DOSBox, DOSBox-X or DOSBox Staging separately and enable the plugin in Options > Configuration > Plugins. File > Run in DOSBox launches the current regular COM, DOS EXE or BAT file.\nFind emulators builds a selectable installed list. Blank executable means Automatic, preferring Staging, then DOSBox-X, then classic DOSBox. You can also type an executable path. Check DOSBox tests the draft without saving or starting a game; it does not test graphical output. OK applies; Cancel/Esc discards.\nThe separate Open DOS programs with DOSBox checkbox allows Enter/double-click on COM and DOS MZ executables before associations. PE/NE/LE/LX Windows executables are excluded; BAT is always explicit. Ctrl+Enter and Open with default app bypass DOS handling.\nGames open in a separate graphical window, not inside DN; a graphical session is required. The source is rechecked before launch and arguments are passed without a host shell. Global emulator settings are retained; automatic game-local configuration loading is disabled. Launch diagnostics remain in this window and Help. Closing or disabling the plugin cancels pending checks/launches without terminating games already started.";
+pub const HELP: &str = "Experimental DOS launcher: install DOSBox, DOSBox-X or DOSBox Staging separately and enable the plugin in Options > Configuration > Plugins. File > Run in DOSBox launches the current regular COM, DOS EXE or BAT file.\nFind emulators builds a selectable installed list. Blank executable means Automatic, preferring Staging, then DOSBox-X, then classic DOSBox. You can also type an executable path. Check DOSBox tests the draft without saving or starting a game; it does not test graphical output. OK applies; Cancel/Esc discards.\nThe separate Open DOS programs with DOSBox checkbox allows Enter/double-click on COM and DOS MZ executables before associations. PE/NE/LE/LX Windows executables are excluded; BAT is always explicit. Ctrl+Enter and Open with default app bypass DOS handling.\nGames open in a separate graphical window, not inside DN; a graphical session is required. The source is rechecked before launch and arguments are passed without a host shell. Global emulator settings are retained; automatic game-local configuration loading is disabled. DOS settings opens an owned draft for shared CPU speed, memory and window/fullscreen overrides. All default to Use emulator settings. Settings OK updates the launcher draft; launcher OK applies it for subsequent launches. DN generates a private override fragment and never edits emulator or game configuration files. Launch diagnostics remain in this window and Help. Closing or disabling the plugin cancels pending checks/launches without terminating games already started. Windows 9x opens a separate DOSBox-X profile for booting an existing installed raw HDD image; its settings do not affect DOS programs. Saved Windows images have individual settings. Save profile writes immediately; choose an entry with Saved image. Boot Windows is on the main launcher. DOS drives opens a separate draft for an extra D:–X: drive: Off, DN Temp Drive or a real folder. The selected folder becomes the emulator host working directory. The program folder remains C:; Windows image booting is unchanged.";

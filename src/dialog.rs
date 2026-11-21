@@ -1,4 +1,13 @@
 pub(crate) const ABOUT_TITLE: &str = " About Directory Navigator ";
+/// Fixed-width terminal logo, kept separate from translated About content.
+pub(crate) const ABOUT_LOGO: [&str; 6] = [
+    "██████╗ ███╗   ██╗",
+    "██╔══██╗████╗  ██║",
+    "██║  ██║██╔██╗ ██║",
+    "██║  ██║██║╚██╗██║",
+    "██████╔╝██║ ╚████║",
+    "╚═════╝ ╚═╝  ╚═══╝",
+];
 pub(crate) const REPOSITORY_URL: &str = "https://github.com/deemoun/Directory-Navigator";
 pub(crate) mod prompt_controller;
 pub struct Dialog {

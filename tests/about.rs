@@ -3,12 +3,26 @@ use dn::{
     localization::Language, mouse::Target, palette::PaletteProfile, windowing::geometry::SurfaceKey,
 };
 use std::io;
+const LOGO: [&str; 6] = [
+    "██████╗ ███╗   ██╗",
+    "██╔══██╗████╗  ██║",
+    "██║  ██║██╔██╗ ██║",
+    "██║  ██║██║╚██╗██║",
+    "██████╔╝██║ ╚████║",
+    "╚═════╝ ╚═╝  ╚═══╝",
+];
 const URL: &str = "https://github.com/deemoun/Directory-Navigator";
 #[test]
 fn about_centers_preserved_text_and_repository_link_in_native_dialog() -> io::Result<()> {
     let fixture = support::Fixture::new("about")?;
+    let mut colors = dn::palette::theme::DEFAULTS;
+    colors[dn::palette::theme::Slot::DialogHeading as usize] = 0x1f;
     for language in [Language::English, Language::Russian] {
-        for palette in [PaletteProfile::ClassicDn, PaletteProfile::Terminal] {
+        for palette in [
+            PaletteProfile::ClassicDn,
+            PaletteProfile::Terminal,
+            PaletteProfile::Custom(colors),
+        ] {
             for (w, h) in [(80, 25), (132, 40)] {
                 let mut app = fixture.app()?;
                 app.config.language = language;
@@ -28,7 +42,24 @@ fn about_centers_preserved_text_and_repository_link_in_native_dialog() -> io::Re
                     .unwrap()
                     .bounds;
                 assert_eq!(rect.width, 64);
-                assert_eq!(rect.height, 20);
+                assert_eq!(rect.height, 22);
+                for x in rect.x + 2..rect.right() - 2 {
+                    assert_eq!(b[(x, rect.y + 1)].symbol(), " ");
+                }
+                let text = support::text(&mut app, w, h)?;
+                assert!(text.contains(language.text("F1: keyboard help")));
+                assert!(text.contains(language.text("Enter / Esc: close")));
+                for (row, logo) in LOGO.iter().enumerate() {
+                    let width = unicode_width::UnicodeWidthStr::width(*logo) as u16;
+                    let x = rect.x + (rect.width - width) / 2;
+                    let y = rect.y + 2 + row as u16;
+                    let rendered: String = (x..x + width).map(|col| b[(col, y)].symbol()).collect();
+                    assert_eq!(rendered, *logo);
+                    let style = palette.for_group(dn::palette::theme::Group::Dialogs, 0x71);
+                    assert_eq!(b[(x, y)].fg, style.fg.unwrap());
+                    assert_eq!(b[(x, y)].bg, style.bg.unwrap());
+                }
+                assert_eq!(app.message_offset(), 0);
                 let link = app
                     .mouse
                     .regions

@@ -2046,11 +2046,60 @@ alone starts no emulator, opens no audio devices and starts no networking.
   executables are excluded; BAT remains explicit. Ctrl+Enter and
   **Open with default app** bypass DOS handling. Global emulator settings are
   retained; automatic game-local configuration loading is disabled.
+  **DOS settings…** edits one shared profile: CPU speed (inherited/fixed/maximum),
+  fixed cycles (50–2,000,000), memory (inherited or 1/2/4/8/16/32/63 MiB), and
+  windowed/fullscreen display. Everything initially inherits emulator settings.
+  Settings OK updates the launcher draft; launcher OK commits it through normal
+  configuration saving. Reset affects only the draft. Changes apply to subsequent
+  launches, not running games. DN loads a private fragment after user settings;
+  it never edits emulator/game configuration files. The fragment is removed after
+  observed emulator exit; if DN exits first it is retained for OS temporary cleanup.
   No emulator is bundled; a graphical session is required. **Check DOSBox**
-  checks the unsaved path draft without starting a game or testing graphical
+  checks the unsaved path and profile draft without starting a game or testing graphical
   output. Checks are cancellable and do not save preferences. Errors retain
   bounded diagnostics in the launcher and Help; inactive results do not steal
   focus. Closing the launcher cancels pending checks, not games already started.
+
+  **Window resolution** defaults to **Automatic**, preserving emulator settings.
+  Fixed starting sizes are 640x480, 800x600, 1024x768, 1280x960, 1600x1200 and
+  1920x1080. This controls the window, not the DOS video mode or fullscreen
+  resolution; desktop bounds, aspect correction and OS DPI scaling may adjust it.
+  Classic DOSBox/DOSBox-X `surface` output may ignore sizing; DN leaves renderer
+  selection to the emulator. Staging 0.83+ uses `window_size`, earlier versions
+  use `windowresolution`. Unknown Staging versions require Automatic or a
+  verifiable version for explicit sizing. Reset and nested OK/Cancel work normally.
+
+  **DOS settings… → DOS drives…** adds one optional extra drive for ordinary DOS
+  launches: **Off** (default), **DN Temp Drive**, or a chosen real **Folder**.
+  Choose **D:–X:**; DN reserves C: for the program and Y:/Z: for emulator utilities.
+  The selected extra letter is unmounted and remounted for this launch. Mounted
+  files remain real and writable; DN does not erase them. Temp Drive is DN's
+  existing persistent storage and is created only on launch, not while editing
+  or checking settings. **Browse…** uses an owned Directory tree picker.
+  The emulator's host working directory becomes the shared folder, with a native
+  `MOUNT <letter> .` command to preserve Unicode paths; relative commands in the
+  user's autoexec resolve from that folder. The launched program's absolute path
+  is retained, and its directory remains C:. Global configuration and game-local
+  suppression remain in place. Nested OK applies to the settings draft, launcher
+  OK applies preferences, and normal Save desktop/save-on-exit persists them.
+  Windows 9x image booting does not use this extra mount.
+
+  **Windows 9x…** on the DOS launcher manages up to **32 saved disk images**,
+  each with its own edition, RAM, DOSBox-X path, fullscreen, mouse, SB16 and
+  Voodoo settings. **Saved image** opens a selector, including **New image profile…**.
+  **Save profile** writes immediately through the locked configuration store,
+  independently of **Save settings on exit**; unrelated unsaved preferences are
+  not written. **Remove profile** removes the entry, keeping its image file.
+  Cancel discards unsaved edits and retains profiles already saved. The old single
+  image is retained as a profile when loading an older configuration.
+  **Boot Windows** is on the main launcher and uses the selected saved profile.
+  Use an existing installed Windows 95/95 OSR2/98/98 SE partitioned FAT raw HDD
+  image (`.img`/`.ima`) and DOSBox-X. **Check** verifies the tool and header, not a
+  working Windows installation. The guest **writes to the image**: keep a backup
+  and close other emulators. Normal DOS settings remain independent. The normal
+  CPU core may be slow, especially on ARM; guest networking and host-folder
+  conversion are disabled and user autoexec is skipped. No installer, disk image
+  or Windows license is supplied.
 - **Acoustic transfers (Experimental)** requires a build with
   `cargo build --release --locked --features acoustic` and is disabled by default.
   **Send opens only the speaker; Receive opens only the microphone.** No return
@@ -2251,3 +2300,23 @@ Bluetooth Classic stack and drivers. A disabled/missing adapter, permission or
 service failure is shown as an error; no other transport is silently substituted.
 Protocol, private-stream, platform-compilation and UI checks do not establish
 real radio interoperability: check actual two-device transfers separately.
+
+## Image viewing
+
+F3 opens PNG, JPEG and WebP files in DN's internal **image viewer**. It preserves
+DN windows, palettes and focus. F2 fits; F3 selects 100% (one source pixel per
+column, with aspect correction); F4 rotates clockwise; F5/F6 zoom; arrows pan; F8 switches
+colored half-blocks/ASCII; Esc/F10 closes. Rotation never changes the file.
+Transparency uses a checkerboard and JPEG orientation is applied automatically.
+Background-prepared, alpha-aware filtering smooths reduced previews. Proportions
+use OS-reported cell dimensions when available; otherwise the 1:2 cell estimate
+is retained. These read-only measurements run at startup, resize and terminal
+resume, never while painting; verified Linux consoles retain their fallback.
+The portable 256-color cell preview works on macOS, Linux and Windows, including
+Linux tty through DN's existing console color conversion. It is a low-resolution
+preview; this release sends no Kitty, Sixel or iTerm2 graphics. Choose ASCII if
+the console font lacks half-blocks. Input is bounded to 64 MiB, 33,554,432 pixels
+and 32,768 pixels per side. Corrupt/oversized images report an error. Only the
+first WebP frame is shown. Enter associations, explicit As Text/As Hex and Quick
+View remain unchanged. Archive image preview, animation, SVG, HEIC and RAW are
+outside this first version.

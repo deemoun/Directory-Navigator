@@ -30,9 +30,10 @@ fn directory(path: &std::path::Path) -> io::Result<()> {
 }
 impl Root {
     fn locate(app: &App, create: bool) -> io::Result<Option<Self>> {
-        let parent = app
-            .config_store
-            .path()?
+        Self::from_config(app.config_store.path()?, create)
+    }
+    pub(crate) fn from_config(config: &std::path::Path, create: bool) -> io::Result<Option<Self>> {
+        let parent = config
             .parent()
             .filter(|p| p.is_absolute())
             .ok_or_else(|| io::Error::other("Cannot determine the Temp Drive directory"))?;
@@ -70,6 +71,9 @@ impl Root {
         };
         root.validate()?;
         Ok(Some(root))
+    }
+    pub(crate) fn path(&self) -> &std::path::Path {
+        &self.path
     }
     pub(crate) fn validate(&self) -> io::Result<()> {
         directory(&self.path)?;

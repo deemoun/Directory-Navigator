@@ -98,7 +98,11 @@ pub(super) fn draw_viewer(frame: &mut impl Frame, app: &App, area: Rect) {
         );
     }
     if let Some(contents) = &viewer.contents {
-        draw_text(frame, viewer, regions[1], profile, app.config.language);
+        if viewer.is_image() {
+            frame.render_widget(Paragraph::new(viewer.image_view.text.clone()), regions[1]);
+        } else {
+            draw_text(frame, viewer, regions[1], profile, app.config.language);
+        }
         let line = viewer.source_line() + 1;
         let stream_status = contents.stream.as_ref().map(|window| {
             format!(
@@ -131,28 +135,34 @@ pub(super) fn draw_viewer(frame: &mut impl Frame, app: &App, area: Rect) {
             )
         });
         frame.render_widget(
-            Paragraph::new(stream_status.or(pdf_status).unwrap_or_else(|| {
-                format!(
-                    " {} │ {line}/{} lines{} · {} · {}",
-                    if viewer.markdown.rendered {
-                        "Markdown"
-                    } else if contents.binary {
-                        "Hex"
-                    } else if viewer.wrap {
-                        "Text Wrap"
-                    } else {
-                        "Text"
-                    },
-                    viewer.source_line_count(),
-                    if contents.truncated {
-                        " [bounded preview]"
-                    } else {
-                        ""
-                    },
-                    contents.format.map(|f| f.to_string()).unwrap_or_default(),
-                    app.config.language.text(&viewer.notice)
-                )
-            }))
+            Paragraph::new(
+                viewer
+                    .image_status(app.config.language)
+                    .or(stream_status)
+                    .or(pdf_status)
+                    .unwrap_or_else(|| {
+                        format!(
+                            " {} │ {line}/{} lines{} · {} · {}",
+                            if viewer.markdown.rendered {
+                                "Markdown"
+                            } else if contents.binary {
+                                "Hex"
+                            } else if viewer.wrap {
+                                "Text Wrap"
+                            } else {
+                                "Text"
+                            },
+                            viewer.source_line_count(),
+                            if contents.truncated {
+                                " [bounded preview]"
+                            } else {
+                                ""
+                            },
+                            contents.format.map(|f| f.to_string()).unwrap_or_default(),
+                            app.config.language.text(&viewer.notice)
+                        )
+                    }),
+            )
             .style(dos(0x30)),
             regions[2],
         );

@@ -83,6 +83,23 @@ fn restore_input(mouse_down: bool) {
 }
 
 impl Session {
+    /// Read-only OS query on startup/resize/resume; never during painting or polling.
+    pub fn refresh_image_metrics(&self, app: &mut crate::app::App) {
+        #[cfg(target_os = "linux")]
+        if self
+            .console
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .snapshot
+            .console
+        {
+            app.image_cell_ratio = 1.0;
+            return;
+        }
+        app.image_cell_ratio =
+            crate::viewer::image::cell_ratio(crossterm::terminal::window_size().ok());
+    }
+
     pub fn poll(&self, screen: &mut Screen, timeout: Duration) -> io::Result<Option<event::Event>> {
         screen.poll_event(timeout)
     }
