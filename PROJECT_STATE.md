@@ -1,6 +1,30 @@
 # Directory Navigator
 
-## Unreleased — directory comparison and plugin diagnostics
+## Current status — published stable 1.1.15
+
+Directory Navigator **1.1.15 is published** on
+[crates.io](https://crates.io/crates/directory-navigator/1.1.15). Publication used
+`cargo publish --locked`; Cargo confirmed registry availability, and a separate
+registry lookup/download confirmed version 1.1.15. The published package was
+verified against clean source commit `1c338de` and contains the final CI fixes and
+workflow split. The crate is `directory-navigator`; the installed command remains
+`dn`. macOS, Linux and Windows remain supported. Version 1.1.9 was the first
+stable release.
+
+Normal builds include music audio support. Acoustic remains an optional build
+feature excluded from default builds, and its plugin is disabled by default.
+DOS launcher and Video Merge remain opt-in; Video Merge has no Experimental label.
+Bluetooth transfers is enabled by default while preserving explicit disabled
+choices. Enabling plugins does not start receivers, open audio/Bluetooth devices
+or launch games automatically.
+
+See the [English README](README.md), [Russian README](README.ru.md) and
+[user guide](docs/USER_GUIDE.md) for supported workflows, installation, controls,
+safeguards and limits.
+
+## Changes released in 1.1.15
+
+### Directory comparison and plugin diagnostics
 
 The existing quick directory comparison remains available. Its Report action opens
 a read-only recursive byte comparison with native paths, hidden entries, bounded
@@ -9,40 +33,36 @@ The report does not synchronize files, change marks or persist results.
 Utilities → Plugin diagnostics reuses the information document and existing bounded
 DOS/FFmpeg version probes. It reports plugin/build state and setup guidance without
 opening devices or starting receivers. Hardware/device availability is explicitly
-unprobed. No dependencies, configuration migration or version change.
+unprobed. These tools added no dependencies or configuration migration.
 
-Validation for this change is reported separately; older counts below are historical.
+### Clearer requirements and destination errors
 
-## Unreleased — one-way acoustic experiment
+DOS launcher and Video Merge distinguish unchecked tools from failed checks and
+show the relevant discovery/settings actions. Video Merge Help retains tool-check
+causes and configured paths. Bluetooth shows platform setup requirements and
+reports an empty paired-device list without claiming an adapter failure. APK
+Workshop explains optional ADB/signing dependencies and distinguishes configured
+paths from verified tools. Audio-disabled Music Player windows explain the required
+build; Remote connections identifies the optional OpenSSH terminal requirement.
+These notices add no startup probes or changes to plugin defaults.
 
-Acoustic protocol 2 replaces bidirectional pairing/acknowledgements with an
-output-only sender and input-only receiver. Numbered encrypted blocks repeat in
-a carousel; receivers collect missing blocks without transmitting. Session-only
-passphrases use Argon2id and XChaCha20-Poly1305. Text/single-file limits are 1 MiB,
-with beneficial compression, three audible speeds, finite/continuous repeats,
-playback estimates and bounded progress. Streaming WAV/RF64 export and recorded
-WAV import need no audio devices. Only authenticated complete data reaches local
-review and guarded file publication. The sender cannot confirm delivery.
+Archive extraction now accepts real destination folders reached through ancestor
+aliases such as macOS's `/Volumes/Macintosh HD/...`. It pins the resolved path,
+checks for changed destinations and still rejects a linked final destination.
+Other users of the shared strict destination guard retain their prior policy.
+Failed system opens of recognized DOS programs explain the DOSBox requirement and
+launcher settings while preserving the original cause and explicit opening rules.
 
-The feature and plugin remain off by default; DN version remains 1.1.15. The
-previously prepared 1.1.15 crate predates these changes and must be regenerated
-before publishing the updated source. Historical acoustic results below describe
-the old protocol; they are not fresh evidence for the new implementation.
-Real speaker/microphone, two-device and platform runtime coverage remains separate
-from synthetic waveforms and protocol tests.
-
-## Unreleased — shared workers and Bluetooth Transfer Center integration
+### Shared workers and Bluetooth Transfer Center integration
 
 Video Merge and Bluetooth use a bounded, nonblocking worker supervisor. Bluetooth
-send queues and accepted incoming files now belong to Transfer Center; closing
+send queues and accepted incoming files belong to Transfer Center; closing
 Bluetooth stops new offers while accepted work continues. Per-file approval stays
 in Bluetooth, and replacement/cancellation belong to Transfer Center. Queued
 receivers retain the negotiated decision timeout. Lost final receipts remain
-explicitly unconfirmed, and completed publications survive cancellation. Version
-is being prepared as 1.1.15. Real two-device Bluetooth validation remains separate from private
-protocol tests and cross-compilation; the historical coverage below is unchanged.
+explicitly unconfirmed, and completed publications survive cancellation.
 
-### Unreleased DOS launcher corrections
+### DOS launcher compatibility
 
 The launcher supports DOSBox Staging, DOSBox-X and classic DOSBox. Find emulators
 builds a selectable installed list; automatic selection prefers that order.
@@ -53,27 +73,72 @@ Check DOSBox verifies an unsaved path draft without committing it. Launch errors
 include bounded stdout/stderr diagnostics in owned dialogs and the launcher;
 inactive failures retain their result without stealing focus. Native arguments,
 source identity checks and default-disabled behavior remain intact.
-Real Linux desktop/emulator execution still requires validation;
-private mock launch and terminal tests are separate evidence.
 
-## Current status — preparing stable 1.1.15
+### One-way acoustic experiment
 
-Directory Navigator 1.1.15 is being prepared; it has not been published. This
-release includes the shared-worker, Bluetooth Transfer Center and DOSBox fixes
-described above. Video
-Merge no longer carries the Experimental label and remains opt-in. Bluetooth
-transfers is enabled by default, preserving explicitly saved disabled choices;
-startup does not open Bluetooth devices or start receiving. Acoustic remains an
-optional feature excluded from the default build. Earlier validation below
-records the work before this release preparation.
+Acoustic protocol 2 replaces bidirectional pairing/acknowledgements with an
+output-only sender and input-only receiver. Numbered encrypted blocks repeat in
+a carousel; receivers collect missing blocks without transmitting. Session-only
+passphrases use Argon2id and XChaCha20-Poly1305. Text/single-file limits are 1 MiB,
+with beneficial compression, three audible speeds, finite/continuous repeats,
+playback estimates and bounded progress. Streaming WAV/RF64 export and recorded
+WAV import need no audio devices. Only authenticated complete data reaches local
+review and guarded file publication. The sender cannot confirm delivery.
+Protocol 2 is incompatible with the previous bidirectional mode. Historical
+Noise/SAS results below concern the replaced protocol, not the current one.
 
-Directory Navigator 1.1.13 is published and available
-on [crates.io](https://crates.io/crates/directory-navigator/1.1.13). The crate is
-`directory-navigator`; the installed executable remains `dn`. macOS, Linux and
-Windows remain supported. Version 1.1.9 was the first stable release.
+### Validation and release workflows
 
-See the [English README](README.md), [Russian README](README.ru.md) and
-[user guide](docs/USER_GUIDE.md) for installation, controls, safeguards and limits.
+Full native suites passed during feature validation on macOS ARM64. Following the
+final CI corrections, the focused release gate passed **644 tests**, the workflow
+policy suite passed **15 tests** including LF/CRLF/mixed-line-ending mutations,
+and the Python release/packaging helpers passed **44 tests**. Rust **1.100.0**
+all-target Clippy with warnings denied passed; preparation also included default,
+audio-disabled and optional-acoustic checks, formatting and diff checks.
+The normal release was rebuilt with `cargo build --release --locked` and reported
+`Directory Navigator 1.1.15`.
+
+The reported Clippy failures were fixed with iterator-based panel setup and a
+Unix-only guard for the DOS test helper, matching its existing callers. No warning
+suppression or test removal was used. The comparison PTY test now checks actual
+manager focus rather than cursor visibility beneath a retained floating report,
+then opens the selected file in F3. Its containing terminal suite passed three
+consecutive release-binary runs without retries or longer timeouts, including
+terminal restoration. Additional private terminal scenarios covered extraction
+through a volume alias and missing-tool guidance.
+
+Both release workflows are manual-only. **Build unified release** retains strict
+all-target Clippy, library/core safety tests, no-audio checks, builds and package
+verification; Intel macOS keeps its lighter build/CLI smoke coverage. It creates
+an unpublished GitHub draft only after all required jobs pass.
+**Unified Release Full Tests** runs the complete Clippy/test suite on all five
+platforms, including Intel, and saves artifacts only, with read-only permissions.
+The complete UI/PTY suites remain available there and in other manual full-check
+workflows; they no longer gate normal unified releases.
+
+`cargo package --list --locked`, `cargo package --locked` and
+`cargo publish --locked --dry-run` passed before publication. The final archive
+contained **486 files**, including required sources, assets, notices and the new
+workflow, while excluding build/reference outputs. No source or version changes
+were made during publication.
+
+### Current validation boundaries
+
+A complete successful five-platform 1.1.15 CI run has **not** been verified here.
+Reported CI failures and their local corrections are distinct from a green CI
+matrix. Whole-program Linux x86_64/ARM64 cross-checks stopped in dependencies
+because Linux C cross-compilers are missing on this Mac; Windows checking stopped
+at missing SDK headers. These attempts are not application cross-build passes or
+native runtime coverage. No workflows were triggered during this work.
+Real Linux desktop/DOSBox execution, two-device Bluetooth exchange and physical
+speaker/microphone acoustic reliability remain unverified here. Private mock,
+protocol, waveform and PTY tests do not establish that hardware coverage.
+
+## Historical implementation and validation
+
+The records below predate the published 1.1.15 state above. Their versions, counts,
+platform claims and references to then-unreleased work are historical evidence,
+not fresh coverage or current feature boundaries.
 
 ### Bluetooth transfers — implementation history before 1.1.14
 
@@ -135,7 +200,7 @@ this is not a complete application cross-build or native execution. Release
 1.1.13 was rebuilt and its EN/RU Bluetooth PTY scenario passed with terminal
 restoration. No real Bluetooth device exchange was available; no CI was run.
 
-### Unreleased remote-pane polish
+### Remote-pane polish — historical implementation
 
 Remote panes retain cached listings after failed or cancelled navigation. A shared
 Panel reconnect action requests credentials again for the captured session and
