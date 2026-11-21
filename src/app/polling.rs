@@ -10,6 +10,7 @@ impl App {
     pub fn poll(&mut self) -> bool {
         // Retire closed owners and orphaned children before polling any reply.
         self.sync_modals();
+        let history_changed = crate::command_line::persistence::poll(self);
         let workers_changed = self.workers.poll();
         let experiments_changed =
             crate::dos::poll(self) | crate::acoustic::poll(self) | crate::video::poll(self);
@@ -29,7 +30,8 @@ impl App {
         let recovery_changed = crate::editor::recovery::poll(self, std::time::Instant::now());
         let mut changed = crate::config_import::poll(self);
         changed |= crate::plugins::host::poll(self, std::time::Instant::now());
-        changed |= workers_changed
+        changed |= history_changed
+            | workers_changed
             | experiments_changed
             | peer_changed
             | clipboard_changed
@@ -85,6 +87,7 @@ impl App {
             && self.job.is_none()
             && !self.transfers.has_work()
             && !self.file_tools.busy()
+            && !self.command_line.persistence.pending()
             && !self.workers.pending()
         {
             self.request_exit();
@@ -163,6 +166,7 @@ impl App {
                 .is_some_and(|i| i.loading());
         if pending
             || self.workers.pending()
+            || self.command_line.persistence.pending()
             || crate::peer::active(self)
             || crate::acoustic::active(self)
             || crate::dos::active(self)

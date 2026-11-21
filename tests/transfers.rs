@@ -544,3 +544,65 @@ fn waiting_conflict_does_not_take_focus_from_editor_and_cancellation_wakes_worke
     assert_eq!(fs::read(f.0.join("out/one"))?, b"keep");
     Ok(())
 }
+
+#[test]
+fn destination_actions_retain_native_targets_and_ignore_retired_ids() -> io::Result<()> {
+    let f = support::Fixture::new("transfer-actions")?.canonicalized()?;
+    fs::write(f.0.join("one"), "one")?;
+    fs::create_dir(f.0.join("out"))?;
+    let mut a = f.app()?;
+    let other = a.panels[1].path.clone();
+    let id = transfers::submit(
+        &mut a,
+        plan(&f.0, "one", "out/new 世界.txt"),
+        CopyOptions::default(),
+    )
+    .unwrap();
+    let owner = a.desktop.active().id;
+    wait(&mut a, |a| {
+        !a.transfers.has_work() && a.panels.iter().all(|panel| !panel.loading)
+    });
+    assert_eq!(
+        a.transfers.entries[0].local_destination,
+        Some(transfers::LocalDestination::File(
+            f.0.join("out/new 世界.txt")
+        ))
+    );
+    let details = transfers::details(&a.transfers.entries[0], a.config.language);
+    assert!(details.contains("Completed"));
+    assert!(details.contains("new 世界.txt"));
+    transfers::action(&mut a, Action::CopyDetails(id));
+    assert_eq!(a.editor_clipboard, details);
+    let cause = format!("original cause 世界 {}", "x".repeat(2048));
+    a.transfers.entries[0].error = Some(cause.clone());
+    a.transfers.entries[0]
+        .progress
+        .details
+        .push(dn::operations::Detail {
+            path: f.0.join("out"),
+            message: "durability warning".into(),
+        });
+    transfers::action(&mut a, Action::CopyDetails(id));
+    assert!(a.editor_clipboard.contains(&cause));
+    assert!(a.editor_clipboard.contains("durability warning"));
+    a.transfers.entries[0].error = None;
+    transfers::action(&mut a, Action::OpenDestination(id));
+    wait(&mut a, |a| !a.panels[0].loading);
+    assert_eq!(a.panels[0].path, f.0.join("out"));
+    assert_eq!(a.panels[0].entries[a.panels[0].cursor].name, "new 世界.txt");
+    assert_eq!(a.panels[1].path, other);
+    assert!(a.desktop.contains(owner));
+    a.desktop.activate(owner);
+    for (w, h) in [(80, 25), (120, 35), (80, 25)] {
+        let frame = support::text(&mut a, w, h)?;
+        assert_eq!(frame, support::text(&mut a, w, h)?);
+        assert!(frame.contains("Open destination"));
+        assert!(frame.contains("Copy details"));
+    }
+    transfers::action(&mut a, Action::Clear);
+    let before = a.panels[0].path.clone();
+    transfers::action(&mut a, Action::OpenDestination(id));
+    transfers::action(&mut a, Action::CopyDetails(id));
+    assert_eq!(a.panels[0].path, before);
+    Ok(())
+}

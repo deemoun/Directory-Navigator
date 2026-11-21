@@ -151,6 +151,13 @@ pub(crate) struct SaveLock {
 }
 impl SaveLock {
     pub(crate) fn acquire(path: &Path) -> io::Result<Self> {
+        Self::try_acquire(path).map_err(|error| {
+            if error.kind() == io::ErrorKind::AlreadyExists {
+                io::Error::other(format!("Settings are locked: {}.lock. If no other copy is saving, remove this stale lock", path.display()))
+            } else { error }
+        })
+    }
+    pub(crate) fn try_acquire(path: &Path) -> io::Result<Self> {
         let mut lock_path = path.as_os_str().to_os_string();
         lock_path.push(".lock");
         let path = PathBuf::from(lock_path);
@@ -161,16 +168,7 @@ impl SaveLock {
             use std::os::unix::fs::OpenOptionsExt;
             options.mode(0o600);
         }
-        let file = options.open(&path).map_err(|e| {
-            if e.kind() == io::ErrorKind::AlreadyExists {
-                io::Error::other(format!(
-                    "Settings are locked: {}. If no other copy is saving, remove this stale lock",
-                    path.display()
-                ))
-            } else {
-                e
-            }
-        })?;
+        let file = options.open(&path)?;
         Ok(Self { file, path })
     }
 }

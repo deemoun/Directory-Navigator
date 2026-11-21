@@ -44,7 +44,9 @@ pub(crate) fn prompt_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
         Target::SubmitPrompt,
         Target::CancelPrompt,
     );
-    if deleting {
+    if matches!(prompt.kind, PromptKind::ClearCommandHistory) {
+        spec.caption(Paragraph::new(app.config.language.text("Clear session and saved command history? The current prompt is kept. This cannot be undone.")).style(dos(theme::TEXT)), Rect::new(rect.x + 2, rect.y + 2, rect.width - 4, 5));
+    } else if deleting {
         let trash = matches!(prompt.kind, PromptKind::Operation(Kind::Trash))
             || matches!(&prompt.kind, PromptKind::ClearTempDrive(clear) if clear.kind == Kind::Trash);
         let mut lines = if trash {

@@ -61,6 +61,15 @@ pub(super) fn poll(app: &mut App, now: Instant) -> bool {
     let progress = job.progress(&snapshot);
     if let Some(entry) = app.transfers.entries.iter_mut().find(|e| e.id == id) {
         entry.progress = progress;
+        if entry.bluetooth == Some(Direction::Receive) && !snapshot.destinations.is_empty() {
+            entry.local_destination = if snapshot.destinations.len() == 1 {
+                Some(LocalDestination::Directory(
+                    snapshot.destinations[0].clone(),
+                ))
+            } else {
+                None
+            };
+        }
         if app.transfers.active == Some(id) && entry.status != Status::Cancelling {
             entry.status = if snapshot.offer.is_some() || job.conflicts().pending().is_some() {
                 Status::Waiting

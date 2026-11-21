@@ -245,3 +245,92 @@ fn menu_actions_and_translated_geometry() -> io::Result<()> {
     }
     Ok(())
 }
+
+#[test]
+fn persistent_history_is_opt_in_keeps_drafts_and_clear_is_cancel_first() -> io::Result<()> {
+    use std::time::Duration;
+    let t = Temp::new("command-persistence")?;
+    let path = t.0.join("command-history.toml");
+    let mut a = t.app()?;
+    assert!(!a.config.save_command_history);
+    remember(&mut a, "echo session only");
+    a.poll();
+    assert!(!path.exists());
+    a.config.save_command_history = true;
+    a.config.save_on_exit = false;
+    remember(&mut a, "echo Ёж 世界");
+    support::wait_until(&mut a, Duration::from_secs(5), |_| {
+        fs::read_to_string(&path).is_ok_and(|s| s.contains("echo Ёж 世界"))
+    });
+    assert!(!fs::read_to_string(&path)?.contains("session only"));
+    let mut b = t.app()?;
+    b.config.save_command_history = true;
+    command_line::paste(&mut b, "unexecuted draft");
+    let cursor = b.command_line.cursor;
+    support::wait_until(&mut b, Duration::from_secs(5), |b| {
+        b.command_line
+            .history()
+            .contains(&"echo Ёж 世界".to_owned())
+    });
+    assert_eq!(b.command_line.text, "unexecuted draft");
+    assert_eq!(b.command_line.cursor, cursor);
+    assert!(b.command_line.pending.is_none());
+    history::open(&mut b);
+    history::action(&mut b, Action::Clear);
+    assert_eq!(b.modals.prompt().unwrap().focus, 2);
+    plain(&mut b, KeyCode::Esc);
+    assert_eq!(b.command_line.history(), ["echo Ёж 世界"]);
+    history::action(&mut b, Action::Clear);
+    // Explicitly choose OK; the default remains Cancel.
+    b.submit_prompt();
+    support::wait_until(&mut b, Duration::from_secs(5), |b| {
+        b.command_line.history().is_empty()
+    });
+    assert_eq!(b.command_line.text, "unexecuted draft");
+    assert_eq!(b.command_line.cursor, cursor);
+    let bytes = fs::read(&path)?;
+    a.config.save_command_history = false;
+    a.poll();
+    remember(&mut a, "echo disabled");
+    a.poll();
+    assert_eq!(fs::read(&path)?, bytes);
+    // The other instance retains recalled entries but writes only a new delta.
+    a.config.save_command_history = true;
+    remember(&mut a, "echo fresh");
+    support::wait_until(&mut a, Duration::from_secs(5), |_| {
+        fs::read_to_string(&path).is_ok_and(|s| s.contains("echo fresh"))
+    });
+    let saved = fs::read_to_string(path)?;
+    assert!(!saved.contains("echo Ёж 世界"));
+    assert!(!saved.contains("echo disabled"));
+    Ok(())
+}
+
+#[test]
+fn history_preference_uses_system_setup_draft_and_old_config_defaults() -> io::Result<()> {
+    use dn::{
+        config::Config,
+        settings::{self, SettingsKind},
+    };
+    assert!(
+        !Config::parse(b"config_version=2\n[application]\nsave_on_exit=false\n")?
+            .save_command_history
+    );
+    let t = Temp::new("command-settings")?;
+    let mut a = t.app()?;
+    a.open_settings(SettingsKind::System);
+    a.modals.settings_mut().unwrap().draft.save_command_history = true;
+    plain(&mut a, KeyCode::Esc);
+    assert!(!a.config.save_command_history);
+    a.open_settings(SettingsKind::System);
+    a.modals.settings_mut().unwrap().draft.save_command_history = true;
+    let screen = draw(&mut a, 80, 25)?;
+    assert!(screen.contains("Save command history"), "{screen}");
+    assert!(screen.contains("plain text"));
+    settings::accept(&mut a);
+    assert!(a.config.save_command_history);
+    a.config_store.save(&a.config, true)?;
+    let saved = fs::read(t.0.join("config.conf"))?;
+    assert!(Config::parse(&saved)?.save_command_history);
+    Ok(())
+}

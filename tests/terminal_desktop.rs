@@ -151,7 +151,7 @@ fn transfer_center_queues_without_blocking_editing_and_restores_terminal() -> io
     s.send(b"\x1b[17;4~", "switch back to center", |s| {
         s.text().contains("Transfer Center") && !s.text().contains("F2 Save")
     })?;
-    s.send(b"\t\t\r", "resume queued copies", |s| {
+    s.send(b"\t\t\t\t\r", "continue queued copies", |s| {
         s.root.join("transfer-one.txt").exists()
             && s.root.join("transfer-two.txt").exists()
             && s.text().contains("Completed")

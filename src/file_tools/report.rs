@@ -35,6 +35,47 @@ impl Status {
         }
     }
 }
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Filter {
+    #[default]
+    All,
+    Different,
+    Left,
+    Right,
+    Identical,
+    Unknown,
+}
+impl Filter {
+    pub const ALL: [Self; 6] = [
+        Self::All,
+        Self::Different,
+        Self::Left,
+        Self::Right,
+        Self::Identical,
+        Self::Unknown,
+    ];
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::All => "All",
+            Self::Different => "Different",
+            Self::Left => "Left only",
+            Self::Right => "Right only",
+            Self::Identical => "Identical",
+            Self::Unknown => "Not compared",
+        }
+    }
+    fn accepts(self, status: Status) -> bool {
+        self == Self::All
+            || matches!(
+                (self, status),
+                (Self::Different, Status::Different)
+                    | (Self::Left, Status::Left)
+                    | (Self::Right, Status::Right)
+                    | (Self::Identical, Status::Identical)
+                    | (Self::Unknown, Status::Unknown)
+            )
+    }
+}
 #[derive(Debug)]
 pub struct Row {
     pub path: PathBuf,
@@ -52,6 +93,12 @@ pub struct Report {
     pub(crate) requests: RequestScope,
     pub roots: [PathBuf; 2],
     pub result: Result,
+    pub filter: Filter,
+    pub visible: Vec<usize>,
+    pub filter_menu: bool,
+    pub filter_choice: usize,
+    anchor: Option<PathBuf>,
+    scroll_anchor: Option<PathBuf>,
     pub cursor: usize,
     pub offset: usize,
     pub rows: usize,
@@ -77,6 +124,12 @@ impl Report {
             requests,
             roots,
             result: Result::default(),
+            filter: Filter::All,
+            visible: Vec::new(),
+            filter_menu: false,
+            filter_choice: 0,
+            anchor: None,
+            scroll_anchor: None,
             cursor: 0,
             offset: 0,
             rows: 10,
@@ -87,6 +140,71 @@ impl Report {
             seen: 0,
             pending: Some(task),
         })
+    }
+    pub fn selected(&self) -> Option<&Row> {
+        self.visible
+            .get(self.cursor)
+            .and_then(|i| self.result.entries.get(*i))
+    }
+    pub fn set_filter(&mut self, filter: Filter) {
+        self.capture_anchors();
+        self.filter = filter;
+        self.refilter();
+        self.last_click = None;
+    }
+    fn capture_anchors(&mut self) {
+        self.anchor = self.selected().map(|r| r.path.clone());
+        self.scroll_anchor = self
+            .visible
+            .get(self.offset)
+            .and_then(|i| self.result.entries.get(*i))
+            .map(|r| r.path.clone());
+    }
+    fn refilter(&mut self) {
+        self.last_click = None;
+        self.visible = self
+            .result
+            .entries
+            .iter()
+            .enumerate()
+            .filter(|(_, r)| self.filter.accepts(r.status))
+            .map(|(i, _)| i)
+            .collect();
+        if let Some(path) = self.anchor.take() {
+            if let Some(index) = self
+                .visible
+                .iter()
+                .position(|i| self.result.entries[*i].path == path)
+            {
+                self.cursor = index;
+            }
+        }
+        if let Some(path) = self.scroll_anchor.take() {
+            if let Some(index) = self
+                .visible
+                .iter()
+                .position(|i| self.result.entries[*i].path == path)
+            {
+                self.offset = index;
+            }
+        }
+        self.fit();
+    }
+    pub fn refresh(&mut self) -> io::Result<()> {
+        if self.busy() {
+            return Ok(());
+        }
+        self.capture_anchors();
+        self.stop = Cancellation::default();
+        self.count = Arc::new(AtomicUsize::new(0));
+        self.seen = 0;
+        let roots = self.roots.clone();
+        let stop = self.stop.clone();
+        let count = self.count.clone();
+        self.pending = Some(self.requests.spawn("dn-compare-report", move |cancel| {
+            scan(roots, &cancel, &stop, &count, LIMIT, DEPTH)
+        })?);
+        Ok(())
     }
     pub fn busy(&self) -> bool {
         self.pending.is_some()
@@ -102,11 +220,13 @@ impl Report {
         let mut changed = now != self.seen;
         self.seen = now;
         if let Some(reply) = crate::task::take_reply(&mut self.pending) {
+            self.capture_anchors();
             self.result = reply.unwrap_or_else(|_| Result {
                 partial: true,
                 notice: "Comparison worker stopped".into(),
                 ..Default::default()
             });
+            self.refilter();
             changed = true;
         }
         changed
@@ -116,7 +236,7 @@ impl Report {
             &mut self.cursor,
             &mut self.offset,
             self.rows,
-            Some(self.result.entries.len().saturating_sub(1)),
+            Some(self.visible.len().saturating_sub(1)),
             None,
         );
     }

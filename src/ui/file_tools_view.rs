@@ -330,6 +330,45 @@ fn report_spec<'a>(
         Target::Tool(ToolAction::Accept),
         Target::Tool(ToolAction::Cancel),
     );
+    if report.filter_menu {
+        spec.control(Control::new(
+            0,
+            Rect::new(x, rect.y + 3, w, 6),
+            ControlKind::List {
+                items: crate::file_tools::report::Filter::ALL
+                    .iter()
+                    .map(|f| lang.text(f.label()).into())
+                    .collect(),
+                cursor: report.filter_choice,
+                offset: 0,
+            },
+            Target::Tool(ToolAction::Accept),
+        ));
+        if let Some(list) = spec.controls.last_mut() {
+            list.enter_action = true;
+            list.dn_list = true;
+            list.hits = (0..6)
+                .map(|i| {
+                    (
+                        Rect::new(x, rect.y + 3 + i as u16, w, 1),
+                        Target::Tool(ToolAction::ReportRow(i)),
+                    )
+                })
+                .collect();
+        }
+        for (id, label, action, column) in [
+            (1, "Apply", ToolAction::Accept, x + 3),
+            (4, "Cancel", ToolAction::Cancel, x + w / 2),
+        ] {
+            spec.control(Control::new(
+                id,
+                Rect::new(column, rect.bottom() - 2, 16, 1),
+                ControlKind::Button(lang.text(label).into()),
+                Target::Tool(action),
+            ));
+        }
+        return spec;
+    }
     let roots = format!(
         "{}: {}  |  {}: {}",
         lang.text("Left"),
@@ -351,11 +390,21 @@ fn report_spec<'a>(
         lang.text("Recursive byte comparison · Includes hidden entries · Read-only"),
         false,
     );
-    let rows = usize::from(rect.height.saturating_sub(11)).max(1);
+    spec.control(Control::new(
+        6,
+        Rect::new(x, rect.y + 3, w, 1),
+        ControlKind::Choice(vec![format!(
+            "{}: {}",
+            lang.text("Show"),
+            lang.text(report.filter.label())
+        )]),
+        Target::Tool(ToolAction::ReportFilter),
+    ));
+    let rows = usize::from(rect.height.saturating_sub(12)).max(1);
     let items = report
-        .result
-        .entries
+        .visible
         .iter()
+        .map(|i| &report.result.entries[*i])
         .map(|row| {
             format!(
                 "{:<16} {}",
@@ -364,7 +413,7 @@ fn report_spec<'a>(
             )
         })
         .collect();
-    let list_bounds = Rect::new(x, rect.y + 3, w, rows as u16);
+    let list_bounds = Rect::new(x, rect.y + 4, w, rows as u16);
     let mut list = Control::new(
         0,
         list_bounds,
@@ -375,7 +424,7 @@ fn report_spec<'a>(
         },
         Target::Tool(ToolAction::Accept),
     );
-    list.hits = (report.offset..report.result.entries.len().min(report.offset + rows))
+    list.hits = (report.offset..report.visible.len().min(report.offset + rows))
         .map(|index| {
             (
                 Rect::new(x, list_bounds.y + (index - report.offset) as u16, w, 1),
@@ -387,9 +436,24 @@ fn report_spec<'a>(
     list.dn_list = true;
     spec.control(list);
     let status = if report.busy() {
-        format!("{}: {}", lang.text("Comparing entries"), report.scanned())
+        format!(
+            "{}: {}{}",
+            lang.text("Comparing entries"),
+            report.scanned(),
+            if report.result.notice.is_empty() {
+                String::new()
+            } else {
+                format!(" · {}", lang.text("Previous results are stale"))
+            }
+        )
     } else {
-        lang.text(&report.result.notice).into()
+        format!(
+            "{} · {}: {}/{}",
+            lang.text(&report.result.notice),
+            lang.text("Shown"),
+            report.visible.len(),
+            report.result.entries.len()
+        )
     };
     text(
         &mut spec,
@@ -430,7 +494,7 @@ fn report_spec<'a>(
             false,
         );
     }
-    if let Some(row) = report.result.entries.get(report.cursor) {
+    if let Some(row) = report.selected() {
         let detail = if row.cause.is_empty() {
             display_name(&row.path.to_string_lossy())
         } else {
@@ -448,8 +512,8 @@ fn report_spec<'a>(
             false,
         );
     }
-    let selected = report.result.entries.get(report.cursor);
-    for (id, label, action, enabled) in [
+    let selected = report.selected();
+    for (column, label) in [
         (
             1,
             "Open left",
@@ -463,13 +527,18 @@ fn report_spec<'a>(
             selected.is_some_and(|r| r.present[1]) && !app.panels[1].loading,
         ),
         (3, "Stop", ToolAction::ReportStop, report.busy()),
+        (5, "Refresh", ToolAction::ReportRefresh, !report.busy()),
         (4, "Close", ToolAction::Cancel, true),
-    ] {
-        let width = w / 4;
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let (id, label, action, enabled) = label;
+        let width = w / 5;
         let mut c = Control::new(
             id,
             Rect::new(
-                x + (id as u16 - 1) * width,
+                x + column as u16 * width,
                 rect.bottom() - 2,
                 width.saturating_sub(2),
                 1,

@@ -26,6 +26,7 @@ macro_rules! fields {
     }
 }
 fields! {
+    CommandHistory: ("Save command history", "application", "save_command_history", save_command_history),
     SaveOnExit: ("Save settings on e~x~it", "application", "save_on_exit", save_on_exit),
     Clock: ("Show ~c~lock", "interface", "show_clock", show_clock),
     HideMenu: ("Hide ~m~enu bar", "interface", "hide_menu", hide_menu),
@@ -52,7 +53,13 @@ impl SettingsKind {
             Self::Keyboard => (" Keyboard shortcuts ", 74, 20, &[], false),
             Self::Regional => (" Language / date & time ", 68, 17, &[], false),
             Self::Plugins => (" Plugins ", 64, 10, &[], false),
-            Self::System => (" System Setup ", 60, 14, &[Hidden, SaveOnExit], false),
+            Self::System => (
+                " System Setup ",
+                68,
+                16,
+                &[Hidden, SaveOnExit, CommandHistory],
+                false,
+            ),
             Self::Interface => (
                 " Interface Setup ",
                 60,

@@ -59,7 +59,7 @@ and modern filesystem handling.
 - Configure file extensions to use DN's viewer/editor or your preferred commands.
 - Classic panel footers show selection totals and available/total volume space.
 - Choose English or Russian, with independent date order and 12/24-hour time.
-- Recall commands through a searchable session history; copy filenames or paths to the system clipboard, with an internal fallback in consoles.
+- Recall commands through a searchable command history; copy filenames or paths to the system clipboard, with an internal fallback in consoles.
 - Use the calculator, character table and configurable user menus—or play Tetris or Pentix with separate, persistent high scores.
 - Inspect and modify standalone Android APKs with the opt-in **APK Workshop**: manifest/DEX inspection, persistent working projects, asset and manifest edits, unsigned export, optional SDK signing and ADB/logcat. Works without apktool; see [APK Workshop](docs/USER_GUIDE.md#apk-workshop) for supported edits and SDK requirements.
 - Play local **MP3, FLAC, WAV and Ogg Vorbis** files on macOS, Linux and Windows in a DN-style player with a session queue, recursive folder import, track tags and durations, shuffle/repeat, pause, seek and volume. Disabled by default; enable it in Options → Configuration → Plugins, then use Utilities → Add music to player. Audio support is included in default builds. Based on Dos Navigator by RIT Research Labs.
@@ -268,6 +268,20 @@ in the active panel's directory; **Esc** clears it. **Ctrl+E / Ctrl+X** recall c
 history. `cd "folder name"` changes the active panel's directory. With no command
 entered, Enter opens the highlighted entry as usual. Shell commands run with your
 normal permissions, independently of the file manager's confirmation safeguards.
+
+**Utilities → Commands History** recalls without executing. Optional **Save command
+history** in System Setup saves only subsequent submissions as plain text in
+`command-history.toml` beside the configuration (100 commands / 1 MiB), even when
+saving settings on exit is off. It defaults off. Disabling retains the file;
+**Clear history…** confirms before clearing session and stored commands, keeping
+the current prompt.
+
+Comparison reports offer **All / Different / Left only / Right only / Identical /
+Not compared** filters and **Refresh** of their captured roots. Old results stay
+visible as stale during refresh; cancellation produces an explicitly partial snapshot.
+Transfer Center offers **Open destination** for unambiguous local targets and
+**Copy details** through the system/internal clipboard. **Continue queued** starts
+waiting jobs without retrying failures.
 
 ## Settings and file handling
 

@@ -17,7 +17,7 @@ fn restore_choice_drafts_child_cancel_mouse_and_immutable_frames() -> io::Result
                 assert!(text.contains(language.text("Panels only")));
             }
             support::render(&mut a, size.0, size.1)?;
-            support::click(&mut a, Target::OpenSettingsChoice(2));
+            support::click(&mut a, Target::OpenSettingsChoice(3));
             assert!(a.modals.settings_choice().is_some());
             support::key(&mut a, K::Down);
             support::key(&mut a, K::Esc);
@@ -26,7 +26,7 @@ fn restore_choice_drafts_child_cancel_mouse_and_immutable_frames() -> io::Result
                 RestoreLevel::Panels
             );
             support::render(&mut a, size.0, size.1)?;
-            support::click(&mut a, Target::OpenSettingsChoice(2));
+            support::click(&mut a, Target::OpenSettingsChoice(3));
             support::key(&mut a, K::Down);
             support::key(&mut a, K::Enter);
             assert_eq!(
@@ -38,6 +38,7 @@ fn restore_choice_drafts_child_cancel_mouse_and_immutable_frames() -> io::Result
             assert_eq!(a.config.restore_session, RestoreLevel::Panels);
             a.open_settings(SettingsKind::System);
             support::render(&mut a, size.0, size.1)?;
+            support::key(&mut a, K::Tab);
             support::key(&mut a, K::Tab);
             support::key(&mut a, K::Tab);
             support::key(&mut a, K::Char(' '));

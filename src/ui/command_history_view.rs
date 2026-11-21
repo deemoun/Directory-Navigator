@@ -81,14 +81,27 @@ pub(crate) fn command_history_spec(app: &App, area: Rect) -> Option<DialogSpec<'
             Target::CommandHistory(Action::Row(i)),
         );
     }
+    if !app.command_line.persistence.notice.is_empty() {
+        spec.caption(
+            Paragraph::new(language.message(&app.command_line.persistence.notice))
+                .style(dos(theme::TEXT)),
+            Rect::new(x, rect.bottom() - 4, width, 1),
+        );
+    }
     spec.caption(
         Paragraph::new(language.text("Enter recalls without running · Tab moves · Esc cancels"))
             .style(dos(theme::TEXT)),
         Rect::new(x, rect.bottom() - 3, width, 1),
     );
     for (label, a, focus, button_x) in [
-        ("[ Use ]", Action::Use, 2, rect.x + 10),
-        ("[ Cancel ]", Action::Cancel, 3, rect.right() - 26),
+        ("[ Use ]", Action::Use, 2, rect.x + 3),
+        (
+            "Clear history…",
+            Action::Clear,
+            4,
+            rect.x + rect.width / 2 - 8,
+        ),
+        ("[ Cancel ]", Action::Cancel, 3, rect.right() - 19),
     ] {
         let button = Rect::new(button_x, rect.bottom() - 2, 16, 1);
         let mut control = Control::new(
@@ -97,7 +110,11 @@ pub(crate) fn command_history_spec(app: &App, area: Rect) -> Option<DialogSpec<'
             ControlKind::Button(language.text(label).into()),
             Target::CommandHistory(a),
         );
-        control.enabled = a != Action::Use || !d.matches.is_empty();
+        control.enabled = match a {
+            Action::Use => !d.matches.is_empty(),
+            Action::Clear => !app.command_line.persistence.clearing(),
+            _ => true,
+        };
         spec.control(control);
     }
     Some(spec)

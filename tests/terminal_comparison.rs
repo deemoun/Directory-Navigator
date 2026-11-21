@@ -21,7 +21,12 @@ fn click(
     s.send(
         format!("\x1b[<0;{column};{y}M\x1b[<0;{column};{y}m").as_bytes(),
         stage,
-        ready,
+        |s| {
+            ready(s)
+                && fs::read_to_string(s.root.join("settings/dn/diagnostics.txt")).is_ok_and(
+                    |state| state.contains("button=none") && state.contains("capture=None "),
+                )
+        },
     )
 }
 #[test]
@@ -57,8 +62,20 @@ fn comparison_report_navigation_resize_and_restoration() -> io::Result<()> {
     })?;
     s.resize(110, 32)?;
     s.resize(80, 25)?;
-    s.send(b"\x1b[F", "last result", |s| {
-        s.text().contains("unique.txt")
+    click(&mut s, "Show:", "filter selector", |s| {
+        s.text().contains("Apply") && s.text().contains("Not compared")
+    })?;
+    click(&mut s, "Left only", "select left-only filter", |s| {
+        s.text().contains("Apply")
+    })?;
+    click(&mut s, "Apply", "filtered report", |s| {
+        s.text().contains("Show: Left only") && s.text().contains("Shown")
+    })?;
+    click(&mut s, "Refresh", "refresh captured comparison", |s| {
+        s.text().contains("Comparison complete") && s.text().contains("Show: Left only")
+    })?;
+    click(&mut s, "unique.txt", "select filtered result", |s| {
+        s.text().matches("unique.txt").count() >= 2
     })?;
     click(&mut s, "Open left", "result navigation", |s| {
         // A retained floating report may cover the command cursor after resize.

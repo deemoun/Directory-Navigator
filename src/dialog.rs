@@ -31,6 +31,7 @@ pub enum PromptKind {
     ImportDos,
     Operation(Kind),
     ClearTempDrive(crate::temp_drive::Clear),
+    ClearCommandHistory,
     GoTo,
 }
 
@@ -68,6 +69,7 @@ impl Prompt {
             PromptKind::Operation(Kind::Delete) => " Confirm permanent deletion ",
             PromptKind::Operation(Kind::Trash) => " Move to Trash ",
             PromptKind::Operation(Kind::Mkdir) => " Make directory ",
+            PromptKind::ClearCommandHistory => " Clear command history ",
             PromptKind::GoTo => " Go to directory ",
             PromptKind::ImportDos => " Import DOS settings ",
         }
@@ -109,6 +111,7 @@ pub fn prompt_help(app: &mut crate::app::App) {
         return;
     };
     let message = match prompt.kind {
+        PromptKind::ClearCommandHistory => "Clears recalled commands and saved command history. The current prompt is kept. Cancel leaves history unchanged.",
         PromptKind::Remote(_) => crate::network::HELP,
         PromptKind::ClearTempDrive(_) => "Clears every item in Temp Drive, including hidden files and folders. The Temp Drive directory is kept. The confirmation shows whether items go to Trash or are permanently deleted. Cancel leaves everything unchanged.",
         PromptKind::Operation(Kind::Mkdir) => "Enter a directory name or path.\nRelative paths use the active panel directory.\nExisting files and directories are never overwritten.",

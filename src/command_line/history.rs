@@ -10,6 +10,7 @@ pub enum Action {
     Field,
     Row(usize),
     Use,
+    Clear,
     Cancel,
 }
 pub struct HistoryDialog {
@@ -125,7 +126,7 @@ pub fn geometry(area: Rect) -> (Rect, usize) {
             width,
             height,
         ),
-        usize::from(height.saturating_sub(8)).max(1),
+        usize::from(height.saturating_sub(9)).max(1),
     )
 }
 pub fn open(app: &mut App) {
@@ -140,6 +141,20 @@ pub fn open(app: &mut App) {
 pub fn action(app: &mut App, action: Action) {
     if action == Action::Cancel {
         app.set_command_history(None);
+        return;
+    }
+    if action == Action::Clear {
+        if !app.command_line.persistence.clearing() {
+            app.modals.set_prompt(Some(crate::dialog::Prompt {
+                kind: crate::dialog::PromptKind::ClearCommandHistory,
+                sources: Vec::new(),
+                base: Default::default(),
+                field: String::new(),
+                cursor: 0,
+                focus: 2,
+                copy: None,
+            }));
+        }
         return;
     }
     if action == Action::Use {
@@ -181,7 +196,18 @@ pub fn paste(app: &mut App, text: &str) {
         app.error(e.to_string());
     }
 }
+pub const HELP: &str = "Recall never runs a command. History keeps 100 unique commands, up to 16 KiB each. Save command history in System Setup is off by default. When enabled, only new submissions are saved as plain text beside the configuration, independently of Save settings on exit. Disabling keeps stored history. Clear history removes session and stored commands after confirmation; the current prompt is kept.";
 pub fn key(app: &mut App, key: KeyEvent) {
+    if key.code == KeyCode::F(1) {
+        if let Some(dialog) = app.command_history_mut() {
+            dialog.last_click = None;
+        }
+        app.push_dialog(crate::dialog::Dialog {
+            title: " Commands History Help ",
+            message: app.config.language.text(HELP).into(),
+        });
+        return;
+    }
     let history = app.command_line.history.clone();
     if let Some(m) = app.command_history_mut() {
         m.last_click = None;

@@ -341,8 +341,16 @@ large, unreadable or changing trees can have unknown totals. Speed counts source
 not add bytes, and native renames do not count as copied data. Remaining time is shown only when meaningful.
 Enter opens details; F1 opens Help. Cancel selected requests cancellation of
 active work and waits for acknowledgement, or removes a queued request without
-writing. Errors and cancellation pause the queue; Resume queue starts waiting
+writing. Errors and cancellation pause the queue; Continue queued starts waiting
 requests without retrying failures. Completed work is retained.
+
+**Open destination** opens an unambiguous local directory in the currently active
+file pane; a file target opens its parent and highlights the file if still present.
+The opposite pane and Transfer Center document remain intact. Remote outgoing and
+ambiguous destinations are unavailable. **Copy details** copies the same localized
+status, paths, progress, original errors, warnings and known outcomes shown by
+Details, using the OS clipboard with the existing internal fallback. These actions
+also work on retained finished entries; they do not retry transfers.
 
 The queue is session-only: up to 64 active/pending requests, 100 finished
 summaries and 100 skip/error details per request, with omitted-detail counts.
@@ -842,7 +850,7 @@ executes commands, and multiline/control-character input is rejected.
 Space/+/-/* retain selection actions when the prompt is empty. `cd`, `cd ~` and
 `cd "directory with spaces"` navigate the active panel; other shell commands use
 a child process, so environment changes do not persist. Long paths and commands
-scroll/clip to keep the insertion cursor visible. No command history is saved.
+scroll/clip to keep the insertion cursor visible. Command history saving is optional and off by default; see [command history](#command-history-and-copying-names).
 
 ## Language and regional formats
 
@@ -871,6 +879,18 @@ rebuild. Catalogs are not loaded from the current directory. Missing resources
 fall back to English; some detailed diagnostics remain English and OS errors are
 shown unchanged. No system locale or timezone settings are changed.
 
+## Comparison report filters and refresh
+
+**Show** selects All, Different, Left only, Right only, Identical or Not compared.
+Navigation and Open left/right always use visible results; filtered counts are
+shown separately from whole-snapshot totals. **Refresh** rescans the captured roots,
+not newly navigated panel directories. It is disabled while scanning. Previous
+results remain visible and labelled stale until completion or cancellation supplies
+a new complete or explicitly partial snapshot. Selection and scroll anchors follow
+relative native paths where possible. Stop/Esc cancels scanning first; the next Esc
+closes the report. Filters last only for that report. F1 opens help. No file contents
+or pane marks are changed.
+
 ## Command history and copying names
 
 Utilities → Commands History (Alt+F8) lists the current session’s commands, most
@@ -879,7 +899,18 @@ part of a command, ignoring case. Arrows, Home/End and page keys select entries;
 Tab moves between the filter, list and buttons. Enter/Use or double-click puts
 the exact command back in the prompt for editing. It never runs automatically.
 Esc/Cancel keeps the previous prompt and cursor. Ctrl+E/Ctrl+X recall still works.
-History is not written to disk.
+System Setup → **Save command history** defaults off. Enabling saves only new
+accepted submissions, not earlier session commands, as plain text in
+`command-history.toml` beside the actual configuration. The file is versioned,
+limited to 100 commands / 1 MiB; oldest commands are trimmed. Each command remains
+limited to 16 KiB. Saving runs in background independently of Save settings on exit;
+the preference itself follows normal configuration saving. Stored history loads
+without replacing the current prompt or executing anything. Disabling keeps the
+stored file. **Clear history…** asks for confirmation (Cancel by default), clears
+session and stored commands, and keeps the current prompt. Corrupt or inaccessible
+storage retains session history and shows a nonblocking notice. Concurrent DN
+instances merge new submissions under a lock; another instance's recalled cache
+is never written back as a snapshot. F1 explains these controls.
 
 File → Copy names / paths → Names / Full paths copies visible marked entries,
 or the highlighted entry if no marks exist. The order matches the panel listing.

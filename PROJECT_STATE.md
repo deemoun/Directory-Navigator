@@ -22,6 +22,31 @@ See the [English README](README.md), [Russian README](README.ru.md) and
 [user guide](docs/USER_GUIDE.md) for supported workflows, installation, controls,
 safeguards and limits.
 
+## Unreleased everyday-usability work
+
+The checkout adds opt-in plain-text command history beside the actual configuration,
+with bounded background delta writes, locked merging, Cancel-first clearing and
+independent data saving. Comparison reports add per-window filters and refresh of
+captured roots, retaining stale snapshots while scanning. Transfer Center retains
+typed local destination summaries and adds Open destination / Copy details;
+Continue queued starts waiting jobs without retrying failures.
+
+These changes retain DN 1.1.15 and are separate from the published crate.
+Local validation on macOS ARM64 covered every native test target. Stale transfer
+readiness and System Setup/Commands History frame expectations were corrected;
+the affected native suites passed on rerun. Only the 32 intentionally changed
+System Setup/history frames were updated; the other 288 parity frames stayed fixed.
+The Rust 1.100 deterministic release gate, all-target Clippy, no-default-features
+check, helper/workflow checks, formatting and diff checks passed. The locked release
+build reports 1.1.15. Private release-terminal scenarios covered history restart
+and recall, comparison filtering/refresh, and transfer destination/details actions,
+including terminal restoration.
+
+Linux x86_64/ARM64 cross-checks stopped at missing native C cross-compilers;
+Windows cross-checks stopped at missing SDK headers in a dependency. No Linux or
+Windows runtime validation or GitHub CI run was performed for these changes.
+Historical counts below are not fresh coverage.
+
 ## Changes released in 1.1.15
 
 ### Directory comparison and plugin diagnostics
@@ -1897,8 +1922,9 @@ older increment entries below also record earlier migration stages.
   guarantee every final keystroke.
 - Published builds provide non-recursive Unix permission / Windows attribute
   editing and desktop text clipboard access with an internal console fallback.
-  Persistent command history remains unimplemented. Command history and DN's
-  internal clipboard are session-only. External commands run with the user's
+  Published 1.1.15 keeps command history in memory; the unreleased checkout adds
+  opt-in persistent command history as described above. DN's internal clipboard
+  remains session-only. External commands run with the user's
   permissions; user menus do not emulate DOS batch syntax.
 - Nearby remains directly connected LAN-only: no relays, internet probes, routed
   private-network/NAT exceptions or persistent trust. Multicast discovery can

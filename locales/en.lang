@@ -791,7 +791,7 @@ Source	Source
 Enter: details · F1: Help · Esc: close window	Enter: details · F1: Help · Esc: close window
 No transfers in this session	No transfers in this session
 Cancel selected	Cancel selected
-Resume queue	Resume queue
+Continue queued	Continue queued
 Clear finished	Clear finished
 Transfers pending	Transfers pending
 Transfers are still pending. Choose how to finish this session.	Transfers are still pending. Choose how to finish this session.
@@ -803,7 +803,7 @@ Transfer details Help	Transfer details Help
 Additional detail records omitted	Additional detail records omitted
 Skipped existing destination	Skipped existing destination
 Completed items are retained. Partial destinations may remain.	Completed items are retained. Partial destinations may remain.
-Copy and Move run one at a time. Closing this window keeps transfers running. Cancel stops the selected request; completed items remain. Failure or cancellation pauses the queue. Resume queue starts waiting requests, without retrying failed work. Totals and remaining time are estimates. Existing files require confirmation by default. Ask merges existing folders and keeps unrelated contents. Explicit Refuse rejects existing top-level destinations; explicit Skip skips them without merging. Bluetooth send queues and accepted incoming files use this queue too. Incoming approval stays in the Bluetooth window; closing it stops new offers but keeps accepted work running. Lost final receipts mean delivery is unconfirmed; inspect the receiver before retrying.	Copy and Move run one at a time. Closing this window keeps transfers running. Cancel stops the selected request; completed items remain. Failure or cancellation pauses the queue. Resume queue starts waiting requests, without retrying failed work. Totals and remaining time are estimates. Existing files require confirmation by default. Ask merges existing folders and keeps unrelated contents. Explicit Refuse rejects existing top-level destinations; explicit Skip skips them without merging. Bluetooth send queues and accepted incoming files use this queue too. Incoming approval stays in the Bluetooth window; closing it stops new offers but keeps accepted work running. Lost final receipts mean delivery is unconfirmed; inspect the receiver before retrying.
+Copy and Move run one at a time. Closing this window keeps transfers running. Cancel stops the selected request; completed items remain. Failure or cancellation pauses the queue. Continue queued starts waiting requests, without retrying failed work. Totals and remaining time are estimates. Existing files require confirmation by default. Ask merges existing folders and keeps unrelated contents. Explicit Refuse rejects existing top-level destinations; explicit Skip skips them without merging. Bluetooth send queues and accepted incoming files use this queue too. Incoming approval stays in the Bluetooth window; closing it stops new offers but keeps accepted work running. Lost final receipts mean delivery is unconfirmed; inspect the receiver before retrying.	Copy and Move run one at a time. Closing this window keeps transfers running. Cancel stops the selected request; completed items remain. Failure or cancellation pauses the queue. Continue queued starts waiting requests, without retrying failed work. Totals and remaining time are estimates. Existing files require confirmation by default. Ask merges existing folders and keeps unrelated contents. Explicit Refuse rejects existing top-level destinations; explicit Skip skips them without merging. Bluetooth send queues and accepted incoming files use this queue too. Incoming approval stays in the Bluetooth window; closing it stops new offers but keeps accepted work running. Lost final receipts mean delivery is unconfirmed; inspect the receiver before retrying.
 Cannot queue transfers while quitting	Cannot queue transfers while quitting
 Another file operation is running	Another file operation is running
 Transfer queue is full (64 requests)	Transfer queue is full (64 requests)
@@ -1968,3 +1968,21 @@ Signing needs SDK tools and Java. Tools… shows missing paths.	Signing needs SD
 Tool paths set; use the requested action to verify availability.	Tool paths set; use the requested action to verify availability.
 Use a build with audio support. F1 Help.	Use a build with audio support. F1 Help.
 Use an audio build. F1 Help.	Use an audio build. F1 Help.
+Save command history	Save command history
+Command history is saved as plain text.	Command history is saved as plain text.
+Clear history…	Clear history…
+Clear command history	Clear command history
+Clear session and saved command history? The current prompt is kept. This cannot be undone.	Clear session and saved command history? The current prompt is kept. This cannot be undone.
+Clears recalled commands and saved command history. The current prompt is kept. Cancel leaves history unchanged.	Clears recalled commands and saved command history. The current prompt is kept. Cancel leaves history unchanged.
+Commands History Help	Commands History Help
+Comparison report Help	Comparison report Help
+Previous results are stale	Previous results are stale
+Shown	Shown
+Show	Show
+Open destination	Open destination
+Copy details	Copy details
+Phase	Phase
+Saving command history before exit…	Saving command history before exit…
+Command history storage is unavailable	Command history storage is unavailable
+Recall never runs a command. History keeps 100 unique commands, up to 16 KiB each. Save command history in System Setup is off by default. When enabled, only new submissions are saved as plain text beside the configuration, independently of Save settings on exit. Disabling keeps stored history. Clear history removes session and stored commands after confirmation; the current prompt is kept.	Recall never runs a command. History keeps 100 unique commands, up to 16 KiB each. Save command history in System Setup is off by default. When enabled, only new submissions are saved as plain text beside the configuration, independently of Save settings on exit. Disabling keeps stored history. Clear history removes session and stored commands after confirmation; the current prompt is kept.
+The report is read-only and includes hidden entries. Show filters visible results; whole-snapshot totals remain separate. Refresh rescans the captured roots and keeps the old snapshot marked stale until completion. Stop or Esc cancels scanning and retains explicitly partial results. Enter or Open left/right navigates to the selected visible result without changing pane marks. Limits: 20,000 entries and 512 levels.	The report is read-only and includes hidden entries. Show filters visible results; whole-snapshot totals remain separate. Refresh rescans the captured roots and keeps the old snapshot marked stale until completion. Stop or Esc cancels scanning and retains explicitly partial results. Enter or Open left/right navigates to the selected visible result without changing pane marks. Limits: 20,000 entries and 512 levels.

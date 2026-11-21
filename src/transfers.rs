@@ -82,7 +82,73 @@ pub enum Request {
         destination: crate::archive::extract::Destination,
     },
 }
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum LocalDestination {
+    Directory(PathBuf),
+    File(PathBuf),
+}
+fn local_target(
+    path: &std::path::Path,
+    single_directory: Option<bool>,
+) -> Option<LocalDestination> {
+    match std::fs::symlink_metadata(path) {
+        Ok(m) if m.is_dir() && !crate::platform_fs::directory_link(&m) => {
+            Some(LocalDestination::Directory(path.to_path_buf()))
+        }
+        Ok(m) if m.is_file() => Some(LocalDestination::File(path.to_path_buf())),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {
+            single_directory.map(|directory| {
+                if directory {
+                    LocalDestination::Directory(path.to_path_buf())
+                } else {
+                    LocalDestination::File(path.to_path_buf())
+                }
+            })
+        }
+        _ => None,
+    }
+}
+fn local_destination(request: &Request, plan: &Plan) -> Option<LocalDestination> {
+    use LocalDestination::{Directory, File};
+    match request {
+        Request::Bluetooth(t) => (t.direction() == crate::bluetooth::transfer::Direction::Receive)
+            .then(|| Directory(t.destination())),
+        Request::Peer(t) => t.destination.clone().map(Directory),
+        Request::Remote(crate::network::transfer::Transfer::Download {
+            destination,
+            members,
+            ..
+        }) => local_target(
+            destination,
+            (members.len() == 1).then(|| members[0].directory),
+        ),
+        Request::Remote(_) => None,
+        Request::Archive { selection, .. } => local_target(
+            &plan.destination,
+            (selection.members.len() == 1).then(|| {
+                selection.catalog.nodes[selection.members[0].index].kind
+                    == crate::archive::reader::Kind::Directory
+            }),
+        ),
+        Request::Create(_) => Some(File(plan.destination.clone())),
+        Request::Filesystem => match plan.kind {
+            operations::Kind::Copy | operations::Kind::Move => local_target(
+                &plan.destination,
+                if plan.sources.len() == 1 {
+                    std::fs::symlink_metadata(&plan.sources[0])
+                        .ok()
+                        .map(|m| m.is_dir() && !crate::platform_fs::directory_link(&m))
+                } else {
+                    None
+                },
+            ),
+            operations::Kind::Mkdir => Some(Directory(plan.destination.clone())),
+            _ => None,
+        },
+    }
+}
 pub struct Entry {
+    pub local_destination: Option<LocalDestination>,
     pub request: Request,
     pub extracting: bool,
     pub packing: bool,
@@ -338,6 +404,10 @@ impl State {
                 .is_none_or(|e| e.status.terminal() || e.status == Status::Cancelling),
             2 => !self.paused,
             3 => !self.entries.iter().any(|e| e.status.terminal()),
+            5 => self
+                .selected()
+                .is_none_or(|e| e.local_destination.is_none()),
+            6 => self.selected().is_none(),
             _ => false,
         };
         if disabled {
@@ -350,6 +420,8 @@ pub enum Action {
     Open,
     Select(TransferId),
     Details,
+    OpenDestination(TransferId),
+    CopyDetails(TransferId),
     Cancel,
     Resume,
     Clear,
@@ -520,7 +592,9 @@ fn submit_request_visible(
         )),
         _ => None,
     };
+    let local_destination = local_destination(&request, &plan);
     app.transfers.entries.push_back(Entry {
+        local_destination,
         bluetooth: match &request {
             Request::Bluetooth(t) => Some(t.direction()),
             _ => None,
@@ -896,13 +970,20 @@ pub fn action(app: &mut App, action: Action) {
             message: app.config.language.text(HELP).into(),
         }),
         Action::Details => show_details(app),
+        Action::OpenDestination(id) => open_destination(app, id),
+        Action::CopyDetails(id) => {
+            if let Some(entry) = app.transfers.entries.iter().find(|entry| entry.id == id) {
+                let text = details(entry, app.config.language);
+                crate::clipboard::copy(app, text);
+            }
+        }
         Action::QuitWait | Action::QuitCancel | Action::QuitReturn => {
             begin_exit(app, action, now);
         }
     }
     app.transfers.trim();
 }
-const HELP: &str = "Copy and Move run one at a time. Closing this window keeps transfers running. Cancel stops the selected request; completed items remain. Failure or cancellation pauses the queue. Resume queue starts waiting requests, without retrying failed work. Totals and remaining time are estimates. Existing files require confirmation by default. Ask merges existing folders and keeps unrelated contents. Explicit Refuse rejects existing top-level destinations; explicit Skip skips them without merging. Bluetooth send queues and accepted incoming files use this queue too. Incoming approval stays in the Bluetooth window; closing it stops new offers but keeps accepted work running. Lost final receipts mean delivery is unconfirmed; inspect the receiver before retrying.";
+const HELP: &str = "Copy and Move run one at a time. Closing this window keeps transfers running. Cancel stops the selected request; completed items remain. Failure or cancellation pauses the queue. Continue queued starts waiting requests, without retrying failed work. Totals and remaining time are estimates. Existing files require confirmation by default. Ask merges existing folders and keeps unrelated contents. Explicit Refuse rejects existing top-level destinations; explicit Skip skips them without merging. Bluetooth send queues and accepted incoming files use this queue too. Incoming approval stays in the Bluetooth window; closing it stops new offers but keeps accepted work running. Lost final receipts mean delivery is unconfirmed; inspect the receiver before retrying.";
 fn cancel_selected(app: &mut App, now: Instant) {
     let Some(id) = app.transfers.selected else {
         return;
@@ -990,13 +1071,19 @@ fn show_details(app: &mut App) {
     let Some(e) = app.transfers.selected() else {
         return;
     };
-    let lang = app.config.language;
+    let text = details(e, app.config.language);
+    app.push_dialog(crate::dialog::Dialog {
+        title: " Transfer details Help ",
+        message: text,
+    });
+}
+pub fn details(e: &Entry, lang: crate::localization::Language) -> String {
     let mut text = format!(
         "#{} · {}\n{}: {}\n{}: {}\n{}: {}\n{}: {}\n",
         e.id,
         lang.text(e.status.caption()),
         lang.text("Source"),
-        if e.bluetooth.is_some() {
+        if e.archive_summary.is_some() {
             format!("{} [{}]", e.source_summary(), e.source_count)
         } else {
             e.plan
@@ -1050,10 +1137,41 @@ fn show_details(app: &mut App) {
             _ => "This request is queued or running; the displayed totals are provisional.",
         }));
     }
-    app.push_dialog(crate::dialog::Dialog {
-        title: " Transfer details Help ",
-        message: text,
-    });
+    text.push_str(&format!(
+        "\n{}: {} · {}: {}\n",
+        lang.text("Bytes"),
+        e.progress.bytes,
+        lang.text("Phase"),
+        lang.text(e.progress.phase.caption())
+    ));
+    text
+}
+fn open_destination(app: &mut App, id: TransferId) {
+    let Some(target) = app
+        .transfers
+        .entries
+        .iter()
+        .find(|e| e.id == id)
+        .and_then(|e| e.local_destination.clone())
+    else {
+        return;
+    };
+    let (directory, name) = match target {
+        LocalDestination::Directory(path) => (path, None),
+        LocalDestination::File(path) => {
+            let Some(parent) = path.parent() else {
+                return;
+            };
+            (parent.to_path_buf(), path.file_name().map(OsString::from))
+        }
+    };
+    let panel = &mut app.panels[app.active];
+    if panel.loading {
+        return;
+    }
+    panel.go_to(directory, app.config.show_hidden);
+    panel.focus_after_refresh = name;
+    crate::windowing::activate(app, crate::desktop::WindowId::MANAGER);
 }
 pub(crate) fn quit_dialog(app: &App) -> bool {
     app.transfers
@@ -1446,6 +1564,7 @@ mod tests {
                 packing: false,
                 archive_summary: None,
                 remote_destination: None,
+                local_destination: None,
                 bluetooth: None,
                 request: Request::Filesystem,
                 id: TransferId(i),

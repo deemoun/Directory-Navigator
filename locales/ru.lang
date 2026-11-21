@@ -791,7 +791,7 @@ Source	Источник
 Enter: details · F1: Help · Esc: close window	Enter: подробности · F1: справка · Esc: закрыть окно
 No transfers in this session	В этом сеансе передач нет
 Cancel selected	Отменить
-Resume queue	Продолжить
+Continue queued	Продолжить очередь
 Clear finished	Очистить
 Transfers pending	Незавершённые передачи
 Transfers are still pending. Choose how to finish this session.	Есть незавершённые передачи. Выберите способ выхода.
@@ -803,7 +803,7 @@ Transfer details Help	Сведения о передаче
 Additional detail records omitted	Других записей пропущено
 Skipped existing destination	Пропущено: назначение уже существует
 Completed items are retained. Partial destinations may remain.	Завершённые объекты сохранены. Могут остаться частично созданные назначения.
-Copy and Move run one at a time. Closing this window keeps transfers running. Cancel stops the selected request; completed items remain. Failure or cancellation pauses the queue. Resume queue starts waiting requests, without retrying failed work. Totals and remaining time are estimates. Existing files require confirmation by default. Ask merges existing folders and keeps unrelated contents. Explicit Refuse rejects existing top-level destinations; explicit Skip skips them without merging. Bluetooth send queues and accepted incoming files use this queue too. Incoming approval stays in the Bluetooth window; closing it stops new offers but keeps accepted work running. Lost final receipts mean delivery is unconfirmed; inspect the receiver before retrying.	Копирование и перемещение выполняются по очереди. Закрытие окна не останавливает передачи. Отмена останавливает выбранный запрос; завершённое сохраняется. Сбой или отмена приостанавливают очередь. Продолжение запускает ожидающие запросы, не повторяя сбойные. Итоги и оставшееся время приблизительны. По умолчанию замена файлов требует подтверждения. Ask объединяет папки, сохраняя постороннее содержимое. Явный Refuse отклоняет существующие назначения верхнего уровня; явный Skip пропускает их без объединения. Очереди отправки Bluetooth и принятые входящие файлы тоже выполняются здесь. Разрешение приёма остаётся в окне Bluetooth; его закрытие прекращает новые предложения, но принятая работа продолжается. Без последнего подтверждения доставка не подтверждена: перед повтором проверьте получателя.
+Copy and Move run one at a time. Closing this window keeps transfers running. Cancel stops the selected request; completed items remain. Failure or cancellation pauses the queue. Continue queued starts waiting requests, without retrying failed work. Totals and remaining time are estimates. Existing files require confirmation by default. Ask merges existing folders and keeps unrelated contents. Explicit Refuse rejects existing top-level destinations; explicit Skip skips them without merging. Bluetooth send queues and accepted incoming files use this queue too. Incoming approval stays in the Bluetooth window; closing it stops new offers but keeps accepted work running. Lost final receipts mean delivery is unconfirmed; inspect the receiver before retrying.	Копирование и перемещение выполняются по очереди. Закрытие окна не останавливает передачи. Отмена останавливает выбранный запрос; завершённое сохраняется. Сбой или отмена приостанавливают очередь. Продолжение запускает ожидающие запросы, не повторяя сбойные. Итоги и оставшееся время приблизительны. По умолчанию замена файлов требует подтверждения. Ask объединяет папки, сохраняя постороннее содержимое. Явный Refuse отклоняет существующие назначения верхнего уровня; явный Skip пропускает их без объединения. Очереди отправки Bluetooth и принятые входящие файлы тоже выполняются здесь. Разрешение приёма остаётся в окне Bluetooth; его закрытие прекращает новые предложения, но принятая работа продолжается. Без последнего подтверждения доставка не подтверждена: перед повтором проверьте получателя.
 Cannot queue transfers while quitting	Нельзя добавлять передачи во время выхода
 Another file operation is running	Выполняется другая файловая операция
 Transfer queue is full (64 requests)	Очередь передач заполнена (64 запроса)
@@ -1970,3 +1970,21 @@ Signing needs SDK tools and Java. Tools… shows missing paths.	Подпись �
 Tool paths set; use the requested action to verify availability.	Пути заданы; доступность проверяется при выполнении действия.
 Use a build with audio support. F1 Help.	Установите сборку с поддержкой звука. F1: справка.
 Use an audio build. F1 Help.	Нужна сборка со звуком. F1.
+Save command history	Сохранять историю команд
+Command history is saved as plain text.	История команд сохраняется открытым текстом.
+Clear history…	Очистить историю…
+Clear command history	Очистить историю команд
+Clear session and saved command history? The current prompt is kept. This cannot be undone.	Очистить историю сеанса и сохранённые команды? Текущая строка останется. Это нельзя отменить.
+Clears recalled commands and saved command history. The current prompt is kept. Cancel leaves history unchanged.	Очищает историю сеанса и сохранённые команды. Текущая строка остаётся. Отмена ничего не меняет.
+Commands History Help	Справка по истории команд
+Comparison report Help	Справка по отчёту сравнения
+Previous results are stale	Прежние результаты устарели
+Shown	Показано
+Show	Показать
+Open destination	Открыть назначение
+Copy details	Копировать сведения
+Phase	Этап
+Saving command history before exit…	Сохранение истории команд перед выходом…
+Command history storage is unavailable	Хранилище истории команд недоступно
+Recall never runs a command. History keeps 100 unique commands, up to 16 KiB each. Save command history in System Setup is off by default. When enabled, only new submissions are saved as plain text beside the configuration, independently of Save settings on exit. Disabling keeps stored history. Clear history removes session and stored commands after confirmation; the current prompt is kept.	Вызов из истории не выполняет команду. Хранятся 100 уникальных команд до 16 КиБ каждая. В System Setup сохранение истории по умолчанию выключено. После включения новые команды сохраняются открытым текстом рядом с конфигурацией независимо от сохранения настроек при выходе. Выключение сохраняет прежний файл. Очистка удаляет историю сеанса и файл после подтверждения, не меняя текущую строку.
+The report is read-only and includes hidden entries. Show filters visible results; whole-snapshot totals remain separate. Refresh rescans the captured roots and keeps the old snapshot marked stale until completion. Stop or Esc cancels scanning and retains explicitly partial results. Enter or Open left/right navigates to the selected visible result without changing pane marks. Limits: 20,000 entries and 512 levels.	Отчёт доступен только для чтения и включает скрытые элементы. Фильтр меняет видимые результаты; общие итоги показываются отдельно. Обновление повторяет сканирование исходных каталогов и помечает прежний снимок устаревшим. Стоп или Esc отменяет сканирование, сохраняя явно неполные результаты. Enter и переход в левую/правую панель работают с видимым результатом и не меняют отметки. Пределы: 20 000 элементов и 512 уровней.

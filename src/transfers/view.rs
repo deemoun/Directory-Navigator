@@ -12,7 +12,7 @@ pub(crate) fn spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
     let state = &app.transfers;
     let r = crate::tool_windows::bounds(app, area, 90, 20);
     let (x, w) = (r.x + 2, r.width.saturating_sub(4));
-    let rows = usize::from(r.height.saturating_sub(12)).max(1);
+    let rows = usize::from(r.height.saturating_sub(14)).max(1);
     let cursor = state
         .entries
         .iter()
@@ -100,7 +100,7 @@ pub(crate) fn spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
                 w,
                 (e.elapsed(now).as_millis() / 120).min(u128::from(u64::MAX)) as u64,
             ),
-            Rect::new(x, r.bottom().saturating_sub(9), w, 1),
+            Rect::new(x, r.bottom().saturating_sub(11), w, 1),
         );
         let percent = e.percent().map_or_else(|| "…".into(), |p| format!("{p}%"));
         let rate = e
@@ -163,13 +163,38 @@ pub(crate) fn spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
         }
         s.caption(
             Paragraph::new(text).style(style(theme::TEXT)),
-            Rect::new(x, r.bottom().saturating_sub(8), w, 5),
+            Rect::new(x, r.bottom().saturating_sub(10), w, 5),
         );
     } else {
         s.caption(
             Paragraph::new(lang.text("No transfers in this session")).style(style(theme::TEXT)),
             Rect::new(x, r.y + 4, w, 1),
         );
+    }
+    if let Some(entry) = state.selected() {
+        let controls = [
+            (
+                5,
+                "Open destination",
+                Action::OpenDestination(entry.id),
+                entry.local_destination.is_some() && !app.panels[app.active].loading,
+            ),
+            (6, "Copy details", Action::CopyDetails(entry.id), true),
+        ];
+        let labels = controls.map(|(_, caption, _, _)| lang.text(caption));
+        let bounds = theme::button_row(Rect::new(x, r.bottom() - 4, w, 1), &labels, 16, 2);
+        for ((id, _, action, enabled), (label, bounds)) in
+            controls.into_iter().zip(labels.into_iter().zip(bounds))
+        {
+            let mut control = Control::new(
+                id,
+                bounds,
+                ControlKind::Button(label.into()),
+                Target::Transfer(action),
+            );
+            control.enabled = enabled;
+            s.control(control);
+        }
     }
     let controls = [
         (
@@ -180,7 +205,7 @@ pub(crate) fn spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
                 .selected()
                 .is_some_and(|e| !e.status.terminal() && e.status != Status::Cancelling),
         ),
-        (2, "Resume queue", Action::Resume, state.paused),
+        (2, "Continue queued", Action::Resume, state.paused),
         (
             3,
             "Clear finished",

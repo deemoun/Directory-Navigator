@@ -11,6 +11,7 @@ impl App {
 
         let hidden_changed = self.config.show_hidden != config.show_hidden;
         self.config = config;
+        crate::command_line::persistence::configure(self);
         crate::plugins::host::apply_enabled(self);
         self.clock.tick_with(self.config.datetime);
         for id in self

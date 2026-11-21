@@ -736,3 +736,81 @@ fn directory_report_is_read_only_localized_navigable_and_owned() -> io::Result<(
     }
     Ok(())
 }
+
+#[test]
+fn report_filters_map_navigation_and_refresh_captured_roots() -> io::Result<()> {
+    use file_tools::report::{Filter, Status};
+    let t = Temp::new()?;
+    for side in ["left", "right"] {
+        fs::create_dir(t.0.join(side))?;
+    }
+    fs::write(t.0.join("left/a-only"), "left")?;
+    fs::write(t.0.join("right/z-only"), "right")?;
+    for side in ["left", "right"] {
+        fs::write(t.0.join(side).join("same"), "same")?;
+    }
+    fs::write(t.0.join("left/changed"), "old")?;
+    fs::write(t.0.join("right/changed"), "new")?;
+    let mut a = t.app()?;
+    for (panel, side) in a.panels.iter_mut().zip(["left", "right"]) {
+        panel.go_to(t.0.join(side), true);
+    }
+    wait(&mut a, |a| a.panels.iter().all(|p| !p.loading));
+    file_tools::open_compare(&mut a);
+    file_tools::action(&mut a, ToolAction::Report);
+    wait(
+        &mut a,
+        |a| matches!(a.file_tools(),Some(ToolDialog::Report(r)) if !r.busy()),
+    );
+    let owner = a.desktop.active().id;
+    for (filter, status) in [
+        (Filter::Left, Status::Left),
+        (Filter::Right, Status::Right),
+        (Filter::Identical, Status::Identical),
+        (Filter::Different, Status::Different),
+        (Filter::Unknown, Status::Unknown),
+    ] {
+        file_tools::action(&mut a, ToolAction::ReportFilterSet(filter));
+        let Some(ToolDialog::Report(r)) = a.file_tools() else {
+            panic!()
+        };
+        assert!(r
+            .visible
+            .iter()
+            .all(|i| r.result.entries[*i].status == status));
+        assert_eq!(r.visible.len(), usize::from(filter != Filter::Unknown));
+        assert_eq!(draw(&mut a, 80, 25)?, draw(&mut a, 80, 25)?);
+    }
+    file_tools::action(&mut a, ToolAction::ReportFilterSet(Filter::Right));
+    file_tools::action(&mut a, ToolAction::ReportRow(0));
+    file_tools::action(&mut a, ToolAction::ReportOpen(1));
+    wait(&mut a, |a| !a.panels[1].loading);
+    assert_eq!(a.panels[1].entries[a.panels[1].cursor].name, "z-only");
+    assert_eq!(
+        fs::canonicalize(&a.panels[0].path)?,
+        fs::canonicalize(t.0.join("left"))?
+    );
+    a.desktop.activate(owner);
+    file_tools::action(&mut a, ToolAction::ReportFilterSet(Filter::All));
+    fs::write(t.0.join("left/new"), "new")?;
+    file_tools::action(&mut a, ToolAction::ReportRefresh);
+    assert!(
+        matches!(a.file_tools(),Some(ToolDialog::Report(r)) if r.busy() && r.result.entries.len()==4)
+    );
+    // Repeated refresh cannot replace a running generation.
+    file_tools::action(&mut a, ToolAction::ReportRefresh);
+    wait(
+        &mut a,
+        |a| matches!(a.file_tools(),Some(ToolDialog::Report(r)) if !r.busy()),
+    );
+    assert!(
+        matches!(a.file_tools(),Some(ToolDialog::Report(r)) if r.result.entries.iter().any(|row| row.path==std::path::Path::new("new")))
+    );
+    file_tools::action(&mut a, ToolAction::ReportRefresh);
+    file_tools::action(&mut a, ToolAction::ReportStop);
+    wait(
+        &mut a,
+        |a| matches!(a.file_tools(),Some(ToolDialog::Report(r)) if !r.busy()),
+    );
+    Ok(())
+}

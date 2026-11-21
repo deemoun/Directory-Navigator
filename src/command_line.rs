@@ -9,6 +9,7 @@ use std::{ffi::OsString, io};
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
 pub mod history;
+pub(crate) mod persistence;
 const MAX_BYTES: usize = 16 * 1024;
 #[derive(Default)]
 pub struct CommandLine {
@@ -17,6 +18,7 @@ pub struct CommandLine {
     pub cursor: usize,
     pub pending: Option<Plan>,
     history: Vec<String>,
+    pub(crate) persistence: persistence::State,
     recalled: Option<usize>,
     draft: String,
     view_start: usize,
@@ -171,7 +173,9 @@ fn submit(app: &mut App) -> io::Result<()> {
     } else {
         app.command_line.pending = Some(shell_plan(text, app.panels[app.active].path.clone()));
     }
+    let recorded = app.command_line.text.clone();
     app.command_line.remember();
+    persistence::submitted(app, recorded);
     app.command_line.clear();
     Ok(())
 }

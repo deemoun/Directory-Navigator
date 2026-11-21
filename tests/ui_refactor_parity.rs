@@ -6,7 +6,8 @@
 //! Plugin preferences and editor frames include the approved music-opening and
 //! Markdown-preview controls. Russian tool footers preserve every shortcut and
 //! the full Close caption, including at 80 columns. System Setup includes the
-//! approved session restoration selector; other frame expectations are unchanged.
+//! session restoration selector and opt-in command history. History includes its
+//! Cancel-first clear action; other frame expectations are unchanged.
 mod support;
 use dn::{
     editor::{self, EditorAction as A},
@@ -173,10 +174,20 @@ fn shared_logic_preserves_native_frames() -> io::Result<()> {
                                 .collect::<String>();
                             assert!(text.contains(language.text("Restore previous session")));
                             assert!(text.contains(language.text("Panels only")));
+                            assert!(text.contains(language.text("Save command history")));
+                            assert!(text.contains(
+                                language.text("Command history is saved as plain text.")
+                            ));
                             assert!(result
                                 .hit_regions()
                                 .iter()
-                                .any(|(_, t)| *t == dn::mouse::Target::OpenSettingsChoice(2)));
+                                .any(|(_, t)| *t == dn::mouse::Target::OpenSettingsChoice(3)));
+                        }
+                        if case == 13 {
+                            assert!(result.hit_regions().iter().any(|(_, target)| *target
+                                == dn::mouse::Target::CommandHistory(
+                                    dn::command_line::history::Action::Clear
+                                )));
                         }
                         if case == 2 {
                             let buffer = Buffer::rendered(ui::render(&a, &snapshot));

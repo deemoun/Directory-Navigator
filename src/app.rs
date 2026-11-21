@@ -354,6 +354,7 @@ impl App {
             prompt.base.join(&prompt.field)
         };
         match prompt.kind {
+            PromptKind::ClearCommandHistory => crate::command_line::persistence::clear(self),
             PromptKind::Remote(mutation) => {
                 crate::network::controller::submit_mutation(self, mutation, &prompt.field)
             }

@@ -82,13 +82,22 @@ pub(crate) fn settings_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
     if settings.kind == SettingsKind::System {
         let index = settings.rows().len();
         spec.caption(
+            Paragraph::new(
+                app.config
+                    .language
+                    .text("Command history is saved as plain text."),
+            )
+            .style(dos(theme::TEXT)),
+            Rect::new(rect.x + 5, rect.y + 7, width - 8, 1),
+        );
+        spec.caption(
             Paragraph::new(app.config.language.text("Restore previous session"))
                 .style(dos(theme::TEXT)),
-            Rect::new(rect.x + 3, rect.y + 6, width - 6, 1),
+            Rect::new(rect.x + 3, rect.y + 8, width - 6, 1),
         );
         spec.control(Control::new(
             index,
-            Rect::new(rect.x + 3, rect.y + 7, width - 6, 1),
+            Rect::new(rect.x + 3, rect.y + 9, width - 6, 1),
             ControlKind::Button(
                 app.config
                     .language

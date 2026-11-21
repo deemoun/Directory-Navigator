@@ -46,6 +46,9 @@ pub enum ToolAction {
     ReportRow(usize),
     ReportOpen(usize),
     ReportStop,
+    ReportRefresh,
+    ReportFilter,
+    ReportFilterSet(report::Filter),
 }
 #[derive(Default)]
 pub struct Tools {
@@ -143,12 +146,7 @@ fn report_open(app: &mut App, side: usize) {
     let Some(ToolDialog::Report(report)) = app.file_tools() else {
         return;
     };
-    let Some(row) = report
-        .result
-        .entries
-        .get(report.cursor)
-        .filter(|r| r.present[side])
-    else {
+    let Some(row) = report.selected().filter(|r| r.present[side]) else {
         return;
     };
     let path = report.roots[side].join(&row.path);
@@ -237,11 +235,12 @@ pub fn poll(app: &mut App) -> bool {
 }
 pub fn accept(app: &mut App) {
     if let Some(ToolDialog::Report(report)) = app.file_tools() {
-        let side = report
-            .result
-            .entries
-            .get(report.cursor)
-            .map_or(0, |r| usize::from(!r.present[0]));
+        if report.filter_menu {
+            let filter = report::Filter::ALL[report.filter_choice];
+            action(app, ToolAction::ReportFilterSet(filter));
+            return;
+        }
+        let side = report.selected().map_or(0, |r| usize::from(!r.present[0]));
         report_open(app, side);
         return;
     }
@@ -358,6 +357,31 @@ pub fn accept(app: &mut App) {
 pub fn action(app: &mut App, action: ToolAction) {
     match action {
         ToolAction::Report => open_report(app),
+        ToolAction::ReportRefresh => {
+            if let Some(ToolDialog::Report(r)) = app.file_tools_mut() {
+                if let Err(error) = r.refresh() {
+                    app.error(error.to_string());
+                }
+            }
+        }
+        ToolAction::ReportFilter => {
+            if let Some(ToolDialog::Report(r)) = app.file_tools_mut() {
+                r.filter_menu = true;
+                r.filter_choice = report::Filter::ALL
+                    .iter()
+                    .position(|f| *f == r.filter)
+                    .unwrap_or(0);
+                r.focus = 0;
+                r.last_click = None;
+            }
+        }
+        ToolAction::ReportFilterSet(filter) => {
+            if let Some(ToolDialog::Report(r)) = app.file_tools_mut() {
+                r.set_filter(filter);
+                r.filter_menu = false;
+                r.focus = 6;
+            }
+        }
         ToolAction::ReportStop => {
             if let Some(ToolDialog::Report(r)) = app.file_tools() {
                 r.stop();
@@ -367,7 +391,13 @@ pub fn action(app: &mut App, action: ToolAction) {
         ToolAction::ReportRow(index) => {
             let mut open = false;
             if let Some(ToolDialog::Report(r)) = app.file_tools_mut() {
-                if index < r.result.entries.len() {
+                if r.filter_menu {
+                    if index < report::Filter::ALL.len() {
+                        r.filter_choice = index;
+                    }
+                    return;
+                }
+                if index < r.visible.len() {
                     let now = Instant::now();
                     open = crate::list_state::ClickTracker::FILE_HISTORY.matches(
                         r.last_click.as_ref(),
@@ -386,7 +416,12 @@ pub fn action(app: &mut App, action: ToolAction) {
         }
         ToolAction::Accept => accept(app),
         ToolAction::Cancel => {
-            if let Some(ToolDialog::Report(r)) = app.file_tools() {
+            if let Some(ToolDialog::Report(r)) = app.file_tools_mut() {
+                if r.filter_menu {
+                    r.filter_menu = false;
+                    r.focus = 6;
+                    return;
+                }
                 if r.busy() {
                     r.stop();
                     return;
@@ -446,7 +481,18 @@ pub fn action(app: &mut App, action: ToolAction) {
         }
     }
 }
+pub const REPORT_HELP: &str = "The report is read-only and includes hidden entries. Show filters visible results; whole-snapshot totals remain separate. Refresh rescans the captured roots and keeps the old snapshot marked stale until completion. Stop or Esc cancels scanning and retains explicitly partial results. Enter or Open left/right navigates to the selected visible result without changing pane marks. Limits: 20,000 entries and 512 levels.";
 pub fn key(app: &mut App, key: KeyEvent) {
+    if key.code == KeyCode::F(1) && matches!(app.file_tools(), Some(ToolDialog::Report(_))) {
+        if let Some(ToolDialog::Report(report)) = app.file_tools_mut() {
+            report.last_click = None;
+        }
+        app.push_dialog(crate::dialog::Dialog {
+            title: " Comparison report Help ",
+            message: app.config.language.text(REPORT_HELP).into(),
+        });
+        return;
+    }
     if let Some(ToolDialog::Report(r)) = app.file_tools_mut() {
         r.last_click = None;
     }
@@ -460,6 +506,13 @@ pub fn key(app: &mut App, key: KeyEvent) {
     let mut choice = None;
     match app.file_tools_mut() {
         Some(ToolDialog::Report(r)) if r.focus == 0 => {
+            if r.filter_menu {
+                if let Some(row) = crate::turbo::widgets::list_key(r.filter_choice, 6, 6, key.code)
+                {
+                    r.filter_choice = row;
+                }
+                return;
+            }
             let amount = match key.code {
                 KeyCode::Up => -1,
                 KeyCode::Down => 1,
@@ -472,7 +525,7 @@ pub fn key(app: &mut App, key: KeyEvent) {
             r.cursor = r
                 .cursor
                 .saturating_add_signed(amount)
-                .min(r.result.entries.len().saturating_sub(1));
+                .min(r.visible.len().saturating_sub(1));
             r.fit();
         }
         Some(ToolDialog::History {

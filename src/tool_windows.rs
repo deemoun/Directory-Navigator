@@ -353,7 +353,7 @@ pub(crate) fn prepare(app: &mut App, area: Rect) {
             .tool(id)
             .is_some_and(|t| t.kind == Kind::Transfers)
         {
-            app.transfers.rows = usize::from(s.bounds.height.saturating_sub(13)).max(1);
+            app.transfers.rows = usize::from(s.bounds.height.saturating_sub(14)).max(1);
         }
         let t = app.desktop.tool_mut(id).unwrap();
         if let Some(tree) = t.state.directory_tree_mut() {
@@ -383,7 +383,7 @@ pub(crate) fn prepare(app: &mut App, area: Rect) {
             );
         }
         if let Some(crate::file_tools::ToolDialog::Report(r)) = t.state.file_tools_mut() {
-            r.rows = usize::from(s.bounds.height.saturating_sub(11)).max(1);
+            r.rows = usize::from(s.bounds.height.saturating_sub(12)).max(1);
             r.fit();
         }
         if let Some(info) = &mut t.utility.information {

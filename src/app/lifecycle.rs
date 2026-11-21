@@ -6,6 +6,7 @@ impl App {
     /// Polling is nonblocking; worker destructors retain their own resources.
     #[doc(hidden)]
     pub fn poll_background_shutdown(&mut self) -> bool {
+        self.command_line.persistence.cancel();
         self.workers.cancel_all();
         self.workers.poll();
         !self.workers.pending()
@@ -73,6 +74,9 @@ impl App {
             job.cancel();
             self.exit_pending = true;
             self.notice = "Cancelling operation before exit…".into();
+        } else if self.command_line.persistence.pending() {
+            self.exit_pending = true;
+            self.notice = "Saving command history before exit…".into();
         } else if self.workers.pending() {
             self.workers.cancel_all();
             self.exit_pending = true;
