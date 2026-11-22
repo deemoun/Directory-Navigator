@@ -2076,3 +2076,4 @@ Window resolution	Разрешение окна
 Window size only; fullscreen uses emulator settings. Cycles are not MHz.	Размер окна; полный экран — по настройкам эмулятора. Циклы — не МГц.
 Cannot verify window resolution for this DOSBox Staging version. Check DOSBox or choose Automatic.	Не удалось определить настройку разрешения для этой версии DOSBox Staging. Проверьте DOSBox или выберите «Автоматически».
 Automatic	Автоматически
+Browse…	Обзор…

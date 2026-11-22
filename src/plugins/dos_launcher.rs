@@ -470,15 +470,8 @@ impl DosLauncher {
                     .into()
             } else {
                 format!(
-                    "Windows: {} · {} MiB",
-                    crate::filesystem::display_name(
-                        std::path::Path::new(&self.windows.image)
-                            .file_name()
-                            .unwrap_or_default()
-                            .to_string_lossy()
-                            .as_ref()
-                    ),
-                    self.windows.memory_mb
+                    "Windows: {}",
+                    windows::image_summary(&self.windows, r.width.saturating_sub(15))
                 )
             }),
             Rect::new(r.x + 3, r.y + 11, r.width - 6, 1),

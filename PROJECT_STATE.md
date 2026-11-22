@@ -22,6 +22,30 @@ See the [English README](README.md), [Russian README](README.ru.md) and
 [user guide](docs/USER_GUIDE.md) for supported workflows, installation, controls,
 safeguards and limits.
 
+## Unreleased recent-window visual polish
+
+The layout audit reproduced clipped Russian Video Merge buttons and long Windows
+image names hiding profile details. Video Merge source/footer actions now use
+shared translated button sizing; Test speed has space for both focus markers.
+Display-only source names/parent paths and DOS saved-image captions preserve whole
+grapheme clusters and useful suffixes, with edition/RAM retained. Browse captions
+are translated in Russian. Source paths, input values, settings transactions and
+worker/transfer behavior are unchanged. About's top logo gap and Transfer Center's
+existing shadow reservation passed the audit and retain their layouts.
+No dependencies, configuration/version changes, commits or publication are added.
+
+Local validation on macOS ARM64 passed: the full native run (1,441 tests,
+14 existing opt-in tests ignored), focused layout/state/Unicode regressions,
+Rust 1.100 all-target Clippy with default/acoustic features, no-default-features
+checking and its CI test suites, 28 acoustic-enabled UI tests, 44 Python helpers,
+workflow policy, formatting and diff checks. Existing frame-parity expectations
+passed unchanged. The locked release rebuild reports 1.1.15; all three private
+release-terminal suites passed (74 tests, four existing opt-in tests ignored),
+covering About, DOS settings, Video Merge and Transfer Center with restoration.
+Linux x86_64/ARM64 and Windows cross-checks stopped in ring at missing C
+cross-compilers / Windows SDK headers on this Mac; no native runtime coverage
+there or new CI result is claimed. No workflow, publication or upload was run.
+
 ## Unreleased portable image viewer
 
 F3 disk-file viewing detects PNG, JPEG and WebP, decodes in bounded owned workers,

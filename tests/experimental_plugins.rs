@@ -541,3 +541,35 @@ fn extra_dos_drive_defaults_persistence_owned_picker_and_cancel() -> io::Result<
     }
     Ok(())
 }
+
+#[test]
+fn long_windows_image_names_keep_ram_and_edition_visible() -> io::Result<()> {
+    let t = Fixture::new("dos-image-summary")?;
+    for language in [Language::English, Language::Russian] {
+        let mut a = t.app()?;
+        a.config.language = language;
+        a.config.set_plugin_enabled(DOS_LAUNCHER, true);
+        let image = t.0.join(format!(
+            "{}-e\u{301}-界-final.img",
+            "ОченьДлинноеИмя".repeat(12)
+        ));
+        a.config.dos.windows.image = image.to_str().unwrap().into();
+        a.config.dos.windows.memory_mb = 128;
+        a.config.dos.windows_images = vec![a.config.dos.windows.clone()];
+        let original = a.config.dos.clone();
+        menu::execute(&mut a, Action::Plugin(DOS_LAUNCHER));
+        let text = support::text(&mut a, 80, 25)?;
+        assert!(text.contains("128 MiB"), "image RAM clipped:\n{text}");
+        assert!(
+            text.contains("final.img"),
+            "image filename suffix clipped:\n{text}"
+        );
+        click(&mut a, Target::Plugin(DOS_LAUNCHER, ActionId(9)));
+        draw(&mut a, 80, 25)?;
+        click(&mut a, Target::Plugin(DOS_LAUNCHER, ActionId(214)));
+        let text = support::text(&mut a, 80, 25)?;
+        assert!(text.contains("128 MiB"), "saved image RAM clipped:\n{text}");
+        assert_eq!(a.config.dos, original);
+    }
+    Ok(())
+}

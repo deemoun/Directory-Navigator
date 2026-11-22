@@ -691,6 +691,96 @@ mod tests {
         }
     }
     #[test]
+    fn visual_states_keep_localized_actions_and_repeated_frames_stable() -> io::Result<()> {
+        let work = crate::network::workspace::Workspace::create(std::env::temp_dir())?;
+        for language in [
+            crate::localization::Language::English,
+            crate::localization::Language::Russian,
+        ] {
+            for palette in [
+                crate::palette::PaletteProfile::ClassicDn,
+                crate::palette::PaletteProfile::ClassicDn
+                    .with_slot(crate::palette::theme::Slot::DialogButton, 0x2f),
+            ] {
+                let mut app = App::new(work.root.clone())?;
+                app.config.save_on_exit = false;
+                app.config.language = language;
+                app.config.palette = palette;
+                app.config.set_plugin_enabled(VIDEO_MERGE, true);
+                crate::plugins::host::open(&mut app, VIDEO_MERGE);
+                let owner = app.desktop.plugins.binding(VIDEO_MERGE).unwrap();
+                for state in 0..5 {
+                    app.video.view = Snapshot {
+                        busy: state == 1 || state == 2,
+                        ready: state == 3,
+                        summary: "Private long source summary · Ёжик · 3840x2160 · 60000/1001 fps"
+                            .into(),
+                        notice: if state == 4 {
+                            "Private failure e\u{301} 界 ".repeat(30)
+                        } else {
+                            "Private status".into()
+                        },
+                        timing: if state == 0 || state == 4 {
+                            None
+                        } else {
+                            Some(Timing {
+                                elapsed: Duration::from_secs(61),
+                                remaining: Some(Duration::from_secs(120)),
+                                processed: 30.0,
+                                total: 100.0,
+                                clip: 2,
+                                clips: 3,
+                                stage: if state == 2 { "Joining" } else { "Converting" },
+                                outcome: if state == 3 { "Completed in" } else { "" },
+                                waiting: false,
+                            })
+                        },
+                        ..Default::default()
+                    };
+                    crate::plugins::host::dispatch(
+                        &mut app,
+                        owner,
+                        crate::plugins::Event::Focus(14),
+                    );
+                    for (w, h) in [(80, 25), (120, 35), (60, 18), (80, 25)] {
+                        let snapshot = crate::layout::prepare(
+                            &mut app,
+                            crate::presentation::layout::Rect::new(0, 0, w, h),
+                        );
+                        let first =
+                            crate::testing::Buffer::rendered(crate::ui::render(&app, &snapshot));
+                        for _ in 0..3 {
+                            assert_eq!(
+                                first,
+                                crate::testing::Buffer::rendered(crate::ui::render(
+                                    &app, &snapshot
+                                ))
+                            );
+                        }
+                        if w >= 80 {
+                            let text = first.content.iter().map(|c| c.symbol()).collect::<String>();
+                            for caption in [
+                                "Settings…",
+                                "Analyze",
+                                "Start",
+                                "Stop",
+                                "Help",
+                                "Close",
+                                "Test speed",
+                            ] {
+                                assert!(
+                                    text.contains(language.text(caption)),
+                                    "state {state}: clipped {caption}"
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+    #[test]
     fn retired_worker_does_not_block_ui_or_update_reopened_video() -> io::Result<()> {
         let work = crate::network::workspace::Workspace::create(std::env::temp_dir())?;
         let mut app = App::new(work.root.clone())?;

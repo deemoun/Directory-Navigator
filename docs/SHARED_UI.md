@@ -45,6 +45,19 @@ draft transactions and child-dialog ownership remain; the plugin list still come
 from its registry. TOML v2, validation,
 unknown-field preservation and atomic publication are unchanged.
 
+## Recent-window visual polish
+
+About, DOS launcher/settings, Video Merge/settings and Transfer Center retain
+native geometry, shared controls and their existing action/focus identities.
+Video Merge's source/footer rows now use translated button-row sizing, including
+focus markers; its Test speed control also reserves both markers. Russian Browse
+captions are translated. Display-only video source rows and DOS image summaries
+fit complete grapheme clusters, preserving filename suffixes and the image's
+edition/RAM. Input fields and native paths are unchanged. The narrow internal
+`ellipsize_tail` helper is used only by these summaries; legacy formatter callers
+retain their existing behavior. Existing About top padding and Transfer Center
+shadow space are verified rather than restyled.
+
 ## Dialog proposals
 
 `Proposal::deliver` checks the live modal/document identity before delivering focus

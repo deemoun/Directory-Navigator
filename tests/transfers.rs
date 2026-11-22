@@ -606,3 +606,94 @@ fn destination_actions_retain_native_targets_and_ignore_retired_ids() -> io::Res
     assert_eq!(a.panels[0].path, before);
     Ok(())
 }
+
+#[test]
+fn transfer_actions_leave_the_bottom_border_and_shadow_row_clear() -> io::Result<()> {
+    for language in [
+        dn::localization::Language::English,
+        dn::localization::Language::Russian,
+    ] {
+        let f = support::Fixture::new("transfer-action-border")?;
+        fs::write(f.0.join("source.txt"), b"private")?;
+        fs::create_dir(f.0.join("out"))?;
+        let mut a = f.app()?;
+        a.config.language = language;
+        a.config.palette = a
+            .config
+            .palette
+            .with_slot(dn::palette::theme::Slot::DialogButton, 0x2f);
+        transfers::action(&mut a, Action::Open);
+        for populated in [false, true] {
+            if populated {
+                a.transfers.paused = true;
+                transfers::submit(
+                    &mut a,
+                    plan(&f.0, "source.txt", "out"),
+                    CopyOptions::default(),
+                )
+                .unwrap();
+                wait(&mut a, |a| a.transfers.entries[0].status == Status::Queued);
+                a.transfers.entries[0].status = Status::Failed;
+                a.transfers.entries[0].error = Some(format!(
+                    "Private failure: {}",
+                    "Ёжик e\u{301} 界 ".repeat(50)
+                ));
+            }
+            for (w, h) in [(80, 25), (120, 40), (60, 18), (80, 25)] {
+                let b = support::draw(&mut a, w, h)?;
+                if w < 80 {
+                    continue;
+                }
+                let id = a.desktop.active().id;
+                let snapshot =
+                    dn::layout::prepare(&mut a, dn::presentation::layout::Rect::new(0, 0, w, h));
+                let r = snapshot
+                    .surfaces
+                    .iter()
+                    .find(|s| s.id.key == dn::windowing::geometry::SurfaceKey::Document(id))
+                    .unwrap()
+                    .bounds;
+                let text = support::text(&mut a, w, h)?;
+                let close = a
+                    .mouse
+                    .regions
+                    .iter()
+                    .filter(|(_, t)| *t == dn::mouse::Target::Transfer(Action::Close))
+                    .max_by_key(|(r, _)| r.y)
+                    .unwrap()
+                    .0;
+                assert!(
+                    close.bottom() < r.bottom() - 1,
+                    "missing shadow row:\n{text}"
+                );
+                for x in r.x + 2..r.right() - 2 {
+                    assert!(
+                        matches!(b[(x, r.bottom() - 1)].symbol(), "═" | "─"),
+                        "border overwritten:\n{text}"
+                    );
+                }
+                for caption in [
+                    "Cancel selected",
+                    "Continue queued",
+                    "Clear finished",
+                    "Close",
+                ] {
+                    assert!(
+                        text.contains(language.text(caption)),
+                        "clipped {caption}:\n{text}"
+                    );
+                }
+                if populated {
+                    for caption in ["Open destination", "Copy details"] {
+                        assert!(
+                            text.contains(language.text(caption)),
+                            "clipped {caption}:\n{text}"
+                        );
+                    }
+                }
+                assert_eq!(text, support::text(&mut a, w, h)?);
+            }
+        }
+    }
+    Ok(())
+}

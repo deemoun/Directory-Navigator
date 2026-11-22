@@ -244,3 +244,64 @@ fn utilities_prefill_ignores_filtered_marks_and_keeps_empty_unmarked_opening() -
     assert!(rows[0].contains("visible.mov"));
     Ok(())
 }
+
+#[test]
+fn translated_source_and_footer_buttons_keep_complete_captions() -> io::Result<()> {
+    for language in [Language::English, Language::Russian] {
+        for palette in [
+            dn::palette::PaletteProfile::ClassicDn,
+            dn::palette::PaletteProfile::ClassicDn
+                .with_slot(dn::palette::theme::Slot::DialogButton, 0x2f),
+        ] {
+            let t = Fixture::new("video-caption-layout")?;
+            let name = format!("{}e\u{301}-界-final.mp4", "Long_".repeat(18));
+            fs::write(t.0.join(&name), b"private placeholder")?;
+            let mut a = t.app()?;
+            a.config.language = language;
+            a.config.palette = palette;
+            a.config.set_plugin_enabled(VIDEO_MERGE, true);
+            a.panels[0].cursor = a.panels[0]
+                .entries
+                .iter()
+                .position(|e| e.name == name.as_str())
+                .unwrap();
+            menu::execute(&mut a, Action::MergeVideos);
+            for (w, h) in [(80, 25), (132, 40), (60, 18), (80, 25)] {
+                draw(&mut a, w, h)?;
+                if w < 80 {
+                    continue;
+                }
+                let text = support::text(&mut a, w, h)?;
+                assert!(
+                    text.contains("final.mp4"),
+                    "filename suffix clipped:\n{text}"
+                );
+                for _ in 0..14 {
+                    key(&mut a, K::Tab);
+                    let text = support::text(&mut a, w, h)?;
+                    for caption in [
+                        "Add file",
+                        "Add folder",
+                        "Remove",
+                        "Move up",
+                        "Move down",
+                        "Settings…",
+                        "Analyze",
+                        "Start",
+                        "Stop",
+                        "Help",
+                        "Close",
+                        "Test speed",
+                    ] {
+                        assert!(
+                            text.contains(language.text(caption)),
+                            "clipped {caption}:\n{text}"
+                        );
+                    }
+                    assert_eq!(text, support::text(&mut a, w, h)?);
+                }
+            }
+        }
+    }
+    Ok(())
+}

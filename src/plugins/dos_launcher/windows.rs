@@ -4,6 +4,24 @@ use crate::{
     dos::windows::Preferences,
     turbo::file_dialog::{Mode, Outcome, Picker},
 };
+/// A bounded, display-only name followed by the profile's identifying settings.
+pub(super) fn image_summary(p: &Preferences, width: u16) -> String {
+    let suffix = format!(" · {} · {} MiB", p.edition.label(), p.memory_mb);
+    let name = crate::filesystem::display_name(
+        &std::path::Path::new(&p.image)
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy(),
+    );
+    let reserved = crate::presentation::text::Span::raw(&suffix)
+        .width()
+        .min(u16::MAX as usize) as u16;
+    format!(
+        "{}{}",
+        crate::presentation::text::ellipsize_tail(&name, width.saturating_sub(reserved)),
+        suffix
+    )
+}
 pub(super) struct Draft {
     pub preferences: Preferences,
     cursor: usize,
@@ -316,16 +334,18 @@ impl DosLauncher {
         let selection = if !self.images.iter().any(|saved| saved.image == p.image) {
             l.text("New image profile…").into()
         } else {
+            let prefix = format!("{}: ", l.text("Saved image"));
+            let reserved = crate::presentation::text::Span::raw(&prefix).width() as u16;
+            let name = crate::filesystem::display_name(
+                &std::path::Path::new(&p.image)
+                    .file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy(),
+            );
             format!(
-                "{}: {}",
-                l.text("Saved image"),
-                crate::filesystem::display_name(
-                    std::path::Path::new(&p.image)
-                        .file_name()
-                        .unwrap_or_default()
-                        .to_string_lossy()
-                        .as_ref()
-                )
+                "{}{}",
+                prefix,
+                crate::presentation::text::ellipsize_tail(&name, w.saturating_sub(reserved + 4))
             )
         };
         let mut c = Control::new(
@@ -433,20 +453,7 @@ impl DosLauncher {
         let mut items: Vec<_> = self
             .images
             .iter()
-            .map(|p| {
-                format!(
-                    "{} · {} · {} MiB",
-                    crate::filesystem::display_name(
-                        std::path::Path::new(&p.image)
-                            .file_name()
-                            .unwrap_or_default()
-                            .to_string_lossy()
-                            .as_ref()
-                    ),
-                    p.edition.label(),
-                    p.memory_mb
-                )
-            })
+            .map(|p| image_summary(p, r.width.saturating_sub(8)))
             .collect();
         items.push(l.text("New image profile…").into());
         let mut list = Control::new(

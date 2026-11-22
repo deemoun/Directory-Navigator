@@ -3,6 +3,28 @@ use super::{layout::Alignment, style::Style};
 use std::borrow::Cow;
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
+/// Fit display-only summaries without splitting combining or joined characters.
+/// Existing text/path storage and the legacy formatter are unchanged.
+pub(crate) fn ellipsize_tail(text: &str, width: u16) -> String {
+    let width = usize::from(width);
+    if text.width() <= width {
+        return text.to_owned();
+    }
+    if width == 0 {
+        return String::new();
+    }
+    let mut remaining = width - 1;
+    let mut start = text.len();
+    for (index, grapheme) in text.grapheme_indices(true).rev() {
+        let cells = grapheme.width();
+        if cells > remaining {
+            break;
+        }
+        remaining -= cells;
+        start = index;
+    }
+    format!("…{}", &text[start..])
+}
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Span<'a> {
     pub content: Cow<'a, str>,
@@ -125,6 +147,15 @@ impl From<String> for Text<'_> {
 mod tests {
     use super::*;
     use crate::presentation::style::{Color, Modifier};
+    #[test]
+    fn summary_tail_preserves_whole_combining_and_joined_graphemes() {
+        assert_eq!(ellipsize_tail("prefix界\u{301}", 2), "…");
+        assert_eq!(ellipsize_tail("prefix👩‍💻", 3), "…👩‍💻");
+        assert_eq!(ellipsize_tail("prefixe\u{301}", 2), "…e\u{301}");
+        assert_eq!(ellipsize_tail("Ёжик.img", 8), "Ёжик.img");
+        assert_eq!(ellipsize_tail("anything", 0), "");
+        assert_eq!(ellipsize_tail("anything", 1), "…");
+    }
     #[test]
     fn graphemes_keep_span_style_and_unicode_width() {
         let mut line = Line::from(vec![

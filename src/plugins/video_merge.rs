@@ -463,13 +463,17 @@ impl VideoMerge {
                     .sources
                     .iter()
                     .map(|p| {
-                        format!(
-                            "{} — {}",
-                            crate::video::display(
-                                PathBuf::from(p.file_name().unwrap_or_default()).as_path()
-                            ),
-                            crate::video::display(p.parent().unwrap_or(p))
-                        )
+                        let name = crate::video::display(
+                            PathBuf::from(p.file_name().unwrap_or_default()).as_path(),
+                        );
+                        let name_width =
+                            crate::presentation::text::Span::raw(&name).width().min(55) as u16;
+                        let name = crate::presentation::text::ellipsize_tail(&name, name_width);
+                        let parent = crate::presentation::text::ellipsize_tail(
+                            &crate::video::display(p.parent().unwrap_or(p)),
+                            71u16.saturating_sub(name_width + 3),
+                        );
+                        format!("{name} — {parent}")
                     })
                     .collect(),
                 cursor: self.cursor,
@@ -489,21 +493,18 @@ impl VideoMerge {
             })
             .collect();
         s.control(list);
-        for (id, label, x, width) in [
-            (1, "Add file", 2, 13),
-            (2, "Add folder", 17, 14),
-            (3, "Remove", 33, 12),
-            (4, "Move up", 47, 12),
-            (5, "Move down", 61, 14),
-        ] {
-            button(
-                &mut s,
-                ctx,
-                id,
-                Rect::new(r.x + x, r.y + 8, width, 1),
-                label,
-                !ctx.video.busy,
-            );
+        let source_buttons = [
+            (1, "Add file"),
+            (2, "Add folder"),
+            (3, "Remove"),
+            (4, "Move up"),
+            (5, "Move down"),
+        ];
+        let labels = source_buttons.map(|(_, label)| ctx.language.text(label));
+        let bounds =
+            crate::dialog_theme::button_row(Rect::new(r.x + 2, r.y + 8, 73, 1), &labels, 11, 1);
+        for ((id, label), bounds) in source_buttons.into_iter().zip(bounds) {
+            button(&mut s, ctx, id, bounds, label, !ctx.video.busy);
         }
         s.caption(
             Paragraph::new(ctx.language.text("Output MP4")),
@@ -541,7 +542,7 @@ impl VideoMerge {
         );
         for (id, label, checked, x, w) in [
             (7, "Include subfolders", self.recursive, 2, 24),
-            (8, "Export timeline CSV", self.csv, 28, 26),
+            (8, "Export timeline CSV", self.csv, 28, 25),
         ] {
             let mut c = Control::new(
                 id,
@@ -563,7 +564,7 @@ impl VideoMerge {
             &mut s,
             ctx,
             14,
-            Rect::new(r.x + 55, r.y + 12, 20, 1),
+            Rect::new(r.x + 54, r.y + 12, 21, 1),
             "Test speed",
             ctx.video.ready && !ctx.video.busy,
         );
@@ -643,28 +644,19 @@ impl VideoMerge {
             Paragraph::new(safe_block(&notice)).wrap(Wrap { trim: false }),
             Rect::new(r.x + 2, r.y + notice_y, 73, notice_h),
         );
-        for (id, label, x, w, enabled) in [
-            (9, "Settings…", 2, 14, !ctx.video.busy),
-            (
-                10,
-                "Analyze",
-                18,
-                12,
-                !ctx.video.busy && !self.sources.is_empty(),
-            ),
-            (11, "Start", 32, 10, ctx.video.ready && !ctx.video.busy),
-            (12, "Stop", 44, 9, ctx.video.busy),
-            (13, "Help", 55, 9, true),
-            (0, "Close", 66, 10, true),
-        ] {
-            button(
-                &mut s,
-                ctx,
-                id,
-                Rect::new(r.x + x, r.y + 20, w, 1),
-                label,
-                enabled,
-            );
+        let actions = [
+            (9, "Settings…", !ctx.video.busy),
+            (10, "Analyze", !ctx.video.busy && !self.sources.is_empty()),
+            (11, "Start", ctx.video.ready && !ctx.video.busy),
+            (12, "Stop", ctx.video.busy),
+            (13, "Help", true),
+            (0, "Close", true),
+        ];
+        let labels = actions.map(|(_, label, _)| ctx.language.text(label));
+        let bounds =
+            crate::dialog_theme::button_row(Rect::new(r.x + 2, r.y + 20, 73, 1), &labels, 10, 1);
+        for ((id, label, enabled), bounds) in actions.into_iter().zip(bounds) {
+            button(&mut s, ctx, id, bounds, label, enabled);
         }
         s
     }
