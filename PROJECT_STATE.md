@@ -22,6 +22,30 @@ See the [English README](README.md), [Russian README](README.ru.md) and
 [user guide](docs/USER_GUIDE.md) for supported workflows, installation, controls,
 safeguards and limits.
 
+## Unreleased DOSBox-X version-query correction
+
+The installed macOS DOSBox-X 2026.10.01 prints a valid version banner but returns
+exit code 1 for both version flags. DN previously discarded that output; normal
+DOS launch retained an unverified-name fallback, while Windows 9x correctly
+required verified DOSBox-X and misleadingly reported a missing installation.
+Version queries now accept code 1 only with a numbered DOSBox-X banner. Other
+exit codes, signals, help failures and unversioned errors retain their failure
+behavior. Windows 9x probes retain the original verification cause and executable
+path, with localized context/advice, instead of dropping them into an install-only
+message. Explicit and automatic verification passed against the installed Mac
+bundle without booting a guest or accessing a user disk image. This is a local
+unreleased fix; it does not alter the published 1.1.16 crate or bump the version.
+
+Validation on macOS ARM64: the regression failed before the fix; all 31 DOS tests,
+19 affected plugin/localization tests, strict Rust 1.100 all-target Clippy,
+no-default-features checking, formatting and diff checks passed. The locked local
+release rebuild reports 1.1.16; all 16 launcher terminal tests passed against it,
+including a mock DOSBox-X returning 1 for its version query and terminal
+restoration. The opt-in installed-emulator test passed for both explicit and
+automatic discovery. Linux/Windows runtime checks remain unavailable; their
+cross-checks still stop in ring at missing Linux C compilers / Windows SDK
+headers. No CI, publication, user-image boot or version bump was performed.
+
 ## Unreleased recent-window visual polish
 
 The layout audit reproduced clipped Russian Video Merge buttons and long Windows

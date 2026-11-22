@@ -2077,3 +2077,6 @@ Window size only; fullscreen uses emulator settings. Cycles are not MHz.	Раз�
 Cannot verify window resolution for this DOSBox Staging version. Check DOSBox or choose Automatic.	Не удалось определить настройку разрешения для этой версии DOSBox Staging. Проверьте DOSBox или выберите «Автоматически».
 Automatic	Автоматически
 Browse…	Обзор…
+Detected emulator	Обнаруженный эмулятор
+DOSBox-X could not be verified for Windows 9x.	Не удалось проверить DOSBox-X для Windows 9x.
+Select DOSBox-X in Windows 9x settings and use Check to verify it.	Укажите DOSBox-X в настройках Windows 9x и нажмите «Проверить».

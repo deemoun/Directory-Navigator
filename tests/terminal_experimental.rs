@@ -533,7 +533,7 @@ fn windows9x_image_boot_draft_picker_and_terminal_restoration() -> io::Result<()
     fs::write(
         &tool,
         r#"#!/bin/sh
-case "${2:-$1}" in --version|-version) echo 'DOSBox-X 2026.10.01';; *)
+case "${2:-$1}" in --version|-version) echo 'DOSBox-X 2026.10.01'; exit 1;; *)
 printf '%s\n' "$@" > windows-boot-args
 prev=''
 for arg in "$@"; do

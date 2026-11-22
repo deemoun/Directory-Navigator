@@ -293,7 +293,11 @@ fn image(p: &Preferences) -> io::Result<(PathBuf, crate::platform_fs::EntryIdent
     let identity = crate::platform_fs::entry_identity(&path)?;
     Ok((path, identity))
 }
-fn tool(p: &Preferences, cancel: &crate::task::Cancellation) -> io::Result<(PathBuf, Verified)> {
+fn tool(
+    p: &Preferences,
+    language: crate::localization::Language,
+    cancel: &crate::task::Cancellation,
+) -> io::Result<(PathBuf, Verified)> {
     let preferences = super::Preferences {
         executable: p.executable.clone(),
         ..Default::default()
@@ -301,19 +305,40 @@ fn tool(p: &Preferences, cancel: &crate::task::Cancellation) -> io::Result<(Path
     let mut candidates = discover(&preferences.executable);
     candidates.sort_by_key(|path| hint(path) != Some(Kind::X));
     let deadline = Instant::now() + Duration::from_secs(8);
+    let mut detail = None;
     for candidate in candidates {
         cancel.check()?;
         if Instant::now() >= deadline {
             break;
         }
-        if let Ok(v) = verify_until(&candidate, cancel, deadline) {
-            if v.kind == Kind::X && v.version != "Version unavailable" {
-                return Ok((candidate, v));
+        let reason = match verify_probe(&candidate, cancel, deadline, false) {
+            Ok(v) if v.kind == Kind::X && v.version != "Version unavailable" => {
+                return Ok((candidate, v))
             }
+            Ok(v) => format!(
+                "{}: {}",
+                language.text("Detected emulator"),
+                v.kind.caption()
+            ),
+            Err(error) => {
+                cancel.check()?;
+                error.to_string()
+            }
+        };
+        if detail.is_none() {
+            detail = Some(format!(
+                "{}\n{reason}",
+                crate::filesystem::display_name(&candidate.to_string_lossy())
+            ));
         }
     }
-    Err(io::Error::other("Windows 9x requires DOSBox-X. Install it or select its executable; DOSBox Staging and classic DOSBox are not used for this profile."))
+    let message = detail.map_or_else(
+        || language.text("Windows 9x requires DOSBox-X. Install it or select its executable; DOSBox Staging and classic DOSBox are not used for this profile.").to_owned(),
+        |detail| format!("{}\n\n{detail}\n\n{}", language.text("DOSBox-X could not be verified for Windows 9x."), language.text("Select DOSBox-X in Windows 9x settings and use Check to verify it.")),
+    );
+    Err(io::Error::other(message))
 }
+
 fn boot_arguments(verified: &Verified, fragment: &Path, image: &str) -> Vec<std::ffi::OsString> {
     let mut args = profile::arguments(verified, fragment);
     args.extend([
@@ -340,7 +365,7 @@ fn prepare_launch(
             "This Windows disk image is already running in DN. Close its emulator first.",
         ));
     }
-    let (executable, verified) = tool(&p, &cancel)?;
+    let (executable, verified) = tool(&p, language, &cancel)?;
     let config = p.configuration()?;
     if !boot {
         return Ok(Reply::Checked(format!("{}\n{}\n{} · {} MiB\n{}\n{}\n{}",language.text("DOSBox-X and image header checked. Windows installation and successful guest boot are not verified."),crate::filesystem::display_name(&path.to_string_lossy()),p.edition.label(),p.memory_mb,verified.version,crate::filesystem::display_name(&executable.to_string_lossy()),config)));
@@ -561,6 +586,72 @@ mod tests {
         assert!(super::super::Profile::default().render(&v)?.is_empty());
         Ok(())
     }
+    #[test]
+    #[ignore = "requires DN_TEST_DOSBOX_X pointing to an installed emulator; version query only"]
+    fn installed_dosbox_x_is_verified_without_booting_a_guest() -> io::Result<()> {
+        let executable = std::env::var_os("DN_TEST_DOSBOX_X")
+            .ok_or_else(|| io::Error::other("Set DN_TEST_DOSBOX_X to the installed executable"))?;
+        let p = Preferences {
+            executable: executable
+                .into_string()
+                .map_err(|_| io::Error::other("Executable path must be Unicode"))?,
+            ..Default::default()
+        };
+        let (path, verified) = tool(
+            &p,
+            crate::localization::Language::English,
+            &Default::default(),
+        )?;
+        assert_eq!(verified.kind, Kind::X);
+        assert_ne!(verified.version, "Version unavailable");
+        println!("Verified {}: {}", path.display(), verified.version);
+        Ok(())
+    }
+    #[cfg(unix)]
+    #[test]
+    fn windows_verification_accepts_x_version_exit_one_and_keeps_failure_details() -> io::Result<()>
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let (w, mut p) = fixture()?;
+        let executable = w.root.join("dosbox-x");
+        p.executable = executable.to_str().unwrap().into();
+        fs::write(
+            &executable,
+            "#!/bin/sh\necho 'DOSBox-X version 2026.10.01 SDL2'\nexit 1\n",
+        )?;
+        fs::set_permissions(&executable, fs::Permissions::from_mode(0o700))?;
+        let (_, verified) = tool(
+            &p,
+            crate::localization::Language::English,
+            &Default::default(),
+        )?;
+        assert_eq!(verified.kind, Kind::X);
+        assert!(verified.version.contains("2026.10.01"));
+        fs::write(
+            &executable,
+            "#!/bin/sh\necho 'private verification failure' >&2\nexit 2\n",
+        )?;
+        let error = tool(
+            &p,
+            crate::localization::Language::English,
+            &Default::default(),
+        )
+        .expect_err("invalid tool must fail")
+        .to_string();
+        assert!(error.contains("private verification failure"), "{error}");
+        assert!(error.contains("dosbox-x"), "{error}");
+        let language = crate::localization::Language::Russian;
+        let error = tool(&p, language, &Default::default())
+            .expect_err("invalid tool must fail")
+            .to_string();
+        assert!(
+            error.contains(language.text("DOSBox-X could not be verified for Windows 9x.")),
+            "{error}"
+        );
+        assert!(error.contains("private verification failure"), "{error}");
+
+        Ok(())
+    }
     #[cfg(unix)]
     #[test]
     fn windows_verification_refuses_other_emulators_without_launching() -> io::Result<()> {
@@ -575,7 +666,11 @@ mod tests {
         ] {
             fs::write(&executable, format!("#!/bin/sh\necho '{name}'\n"))?;
             fs::set_permissions(&executable, fs::Permissions::from_mode(0o700))?;
-            let result = tool(&p, &Default::default());
+            let result = tool(
+                &p,
+                crate::localization::Language::English,
+                &Default::default(),
+            );
             assert_eq!(result.is_ok(), name.starts_with("DOSBox-X"));
         }
         Ok(())
@@ -629,7 +724,7 @@ mod lifecycle_tests {
         fs::write(
             &executable,
             r#"#!/bin/sh
-case "${2:-$1}" in --version|-version) echo 'DOSBox-X 2026.10.01'; exit 0;; esac
+case "${2:-$1}" in --version|-version) echo 'DOSBox-X 2026.10.01'; exit 1;; esac
 printf '%s\n' "$@" > observed-args
 prev=''
 for arg in "$@"; do

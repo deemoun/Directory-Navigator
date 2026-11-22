@@ -226,14 +226,50 @@ fn output(
             }
         }
     }
-    if !status.success() {
+    let text = String::from_utf8_lossy(&bytes).into_owned();
+    if !status.success() && !version_query_exit_one(argument, status.code(), &text) {
         return Err(io::Error::other(format!(
-            "DOSBox verification failed ({status}): {}",
-            String::from_utf8_lossy(&bytes)
+            "DOSBox verification failed ({status}): {text}"
         )));
     }
-    Ok(String::from_utf8_lossy(&bytes).into_owned())
+    Ok(text)
 }
+/// DOSBox-X's version command can deliberately return 1 after a valid banner.
+/// Accept that query result only, never help failures, crashes or unversioned errors.
+fn version_query_exit_one(argument: &str, code: Option<i32>, text: &str) -> bool {
+    if code != Some(1) || !matches!(argument, "-version" | "--version") {
+        return false;
+    }
+    text.lines().any(|line| {
+        let lower = line.trim_start().to_ascii_lowercase();
+        let Some(rest) = lower
+            .strip_prefix("dosbox-x")
+            .or_else(|| lower.strip_prefix("dosbox x"))
+        else {
+            return false;
+        };
+        if !rest.starts_with(char::is_whitespace) {
+            return false;
+        }
+        let rest = rest.trim_start();
+        let rest = rest
+            .strip_prefix("version")
+            .unwrap_or(rest)
+            .trim_start_matches([' ', '\t', ':']);
+        let token = rest
+            .split_ascii_whitespace()
+            .next()
+            .unwrap_or("")
+            .trim_end_matches(',');
+        let core = token.split('-').next().unwrap_or("");
+        let parts = core.split('.');
+        parts.clone().count() >= 2
+            && parts
+                .into_iter()
+                .all(|part| !part.is_empty() && part.bytes().all(|b| b.is_ascii_digit()))
+    })
+}
+
 fn host_shell_script(path: &Path) -> bool {
     cfg!(windows)
         && path
@@ -248,6 +284,14 @@ fn verify_until(
     executable: &Path,
     cancel: &crate::task::Cancellation,
     deadline: Instant,
+) -> io::Result<Verified> {
+    verify_probe(executable, cancel, deadline, true)
+}
+fn verify_probe(
+    executable: &Path,
+    cancel: &crate::task::Cancellation,
+    deadline: Instant,
+    allow_unverified: bool,
 ) -> io::Result<Verified> {
     if host_shell_script(executable) {
         return Err(io::Error::other(
@@ -314,7 +358,7 @@ fn verify_until(
         }
         // Some GUI builds do not return version text through redirected handles.
         // Keep known installed entry points usable and identify the limitation.
-        if let Some(kind) = hinted {
+        if let Some(kind) = hinted.filter(|_| allow_unverified) {
             return Ok(Verified {
                 kind,
                 flag: if kind == Kind::Staging {
@@ -1075,6 +1119,26 @@ mod tests {
     impl Drop for Fixture {
         fn drop(&mut self) {
             let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+    #[test]
+    fn version_query_exit_one_requires_a_numbered_x_banner_and_version_flag() {
+        let banner = "\nDOSBox-X version 2026.10.01 SDL2, copyright 2011-2026\n";
+        for flag in ["-version", "--version"] {
+            assert!(version_query_exit_one(flag, Some(1), banner));
+        }
+        for code in [None, Some(0), Some(2), Some(139)] {
+            assert!(!version_query_exit_one("-version", code, banner));
+        }
+        assert!(!version_query_exit_one("-help", Some(1), banner));
+        for bad in [
+            "DOSBox-X failed to initialize SDL",
+            "DOSBox-X version unavailable",
+            "DOSBox-X version 2026",
+            "DOSBox Staging 0.83.0",
+            "not DOSBox-X version 2026.10.01",
+        ] {
+            assert!(!version_query_exit_one("-version", Some(1), bad), "{bad}");
         }
     }
     #[test]
