@@ -1,15 +1,21 @@
 # Directory Navigator
 
-## Current status — published stable 1.1.15
+## Current status — published stable 1.1.17
 
-Directory Navigator **1.1.15 is published** on
-[crates.io](https://crates.io/crates/directory-navigator/1.1.15). Publication used
-`cargo publish --locked`; Cargo confirmed registry availability, and a separate
-registry lookup/download confirmed version 1.1.15. The published package was
-verified against clean source commit `1c338de` and contains the final CI fixes and
-workflow split. The crate is `directory-navigator`; the installed command remains
-`dn`. macOS, Linux and Windows remain supported. Version 1.1.9 was the first
-stable release.
+Directory Navigator **1.1.17 is published** on
+[crates.io](https://crates.io/crates/directory-navigator/1.1.17). Publication used
+`cargo publish --locked` from clean source commit `dff31b2`; Cargo confirmed
+registry availability, and a separate public registry lookup confirmed version
+1.1.17 is available and not yanked. The crate is `directory-navigator`; the
+installed command remains `dn`. macOS, Linux and Windows remain supported.
+Version 1.1.9 was the first stable release.
+
+Version 1.1.17 is a DOSBox-X detection patch on top of 1.1.16. The latter includes
+the portable PNG/JPEG/WebP viewer, shared DOS settings and saved Windows 9x image
+profiles, optional extra DOS drives and window-resolution controls, persistent
+command history, comparison filters/refresh, Transfer Center actions and visual
+polish. Implementation-stage records below retain their original validation
+versions and results; they are not claims of fresh 1.1.17 platform coverage.
 
 Normal builds include music audio support. Acoustic remains an optional build
 feature excluded from default builds, and its plugin is disabled by default.
@@ -22,7 +28,7 @@ See the [English README](README.md), [Russian README](README.ru.md) and
 [user guide](docs/USER_GUIDE.md) for supported workflows, installation, controls,
 safeguards and limits.
 
-## Unreleased DOSBox-X version-query correction
+## Changes released in 1.1.17 — DOSBox-X detection
 
 The installed macOS DOSBox-X 2026.10.01 prints a valid version banner but returns
 exit code 1 for both version flags. DN previously discarded that output; normal
@@ -33,20 +39,44 @@ exit codes, signals, help failures and unversioned errors retain their failure
 behavior. Windows 9x probes retain the original verification cause and executable
 path, with localized context/advice, instead of dropping them into an install-only
 message. Explicit and automatic verification passed against the installed Mac
-bundle without booting a guest or accessing a user disk image. This is a local
-unreleased fix; it does not alter the published 1.1.16 crate or bump the version.
+bundle without booting a guest or accessing a user disk image. The correction is
+included in the published 1.1.17 crate; the existing 1.1.16 crate is unchanged.
 
-Validation on macOS ARM64: the regression failed before the fix; all 31 DOS tests,
-19 affected plugin/localization tests, strict Rust 1.100 all-target Clippy,
-no-default-features checking, formatting and diff checks passed. The locked local
-release rebuild reports 1.1.16; all 16 launcher terminal tests passed against it,
-including a mock DOSBox-X returning 1 for its version query and terminal
-restoration. The opt-in installed-emulator test passed for both explicit and
-automatic discovery. Linux/Windows runtime checks remain unavailable; their
-cross-checks still stop in ring at missing Linux C compilers / Windows SDK
-headers. No CI, publication, user-image boot or version bump was performed.
+### Local release validation and coverage
 
-## Unreleased recent-window visual polish
+The DOSBox-X regression failed before the fix. Initial patch validation passed
+31 DOS tests and 19 affected plugin/localization tests against a local 1.1.16
+build. During 1.1.17 preparation on macOS ARM64, the full native suite passed **1,443 tests**, with **15 opt-in tests
+ignored**. Strict Rust 1.100 all-target Clippy passed with default and acoustic
+features; the no-audio CI suites passed 17 tests and acoustic-enabled UI suites
+passed 28. All 44 Python release/packaging helpers, workflow-policy tests,
+formatting and diff checks passed. These are local results, not a verified
+five-platform GitHub CI run.
+
+The locked release rebuild reports `Directory Navigator 1.1.17`. All 16 launcher
+terminal tests passed against that binary, including a mock DOSBox-X returning 1
+for its version query and terminal restoration. The opt-in installed-emulator
+test passed for both explicit and automatic discovery of DOSBox-X 2026.10.01 on
+this Mac. No user disk image was accessed or Windows guest booted.
+
+`cargo publish --dry-run --locked --allow-dirty` and
+`cargo package --locked --allow-dirty` passed while only the reviewed manifest and
+lockfile version bump was uncommitted. The archive contained **498 files** and
+was checked for the current fix and regression test. After that bump was
+committed, actual publication used clean source and `cargo publish --locked`.
+
+Linux x86_64/ARM64 and Windows whole-program cross-checks stopped in ring at
+missing Linux C cross-compilers / Windows SDK headers on this Mac. They are not
+cross-build passes. Linux/Windows runtime checks remain unavailable; no new CI
+result is claimed and no workflow was triggered during preparation/publication.
+
+## Historical 1.1.16 implementation and validation
+
+The following features shipped in 1.1.16 and remain in 1.1.17. Records describe
+implementation-stage checks against local 1.1.15 builds. References to work being
+unreleased or to no publication occurring describe those stages only.
+
+### Recent-window visual polish
 
 The layout audit reproduced clipped Russian Video Merge buttons and long Windows
 image names hiding profile details. Video Merge source/footer actions now use
@@ -70,7 +100,7 @@ Linux x86_64/ARM64 and Windows cross-checks stopped in ring at missing C
 cross-compilers / Windows SDK headers on this Mac; no native runtime coverage
 there or new CI result is claimed. No workflow, publication or upload was run.
 
-## Unreleased portable image viewer
+### Portable image viewer
 
 F3 disk-file viewing detects PNG, JPEG and WebP, decodes in bounded owned workers,
 and prepares portable colored-cell images through the existing viewer/native
@@ -113,7 +143,7 @@ dependency at missing Linux C cross-compilers / Windows SDK headers. Real Linux
 tty colors/fonts and Linux/Windows runtime behavior remain untested here. No CI
 run or publication was performed.
 
-## Unreleased DOS window resolution
+### DOS window resolution
 
 Ordinary DOS settings now include Automatic (inherited) and six fixed initial
 window sizes, from 640x480 to 1920x1080. The private configuration fragment uses
@@ -136,7 +166,7 @@ Release was rebuilt and verified as 1.1.15; all 16 launcher terminal scenarios
 passed against it, including resolution selection, generated configuration and
 terminal restoration. Formatting and diff checks passed. No CI was triggered.
 
-## Unreleased extra DOS drive
+### Extra DOS drive
 
 Ordinary DOS launches now optionally share DN Temp Drive or a real folder as
 D:–X:, through an owned DOS settings page and folder-tree picker. Off remains the
@@ -163,7 +193,7 @@ Rust 1.100 all-target Clippy passed for default and acoustic-enabled builds;
 no-default-features checking, formatting, all 44 Python helpers, the 15 workflow
 policy tests, local documentation links and `git diff --check` also passed.
 
-## Unreleased Windows 9x saved-image profiles
+### Windows 9x saved-image profiles
 
 The DOS launcher now has a saved-image selector and a separate Windows 9x
 settings page. Up to 32 image profiles retain individual edition, RAM, DOSBox-X
@@ -186,7 +216,7 @@ booting from the main launcher and terminal restoration. Linux ARM64/x86_64 and
 Windows cross-checks remain blocked by missing cross-C compilers/Windows SDK
 headers while building ring; no native runtime coverage is claimed for them.
 
-## Unreleased shared DOS settings
+### Shared DOS settings
 
 The opt-in experimental DOS launcher adds one shared CPU/memory/display profile,
 with inherited defaults and nested draft OK/Cancel. Explicit settings are loaded
@@ -209,7 +239,7 @@ Windows cross-checks remain blocked by missing SDK headers in a dependency.
 No real emulator/game or Linux/Windows runtime testing, publication or CI run was
 performed for this change.
 
-## Unreleased everyday-usability work
+### Everyday-usability work
 
 The checkout adds opt-in plain-text command history beside the actual configuration,
 with bounded background delta writes, locked merging, Cancel-first clearing and
@@ -218,7 +248,7 @@ captured roots, retaining stale snapshots while scanning. Transfer Center retain
 typed local destination summaries and adds Open destination / Copy details;
 Continue queued starts waiting jobs without retrying failures.
 
-These changes retain DN 1.1.15 and are separate from the published crate.
+At implementation time these changes retained DN 1.1.15; they shipped in 1.1.16.
 Local validation on macOS ARM64 covered every native test target. Stale transfer
 readiness and System Setup/Commands History frame expectations were corrected;
 the affected native suites passed on rerun. Only the 32 intentionally changed
@@ -334,7 +364,7 @@ contained **486 files**, including required sources, assets, notices and the new
 workflow, while excluding build/reference outputs. No source or version changes
 were made during publication.
 
-### Current validation boundaries
+### Historical 1.1.15 validation boundaries
 
 A complete successful five-platform 1.1.15 CI run has **not** been verified here.
 Reported CI failures and their local corrections are distinct from a green CI
@@ -2109,10 +2139,10 @@ older increment entries below also record earlier migration stages.
   guarantee every final keystroke.
 - Published builds provide non-recursive Unix permission / Windows attribute
   editing and desktop text clipboard access with an internal console fallback.
-  Published 1.1.15 keeps command history in memory; the unreleased checkout adds
-  opt-in persistent command history as described above. DN's internal clipboard
-  remains session-only. External commands run with the user's
-  permissions; user menus do not emulate DOS batch syntax.
+  Command history is optionally persisted as plain text, off by default, as
+  described above. DN's internal clipboard remains session-only. External
+  commands run with the user's permissions; user menus do not emulate DOS batch
+  syntax.
 - Nearby remains directly connected LAN-only: no relays, internet probes, routed
   private-network/NAT exceptions or persistent trust. Multicast discovery can
   still require manual connection details, and a direct UDP path is necessary.
@@ -2122,7 +2152,8 @@ older increment entries below also record earlier migration stages.
   names; Finder Put Back is not guaranteed. Restore through the desktop manager.
   Linux external opening needs xdg-utils and a desktop session.
 - Suggested follow-up work: transfer interruption/recovery hardening, actionable
-  bug-report diagnostics, persistent command history and broader desktop/console validation. These are candidates, not committed release promises.
+  bug-report diagnostics and broader desktop/console validation. These are
+  candidates, not committed release promises.
 
 ## Build and run
 
