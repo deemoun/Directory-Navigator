@@ -186,8 +186,16 @@ fn pane_navigation_marks_refresh_identity_and_disconnect_keep_native_paths() -> 
     memory.put("/file.txt", Some(b"text"));
     let mut app = crate::app::App::new(t.0.clone())?;
     pump(&mut app, |a| a.panels.iter().all(|p| !p.loading));
+    let outer_types = crate::panel::filter::TypesFilter {
+        hide: false,
+        selected: [None].into(),
+    };
+    app.panels[0].set_filename_filter(crate::panel::filter::FilenameFilter::Types(
+        outer_types.clone(),
+    ))?;
     let conn = Connection::test(profile(), memory.clone());
     app.panels[0].open_remote(conn, true)?;
+    assert!(app.panels[0].types_filter.is_none());
     pump(&mut app, |a| !a.panels[0].loading);
     assert_eq!(app.panels[0].path, t.0);
     assert!(app.panels[0].heading().starts_with("sftp://"));
@@ -225,6 +233,7 @@ fn pane_navigation_marks_refresh_identity_and_disconnect_keep_native_paths() -> 
     app.panels[0].leave_remote(true);
     pump(&mut app, |a| !a.panels[0].loading);
     assert!(!app.panels[0].is_virtual());
+    assert_eq!(app.panels[0].types_filter, Some(outer_types));
     assert_eq!(std::fs::read(t.0.join("local"))?, b"unchanged");
     assert_eq!(app.panels[1].path, t.0);
     Ok(())

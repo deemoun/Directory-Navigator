@@ -879,6 +879,36 @@ rebuild. Catalogs are not loaded from the current directory. Missing resources
 fall back to English; some detailed diagnostics remain English and OS errors are
 shown unchanged. No system locale or timezone settings are changed.
 
+## Filename filter and file types
+
+Panel → Filename filter… (Alt+Del) starts in the current filter mode. **Wildcard**
+keeps case-sensitive `*`/`?` matching; semicolons are literal, not separators.
+Empty input or `*` clears the wildcard filter. **File types** lists extensions and
+counts from the loaded panel cache, including entries excluded by the filename
+filter. Hidden entries follow the panel’s hidden-file setting; no new read or
+recursive scan is started.
+
+Use Space/click to select several types and choose **Show selected / Hide
+selected**. Arrows, Home/End, Page keys and wheel navigate. Matching is exact and
+case-sensitive on every platform: `.jpg` and `.JPG` are separate. Only the final
+extension counts (`archive.tar.gz` is `.gz`). **No extension** includes `.profile`;
+a trailing dot is a distinct empty extension, displayed as `.`. Directories and
+`..` stay visible in File types mode; wildcard behavior is unchanged.
+
+Apply commits to the originating pane; Cancel/Esc discards all draft edits.
+Clear resets the draft; Apply without selected types clears filtering. Marks
+remain, including filtered-out marks; file operations use visible marks. The
+highlighted native filename is retained when visible, otherwise selection and
+scroll are clamped. The other pane stays unchanged. Reopen the dialog if its
+captured directory changes before Apply. F1 opens filter help.
+
+The picker shows at most 256 distinct types, retaining active selections even
+when their current count is zero. A notice explains a limited list; use Wildcard
+for other extensions. The serialized native selection is limited to 4 KiB;
+oversized choices are refused without changing the live filter. Refresh retains
+filters; archive/remote exit restores the originating pane’s filter. Panel session
+restoration also preserves the selected mode and native extension keys.
+
 ## Comparison report filters and refresh
 
 **Show** selects All, Different, Left only, Right only, Identical or Not compared.

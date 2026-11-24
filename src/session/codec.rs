@@ -73,6 +73,21 @@ pub(crate) fn decode(value: &V) -> io::Result<Snapshot> {
                 path: path(t, "path")?,
                 cursor,
                 filter,
+                types_filter: t
+                    .get("file_types")
+                    .map(|value| {
+                        let t = table(value)?;
+                        let values = t.get("extensions").and_then(V::as_array).ok_or_else(bad)?;
+                        if values.len() > crate::panel::filter::MAX_TYPES {
+                            return Err(bad());
+                        }
+                        let values = values
+                            .iter()
+                            .map(|v| v.as_str().map(str::to_owned).ok_or_else(bad))
+                            .collect::<io::Result<Vec<_>>>()?;
+                        crate::panel::filter::TypesFilter::decode(boolean(t, "hide")?, &values)
+                    })
+                    .transpose()?,
                 offset: num(t, "offset")?,
             })
         })
@@ -169,10 +184,20 @@ pub(crate) fn encode(snapshot: &Snapshot) -> io::Result<V> {
                 t.insert("cursor".into(), p(cursor));
             }
             t.insert("filter".into(), s(&r.filter));
+            if let Some(types) = &r.types_filter {
+                types.validate()?;
+                let mut value = Table::new();
+                value.insert("hide".into(), V::Boolean(types.hide));
+                value.insert(
+                    "extensions".into(),
+                    V::Array(types.encoded().iter().map(|v| s(v)).collect()),
+                );
+                t.insert("file_types".into(), V::Table(value));
+            }
             t.insert("offset".into(), n(r.offset));
-            V::Table(t)
+            Ok(V::Table(t))
         })
-        .collect();
+        .collect::<io::Result<Vec<_>>>()?;
     let documents = snapshot
         .documents
         .iter()

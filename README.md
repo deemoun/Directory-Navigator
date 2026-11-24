@@ -257,6 +257,12 @@ check unsaved changes across the relevant editors. Editors and viewers open maxi
 can be moved or resized, and support **Tile** and **Cascade** through the Manager
 menu or window list. File-document geometry can be restored with the optional session settings.
 
+**Panel → Filename filter…** (Alt+Del) offers a wildcard or a multi-select file-type
+picker. Show/Hide selected matches extensions exactly and keeps directories
+visible; `.jpg` and `.JPG` differ. It uses loaded entries, respects hidden-file
+visibility and preserves marks. Cancel keeps the old filter; Clear resets the
+draft. See the [guide](docs/USER_GUIDE.md#filename-filter-and-file-types).
+
 Copy and Move use a switchable **Transfer Center**: continue browsing or editing
 while one transfer runs and others wait in its queue. **Manager → Transfers…**
 reopens progress and results. Closing the window keeps work running; errors or

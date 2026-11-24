@@ -75,6 +75,7 @@ fn snapshot(t: &Temp) -> Snapshot {
             path: t.0.clone(),
             cursor: None,
             filter: String::new(),
+            types_filter: None,
             offset: 0,
         }),
         active_panel: 1,
@@ -136,6 +137,7 @@ fn panel_restoration_preserves_filter_cursor_scroll_and_clears_marks() -> io::Re
         path: dir.clone(),
         cursor: Some("item-37.txt".into()),
         filter: "*.txt".into(),
+        types_filter: None,
         offset: 30,
     };
     a.config.session = Some(snap);
@@ -462,5 +464,54 @@ fn quit_capture_uses_the_final_saved_path_and_never_contains_buffer_text() -> io
     let saved = capture(&a)?.unwrap();
     assert_eq!(saved.documents[0].path, new);
     assert!(!encode(&saved)?.to_string().contains("private unsaved text"));
+    Ok(())
+}
+
+#[test]
+fn file_type_filters_roundtrip_restore_and_reject_corrupt_native_keys() -> io::Result<()> {
+    use crate::panel::filter::{FilenameFilter, TypesFilter};
+    let t = Temp::new()?;
+    fs::write(t.0.join("a.txt"), b"text")?;
+    fs::write(t.0.join("b.png"), b"image")?;
+    let types = TypesFilter {
+        hide: false,
+        selected: [
+            None,
+            Some("".into()),
+            Some("txt".into()),
+            Some("юникод".into()),
+        ]
+        .into(),
+    };
+    let mut snap = snapshot(&t);
+    snap.panels[0].types_filter = Some(types.clone());
+    let value = codec::encode(&snap)?;
+    assert_eq!(codec::decode(&value)?, snap);
+    let config_path = t.0.join("file-types.conf");
+    let config = Config {
+        session: Some(snap.clone()),
+        ..Config::default()
+    };
+    config.save(&config_path)?;
+    assert_eq!(Config::read(&config_path)?.session, Some(snap.clone()));
+    let mut app = t.app()?;
+    pump(&mut app)?;
+    app.config.session = Some(snap);
+    begin(&mut app, false);
+    pump(&mut app)?;
+    assert_eq!(
+        app.panels[0].filename_filter(),
+        FilenameFilter::Types(types)
+    );
+    assert!(app.panels[0].entries.iter().any(|e| e.name == "a.txt"));
+    assert!(!app.panels[0].entries.iter().any(|e| e.name == "b.png"));
+    let mut broken = value;
+    broken["panels"][0]["file_types"]["extensions"] =
+        toml::Value::Array(vec![toml::Value::String("not-a-native-key".into())]);
+    assert!(codec::decode(&broken).is_err());
+    let mut old = codec::encode(&snapshot(&t))?;
+    assert!(old["panels"][0].get("file_types").is_none());
+    old["panels"][0]["filter"] = toml::Value::String("*.png".into());
+    assert_eq!(codec::decode(&old)?.panels[0].filter, "*.png");
     Ok(())
 }

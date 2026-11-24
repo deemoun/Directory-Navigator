@@ -124,3 +124,71 @@ fn completed_transfer_destination_and_details_restore_terminal() -> io::Result<(
     )?;
     s.finish()
 }
+
+#[test]
+fn file_types_filter_multiselect_cancel_resize_and_terminal_restoration() -> io::Result<()> {
+    // These fixtures use single-cell ASCII names; at 80 columns the originating
+    // pane occupies the left 40 cells. The opposite pane must remain unfiltered.
+    fn left_listing(s: &Session) -> String {
+        s.text()
+            .lines()
+            .skip(2)
+            .take(16)
+            .map(|line| line.chars().take(40).collect::<String>())
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+    let mut s = Session::new("file-types-filter")?;
+    s.wait("manager ready", Session::command_prompt_active)?;
+    fs::write(s.root.join("alpha.jpg"), b"private fixture")?;
+    fs::write(s.root.join("beta.png"), b"private fixture")?;
+    s.send(b"\x12", "refresh private types", |s| {
+        s.text().contains("beta.png")
+            && fs::read_to_string(s.root.join("settings/dn/diagnostics.txt")).is_ok_and(|state| {
+                state
+                    .lines()
+                    .any(|line| line == "panels_loading=[false, false]")
+            })
+    })?;
+    s.send(b"\x1b[3;3~", "filename filter", |s| {
+        s.text().contains("Filename filter")
+    })?;
+    click(&mut s, "Filter mode", "file type mode", |s| {
+        s.text().contains("Show selected")
+    })?;
+    click(&mut s, ".png (", "select PNG", |s| {
+        s.text().contains("[x] .png")
+    })?;
+    click(&mut s, ".jpg (", "select JPEG", |s| {
+        s.text().contains("[x] .jpg")
+    })?;
+    s.resize(110, 32)?;
+    s.resize(80, 25)?;
+    click(&mut s, "Apply", "apply types", |s| {
+        s.command_prompt_active() && !s.text().contains("Filename filter")
+    })?;
+    let screen = left_listing(&s);
+    assert!(screen.contains("alpha.jpg") && screen.contains("beta.png"));
+    assert!(!screen.contains("item-000"));
+    assert!(s.text().contains("item-000")); // opposite pane is unchanged.
+    s.send(b"\x1b[3;3~", "reopen type filter", |s| {
+        s.text().contains("[x] .png")
+    })?;
+    click(&mut s, "Clear", "clear draft only", |s| {
+        s.text().contains("Wildcard")
+    })?;
+    s.send(b"\x1b", "cancel draft", |s| {
+        s.command_prompt_active() && !s.text().contains("Filename filter")
+    })?;
+    assert!(!left_listing(&s).contains("item-000"));
+    s.send(b"\x1b[3;3~", "reopen retained types", |s| {
+        s.text().contains("[x] .png")
+    })?;
+    click(&mut s, "Clear", "reset draft", |s| {
+        s.text().contains("Wildcard")
+    })?;
+    click(&mut s, "Apply", "clear filter", |s| {
+        s.command_prompt_active() && left_listing(s).contains("item-000")
+    })?;
+    s.finish()
+}

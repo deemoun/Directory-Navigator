@@ -2078,3 +2078,17 @@ Browse…	Browse…
 Detected emulator	Detected emulator
 DOSBox-X could not be verified for Windows 9x.	DOSBox-X could not be verified for Windows 9x.
 Select DOSBox-X in Windows 9x settings and use Check to verify it.	Select DOSBox-X in Windows 9x settings and use Check to verify it.
+Filter mode	Filter mode
+File types	File types
+Wildcard	Wildcard
+No extension	No extension
+Show selected	Show selected
+Hide selected	Hide selected
+Only 256 types shown; use Wildcard for other types.	Only 256 types shown; use Wildcard for other types.
+No file types in the loaded listing.	No file types in the loaded listing.
+Space/click selects types; exact case (.jpg differs from .JPG).	Space/click selects types; exact case (.jpg differs from .JPG).
+Case-sensitive * and ?; empty or * clears.\nParent stays visible. File types keeps directories visible.	Case-sensitive * and ?; empty or * clears.\nParent stays visible. File types keeps directories visible.
+Loaded entries only; hidden setting applies. Marks are preserved.	Loaded entries only; hidden setting applies. Marks are preserved.
+Directory changed; reopen the filename filter.	Directory changed; reopen the filename filter.
+File type selection exceeds 256 types / 4 KiB or contains invalid native extensions.	File type selection exceeds 256 types / 4 KiB or contains invalid native extensions.
+Wildcard keeps case-sensitive * and ? matching; semicolons remain literal. File types lists extensions from the loaded panel, including entries hidden by its filename filter. The hidden-file setting still applies.\nSpace/click toggles types; arrows, Page keys and wheel move. Show selected includes those types; Hide selected excludes them. Directories stay visible in File types mode. Extensions match exactly: .jpg and .JPG differ. No extension includes dotfiles without a suffix; a trailing dot is a separate empty extension.\nApply changes only the originating pane. Cancel/Esc keeps its filter. Clear resets the draft; Apply with no selected types clears filtering. Marks are retained; operations use visible marks. Up to 256 types and 4 KiB of serialized selection are supported; use Wildcard for types not shown. No directory scan is started.	Wildcard keeps case-sensitive * and ? matching; semicolons remain literal. File types lists extensions from the loaded panel, including entries hidden by its filename filter. The hidden-file setting still applies.\nSpace/click toggles types; arrows, Page keys and wheel move. Show selected includes those types; Hide selected excludes them. Directories stay visible in File types mode. Extensions match exactly: .jpg and .JPG differ. No extension includes dotfiles without a suffix; a trailing dot is a separate empty extension.\nApply changes only the originating pane. Cancel/Esc keeps its filter. Clear resets the draft; Apply with no selected types clears filtering. Marks are retained; operations use visible marks. Up to 256 types and 4 KiB of serialized selection are supported; use Wildcard for types not shown. No directory scan is started.

@@ -1,4 +1,5 @@
 pub mod archive;
+pub mod filter;
 pub mod remote;
 use crate::filesystem::{self, Entry};
 pub use archive::Location;
@@ -39,6 +40,7 @@ pub struct Panel {
     pub entries: Vec<Entry>,
     filtered_out: Vec<Entry>,
     pub filter: String,
+    pub types_filter: Option<filter::TypesFilter>,
     pub cursor: usize,
     pub offset: usize,
     pub loading: bool,
@@ -121,6 +123,7 @@ impl Panel {
             entries: Vec::new(),
             filtered_out: Vec::new(),
             filter: String::new(),
+            types_filter: None,
             cursor: 0,
             offset: 0,
             loading: false,
@@ -210,6 +213,7 @@ impl Panel {
                         if self.path != response.request.path {
                             self.selected.clear();
                             self.filter.clear();
+                            self.types_filter = None;
                         } else {
                             let names: BTreeSet<_> =
                                 entries.iter().map(|entry| &entry.name).collect();
@@ -300,10 +304,12 @@ impl Panel {
         } else {
             &self.filter
         });
-        let (mut visible, excluded): (Vec<_>, Vec<_>) = self
-            .entries
-            .drain(..)
-            .partition(|entry| entry.parent || matcher.matches(&entry.name));
+        let (mut visible, excluded): (Vec<_>, Vec<_>) = self.entries.drain(..).partition(|entry| {
+            self.types_filter.as_ref().map_or_else(
+                || entry.parent || matcher.matches(&entry.name),
+                |types| types.matches(entry),
+            )
+        });
         if needs_sort {
             sort_entries(&mut visible, self.sort);
         }
@@ -311,8 +317,14 @@ impl Panel {
         self.filtered_out = excluded;
         self.cursor = name
             .and_then(|name| self.entries.iter().position(|e| e.name == name))
-            .unwrap_or(0);
-        self.offset = 0;
+            .unwrap_or_else(|| {
+                if self.types_filter.is_some() {
+                    self.cursor.min(self.entries.len().saturating_sub(1))
+                } else {
+                    0
+                }
+            });
+        self.keep_visible_grid(self.viewport_rows, self.viewport_columns);
         self.total_files = 0;
         self.total_bytes = 0;
         self.unknown_sizes = false;
@@ -329,6 +341,7 @@ impl Panel {
         if self.loading {
             return;
         }
+        self.types_filter = None;
         self.filter = if pattern.is_empty() || pattern == "*" {
             String::new()
         } else {

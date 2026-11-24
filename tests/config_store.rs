@@ -47,6 +47,7 @@ fn defaults_with_panel_session(root: &std::path::Path) -> Config {
                 path: root.to_path_buf(),
                 cursor: None,
                 filter: String::new(),
+                types_filter: None,
                 offset: 0,
             }),
             active_panel: 0,

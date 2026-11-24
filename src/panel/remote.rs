@@ -30,6 +30,7 @@ struct Origin {
     excluded: Vec<Entry>,
     selected: BTreeSet<OsString>,
     filter: String,
+    types_filter: Option<filter::TypesFilter>,
     cursor: usize,
     offset: usize,
 }
@@ -73,6 +74,7 @@ impl Panel {
             excluded: std::mem::take(&mut self.filtered_out),
             selected: std::mem::take(&mut self.selected),
             filter: std::mem::take(&mut self.filter),
+            types_filter: self.types_filter.take(),
             cursor: self.cursor,
             offset: self.offset,
         };
@@ -352,6 +354,7 @@ impl Panel {
         self.filtered_out = remote.origin.excluded;
         self.selected = remote.origin.selected;
         self.filter = remote.origin.filter;
+        self.types_filter = remote.origin.types_filter;
         self.cursor = remote.origin.cursor;
         self.offset = remote.origin.offset;
         self.loading = false;
@@ -390,6 +393,7 @@ impl Panel {
                 .filter(|e| !e.parent)
                 .map(|e| PathBuf::from(&e.name)),
             filter: r.origin.filter.clone(),
+            types_filter: r.origin.types_filter.clone(),
             offset: r.origin.offset,
         })
     }

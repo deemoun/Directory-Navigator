@@ -41,6 +41,7 @@ pub struct PanelRecord {
     pub path: PathBuf,
     pub cursor: Option<PathBuf>,
     pub filter: String,
+    pub types_filter: Option<crate::panel::filter::TypesFilter>,
     pub offset: usize,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

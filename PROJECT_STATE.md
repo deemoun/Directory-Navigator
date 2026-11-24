@@ -28,6 +28,35 @@ See the [English README](README.md), [Russian README](README.ru.md) and
 [user guide](docs/USER_GUIDE.md) for supported workflows, installation, controls,
 safeguards and limits.
 
+## Unreleased extension filter picker
+
+The existing Filename filter dialog adds Wildcard / File types modes with
+multi-selection, exact native extension matching and Show/Hide selected. Counts
+come from cached visible/excluded entries, respect hidden visibility and perform
+no directory read. Type filtering keeps directories visible; marks and the other
+pane are preserved. Clear changes only the draft; Cancel leaves the live filter.
+The picker is bounded to 256 types and 4 KiB of serialized selection. Optional
+session fields preserve typed filters without changing the configuration version;
+archive/remote origin restoration carries them alongside the existing wildcard.
+The application version remains 1.1.17; this work is not in the published crate.
+
+Local validation on macOS ARM64: the full native suite passed **1,453 tests**,
+with **15 existing opt-in tests ignored**, including the core release-gate and
+15 workflow-policy tests. All eight filter integration tests passed; session
+coverage includes actual configuration-file round-trips and restoration. Strict
+Rust 1.100 all-target Clippy, no-default-features checks, 25 no-audio tests,
+44 Python helpers, documentation links, formatting and diff checks passed.
+Existing frame-parity snapshots remained unchanged. The 12-test everyday terminal
+suite passed against the rebuilt 1.1.17 release, including three private runtime
+scenarios for history, Transfer Center and filtering with terminal restoration.
+The new walkthrough asserts the originating pane separately from its unchanged
+opposite pane and accounts for brief-column filename truncation.
+
+Linux x86_64/ARM64 and Windows cross-Clippy attempts stopped in ring at missing
+Linux C cross-compilers / Windows SDK headers. No Linux/Windows runtime coverage
+or fresh CI result is claimed. No dependencies or version changes, publication,
+commit, push or workflow run were added.
+
 ## Changes released in 1.1.17 — DOSBox-X detection
 
 The installed macOS DOSBox-X 2026.10.01 prints a valid version banner but returns

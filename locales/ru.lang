@@ -2080,3 +2080,17 @@ Browse…	Обзор…
 Detected emulator	Обнаруженный эмулятор
 DOSBox-X could not be verified for Windows 9x.	Не удалось проверить DOSBox-X для Windows 9x.
 Select DOSBox-X in Windows 9x settings and use Check to verify it.	Укажите DOSBox-X в настройках Windows 9x и нажмите «Проверить».
+Filter mode	Режим фильтра
+File types	Типы файлов
+Wildcard	Маска
+No extension	Без расширения
+Show selected	Показывать выбранные
+Hide selected	Скрывать выбранные
+Only 256 types shown; use Wildcard for other types.	Показаны лишь 256 типов; для остальных используйте маску.
+No file types in the loaded listing.	В загруженном списке нет типов файлов.
+Space/click selects types; exact case (.jpg differs from .JPG).	Пробел/щелчок — выбор; регистр важен (.jpg и .JPG различаются).
+Case-sensitive * and ?; empty or * clears.\nParent stays visible. File types keeps directories visible.	Маска * и ? учитывает регистр; пустая или * сбрасывает фильтр.\nРодитель виден всегда. В режиме типов каталоги остаются видимыми.
+Loaded entries only; hidden setting applies. Marks are preserved.	Только загруженные записи; скрытые — по настройке. Отметки сохраняются.
+Directory changed; reopen the filename filter.	Каталог изменился; откройте фильтр имён заново.
+File type selection exceeds 256 types / 4 KiB or contains invalid native extensions.	Выбрано более 256 типов / 4 КиБ либо расширения содержат недопустимые данные.
+Wildcard keeps case-sensitive * and ? matching; semicolons remain literal. File types lists extensions from the loaded panel, including entries hidden by its filename filter. The hidden-file setting still applies.\nSpace/click toggles types; arrows, Page keys and wheel move. Show selected includes those types; Hide selected excludes them. Directories stay visible in File types mode. Extensions match exactly: .jpg and .JPG differ. No extension includes dotfiles without a suffix; a trailing dot is a separate empty extension.\nApply changes only the originating pane. Cancel/Esc keeps its filter. Clear resets the draft; Apply with no selected types clears filtering. Marks are retained; operations use visible marks. Up to 256 types and 4 KiB of serialized selection are supported; use Wildcard for types not shown. No directory scan is started.	Режим «Маска» сохраняет поиск с учётом регистра по * и ?; точка с запятой остаётся обычным символом. «Типы файлов» показывает расширения из загруженного списка панели, включая записи, исключённые её фильтром. Настройка скрытых файлов действует.\nПробел/щелчок выбирает типы; стрелки, Page и колесо перемещают курсор. «Показывать выбранные» оставляет эти типы, «Скрывать выбранные» исключает их. Каталоги остаются видимыми. Расширения сравниваются точно: .jpg и .JPG различаются. «Без расширения» включает имена вроде .profile; точка в конце — отдельное пустое расширение.\n«Применить» меняет только исходную панель. Esc/«Отмена» сохраняет фильтр. «Сбросить» очищает черновик; применение без выбранных типов снимает фильтр. Отметки сохраняются; операции используют видимые отметки. Не более 256 типов и 4 КиБ сохранённого выбора; для остальных используйте маску. Чтение каталога не запускается.

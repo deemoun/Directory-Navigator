@@ -1,6 +1,19 @@
+use crate::panel::filter::{FilenameFilter, TypeRow, TypesFilter};
 use crate::{app::App, dialog, menu};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use std::{path::PathBuf, time::Instant};
+#[derive(Clone, Debug)]
+pub struct FilterDraft {
+    pub panel: usize,
+    pub path: PathBuf,
+    pub location: (u64, usize),
+    pub revision: u64,
+    pub types_mode: bool,
+    pub types: TypesFilter,
+    pub rows: Vec<TypeRow>,
+    pub limited: bool,
+    pub row: usize,
+}
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Action {
     Slot(usize),
@@ -10,6 +23,10 @@ pub enum Action {
     Close,
     ApplyFilter,
     FilterField,
+    FilterMode,
+    FilterPolicy,
+    FilterType(usize),
+    ClearFilter,
     #[cfg(windows)]
     Drive(u8),
 }
@@ -27,6 +44,7 @@ pub enum Modal {
         last_click: Option<((usize, Option<PathBuf>), Instant)>,
     },
     Filter {
+        draft: FilterDraft,
         field: String,
         cursor: usize,
         focus: usize,
@@ -62,10 +80,24 @@ pub fn open_filter(app: &mut App) {
     app.modals.set_quick_search(None);
     let field = app.panels[app.active].filter.clone();
     let cursor = field.len();
+    let panel = &app.panels[app.active];
+    let (rows, limited) = panel.file_types();
+    let draft = FilterDraft {
+        panel: app.active,
+        path: panel.path.clone(),
+        location: panel.location_key(),
+        revision: panel.revision,
+        types_mode: panel.types_filter.is_some(),
+        types: panel.types_filter.clone().unwrap_or_default(),
+        rows,
+        limited,
+        row: 0,
+    };
     app.modals.set_navigation_dialog(Some(Modal::Filter {
+        draft,
         field,
         cursor,
-        focus: 0,
+        focus: 1,
     }));
 }
 pub fn assign(app: &mut App, slot: usize) {
@@ -160,13 +192,69 @@ pub fn action(app: &mut App, action: Action) {
         Action::Clear => app.config.bookmarks[slot] = None,
         Action::Close => app.set_navigation_dialog(None),
         Action::ApplyFilter => {
-            if let Some(Modal::Filter { field, .. }) = app.take_navigation_dialog() {
-                app.panels[app.active].set_filter(field);
+            let Some(Modal::Filter { draft, field, .. }) = app.navigation_dialog() else {
+                return;
+            };
+            let panel = &app.panels[draft.panel];
+            if panel.loading
+                || panel.path != draft.path
+                || panel.location_key() != draft.location
+                || panel.revision != draft.revision
+            {
+                app.error("Directory changed; reopen the filename filter.");
+                return;
+            }
+            let index = draft.panel;
+            let filter = if draft.types_mode {
+                FilenameFilter::Types(draft.types.clone())
+            } else {
+                FilenameFilter::Wildcard(field.clone())
+            };
+            if let Err(error) = app.panels[index].set_filename_filter(filter) {
+                app.error(error.to_string());
+            } else {
+                app.set_navigation_dialog(None);
             }
         }
         Action::FilterField => {
             if let Some(Modal::Filter { focus, .. }) = app.navigation_dialog_mut() {
-                *focus = 0;
+                *focus = 1;
+            }
+        }
+        Action::FilterMode => {
+            if let Some(Modal::Filter { draft, .. }) = app.navigation_dialog_mut() {
+                draft.types_mode = !draft.types_mode;
+            }
+        }
+        Action::FilterPolicy => {
+            if let Some(Modal::Filter { draft, .. }) = app.navigation_dialog_mut() {
+                draft.types.hide = !draft.types.hide;
+            }
+        }
+        Action::FilterType(row) => {
+            if let Some(Modal::Filter { draft, focus, .. }) = app.navigation_dialog_mut() {
+                if let Some(value) = draft.rows.get(row) {
+                    draft.row = row;
+                    *focus = 1;
+                    if !draft.types.selected.remove(&value.extension) {
+                        draft.types.selected.insert(value.extension.clone());
+                    }
+                }
+            }
+        }
+        Action::ClearFilter => {
+            if let Some(Modal::Filter {
+                draft,
+                field,
+                cursor,
+                focus,
+            }) = app.navigation_dialog_mut()
+            {
+                draft.types = TypesFilter::default();
+                draft.types_mode = false;
+                field.clear();
+                *cursor = 0;
+                *focus = 1;
             }
         }
     }
@@ -175,14 +263,36 @@ pub fn paste(app: &mut App, text: &str) {
     if let Some(Modal::Filter {
         field,
         cursor,
-        focus: 0,
+        focus: 1,
+        draft,
     }) = app.navigation_dialog_mut()
     {
-        dialog::paste_input(field, cursor, text);
+        if !draft.types_mode {
+            dialog::paste_input(field, cursor, text);
+        }
     }
 }
 pub fn key(app: &mut App, key: KeyEvent) {
     reset_click(app);
+    if key.code == KeyCode::F(1) && matches!(app.navigation_dialog(), Some(Modal::Filter { .. })) {
+        app.push_dialog(crate::dialog::Dialog {
+            title: " Filename filter ",
+            message: HELP.into(),
+        });
+        return;
+    }
+    if key.code == KeyCode::Char(' ') {
+        if let Some(Modal::Filter {
+            draft, focus: 1, ..
+        }) = app.navigation_dialog()
+        {
+            if draft.types_mode {
+                let row = draft.row;
+                action(app, Action::FilterType(row));
+                return;
+            }
+        }
+    }
     if crate::dialog_controls::key(app, key, crate::focus::Focus::Navigation) {
         return;
     }
@@ -203,11 +313,20 @@ pub fn key(app: &mut App, key: KeyEvent) {
             }
         }
         Some(Modal::Filter {
+            draft,
             field,
             cursor,
             focus,
         }) => match key.code {
-            code if *focus == 0
+            code if *focus == 1 && draft.types_mode => {
+                if let Some(row) =
+                    crate::turbo::widgets::list_key(draft.row, draft.rows.len(), 6, code)
+                {
+                    draft.row = row;
+                }
+            }
+            code if *focus == 1
+                && !draft.types_mode
                 && !key
                     .modifiers
                     .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) =>
@@ -220,6 +339,21 @@ pub fn key(app: &mut App, key: KeyEvent) {
     }
 }
 pub fn mouse(app: &mut App, event: MouseEvent, target: Option<crate::mouse::Target>) {
+    if matches!(
+        event.kind,
+        MouseEventKind::ScrollUp | MouseEventKind::ScrollDown
+    ) {
+        if let Some(Modal::Filter { draft, .. }) = app.navigation_dialog_mut() {
+            if draft.types_mode {
+                draft.row = if event.kind == MouseEventKind::ScrollUp {
+                    draft.row.saturating_sub(1)
+                } else {
+                    (draft.row + 1).min(draft.rows.len().saturating_sub(1))
+                };
+                return;
+            }
+        }
+    }
     if event.kind == MouseEventKind::Down(MouseButton::Left) {
         if let Some(crate::mouse::Target::Navigation(Action::Slot(slot))) = target {
             if let Some(path) = app.config.bookmarks.get(slot) {
@@ -266,3 +400,7 @@ fn reset_click(app: &mut App) {
         *last_click = None;
     }
 }
+
+pub const HELP: &str = "Wildcard keeps case-sensitive * and ? matching; semicolons remain literal. File types lists extensions from the loaded panel, including entries hidden by its filename filter. The hidden-file setting still applies.
+Space/click toggles types; arrows, Page keys and wheel move. Show selected includes those types; Hide selected excludes them. Directories stay visible in File types mode. Extensions match exactly: .jpg and .JPG differ. No extension includes dotfiles without a suffix; a trailing dot is a separate empty extension.
+Apply changes only the originating pane. Cancel/Esc keeps its filter. Clear resets the draft; Apply with no selected types clears filtering. Marks are retained; operations use visible marks. Up to 256 types and 4 KiB of serialized selection are supported; use Wildcard for types not shown. No directory scan is started.";

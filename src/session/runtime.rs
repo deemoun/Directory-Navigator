@@ -69,6 +69,7 @@ pub(crate) fn capture(app: &App) -> io::Result<Option<Snapshot>> {
                 path: a.path.parent().unwrap_or(&p.path).to_owned(),
                 cursor: a.path.file_name().map(PathBuf::from),
                 filter: String::new(),
+                types_filter: None,
                 offset: 0,
             }
         } else {
@@ -80,6 +81,7 @@ pub(crate) fn capture(app: &App) -> io::Result<Option<Snapshot>> {
                     .filter(|e| !e.parent)
                     .map(|e| PathBuf::from(&e.name)),
                 filter: p.filter.clone(),
+                types_filter: p.types_filter.clone(),
                 offset: p.offset,
             }
         }
@@ -282,7 +284,11 @@ pub(crate) fn poll(app: &mut App) -> bool {
             if let Some(r) = state.panel_positions[i].take() {
                 if !state.interacted {
                     let p = &mut app.panels[i];
-                    p.set_filter(r.filter);
+                    p.set_filename_filter(r.types_filter.map_or_else(
+                        || crate::panel::filter::FilenameFilter::Wildcard(r.filter),
+                        crate::panel::filter::FilenameFilter::Types,
+                    ))
+                    .expect("validated session filter");
                     p.cursor = r
                         .cursor
                         .as_ref()
