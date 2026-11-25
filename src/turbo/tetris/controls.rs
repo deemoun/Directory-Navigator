@@ -35,8 +35,9 @@ pub(crate) fn spec(
 ) -> DialogSpec<'static> {
     let area = ctx.area;
     let lang = ctx.language;
-    let x = (area.width - 54) / 2;
-    let y = (area.height - 23) / 2;
+    let play = crate::tetris::layout::Play::new(area);
+    let x = play.bounds.x;
+    let y = play.bounds.y;
     let (focus, default, cancel) = match g.screen {
         Screen::Play => (
             g.play_focus,
@@ -81,21 +82,21 @@ pub(crate) fn spec(
             s.hit(Rect::new(x + 2, y, 3, 1), crate::tetris::target(A::Close));
             let mut board = Control::new(
                 0,
-                Rect::new(x + 2, y + 2, 20, 20),
+                Rect::new(x + 2, y + 2, 24 * play.scale, 19 * play.scale),
                 ControlKind::Surface,
                 crate::tetris::target(A::BoardFocus),
             );
             board.paint = false;
             s.control(board);
             for (row, pair) in crate::tetris::BUTTONS.chunks(2).enumerate() {
-                let mut left = x + 28;
+                let mut left = play.sidebar();
                 for (column, (label, action)) in pair.iter().enumerate() {
                     let width = crate::tetris::layout::button_width(lang.text(label)).max(11);
                     button(
                         &mut s,
                         ctx,
                         row * 2 + column + 1,
-                        Rect::new(left, y + 17 + row as u16 * 2, width, 1),
+                        Rect::new(left, play.buttons_y() + row as u16 * 2, width, 1),
                         label,
                         *action,
                         true,

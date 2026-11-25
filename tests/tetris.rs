@@ -1230,3 +1230,62 @@ fn name_scroll_keeps_wide_graphemes_whole_and_cursor_after_the_actual_text() -> 
     }
     Ok(())
 }
+
+#[test]
+fn board_scales_on_large_terminals_and_restores_without_redraw_drift() -> io::Result<()> {
+    use dn::{localization::Language, palette::PaletteProfile};
+    let temp = Temp::new()?;
+    for language in [Language::English, Language::Russian] {
+        let mut app = temp.app()?;
+        app.config.language = language;
+        app.config.show_clock = false;
+        app.config.palette = PaletteProfile::ClassicDn;
+        tetris::open(&mut app);
+        let game = app.desktop.game_mut().unwrap();
+        game.paused = true;
+        game.board = [[0; WIDTH]; HEIGHT];
+        game.board[HEIGHT - 1][0] = 14;
+        for (w, h, scale) in [
+            (80, 25, 1),
+            (80, 43, 1),
+            (80, 44, 2),
+            (104, 63, 3),
+            (128, 82, 4),
+            (80, 25, 1),
+        ] {
+            let mut previous = None;
+            for _ in 0..3 {
+                let terminal = render(&mut app, w, h)?;
+                let b = terminal.backend().buffer();
+                let board = app
+                    .mouse
+                    .regions
+                    .iter()
+                    .find(|(_, target)| *target == dn::tetris::target(GameAction::BoardFocus))
+                    .unwrap()
+                    .0;
+                assert_eq!((board.width, board.height), (24 * scale, 19 * scale));
+                for dy in 0..scale {
+                    for dx in 0..2 * scale {
+                        let cell = &b[(board.x + dx, board.y + 18 * scale + dy)];
+                        assert_eq!(cell.symbol(), "█");
+                        assert_eq!(cell.fg, app.config.palette.color(14));
+                    }
+                }
+                let pixels = b.content.clone();
+                if let Some(old) = previous.replace(pixels.clone()) {
+                    assert_eq!(old, pixels);
+                }
+            }
+            click(&mut app, GameAction::Setup);
+            render(&mut app, w, h)?;
+            assert!(matches!(
+                app.desktop.game().unwrap().screen,
+                Screen::Setup { .. }
+            ));
+            key(&mut app, KeyCode::Esc);
+            assert_eq!(app.desktop.game().unwrap().screen, Screen::Play);
+        }
+    }
+    Ok(())
+}

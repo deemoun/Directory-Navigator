@@ -12,8 +12,10 @@ impl App {
         self.sync_modals();
         let history_changed = crate::command_line::persistence::poll(self);
         let workers_changed = self.workers.poll();
-        let experiments_changed =
-            crate::dos::poll(self) | crate::acoustic::poll(self) | crate::video::poll(self);
+        let experiments_changed = crate::dos::poll(self)
+            | crate::acoustic::poll(self)
+            | crate::video::poll(self)
+            | crate::notes::poll(self);
         let peer_changed = crate::peer::poll(self) | crate::bluetooth::poll(self);
         let clipboard_changed = crate::clipboard::poll(self);
         let associations_changed = crate::associations::poll(self);

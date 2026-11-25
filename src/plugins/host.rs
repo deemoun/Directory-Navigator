@@ -77,6 +77,11 @@ pub(crate) fn context(app: &App, b: Binding, area: Rect, now: Instant) -> Option
             Default::default()
         },
         acoustic: app.acoustic.view.clone(),
+        notes: if b.plugin == NOTE_TRAINER {
+            app.notes.view.clone()
+        } else {
+            Default::default()
+        },
         bluetooth: app.bluetooth.view.clone(),
         nearby: if b.plugin == NEARBY_TRANSFERS {
             app.peer.view.clone()
@@ -149,6 +154,9 @@ pub(crate) fn open(app: &mut App, id: PluginId) {
     }
     if id == VIDEO_MERGE {
         crate::video::opened(app);
+    }
+    if id == NOTE_TRAINER {
+        crate::notes::opened(app);
     }
     if id == ACOUSTIC_TRANSFERS {
         crate::acoustic::opened(app);
@@ -302,6 +310,9 @@ fn apply(app: &mut App, b: Binding, effects: Vec<Effect>) {
             }
             Effect::DosDiscover => crate::dos::discover_emulators(app, b),
             Effect::DosStop => crate::dos::stop(app, b),
+            Effect::Notes { generation, action } => {
+                crate::notes::action(app, b, generation, action);
+            }
             Effect::Acoustic { generation, action } => {
                 crate::acoustic::action(app, b, generation, action)
             }

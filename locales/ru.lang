@@ -2094,3 +2094,39 @@ Loaded entries only; hidden setting applies. Marks are preserved.	Только �
 Directory changed; reopen the filename filter.	Каталог изменился; откройте фильтр имён заново.
 File type selection exceeds 256 types / 4 KiB or contains invalid native extensions.	Выбрано более 256 типов / 4 КиБ либо расширения содержат недопустимые данные.
 Wildcard keeps case-sensitive * and ? matching; semicolons remain literal. File types lists extensions from the loaded panel, including entries hidden by its filename filter. The hidden-file setting still applies.\nSpace/click toggles types; arrows, Page keys and wheel move. Show selected includes those types; Hide selected excludes them. Directories stay visible in File types mode. Extensions match exactly: .jpg and .JPG differ. No extension includes dotfiles without a suffix; a trailing dot is a separate empty extension.\nApply changes only the originating pane. Cancel/Esc keeps its filter. Clear resets the draft; Apply with no selected types clears filtering. Marks are retained; operations use visible marks. Up to 256 types and 4 KiB of serialized selection are supported; use Wildcard for types not shown. No directory scan is started.	Режим «Маска» сохраняет поиск с учётом регистра по * и ?; точка с запятой остаётся обычным символом. «Типы файлов» показывает расширения из загруженного списка панели, включая записи, исключённые её фильтром. Настройка скрытых файлов действует.\nПробел/щелчок выбирает типы; стрелки, Page и колесо перемещают курсор. «Показывать выбранные» оставляет эти типы, «Скрывать выбранные» исключает их. Каталоги остаются видимыми. Расширения сравниваются точно: .jpg и .JPG различаются. «Без расширения» включает имена вроде .profile; точка в конце — отдельное пустое расширение.\n«Применить» меняет только исходную панель. Esc/«Отмена» сохраняет фильтр. «Сбросить» очищает черновик; применение без выбранных типов снимает фильтр. Отметки сохраняются; операции используют видимые отметки. Не более 256 типов и 4 КиБ сохранённого выбора; для остальных используйте маску. Чтение каталога не запускается.
+Note Trainer (Experimental)	Изучение нот (эксперимент)
+Note Trainer (Experimental)...	Изучение нот (эксперимент)...
+Note Trainer Help	Справка по изучению нот
+ [not compiled]	 [нет в сборке]
+Enlarge the terminal to 80x25 for the piano board.	Увеличьте терминал до 80x25 для отображения клавиатуры.
+Detected: —	Распознано: —
+Detected:	Распознано:
+cents	центов
+Play:	Сыграйте:
+Correct:	Верно:
+Correct — choose Next note	Верно — выберите следующую ноту
+Live board — play a single note; no audio is saved.	Играйте по одной ноте. Звук не сохраняется.
+Listen	Слушать
+Mode: Practice	Режим: упражнение
+Mode: Live	Режим: наблюдение
+Next note	Следующая нота
+> Heard · * Target · Click a piano key to set a practice target	> Звучит · * Задание · Щелчок по клавише выбирает ноту
+Octave -	Октава -
+Octave +	Октава +
+Sharps: On	Диезы: вкл.
+Sharps: Off	Диезы: выкл.
+Microphone level:	Уровень микрофона:
+Clipping	Перегрузка
+Press Listen to open the default microphone.	Нажмите «Слушать», чтобы открыть системный микрофон.
+Single notes · A4 = 440 Hz · Avoid background audio	По одной ноте · A4 = 440 Гц · Без фоновой музыки
+Microphone stopped	Микрофон остановлен
+Opening microphone…	Открытие микрофона…
+Listening — play one note at a time	Слушаю — играйте по одной ноте
+Stop Acoustic transfers before using the microphone.	Остановите акустическую передачу перед использованием микрофона.
+Microphone could not start; check system input and privacy permissions.	Не удалось открыть микрофон; проверьте аудиовход и разрешения.
+Microphone stopped; check input/privacy settings, then Listen to retry.	Микрофон остановлен; проверьте аудиовход/доступ и повторите «Слушать».
+Note Trainer is not compiled; rebuild with --features note-trainer.	Нет поддержки; пересоберите с --features note-trainer.
+Note Trainer support	Поддержка изучения нот
+Included; microphone opens only on Listen	Включена; микрофон открывается только по кнопке «Слушать»
+Experimental Note Trainer is a separate optional build: cargo build --release --locked --features note-trainer. Enable it in Options > Configuration > Plugins, then open Utilities > Note Trainer. Normal builds and acoustic transfers are unchanged.\nListen opens the system-default microphone; Stop, closing, disabling the plugin or exiting releases it. Opening/enabling alone never records or opens audio. No audio is saved or transmitted. Other documents remain usable while listening. Use system input/privacy settings to choose the microphone and allow access for DN or its terminal. Linux builds require pkg-config and ALSA development libraries.\nLive shows one detected note, octave, frequency and cents relative to A4=440 Hz (middle C is C4). The two-octave piano follows the note; > marks heard and * marks the practice target. Practice asks for a note: play it steadily, then choose Next note. Octave -/+ changes the exercise octave (C2–C6); Sharps adds black keys. Clicking a piano key sets a target. Each challenge scores once; holding a note does not repeatedly score. Progress lasts only until this window closes.\nPlay one note at a time, not chords. Let the microphone hear the keyboard and pause background music; background sounds and harmonics can produce wrong octaves. Very low/high notes, quiet instruments, sustain and noisy microphones need real-device validation. Green/cyan accents follow DN palettes; markers remain meaningful with custom colors. Detection is experimental, not a certified tuner. If the level stays at zero, check input/gain/privacy. Clipping means lower input gain or move the microphone. Device failure stops listening; Listen retries explicitly. Below 80x25 the global resize notice is shown and capture stops; restore the terminal and choose Listen to resume.	Изучение нот — отдельная экспериментальная возможность сборки: cargo build --release --locked --features note-trainer. Включите плагин в Options > Configuration > Plugins и откройте его через Utilities. Обычная сборка и акустические передачи не изменены.\n«Слушать» открывает системный микрофон. «Стоп», закрытие, отключение плагина и выход освобождают его. Открытие окна или включение плагина само по себе не открывает аудиоустройства. Звук не сохраняется и не передаётся. Во время прослушивания можно работать в других окнах. Выберите микрофон и разрешите доступ DN или терминалу в системных настройках. Для сборки в Linux нужны pkg-config и библиотеки разработки ALSA.\nРежим наблюдения показывает одну ноту, октаву, частоту и отклонение в центах от A4=440 Гц; среднее до — C4. Клавиатура из двух октав следует за распознанной нотой: > — звучит, * — задание. Упражнение просит сыграть ноту; удерживайте её, затем выберите следующую. Кнопки октавы меняют диапазон задания C2–C6, «Диезы» добавляет чёрные клавиши. Щелчок по клавише задаёт цель. Одно задание засчитывается один раз; удержание не увеличивает счёт. Прогресс хранится только до закрытия окна.\nИграйте по одной ноте, без аккордов. Микрофон должен слышать инструмент; отключите фоновую музыку. Шум и обертоны могут привести к неверной октаве. Крайние ноты, тихие инструменты, педаль и шумные микрофоны требуют проверки на реальном оборудовании. Цвета используют палитру DN; знаки > и * сохраняют смысл с пользовательскими цветами. Это экспериментальное средство обучения, не поверенный тюнер. Нулевой уровень — повод проверить вход, усиление и разрешения; перегрузка — уменьшить усиление или отодвинуть микрофон. При потере устройства прослушивание останавливается, повторный запуск — только кнопкой «Слушать». При размере меньше 80x25 показывается общее сообщение DN, микрофон останавливается. Увеличьте терминал и нажмите «Слушать» для повторного запуска.
+Microphone stopped for a small terminal; resize and press Listen.	Микрофон остановлен: увеличьте терминал и нажмите «Слушать».

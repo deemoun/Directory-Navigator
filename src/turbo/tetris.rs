@@ -26,14 +26,16 @@ pub(crate) fn prepare(
         cursor: None,
         regions: Vec::new(),
     };
-    let x = (width - 54) / 2;
-    let y = (height - 23) / 2;
-    scene.fill(x, y, 54, 23, 0x70);
-    scene.border(x, y, 54, 23, true, 0x7f);
+    let play = crate::tetris::layout::Play::new(ctx.area);
+    let r = play.bounds;
+    let (x, y) = (r.x, r.y);
+    let scale = play.scale;
+    scene.fill(x, y, r.width, r.height, 0x70);
+    scene.border(x, y, r.width, r.height, true, 0x7f);
     scene.title(
         x,
         y,
-        54,
+        r.width,
         &crate::formatting::tail(language.text("Navigator's game"), 40),
     );
     scene.text(x + 2, y, 1, "[", 0x7f);
@@ -41,12 +43,31 @@ pub(crate) fn prepare(
     scene.text(x + 4, y, 1, "]", 0x7f);
     let wx = x + 1;
     let wy = y + 1;
-    scene.fill(wx, wy, WIDTH as u16 * 2 + 2, HEIGHT as u16 + 2, 0x0f);
-    scene.border(wx, wy, WIDTH as u16 * 2 + 2, HEIGHT as u16 + 2, false, 0x7f);
+    scene.fill(
+        wx,
+        wy,
+        WIDTH as u16 * 2 * scale + 2,
+        HEIGHT as u16 * scale + 2,
+        0x0f,
+    );
+    scene.border(
+        wx,
+        wy,
+        WIDTH as u16 * 2 * scale + 2,
+        HEIGHT as u16 * scale + 2,
+        false,
+        0x7f,
+    );
     for (row, cells) in game.board.iter().enumerate() {
         for (col, &color) in cells.iter().enumerate() {
             if color != 0 {
-                scene.text(wx + 1 + col as u16 * 2, wy + 1 + row as u16, 2, "██", color);
+                block(
+                    &mut scene,
+                    wx + 1 + col as u16 * 2 * scale,
+                    wy + 1 + row as u16 * scale,
+                    scale,
+                    color,
+                );
             }
         }
     }
@@ -54,16 +75,16 @@ pub(crate) fn prepare(
         for (col, row) in game.piece.positions().filter(|(col, row)| {
             (0..WIDTH as i32).contains(col) && (0..HEIGHT as i32).contains(row)
         }) {
-            scene.text(
-                wx + 1 + col as u16 * 2,
-                wy + 1 + row as u16,
-                2,
-                "██",
+            block(
+                &mut scene,
+                wx + 1 + col as u16 * 2 * scale,
+                wy + 1 + row as u16 * scale,
+                scale,
                 Figure::color(game.piece.kind),
             );
         }
     }
-    let sx = x + 28;
+    let sx = play.sidebar();
     for (top, h, title, attr) in [
         (y + 1, 5, "Info", 0x70),
         (y + 5, 7, "Next", 0x70),
@@ -145,10 +166,12 @@ pub(crate) fn prepare(
         );
     }
     if game.paused || game.over {
-        scene.fill(wx + 3, wy + 9, 20, 1, 0x3f);
+        let banner_x = wx + 1 + (WIDTH as u16 * 2 * scale - 20) / 2;
+        let banner_y = wy + (HEIGHT as u16 * scale - 1) / 2;
+        scene.fill(banner_x, banner_y, 20, 1, 0x3f);
         scene.text(
-            wx + 3,
-            wy + 9,
+            banner_x,
+            banner_y,
             20,
             if game.over {
                 " GAME OVER · F2 New "
@@ -160,6 +183,13 @@ pub(crate) fn prepare(
     }
     let _ = pending;
     scene
+}
+
+fn block(scene: &mut Scene, x: u16, y: u16, scale: u16, color: u8) {
+    let pixels = "█".repeat(usize::from(2 * scale));
+    for row in 0..scale {
+        scene.text(x, y + row, 2 * scale, &pixels, color);
+    }
 }
 
 pub(crate) fn page(

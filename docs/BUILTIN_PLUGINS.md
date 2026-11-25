@@ -483,3 +483,30 @@ or `window_size` (Staging 0.83+). Unknown Staging versions reject explicit sizes
 No renderer or fullscreen resolution is changed. The emulator retains aspect,
 DPI and desktop constraints; classic/X surface output may ignore window sizing.
 The owned settings draft, reset and normal saving include the preference.
+
+## Note Trainer (optional experiment)
+
+`note_trainer` is registered as a default-disabled document. The independent
+`note-trainer` feature enables the existing pinned CPAL dependency; the default
+build retains availability UI without microphone/DSP execution. Acoustic code
+and its feature remain separate. Host-owned `notes::State`, typed Notes effects,
+window bindings and request generations control capture. A supervised worker
+constructs and drops CPAL streams; UI close/disable/quit cancels without joining.
+Reopening gets a fresh request scope. No device probe occurs during activation
+or painting. Inactive updates only change the owned snapshot and cannot focus it.
+
+The callback mixes bounded mono blocks into an eight-block nonblocking queue.
+Overflow discards obsolete samples and resets pitch stabilization. Fixed FIR
+anti-aliasing precedes integer decimation; a bounded YIN-style CMND detector uses
+half-sample reconstruction and multiple-period refinement to limit high-register
+octave errors. Only three consistent frames become a reading. A latest-value
+mailbox bounds UI progress; device errors stop capture and retain bounded causes.
+The plugin prepares exercises and geometry before immutable painting. Exercises
+are session-only, score once per challenge and require release for a repeated
+held target. No external SDK, new dependency, file recording or network is used.
+
+The signal-processing reference is de Cheveigné and Kawahara, *YIN, a fundamental
+frequency estimator for speech and music* (2002), DOI
+[10.1121/1.1458024](https://doi.org/10.1121/1.1458024). This is DN's implementation,
+not copied source from a pitch-detection crate. Real microphone/instrument
+reliability remains a hardware acceptance check, separate from synthetic tests.

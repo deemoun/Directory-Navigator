@@ -832,6 +832,7 @@ mod tests {
                 received: Some("received".into()),
                 ..Default::default()
             },
+            notes: Default::default(),
             nearby: Default::default(),
             bluetooth: Default::default(),
         }

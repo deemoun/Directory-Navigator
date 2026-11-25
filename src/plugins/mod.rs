@@ -8,6 +8,7 @@ pub(crate) mod dos_launcher;
 pub(crate) mod host;
 pub(crate) mod mp3_player;
 pub(crate) mod nearby_transfers;
+pub(crate) mod note_trainer;
 pub(crate) mod remote_connections;
 pub(crate) mod tetris;
 pub(crate) mod video_merge;
@@ -34,6 +35,7 @@ pub struct PluginId(pub &'static str);
 pub const BLUETOOTH_TRANSFERS: PluginId = PluginId("bluetooth_transfers");
 pub const VIDEO_MERGE: PluginId = PluginId("video_merge");
 pub const DOS_LAUNCHER: PluginId = PluginId("dos_launcher");
+pub const NOTE_TRAINER: PluginId = PluginId("note_trainer");
 pub const ACOUSTIC_TRANSFERS: PluginId = PluginId("acoustic_transfers");
 pub const NEARBY_TRANSFERS: PluginId = PluginId("nearby_transfers");
 pub const REMOTE_CONNECTIONS: PluginId = PluginId("remote_connections");
@@ -61,6 +63,7 @@ pub fn enabled_by_default(id: PluginId) -> bool {
         APK_WORKSHOP,
         DOS_LAUNCHER,
         ACOUSTIC_TRANSFERS,
+        NOTE_TRAINER,
         VIDEO_MERGE,
     ];
     !DEFAULT_DISABLED.contains(&id)
@@ -126,6 +129,7 @@ pub(crate) struct Context {
     pub video_preferences: crate::video::Preferences,
     pub video: crate::video::Snapshot,
     pub acoustic: crate::acoustic::Snapshot,
+    pub notes: crate::notes::Snapshot,
     pub bluetooth: crate::bluetooth::Snapshot,
     pub nearby: crate::peer::Snapshot,
 }
@@ -209,6 +213,10 @@ pub(crate) enum Event<'a> {
     },
 }
 pub(crate) enum Effect {
+    Notes {
+        generation: u64,
+        action: crate::notes::Action,
+    },
     Bluetooth {
         generation: u64,
         action: crate::bluetooth::Action,
@@ -364,6 +372,8 @@ impl Default for Runtime {
             .expect("acoustic ID");
         s.register(Box::<video_merge::VideoMerge>::default())
             .expect("video ID");
+        s.register(Box::<note_trainer::NoteTrainer>::default())
+            .expect("Note Trainer ID");
         s.register(Box::<tetris::TetrisPlugin>::default())
             .expect("tetris ID");
         s
@@ -411,7 +421,9 @@ impl Runtime {
             DOS_LAUNCHER => 6,
             ACOUSTIC_TRANSFERS => 7,
             VIDEO_MERGE => 8,
-            _ => 9,
+            BLUETOOTH_TRANSFERS => 9,
+            NOTE_TRAINER => 10,
+            _ => 11,
         });
         definitions.into_iter()
     }

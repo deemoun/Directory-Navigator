@@ -139,6 +139,12 @@ impl Settings {
                 self.draft.dos.open_on_enter = !self.draft.dos.open_on_enter;
             }
             if let Some((id, _)) = self.plugins.get(index) {
+                if *id == crate::plugins::NOTE_TRAINER
+                    && !crate::notes::available()
+                    && !self.draft.plugin_enabled(*id)
+                {
+                    return;
+                }
                 if *id == crate::plugins::ACOUSTIC_TRANSFERS && !crate::acoustic::available() {
                     return;
                 }

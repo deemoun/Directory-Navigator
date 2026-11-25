@@ -26,6 +26,7 @@ pub mod input;
 pub mod limits;
 pub mod menu;
 pub mod mouse;
+pub(crate) mod notes;
 pub mod operations;
 pub mod panel;
 pub mod panel_layout;

@@ -814,6 +814,7 @@ mod tests {
             video: Default::default(),
             video_preferences: Default::default(),
             acoustic: Default::default(),
+            notes: Default::default(),
             bluetooth: Default::default(),
             nearby: Default::default(),
         }

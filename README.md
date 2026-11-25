@@ -796,6 +796,27 @@ interoperability must be verified separately from protocol and UI tests.
 See the [guide](docs/USER_GUIDE.md#bluetooth-transfers). Acoustic remains an
 independent optional build feature, off in normal builds.
 
+## Optional Note Trainer
+
+**Note Trainer (Experimental)** is disabled in Plugins by default and excluded
+from normal builds, independently of acoustic transfers. This is an unreleased
+source feature, not included in the published 1.1.17 crate. Build it separately:
+
+```sh
+cargo build --release --locked --features note-trainer --target-dir target/note-trainer-release
+./target/note-trainer-release/release/dn
+```
+
+Enable it in **Options → Configuration → Plugins**, then open **Utilities →
+Note Trainer**. Listen starts the default microphone; the piano board highlights
+one detected note and shows octave, frequency, tuning offset and input level.
+Practice asks for a note, with octave/black-key options and one success per
+challenge. No audio is saved or transmitted. Stop/close/disable releases the
+microphone. Allow microphone access in system settings; Linux builds need the
+same ALSA development packages as audio builds. Real instruments, noisy rooms
+and extreme notes still require hardware testing; chords/MIDI are not supported.
+See the [guide](docs/USER_GUIDE.md#experimental-note-trainer).
+
 ## License
 
 Directory Navigator is available under the [MIT license](LICENSE).

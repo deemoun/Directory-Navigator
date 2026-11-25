@@ -78,7 +78,7 @@ fn settings_draft_cancel_commit_disable_live_game_and_reenable_keep_scores() -> 
         .unwrap();
     a.desktop.activate(dn::desktop::WindowId::MANAGER);
     a.open_settings(SettingsKind::Plugins);
-    assert_eq!(a.modals.settings().unwrap().control_count(), 12);
+    assert_eq!(a.modals.settings().unwrap().control_count(), 13);
     key(&mut a, K::Tab);
     key(&mut a, K::Tab);
     key(&mut a, K::Char(' '));
@@ -163,7 +163,7 @@ fn plugins_dialog_localized_native_controls_mouse_keyboard_and_immutable_render(
             key(&mut a, K::BackTab);
             assert_eq!(a.modals.settings().unwrap().cursor, 0);
             key(&mut a, K::BackTab);
-            assert_eq!(a.modals.settings().unwrap().cursor, 13);
+            assert_eq!(a.modals.settings().unwrap().cursor, 14);
             let snap = dn::layout::prepare_window(
                 &mut a,
                 dn::testing::layout::Rect::new(7, 3, 80, 25),

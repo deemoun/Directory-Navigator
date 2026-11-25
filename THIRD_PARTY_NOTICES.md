@@ -2480,3 +2480,10 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
+
+## Optional Note Trainer
+
+The independent `note-trainer` feature uses the already pinned, unmodified CPAL
+0.17.3 (Apache-2.0) for microphone input on macOS, Linux and Windows. CPAL's source
+and license are listed above under audio/acoustic support; no additional library
+is introduced. DN's pitch analysis and piano-learning UI are project code.

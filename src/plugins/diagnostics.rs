@@ -52,6 +52,15 @@ pub(crate) fn collect(input: Input, cancel: &crate::task::Cancellation) -> Field
         }
         .into(),
     ));
+    fields.push((
+        "Note Trainer support".into(),
+        if crate::notes::available() {
+            "Included; microphone opens only on Listen"
+        } else {
+            crate::notes::UNAVAILABLE
+        }
+        .into(),
+    ));
     let bluetooth_requirements = if cfg!(target_os = "linux") {
         "BlueZ system service and a Bluetooth Classic adapter; Refresh in Bluetooth transfers checks paired devices"
     } else if cfg!(windows) {

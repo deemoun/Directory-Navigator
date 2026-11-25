@@ -1121,6 +1121,10 @@ Opening an existing player activates its single window.
 
 ## Tetris / Pentix and high scores
 
+The board automatically uses larger, proportionally scaled blocks in larger
+terminals (2× from 80×44, 3× from 104×63 and 4× from 128×82). Resizing back
+restores the compact board; 80×25 retains the classic layout.
+
 The game uses a classic DN-style board with Info, Next and Best panels and
 New / Setup / Top 10 / Pause buttons. Tab/Shift+Tab cycle through the board and
 these buttons; Enter activates the selected button. Gravity pauses while button
@@ -2350,3 +2354,46 @@ and 32,768 pixels per side. Corrupt/oversized images report an error. Only the
 first WebP frame is shown. Enter associations, explicit As Text/As Hex and Quick
 View remain unchanged. Archive image preview, animation, SVG, HEIC and RAW are
 outside this first version.
+
+## Experimental Note Trainer
+
+Note Trainer is a separate optional source build, disabled by default in Plugins.
+It is not in the published 1.1.17 crate or the normal build. Build with
+`cargo build --release --locked --features note-trainer --target-dir target/note-trainer-release`
+and run `./target/note-trainer-release/release/dn` (Windows: `dn.exe`). Enable
+**Note Trainer (Experimental)** in Options → Configuration → Plugins, then open
+its Utilities entry. Settings retain normal OK/Cancel and saving rules. An
+uncompiled build marks the setting unavailable; it can disable an explicit saved
+choice but cannot newly enable it. `--no-default-features --features note-trainer`
+also works: neither music playback nor acoustic transfers is required.
+
+Opening/enabling alone opens no device. **Listen** opens the system-default
+microphone (CoreAudio/ALSA/WASAPI); **Stop**, closing, disabling or exiting releases
+it. Input stays in bounded memory; there is no audio file, network transmission
+or persistent practice history. Other documents remain usable without microphone
+results taking focus. System input/privacy settings select the microphone and
+permit DN or its terminal to access it. Linux requires pkg-config and ALSA build
+libraries even without music. The current input must offer 16–192 kHz PCM and
+1–32 channels; unsupported/default-device failures show a cause, with explicit
+Listen retry rather than automatic restart.
+
+Live shows the detected single note, octave, frequency, cents and periodicity
+confidence, relative to A4=440 Hz (middle C=C4). Confidence is an algorithm score,
+not a guarantee. The two-octave piano follows the note; **>** marks heard and
+**\*** marks the exercise target. Practice starts with C4 and cycles white-key
+challenges in the selected octave (C2–C6); **Sharps** includes black keys.
+**Next note** starts another challenge, and clicking a visible piano key sets a
+specific target. Play steadily: a challenge scores once when the nearest note matches; the cents
+readout is advisory rather than an additional tuning test.
+Repeating the same target while holding it requires release or another note
+first. Progress resets when the window closes. Live mode keeps exercise-only
+controls disabled. F1/Help explains controls and includes the original error.
+
+Play one note at a time. The keyboard must be audible to the microphone; a
+MIDI-only connection supplies no audio. Pause background music and reduce noise.
+Clipping means lower input gain or move the microphone. Quiet sounds, sustain,
+harmonics and extreme notes can confuse detection. This is experimental learning
+assistance, not a certified tuner, chord recognizer or transcription tool. DSP
+and fake-worker tests do not establish real-instrument reliability. Below 80×25 DN shows its global resize notice; capture stops and requires
+Listen after restoring the terminal. F10 can exit from the small screen. Markers and
+shared palette roles preserve meaning with custom colors and Linux tty.

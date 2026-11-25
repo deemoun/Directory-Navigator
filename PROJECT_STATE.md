@@ -28,6 +28,42 @@ See the [English README](README.md), [Russian README](README.ru.md) and
 [user guide](docs/USER_GUIDE.md) for supported workflows, installation, controls,
 safeguards and limits.
 
+## Unreleased optional Note Trainer
+
+The new `note_trainer` plugin is experimental and default-disabled. Its independent
+`note-trainer` feature reuses CPAL 0.17.3 without enabling acoustic transfers or
+requiring music playback. Normal builds retain unavailable settings/diagnostics
+without opening input devices. Listen explicitly starts the default microphone;
+a two-octave piano shows a stabilized single note, octave, frequency, cents and
+level. Practice offers white/black-key targets and one score per challenge.
+Settings use existing drafts; exercises and audio remain session-only, with no
+recordings, network use or persistent lesson data. Host-owned supervised workers,
+bounded PCM/mailboxes and owner/generation checks preserve responsiveness and
+reject retired results. Closing, disabling and quitting cancel capture.
+
+The feature is source-only and not part of published 1.1.17. Separate normal and
+Note Trainer release outputs preserve the default build. Hardware microphone,
+instrument and platform reliability must be reported separately from synthetic
+DSP, mock-worker and terminal checks; no real-device reliability is claimed.
+
+Local validation for this change on macOS ARM64: the full native suite passed
+(1,471 passed, 15 ignored). The optional feature passed its ten focused library
+tests, including all 88 synthetic piano notes, harmonic fixtures, high-rate input,
+noise rejection and worker lifecycle checks. Both integration tests and the
+private terminal suite passed against the separate Note Trainer release binary;
+the normal release binary also passed the terminal scenario, including restoration
+after exit. No test opened a real microphone. EN/RU, custom colors, immutable
+frames and the acoustic/Note Trainer build combinations passed their UI checks;
+only the Plugins settings frames intentionally changed.
+
+Strict all-target Clippy passed for default and combined optional builds, along
+with no-default-features checks, the independent Note Trainer build without music,
+helper/workflow tests, formatting and diff checks. Both locked release builds
+report 1.1.17. Linux cross-checks were blocked by missing native cross-compilers;
+Windows was blocked by missing SDK headers in the existing Ring dependency.
+Linux/Windows runtime and real microphone/instrument checks remain pending;
+no CI workflow was started.
+
 ## Unreleased extension filter picker
 
 The existing Filename filter dialog adds Wildcard / File types modes with

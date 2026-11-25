@@ -347,17 +347,32 @@ fn shared_logic_preserves_native_frames() -> io::Result<()> {
                 )
         })
         .map(|line| {
-            // Availability changes this checkbox's colors and mouse target, not other UI.
+            // Optional capabilities change their Plugins checkbox/availability,
+            // never other settings or documents. Keep every variant explicit.
             let key = line.split_once(": ").unwrap().0;
-            if acoustic_available && key.ends_with("/4") {
-                include_str!("fixtures/acoustic_plugin_frames.txt")
+            let note_available = cfg!(all(
+                feature = "note-trainer",
+                any(
+                    target_os = "macos",
+                    target_os = "linux",
+                    target_os = "windows"
+                )
+            ));
+            let variant = match (acoustic_available, note_available) {
+                (true, true) => Some(include_str!("fixtures/note_acoustic_plugin_frames.txt")),
+                (true, false) => Some(include_str!("fixtures/acoustic_plugin_frames.txt")),
+                (false, true) => Some(include_str!("fixtures/note_plugin_frames.txt")),
+                (false, false) => None,
+            };
+            if let Some(variant) = variant.filter(|_| key.ends_with("/4")) {
+                variant
                     .lines()
                     .find(|candidate| {
                         candidate
                             .split_once(": ")
                             .is_some_and(|(name, _)| name == key)
                     })
-                    .expect("explicit acoustic Plugins fixture")
+                    .expect("explicit optional Plugins fixture")
             } else {
                 line
             }

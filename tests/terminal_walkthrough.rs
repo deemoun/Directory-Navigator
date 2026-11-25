@@ -1204,3 +1204,35 @@ fn pdf_password_retry_help_cancel_and_terminal_restoration() -> io::Result<()> {
     assert_eq!(fs::read(s.root.join("private.pdf"))?, bytes);
     s.finish()
 }
+
+#[test]
+fn tetris_large_board_resize_controls_and_terminal_restoration() -> io::Result<()> {
+    let mut s = Session::new("tetris-large-board")?;
+    s.wait("manager ready", Session::command_prompt_active)?;
+    s.send(b"\x1b[20;3~", "game opened", |s| {
+        s.text().contains("Navigator's game")
+    })?;
+    s.send(b"\x1bOR", "pause game", |s| s.text().contains("PAUSED"))?;
+    for (w, h, dimensions) in [
+        (100, 46, "width: 78, height: 42"),
+        (160, 70, "width: 102, height: 61"),
+        (80, 25, "width: 54, height: 23"),
+    ] {
+        s.resize(w, h)?;
+        s.wait("scaled game geometry", |s| {
+            s.text().contains("PAUSED")
+                && fs::read_to_string(s.root.join("settings/dn/diagnostics.txt")).is_ok_and(|d| {
+                    d.lines()
+                        .any(|l| l.starts_with("top=") && l.contains(dimensions))
+                })
+        })?;
+        s.send(b"\x1b[15~", "scaled setup", |s| {
+            s.text().contains("Setup game")
+        })?;
+        s.send(b"\x1b", "return to scaled game", |s| {
+            !s.text().contains("Setup game") && s.text().contains("PAUSED")
+        })?;
+    }
+    s.send(b"\x1b", "close game", Session::command_prompt_active)?;
+    s.finish()
+}

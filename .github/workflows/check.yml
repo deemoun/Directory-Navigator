@@ -33,4 +33,12 @@ jobs:
         run: cargo test --locked --features acoustic --test experimental_plugins --test ui_refactor_parity --test terminal_experimental
       - name: Check acoustic support without music playback
         run: cargo check --locked --no-default-features --features acoustic
+      - name: Check optional Note Trainer support
+        run: cargo clippy --locked --all-targets --features note-trainer -- -D warnings
+      - name: Test Note Trainer without microphone hardware
+        run: cargo test --locked --features note-trainer --lib note
+      - name: Test Note Trainer controls without microphone hardware
+        run: cargo test --locked --features note-trainer --test note_trainer --test terminal_notes --test ui_refactor_parity
+      - name: Check Note Trainer without music playback
+        run: cargo check --locked --no-default-features --features note-trainer
       - run: cargo build --release --locked

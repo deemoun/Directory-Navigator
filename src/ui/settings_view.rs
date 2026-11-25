@@ -197,7 +197,16 @@ fn plugins_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
                         .to_owned()
                 } else {
                     let (id, title) = settings.plugins[index];
-                    format!("{} ({})", language.text(title), id.0)
+                    format!(
+                        "{} ({}){}",
+                        language.text(title),
+                        id.0,
+                        if id == crate::plugins::NOTE_TRAINER && !crate::notes::available() {
+                            language.text(" [not compiled]")
+                        } else {
+                            ""
+                        }
+                    )
                 },
                 checked: if option {
                     if dos_option {
@@ -216,8 +225,11 @@ fn plugins_spec(app: &App, area: Rect) -> Option<DialogSpec<'_>> {
         } else if option {
             settings.mp3_open_enabled()
         } else {
-            settings.plugins[index].0 != crate::plugins::ACOUSTIC_TRANSFERS
-                || crate::acoustic::available()
+            (settings.plugins[index].0 != crate::plugins::ACOUSTIC_TRANSFERS
+                || crate::acoustic::available())
+                && (settings.plugins[index].0 != crate::plugins::NOTE_TRAINER
+                    || crate::notes::available()
+                    || settings.draft.plugin_enabled(crate::plugins::NOTE_TRAINER))
         };
         if !visible {
             c.paint = false;

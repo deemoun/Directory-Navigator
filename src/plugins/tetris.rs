@@ -111,16 +111,12 @@ impl ToolPlugin for TetrisPlugin {
     fn windows(&self, ctx: &Context) -> Vec<super::LocalWindow> {
         use crate::windowing::geometry::Capabilities as C;
         let g = self.game.as_ref().expect("open game");
+        let play = crate::tetris::layout::Play::new(ctx.area).bounds;
         let mut result = vec![super::LocalWindow {
             id: 0,
             parent: None,
-            bounds: crate::presentation::layout::Rect::new(
-                (ctx.area.width - 54) / 2,
-                (ctx.area.height - 23) / 2,
-                54,
-                23,
-            ),
-            caps: C::fixed(54, 23),
+            bounds: play,
+            caps: C::fixed(play.width, play.height),
         }];
         for (id, page) in self.pages() {
             let bounds = crate::tetris::layout::page(

@@ -334,8 +334,8 @@ fn plugins_settings_lists_registered_tools_not_a_builtin_whitelist() -> io::Resu
     a.desktop.activate(WindowId::MANAGER);
     a.open_settings(crate::settings::SettingsKind::Plugins);
     let settings = a.modals.settings().unwrap();
-    assert_eq!(settings.plugins.len(), 11);
-    assert_eq!(settings.control_count(), 13); // Registered tools plus music and DOS opening preferences.
+    assert_eq!(settings.plugins.len(), 12);
+    assert_eq!(settings.control_count(), 14); // Registered tools plus music and DOS opening preferences.
     let index = settings
         .plugins
         .iter()

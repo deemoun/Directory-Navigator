@@ -102,6 +102,11 @@ pub const ROOTS: &[Root] = &[
                 "",
                 Plugin(crate::plugins::ACOUSTIC_TRANSFERS),
             ),
+            item(
+                "Note Trainer (Experimental)...",
+                "",
+                Plugin(crate::plugins::NOTE_TRAINER),
+            ),
             item("Video Merge...", "", Plugin(crate::plugins::VIDEO_MERGE)),
             item("~T~emp Drive", "", TempDrive),
             item("Clear Temp ~D~rive...", "", ClearTempDrive),

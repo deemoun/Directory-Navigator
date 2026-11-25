@@ -2092,3 +2092,39 @@ Loaded entries only; hidden setting applies. Marks are preserved.	Loaded entries
 Directory changed; reopen the filename filter.	Directory changed; reopen the filename filter.
 File type selection exceeds 256 types / 4 KiB or contains invalid native extensions.	File type selection exceeds 256 types / 4 KiB or contains invalid native extensions.
 Wildcard keeps case-sensitive * and ? matching; semicolons remain literal. File types lists extensions from the loaded panel, including entries hidden by its filename filter. The hidden-file setting still applies.\nSpace/click toggles types; arrows, Page keys and wheel move. Show selected includes those types; Hide selected excludes them. Directories stay visible in File types mode. Extensions match exactly: .jpg and .JPG differ. No extension includes dotfiles without a suffix; a trailing dot is a separate empty extension.\nApply changes only the originating pane. Cancel/Esc keeps its filter. Clear resets the draft; Apply with no selected types clears filtering. Marks are retained; operations use visible marks. Up to 256 types and 4 KiB of serialized selection are supported; use Wildcard for types not shown. No directory scan is started.	Wildcard keeps case-sensitive * and ? matching; semicolons remain literal. File types lists extensions from the loaded panel, including entries hidden by its filename filter. The hidden-file setting still applies.\nSpace/click toggles types; arrows, Page keys and wheel move. Show selected includes those types; Hide selected excludes them. Directories stay visible in File types mode. Extensions match exactly: .jpg and .JPG differ. No extension includes dotfiles without a suffix; a trailing dot is a separate empty extension.\nApply changes only the originating pane. Cancel/Esc keeps its filter. Clear resets the draft; Apply with no selected types clears filtering. Marks are retained; operations use visible marks. Up to 256 types and 4 KiB of serialized selection are supported; use Wildcard for types not shown. No directory scan is started.
+Note Trainer (Experimental)	Note Trainer (Experimental)
+Note Trainer (Experimental)...	Note Trainer (Experimental)...
+Note Trainer Help	Note Trainer Help
+ [not compiled]	 [not compiled]
+Enlarge the terminal to 80x25 for the piano board.	Enlarge the terminal to 80x25 for the piano board.
+Detected: —	Detected: —
+Detected:	Detected:
+cents	cents
+Play:	Play:
+Correct:	Correct:
+Correct — choose Next note	Correct — choose Next note
+Live board — play a single note; no audio is saved.	Live board — play a single note; no audio is saved.
+Listen	Listen
+Mode: Practice	Mode: Practice
+Mode: Live	Mode: Live
+Next note	Next note
+> Heard · * Target · Click a piano key to set a practice target	> Heard · * Target · Click a piano key to set a practice target
+Octave -	Octave -
+Octave +	Octave +
+Sharps: On	Sharps: On
+Sharps: Off	Sharps: Off
+Microphone level:	Microphone level:
+Clipping	Clipping
+Press Listen to open the default microphone.	Press Listen to open the default microphone.
+Single notes · A4 = 440 Hz · Avoid background audio	Single notes · A4 = 440 Hz · Avoid background audio
+Microphone stopped	Microphone stopped
+Opening microphone…	Opening microphone…
+Listening — play one note at a time	Listening — play one note at a time
+Stop Acoustic transfers before using the microphone.	Stop Acoustic transfers before using the microphone.
+Microphone could not start; check system input and privacy permissions.	Microphone could not start; check system input and privacy permissions.
+Microphone stopped; check input/privacy settings, then Listen to retry.	Microphone stopped; check input/privacy settings, then Listen to retry.
+Note Trainer is not compiled; rebuild with --features note-trainer.	Note Trainer is not compiled; rebuild with --features note-trainer.
+Note Trainer support	Note Trainer support
+Included; microphone opens only on Listen	Included; microphone opens only on Listen
+Experimental Note Trainer is a separate optional build: cargo build --release --locked --features note-trainer. Enable it in Options > Configuration > Plugins, then open Utilities > Note Trainer. Normal builds and acoustic transfers are unchanged.\nListen opens the system-default microphone; Stop, closing, disabling the plugin or exiting releases it. Opening/enabling alone never records or opens audio. No audio is saved or transmitted. Other documents remain usable while listening. Use system input/privacy settings to choose the microphone and allow access for DN or its terminal. Linux builds require pkg-config and ALSA development libraries.\nLive shows one detected note, octave, frequency and cents relative to A4=440 Hz (middle C is C4). The two-octave piano follows the note; > marks heard and * marks the practice target. Practice asks for a note: play it steadily, then choose Next note. Octave -/+ changes the exercise octave (C2–C6); Sharps adds black keys. Clicking a piano key sets a target. Each challenge scores once; holding a note does not repeatedly score. Progress lasts only until this window closes.\nPlay one note at a time, not chords. Let the microphone hear the keyboard and pause background music; background sounds and harmonics can produce wrong octaves. Very low/high notes, quiet instruments, sustain and noisy microphones need real-device validation. Green/cyan accents follow DN palettes; markers remain meaningful with custom colors. Detection is experimental, not a certified tuner. If the level stays at zero, check input/gain/privacy. Clipping means lower input gain or move the microphone. Device failure stops listening; Listen retries explicitly. Below 80x25 the global resize notice is shown and capture stops; restore the terminal and choose Listen to resume.	Experimental Note Trainer is a separate optional build: cargo build --release --locked --features note-trainer. Enable it in Options > Configuration > Plugins, then open Utilities > Note Trainer. Normal builds and acoustic transfers are unchanged.\nListen opens the system-default microphone; Stop, closing, disabling the plugin or exiting releases it. Opening/enabling alone never records or opens audio. No audio is saved or transmitted. Other documents remain usable while listening. Use system input/privacy settings to choose the microphone and allow access for DN or its terminal. Linux builds require pkg-config and ALSA development libraries.\nLive shows one detected note, octave, frequency and cents relative to A4=440 Hz (middle C is C4). The two-octave piano follows the note; > marks heard and * marks the practice target. Practice asks for a note: play it steadily, then choose Next note. Octave -/+ changes the exercise octave (C2–C6); Sharps adds black keys. Clicking a piano key sets a target. Each challenge scores once; holding a note does not repeatedly score. Progress lasts only until this window closes.\nPlay one note at a time, not chords. Let the microphone hear the keyboard and pause background music; background sounds and harmonics can produce wrong octaves. Very low/high notes, quiet instruments, sustain and noisy microphones need real-device validation. Green/cyan accents follow DN palettes; markers remain meaningful with custom colors. Detection is experimental, not a certified tuner. If the level stays at zero, check input/gain/privacy. Clipping means lower input gain or move the microphone. Device failure stops listening; Listen retries explicitly. Below 80x25 the global resize notice is shown and capture stops; restore the terminal and choose Listen to resume.
+Microphone stopped for a small terminal; resize and press Listen.	Microphone stopped for a small terminal; resize and press Listen.
