@@ -108,6 +108,11 @@ pub const ROOTS: &[Root] = &[
                 Plugin(crate::plugins::NOTE_TRAINER),
             ),
             item("Video Merge...", "", Plugin(crate::plugins::VIDEO_MERGE)),
+            item(
+                "Cache and temporary directories...",
+                "",
+                Plugin(crate::plugins::CACHE_LOCATIONS),
+            ),
             item("~T~emp Drive", "", TempDrive),
             item("Clear Temp ~D~rive...", "", ClearTempDrive),
             item(

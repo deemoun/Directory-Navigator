@@ -212,6 +212,16 @@ fn shared_logic_preserves_native_frames() -> io::Result<()> {
                                 && r.width >= 60));
                         }
                         if case == 4 {
+                            assert!(a
+                                .modals
+                                .settings()
+                                .unwrap()
+                                .draft
+                                .plugin_enabled(dn::plugins::CACHE_LOCATIONS));
+                            assert!(result
+                                .hit_regions()
+                                .iter()
+                                .any(|(_, t)| *t == dn::mouse::Target::Setting(11)));
                             assert!(
                                 result
                                     .hit_regions()

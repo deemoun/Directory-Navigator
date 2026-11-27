@@ -17,6 +17,7 @@ pub struct App {
     pub(crate) workers: crate::workers::Supervisor,
     pub(crate) dos: crate::dos::State,
     pub(crate) video: crate::video::State,
+    pub(crate) cache_locations: crate::cache_locations::State,
     pub(crate) notes: crate::notes::State,
     pub(crate) acoustic: crate::acoustic::State,
     pub(crate) peer: crate::peer::State,
@@ -86,6 +87,7 @@ impl App {
             video: Default::default(),
             acoustic: Default::default(),
             notes: Default::default(),
+            cache_locations: Default::default(),
             peer: Default::default(),
             bluetooth: Default::default(),
             #[cfg(target_os = "linux")]

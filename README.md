@@ -817,6 +817,33 @@ same ALSA development packages as audio builds. Real instruments, noisy rooms
 and extreme notes still require hardware testing; chords/MIDI are not supported.
 See the [guide](docs/USER_GUIDE.md#experimental-note-trainer).
 
+## Cache and temporary directories
+
+**Utilities → Cache and temporary directories…** lists standard user/system
+cache, temporary and log directories on macOS, Linux and Windows. The plugin is
+enabled by default; opening it does not start recursive analysis. Use **Analyze**
+for one location or **Analyze all** for sequential scans. Stop cancels; Open or
+double-click opens a location in the originating pane, and Copy path uses the
+OS/internal clipboard. Sizes are apparent bytes, not reclaimable space; hidden
+entries are included, links are not followed and other mounts are excluded.
+Partial/stale results are labelled, overlapping locations have no grand total.
+This is read-only inspection, with no cleanup or elevated access. See the
+[guide](docs/USER_GUIDE.md#cache-and-temporary-directories).
+
+macOS also lists curated developer storage: Xcode build output and archives, iOS
+device support, simulator data/assets, Cargo caches, installed Rust toolchains,
+Gradle caches/distributions, npm, Maven, pip/uv defaults, Android SDK and
+virtual devices. Archives, simulator data and installed tools are explicitly
+labelled; they are not disposable caches. No projects are searched
+automatically.
+
+macOS application storage is also available: `/Applications`, `~/Applications`,
+shared/user `Library/Application Support`, user `Library/Containers`,
+`Library/Group Containers` and `Library/Application Support/MobileSync/Backup`.
+Installed apps, application data and device backups are clearly labelled as
+potentially valuable. Backups overlap Application Support; there is no combined
+total. These entries do not provide uninstalling or cleanup.
+
 ## License
 
 Directory Navigator is available under the [MIT license](LICENSE).

@@ -6,6 +6,7 @@ pub(crate) mod acoustic;
 pub mod app;
 pub mod associations;
 pub(crate) mod button_feedback;
+pub(crate) mod cache_locations;
 pub mod clipboard;
 pub mod columns;
 pub mod commands;

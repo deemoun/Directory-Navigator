@@ -2,6 +2,7 @@
 pub(crate) mod acoustic_transfers;
 pub(crate) mod apk_workshop;
 pub(crate) mod bluetooth_transfers;
+pub(crate) mod cache_directories;
 pub(crate) mod calculator;
 pub(crate) mod diagnostics;
 pub(crate) mod dos_launcher;
@@ -35,6 +36,7 @@ pub struct PluginId(pub &'static str);
 pub const BLUETOOTH_TRANSFERS: PluginId = PluginId("bluetooth_transfers");
 pub const VIDEO_MERGE: PluginId = PluginId("video_merge");
 pub const DOS_LAUNCHER: PluginId = PluginId("dos_launcher");
+pub const CACHE_LOCATIONS: PluginId = PluginId("cache_locations");
 pub const NOTE_TRAINER: PluginId = PluginId("note_trainer");
 pub const ACOUSTIC_TRANSFERS: PluginId = PluginId("acoustic_transfers");
 pub const NEARBY_TRANSFERS: PluginId = PluginId("nearby_transfers");
@@ -130,6 +132,7 @@ pub(crate) struct Context {
     pub video: crate::video::Snapshot,
     pub acoustic: crate::acoustic::Snapshot,
     pub notes: crate::notes::Snapshot,
+    pub cache_locations: crate::cache_locations::Snapshot,
     pub bluetooth: crate::bluetooth::Snapshot,
     pub nearby: crate::peer::Snapshot,
 }
@@ -213,6 +216,10 @@ pub(crate) enum Event<'a> {
     },
 }
 pub(crate) enum Effect {
+    CacheLocations {
+        generation: u64,
+        action: crate::cache_locations::Action,
+    },
     Notes {
         generation: u64,
         action: crate::notes::Action,
@@ -372,6 +379,8 @@ impl Default for Runtime {
             .expect("acoustic ID");
         s.register(Box::<video_merge::VideoMerge>::default())
             .expect("video ID");
+        s.register(Box::<cache_directories::CacheDirectories>::default())
+            .expect("cache directories ID");
         s.register(Box::<note_trainer::NoteTrainer>::default())
             .expect("Note Trainer ID");
         s.register(Box::<tetris::TetrisPlugin>::default())
@@ -423,7 +432,8 @@ impl Runtime {
             VIDEO_MERGE => 8,
             BLUETOOTH_TRANSFERS => 9,
             NOTE_TRAINER => 10,
-            _ => 11,
+            CACHE_LOCATIONS => 11,
+            _ => 12,
         });
         definitions.into_iter()
     }

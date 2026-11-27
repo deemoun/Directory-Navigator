@@ -2130,3 +2130,100 @@ Note Trainer support	Поддержка изучения нот
 Included; microphone opens only on Listen	Включена; микрофон открывается только по кнопке «Слушать»
 Experimental Note Trainer is a separate optional build: cargo build --release --locked --features note-trainer. Enable it in Options > Configuration > Plugins, then open Utilities > Note Trainer. Normal builds and acoustic transfers are unchanged.\nListen opens the system-default microphone; Stop, closing, disabling the plugin or exiting releases it. Opening/enabling alone never records or opens audio. No audio is saved or transmitted. Other documents remain usable while listening. Use system input/privacy settings to choose the microphone and allow access for DN or its terminal. Linux builds require pkg-config and ALSA development libraries.\nLive shows one detected note, octave, frequency and cents relative to A4=440 Hz (middle C is C4). The two-octave piano follows the note; > marks heard and * marks the practice target. Practice asks for a note: play it steadily, then choose Next note. Octave -/+ changes the exercise octave (C2–C6); Sharps adds black keys. Clicking a piano key sets a target. Each challenge scores once; holding a note does not repeatedly score. Progress lasts only until this window closes.\nPlay one note at a time, not chords. Let the microphone hear the keyboard and pause background music; background sounds and harmonics can produce wrong octaves. Very low/high notes, quiet instruments, sustain and noisy microphones need real-device validation. Green/cyan accents follow DN palettes; markers remain meaningful with custom colors. Detection is experimental, not a certified tuner. If the level stays at zero, check input/gain/privacy. Clipping means lower input gain or move the microphone. Device failure stops listening; Listen retries explicitly. Below 80x25 the global resize notice is shown and capture stops; restore the terminal and choose Listen to resume.	Изучение нот — отдельная экспериментальная возможность сборки: cargo build --release --locked --features note-trainer. Включите плагин в Options > Configuration > Plugins и откройте его через Utilities. Обычная сборка и акустические передачи не изменены.\n«Слушать» открывает системный микрофон. «Стоп», закрытие, отключение плагина и выход освобождают его. Открытие окна или включение плагина само по себе не открывает аудиоустройства. Звук не сохраняется и не передаётся. Во время прослушивания можно работать в других окнах. Выберите микрофон и разрешите доступ DN или терминалу в системных настройках. Для сборки в Linux нужны pkg-config и библиотеки разработки ALSA.\nРежим наблюдения показывает одну ноту, октаву, частоту и отклонение в центах от A4=440 Гц; среднее до — C4. Клавиатура из двух октав следует за распознанной нотой: > — звучит, * — задание. Упражнение просит сыграть ноту; удерживайте её, затем выберите следующую. Кнопки октавы меняют диапазон задания C2–C6, «Диезы» добавляет чёрные клавиши. Щелчок по клавише задаёт цель. Одно задание засчитывается один раз; удержание не увеличивает счёт. Прогресс хранится только до закрытия окна.\nИграйте по одной ноте, без аккордов. Микрофон должен слышать инструмент; отключите фоновую музыку. Шум и обертоны могут привести к неверной октаве. Крайние ноты, тихие инструменты, педаль и шумные микрофоны требуют проверки на реальном оборудовании. Цвета используют палитру DN; знаки > и * сохраняют смысл с пользовательскими цветами. Это экспериментальное средство обучения, не поверенный тюнер. Нулевой уровень — повод проверить вход, усиление и разрешения; перегрузка — уменьшить усиление или отодвинуть микрофон. При потере устройства прослушивание останавливается, повторный запуск — только кнопкой «Слушать». При размере меньше 80x25 показывается общее сообщение DN, микрофон останавливается. Увеличьте терминал и нажмите «Слушать» для повторного запуска.
 Microphone stopped for a small terminal; resize and press Listen.	Микрофон остановлен: увеличьте терминал и нажмите «Слушать».
+Cache and temporary directories	Кэш и временные каталоги
+Cache and temporary directories...	Кэш и временные каталоги...
+Cache and temporary directories Help	Справка: кэш и временные каталоги
+User caches	Кэш пользователя
+User logs	Журналы пользователя
+System caches	Системный кэш
+System logs	Системные журналы
+User temporary files	Временные файлы пользователя
+Windows temporary files	Временные файлы Windows
+Current temporary directory	Текущий временный каталог
+System temporary files	Системные временные файлы
+Persistent temporary files	Долговременные временные файлы
+System diagnostic logs	Диагностические журналы системы
+Re-creatable application caches; applications may be using them.	Восстанавливаемый кэш приложений; он может использоваться прямо сейчас.
+Diagnostic logs; they can be useful for troubleshooting.	Диагностические журналы могут пригодиться при поиске неисправностей.
+Shared system caches; inspection may require additional access.	Общий системный кэш; доступ для просмотра может быть ограничен.
+Temporary working files; running applications may need them.	Рабочие временные файлы могут быть нужны запущенным приложениям.
+Temporary files that may remain across restarts.	Временные файлы, которые могут сохраняться после перезагрузки.
+Unresolved	Путь не определён
+Missing	Отсутствует
+Access denied	Нет доступа
+Not analyzed	Не измерено
+Cancelled — partial	Отменено — частично
+Directory changed	Каталог изменился
+Analysis stopped; incomplete measurements are partial.	Анализ остановлен; незавершённые измерения частичные.
+Snapshot ready; locations can overlap. No grand total.	Снимок готов; каталоги могут пересекаться. Общего итога нет.
+This native path cannot be represented as clipboard text.	Этот путь нельзя точно представить текстом для буфера обмена.
+Stopping…	Остановка…
+Discovering standard locations…	Поиск стандартных каталогов…
+Analyzing apparent bytes…	Подсчёт логических размеров…
+Select a location and Analyze; no files are deleted.	Выберите каталог и «Анализ»; файлы не удаляются.
+Location                         Apparent size / status	Каталог                          Логический размер / состояние
+ · stale	 · устарело
+Path could not be resolved	Не удалось определить путь
+Files:	Файлов:
+Skipped:	Пропущено:
+Excluded mounts:	Исключено томов:
+Read-only · Apparent bytes are not reclaimable space.	Только чтение · Логический размер — не объём для очистки.
+Analyze all	Анализ всех
+Copy path	Копировать путь
+Complete	Завершено
+Partial	Частично
+This read-only tool lists standard cache, temporary and diagnostic-log locations. Opening it checks locations, but never recursively scans them. Analyze measures the selection; Analyze all visits available locations sequentially. Stop or Esc cancels analysis; Esc again closes. Refresh rediscovers locations and marks retained measurements stale. Open or double-click opens the location in the originating pane; Copy path uses the OS/internal clipboard.\nSizes are apparent file lengths, not allocated or reclaimable space. Hidden entries are included, hard links count separately, and links are not followed. Each scan stays on its root filesystem, with limits of 20,000 directory records and 512 levels. Restricted entries, excluded mounts, cancellation and limits produce partial results. Locations can overlap, so there is no grand total. Snapshots can become outdated while applications run. Nothing here means safe to delete: applications can need temporary files, caches can require rebuilding, and logs aid troubleshooting.\nNo deletion, elevated access, cleanup commands or persistent scan cache is provided. Help and original causes remain available without switching focus from other documents. Missing, inaccessible and unresolved locations are distinct. Closing or disabling cancels background work.	Этот инструмент только для чтения показывает стандартные каталоги кэша, временных файлов и диагностических журналов. Открытие проверяет доступность, но не запускает рекурсивное сканирование. «Анализ» измеряет выбранный каталог; «Анализ всех» обходит доступные каталоги по очереди. «Стоп» или Esc останавливает анализ; повторный Esc закрывает окно. «Обновить» заново определяет каталоги и помечает сохранённые измерения устаревшими. «Открыть» или двойной щелчок открывает каталог в исходной панели; «Копировать путь» использует системный или внутренний буфер.\nРазмеры — суммы логических длин файлов, а не занятого или освобождаемого места. Скрытые записи включены, жёсткие ссылки считаются отдельно; переходы по ссылкам не выполняются. Сканирование не выходит за файловую систему корня. Лимиты: 20 000 каталогов и 512 уровней. Ошибки доступа, исключённые тома, отмена и лимиты дают частичный результат. Каталоги могут пересекаться, поэтому общего итога нет. Снимки устаревают при работе приложений. Ничто здесь не означает «можно безопасно удалить»: временные файлы могут быть нужны, кэш потребует восстановления, журналы помогают диагностике.\nУдаление, повышение прав, команды очистки и постоянный кэш измерений отсутствуют. Исходные причины ошибок доступны без перехвата фокуса. Отсутствие каталога, отказ доступа и неопределённый путь различаются. Закрытие и отключение плагина отменяет работу.
+Inspection failed; incomplete measurements are partial.	Проверка не завершена; неполные измерения частичные.
+Refresh cancelled; previous locations retained. Measurements are stale.	Обновление отменено; прежние каталоги сохранены. Измерения устарели.
+Wait for directory navigation to finish, then Open again.	Дождитесь завершения перехода в каталог и снова нажмите «Открыть».
+Could not start inspection; see Help for the original error.	Не удалось начать проверку; исходная ошибка приведена в справке.
+Xcode build output	Сборки Xcode
+Rebuildable Xcode build products and indexes; active builds may need them.	Результаты сборки и индексы Xcode; могут использоваться текущими сборками.
+Xcode archives (valuable)	Архивы Xcode (ценные)
+Release archives and debug symbols; valuable developer data, not disposable cache.	Архивы выпусков и отладочные символы; ценные данные, а не временный кэш.
+iOS device support	Поддержка устройств iOS
+Installed device debugging support and symbols; debugging may require these files.	Файлы поддержки отладки устройств и символы; могут требоваться для отладки.
+Simulator devices (data)	Данные симуляторов
+Simulator devices, applications and user data; may contain valuable unsaved work.	Устройства, приложения и данные симуляторов; могут содержать ценную работу.
+Simulator caches	Кэш симуляторов
+Simulator caches; running simulators may be using them.	Кэш симуляторов; может использоваться запущенными симуляторами.
+Shared simulator assets	Общие ресурсы симуляторов
+Installed simulator runtimes and assets; other mounted filesystems are excluded.	Установленные среды и ресурсы симуляторов; другие файловые системы исключены.
+Cargo registry cache	Кэш реестра Cargo
+Downloaded Rust dependencies and registry metadata; offline builds may need them.	Загруженные зависимости Rust и индекс; могут требоваться для автономной сборки.
+Cargo Git cache	Кэш Git Cargo
+Downloaded Git dependencies; offline builds may need these checkouts.	Зависимости из Git; могут требоваться для автономной сборки.
+Rust toolchains (installed)	Rust (установленные версии)
+Installed Rust compilers and tools; development depends on these installations.	Установленные компиляторы и инструменты Rust; необходимы для разработки.
+Gradle caches	Кэш Gradle
+Gradle dependency and build caches; offline builds may require them.	Кэш сборок и зависимостей Gradle; может требоваться для автономной сборки.
+Gradle distributions	Дистрибутивы Gradle
+Downloaded Gradle Wrapper versions; projects may require these installations.	Загруженные версии Gradle Wrapper; могут требоваться проектам.
+npm cache	Кэш npm
+Downloaded npm packages; configured locations outside the environment are not inspected.	Загруженные пакеты npm; пути из файлов конфигурации не определяются.
+Maven repository (default)	Репозиторий Maven (обычный)
+Default local Maven repository; may include locally published artifacts unavailable elsewhere.	Обычный локальный репозиторий Maven; может содержать уникальные локальные артефакты.
+Android SDK (installed)	Android SDK (установленный)
+Installed Android SDK tools and platforms; development depends on these files.	Установленные инструменты и платформы Android SDK; необходимы для разработки.
+Android virtual devices (data)	Данные эмуляторов Android
+Virtual devices and their application/user data; valuable data, not disposable cache.	Виртуальные устройства и их данные; ценные данные, а не временный кэш.
+pip cache (default)	Кэш pip (обычный)
+Default pip download and wheel cache; custom configuration is not inspected.	Обычный кэш загрузок и пакетов pip; настройки другого пути не читаются.
+uv cache (default)	Кэш uv (обычный)
+Default uv package cache; custom configuration is not inspected.	Обычный кэш пакетов uv; настройки другого пути не читаются.
+On macOS, developer locations include archives, simulator data and installed SDKs/toolchains, not just caches. These can contain valuable work or required tools. No project search or automatic analysis is performed.	В macOS показаны также архивы, данные симуляторов и установленные SDK/инструменты. Они могут содержать ценные данные и необходимые программы. Поиск проектов и автоматический анализ не выполняются.
+Applications (installed)	Приложения (установленные)
+Installed applications, not disposable cache; inspect only, without uninstalling.	Установленные приложения, а не временный кэш; только просмотр, без удаления.
+User applications (installed)	Приложения пользователя
+Installed applications in your home directory, not disposable cache.	Установленные приложения пользователя, а не временный кэш.
+Shared application data	Общие данные приложений
+Shared application resources and potentially valuable data; applications may require them.	Общие ресурсы и потенциально ценные данные; могут требоваться приложениям.
+User application data	Данные приложений пользователя
+Application resources and potentially valuable user data; not disposable cache.	Ресурсы приложений и потенциально ценные данные пользователя; не временный кэш.
+App containers (user data)	Контейнеры приложений
+Sandboxed application settings and potentially valuable user data; not disposable cache.	Настройки изолированных приложений и потенциально ценные данные; не временный кэш.
+Group containers (user data)	Общие контейнеры приложений
+Shared sandbox settings and potentially valuable user data; not disposable cache.	Общие настройки изолированных приложений и потенциально ценные данные; не временный кэш.
+Device backups (valuable)	Резервные копии устройств
+Local iPhone/iPad backups; valuable device data, also included under User application data.	Ценные резервные копии iPhone/iPad; также входят в данные приложений пользователя.
+macOS application locations include installed apps, Application Support, app/group containers and local device backups. These may contain essential software or valuable user data. Backups overlap Application Support; sizes are not safe-to-delete estimates.	В macOS показаны установленные приложения, Application Support, контейнеры приложений и локальные резервные копии устройств. Они могут содержать необходимые программы и ценные данные. Резервные копии входят в Application Support; размеры не означают объём для безопасного удаления.

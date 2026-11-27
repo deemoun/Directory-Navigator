@@ -15,7 +15,8 @@ impl App {
         let experiments_changed = crate::dos::poll(self)
             | crate::acoustic::poll(self)
             | crate::video::poll(self)
-            | crate::notes::poll(self);
+            | crate::notes::poll(self)
+            | crate::cache_locations::poll(self);
         let peer_changed = crate::peer::poll(self) | crate::bluetooth::poll(self);
         let clipboard_changed = crate::clipboard::poll(self);
         let associations_changed = crate::associations::poll(self);

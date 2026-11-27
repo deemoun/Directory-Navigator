@@ -2397,3 +2397,64 @@ assistance, not a certified tuner, chord recognizer or transcription tool. DSP
 and fake-worker tests do not establish real-instrument reliability. Below 80×25 DN shows its global resize notice; capture stops and requires
 Listen after restoring the terminal. F10 can exit from the small screen. Markers and
 shared palette roles preserve meaning with custom colors and Linux tty.
+
+## Cache and temporary directories
+
+Utilities → Cache and temporary directories… is a default-enabled, read-only
+plugin on macOS, Linux and Windows. Opening performs bounded location discovery,
+not recursive analysis. Standard user/system caches, temporary directories and
+logs are candidates for inspection, not a recommendation to delete them.
+Missing, inaccessible and unresolved paths are shown separately; recognized
+aliases are deduplicated. Windows uses native known folders, Linux respects an
+absolute XDG_CACHE_HOME (otherwise ~/.cache), and macOS uses Library caches/logs.
+
+Analyze scans the selected accessible location; Analyze all visits them
+sequentially. Stop or Esc cancels; a second Esc closes. Title-close or disabling
+cancels work. Other documents remain usable without background focus changes.
+Arrows, Home/End, page keys and wheel select rows; Enter/Open/double-click opens
+in the originating pane without closing the plugin. Copy path uses the existing
+system/internal clipboard. Help includes the selected location's original cause.
+
+Sizes include hidden entries and count regular-file lengths, separate hard links
+and link metadata without following links or Windows directory reparse points.
+Each root stays on its filesystem. The shared limits are 20,000 directory records
+and 512 levels per location. Progress, skipped entries, excluded mounts and
+partial/cancelled/limited results are explicit. Refresh rediscovers paths and
+marks retained measurements stale. Cancelling Refresh retains the previous list
+and measurements instead of publishing an incomplete catalog. Open, Enter and
+double-click all reject locations marked Directory changed; Refresh first. If
+the originating pane is loading, Open explains the wait and does not navigate.
+Worker startup errors remain available in full (within the diagnostic bound) in
+Help, alongside the short notice. Snapshots are session-only and can become
+outdated as applications run. Locations can overlap; there is no grand total.
+Apparent sizes are not allocated or reclaimable space. There are no deletion
+actions, elevation, cleanup commands or automatic scans.
+
+macOS also lists curated developer storage: Xcode build output and archives, iOS
+device support, simulator data/assets, Cargo caches, installed Rust toolchains,
+Gradle caches/distributions, npm, Maven, pip/uv defaults, Android SDK and
+virtual devices. Archives, simulator data and installed tools are explicitly
+labelled; they are not disposable caches. No projects are searched
+automatically.
+
+Developer paths honor absolute `CARGO_HOME`, `RUSTUP_HOME`, `GRADLE_USER_HOME`,
+`npm_config_cache` (then `NPM_CONFIG_CACHE`), `ANDROID_HOME` and `ANDROID_AVD_HOME`.
+Missing/relative overrides use the standard home-relative locations; configuration
+files are not parsed. Maven, pip and uv entries refer to their default locations.
+Custom project build directories and package-manager configuration may live elsewhere.
+Nested locations can overlap the general cache rows: analyze individual entries
+when a repeated scan is unnecessary. Installed SDKs/toolchains and release archives
+may be essential; DN neither deletes them nor recommends deletion.
+
+macOS application storage is also available: `/Applications`, `~/Applications`,
+shared/user `Library/Application Support`, user `Library/Containers`,
+`Library/Group Containers` and `Library/Application Support/MobileSync/Backup`.
+Installed apps, application data and device backups are clearly labelled as
+potentially valuable. Backups overlap Application Support; there is no combined
+total. These entries do not provide uninstalling or cleanup.
+
+Application locations are appended after developer locations. Missing paths remain
+visible; redirected homes use the same native HOME resolution. Analysis is always
+explicit and bounded, including inside application bundles. System applications
+under `/System/Applications` are excluded. No application enumeration or per-app
+breakdown is performed, and Linux/Windows catalogs are unchanged.

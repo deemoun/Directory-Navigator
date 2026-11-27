@@ -510,3 +510,25 @@ frequency estimator for speech and music* (2002), DOI
 [10.1121/1.1458024](https://doi.org/10.1121/1.1458024). This is DN's implementation,
 not copied source from a pitch-detection crate. Real microphone/instrument
 reliability remains a hardware acceptance check, separate from synthetic tests.
+
+## Cache and temporary directories
+
+`cache_locations` is a default-enabled document plugin with no startup scan.
+Its host state captures the originating pane, owner and request generation;
+supervised workers discover a bounded OS catalog or scan locations sequentially.
+The shared directory-usage collector supplies apparent-byte accounting, bounded
+progress, mount exclusions, limits and partial results. Latest-snapshot delivery
+retains only the small catalog, not every scanned directory. The plugin uses
+shared list/buttons and performs no filesystem work during painting. Open and
+Copy path are typed host actions; disabling or retirement cancels work. No
+cleanup, elevated operations, persistent results or configuration fields exist.
+
+The macOS catalog additionally names developer caches, archives, simulator data
+and installed SDK/toolchain locations. Only explicit absolute environment overrides
+are read; there is no project search or package-manager configuration parsing.
+Purpose labels distinguish rebuildable output from valuable or installed data.
+
+The macOS catalog also appends installed Applications directories, shared/user
+Application Support, user app/group containers and MobileSync backups. Existing
+read-only discovery and traversal apply; no uninstalling or application enumeration
+is introduced. Backups overlap Application Support, so no aggregate total is shown.

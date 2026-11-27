@@ -28,6 +28,69 @@ See the [English README](README.md), [Russian README](README.ru.md) and
 [user guide](docs/USER_GUIDE.md) for supported workflows, installation, controls,
 safeguards and limits.
 
+## Unreleased cache and temporary directories
+
+The macOS catalog also includes installed Applications folders, shared/user
+Application Support, user app/group containers and MobileSync device backups.
+These seven entries distinguish installed software and valuable data from caches.
+Analysis remains explicit/read-only; overlapping entries have no combined total.
+No system applications, uninstalling, configuration or dependency changes were added.
+Application-location validation on macOS ARM64: 1,501 native tests passed
+(15 existing ignores), including 18 focused cache tests. Strict Rust 1.100
+all-target Clippy, no-default-features, localization, helper/workflow checks,
+formatting and diff checks passed. The locked 1.1.17 release passed two private
+terminal runs covering application-list scrolling and terminal restoration.
+Linux x86_64/ARM64 and Windows cross-checks remain blocked by missing native
+cross-compilers or Windows SDK headers; those runtimes and Intel Mac were not tested.
+
+macOS additionally lists curated developer storage: Xcode output/archives,
+device support, simulator data/assets, Cargo/Gradle/npm caches, installed Rust
+toolchains, Maven/pip/uv defaults, Android SDK and virtual devices. Valuable data
+and installed assets are labelled separately from rebuildable caches. Absolute
+named environment overrides are supported; no project search or automatic scan
+is added. Linux/Windows catalogs remain unchanged.
+Earlier developer-catalog validation on macOS ARM64: 1,500 native tests passed (15
+existing ignores), with 17 focused cache tests, strict Rust 1.100 all-target
+Clippy, no-default-features and helper/workflow checks. The locked 1.1.17
+release passed two private terminal runs including developer-list scrolling.
+Linux/Windows cross-checks remain blocked by missing cross-compiler/SDK tools.
+
+The default-enabled `cache_locations` document plugin lists standard cache,
+temporary and diagnostic-log locations on macOS/Linux/Windows. Opening only
+checks location availability; Analyze/Analyze all explicitly start cancellable,
+sequential, supervised directory-usage scans. Aliases deduplicate, apparent sizes
+include hidden entries, and mount exclusions/limits/errors/cancellation remain
+partial. Refresh marks retained snapshots stale; no overlapping grand total is
+reported. Open targets the originating pane, Copy path uses the clipboard bridge.
+No deletion, elevation, automatic scan, persistent cache or dependency was added.
+Local macOS ARM64 validation: full native tests and eighteen focused cache tests
+passed, including injected platform catalogs, alias/link accounting, stale owners,
+worker failure labels, keyboard/mouse navigation and immutable EN/RU/custom-color
+frames. The rebuilt release (1.1.17, `--locked`) passed the private cache terminal
+scenario, including clipboard fallback, navigation, resize and terminal restoration.
+Only the Plugins settings snapshot frames changed; default, acoustic, Note Trainer
+and combined variants passed. Strict all-target Clippy passed on the configured
+toolchain and Rust 1.100 (default/combined optional builds); no-default-features,
+44 helper/workflow tests, formatting, local links and diff checks passed.
+Linux x86_64/ARM64 cross-checks were blocked by missing cross-compilers; Windows
+was blocked by missing SDK headers in the existing Ring dependency. Linux/Windows
+runtime and macOS Intel checks remain unavailable. No CI workflow was started.
+
+Follow-up cache fixes retain the previous catalog on cancelled Refresh (including
+late and pre-entry cancellation), share Open eligibility across button/keyboard/
+double-click actions, retain bounded startup diagnostics in Help, and explain
+when the originating pane is still loading. All four original failures were
+reproduced before fixing them. Local macOS ARM64 validation passed: 15 cache
+regressions (including six new cases), full native tests (1,498 passed, 15 existing
+ignored), localization/settings/frame tests, strict Rust 1.100 all-target Clippy
+for default and combined optional builds, no-default-features checks/tests and
+44 helper tests. The locked 1.1.17 release was rebuilt; the extended private
+terminal suite passed twice, exercising replaced-directory rejection, refresh,
+navigation, Help, clipboard fallback, resize and terminal restoration. No frame
+expectations changed. Linux x86_64/ARM64 and Windows cross-checks remain blocked
+by missing cross-compilers/SDK headers; those runtime checks are unavailable.
+No version/dependency/configuration changes or CI runs were made.
+
 ## Unreleased optional Note Trainer
 
 The new `note_trainer` plugin is experimental and default-disabled. Its independent

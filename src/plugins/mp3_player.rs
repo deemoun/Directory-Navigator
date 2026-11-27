@@ -1453,6 +1453,7 @@ mod tests {
             video_preferences: Default::default(),
             acoustic: Default::default(),
             notes: Default::default(),
+            cache_locations: Default::default(),
             bluetooth: Default::default(),
             nearby: Default::default(),
         }

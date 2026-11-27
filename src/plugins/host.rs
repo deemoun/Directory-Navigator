@@ -77,6 +77,11 @@ pub(crate) fn context(app: &App, b: Binding, area: Rect, now: Instant) -> Option
             Default::default()
         },
         acoustic: app.acoustic.view.clone(),
+        cache_locations: if b.plugin == CACHE_LOCATIONS {
+            app.cache_locations.view.clone()
+        } else {
+            Default::default()
+        },
         notes: if b.plugin == NOTE_TRAINER {
             app.notes.view.clone()
         } else {
@@ -154,6 +159,9 @@ pub(crate) fn open(app: &mut App, id: PluginId) {
     }
     if id == VIDEO_MERGE {
         crate::video::opened(app);
+    }
+    if id == CACHE_LOCATIONS {
+        crate::cache_locations::opened(app, b);
     }
     if id == NOTE_TRAINER {
         crate::notes::opened(app);
@@ -310,6 +318,9 @@ fn apply(app: &mut App, b: Binding, effects: Vec<Effect>) {
             }
             Effect::DosDiscover => crate::dos::discover_emulators(app, b),
             Effect::DosStop => crate::dos::stop(app, b),
+            Effect::CacheLocations { generation, action } => {
+                crate::cache_locations::action(app, b, generation, action)
+            }
             Effect::Notes { generation, action } => {
                 crate::notes::action(app, b, generation, action);
             }

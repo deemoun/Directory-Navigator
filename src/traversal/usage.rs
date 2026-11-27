@@ -272,11 +272,16 @@ where
     }
 }
 
-pub(super) fn run(root: PathBuf, cancel: &Cancellation, sender: &SyncSender<Event>) {
+/// Shared worker entry point; the caller owns bounded progress delivery.
+pub(crate) fn collect(
+    root: &Path,
+    cancel: &Cancellation,
+    emit: impl FnMut(Update) -> bool,
+) -> (Stats, bool) {
     let mut scanner = Scanner {
         cancel,
         probe: entry_identity,
-        emit: |u| send(sender, Event::Usage(u), cancel, true),
+        emit,
         limit: DIRECTORY_LIMIT,
         depth: DEPTH_LIMIT,
         stats: Stats::default(),
@@ -285,14 +290,20 @@ pub(super) fn run(root: PathBuf, cancel: &Cancellation, sender: &SyncSender<Even
         limited: false,
         last: Instant::now(),
     };
-    scanner.scan(&root);
+    scanner.scan(root);
     scanner.flush();
+    (scanner.stats, scanner.limited)
+}
+pub(super) fn run(root: PathBuf, cancel: &Cancellation, sender: &SyncSender<Event>) {
+    let (stats, limited) = collect(&root, cancel, |u| {
+        send(sender, Event::Usage(u), cancel, true)
+    });
     send(
         sender,
         Event::Done {
-            stats: scanner.stats,
+            stats,
             cancelled: cancel.cancelled(),
-            limited: scanner.limited,
+            limited,
         },
         cancel,
         true,

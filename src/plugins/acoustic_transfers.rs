@@ -833,6 +833,7 @@ mod tests {
                 ..Default::default()
             },
             notes: Default::default(),
+            cache_locations: Default::default(),
             nearby: Default::default(),
             bluetooth: Default::default(),
         }

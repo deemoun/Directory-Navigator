@@ -22,8 +22,8 @@ fn note_plugin_defaults_off_saved_choices_and_settings_cancel_are_preserved() ->
     assert!(Config::read(&path)?.plugin_enabled(NOTE_TRAINER));
     assert!(fs::read_to_string(&path)?.contains("future-plugin"));
     app.open_settings(SettingsKind::Plugins);
-    // Appended after established plugins, before the two opening preferences.
-    let index = app.modals.settings().unwrap().control_count() - 3;
+    // Before Cache directories and the two opening preferences.
+    let index = app.modals.settings().unwrap().control_count() - 4;
     app.modals.settings_mut().unwrap().toggle(index);
     key(&mut app, KeyCode::Esc);
     assert!(!app.config.plugin_enabled(NOTE_TRAINER));
