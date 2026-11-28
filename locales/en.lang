@@ -2170,7 +2170,7 @@ Analyze all	Analyze all
 Copy path	Copy path
 Complete	Complete
 Partial	Partial
-This read-only tool lists standard cache, temporary and diagnostic-log locations. Opening it checks locations, but never recursively scans them. Analyze measures the selection; Analyze all visits available locations sequentially. Stop or Esc cancels analysis; Esc again closes. Refresh rediscovers locations and marks retained measurements stale. Open or double-click opens the location in the originating pane; Copy path uses the OS/internal clipboard.\nSizes are apparent file lengths, not allocated or reclaimable space. Hidden entries are included, hard links count separately, and links are not followed. Each scan stays on its root filesystem, with limits of 20,000 directory records and 512 levels. Restricted entries, excluded mounts, cancellation and limits produce partial results. Locations can overlap, so there is no grand total. Snapshots can become outdated while applications run. Nothing here means safe to delete: applications can need temporary files, caches can require rebuilding, and logs aid troubleshooting.\nNo deletion, elevated access, cleanup commands or persistent scan cache is provided. Help and original causes remain available without switching focus from other documents. Missing, inaccessible and unresolved locations are distinct. Closing or disabling cancels background work.	This read-only tool lists standard cache, temporary and diagnostic-log locations. Opening it checks locations, but never recursively scans them. Analyze measures the selection; Analyze all visits available locations sequentially. Stop or Esc cancels analysis; Esc again closes. Refresh rediscovers locations and marks retained measurements stale. Open or double-click opens the location in the originating pane; Copy path uses the OS/internal clipboard.\nSizes are apparent file lengths, not allocated or reclaimable space. Hidden entries are included, hard links count separately, and links are not followed. Each scan stays on its root filesystem, with limits of 20,000 directory records and 512 levels. Restricted entries, excluded mounts, cancellation and limits produce partial results. Locations can overlap, so there is no grand total. Snapshots can become outdated while applications run. Nothing here means safe to delete: applications can need temporary files, caches can require rebuilding, and logs aid troubleshooting.\nNo deletion, elevated access, cleanup commands or persistent scan cache is provided. Help and original causes remain available without switching focus from other documents. Missing, inaccessible and unresolved locations are distinct. Closing or disabling cancels background work.
+This tool lists standard cache, temporary and diagnostic-log locations. Opening it checks locations, but never recursively scans them. Analyze measures the selection; Analyze all visits available locations sequentially. Stop or Esc cancels analysis; Esc again closes. Refresh rediscovers locations and marks retained measurements stale. Open or double-click opens the location in the originating pane; Copy path uses the OS/internal clipboard.\nSizes are apparent file lengths, not allocated or reclaimable space. Hidden entries are included, hard links count separately, and links are not followed. Each scan stays on its root filesystem, with limits of 20,000 directory records and 512 levels. Restricted entries, excluded mounts, cancellation and limits produce partial results. Locations can overlap, so there is no grand total. Snapshots can become outdated while applications run. Nothing here means safe to delete: applications can need temporary files, caches can require rebuilding, and logs aid troubleshooting.\nAnalysis never changes files. Cleanup, where offered, always requires review and explicit Trash confirmation. No elevated access, permanent-delete fallback or persistent scan cache is provided. Help and original causes remain available without switching focus from other documents. Missing, inaccessible and unresolved locations are distinct. Closing or disabling cancels background work.	This tool lists standard cache, temporary and diagnostic-log locations. Opening it checks locations, but never recursively scans them. Analyze measures the selection; Analyze all visits available locations sequentially. Stop or Esc cancels analysis; Esc again closes. Refresh rediscovers locations and marks retained measurements stale. Open or double-click opens the location in the originating pane; Copy path uses the OS/internal clipboard.\nSizes are apparent file lengths, not allocated or reclaimable space. Hidden entries are included, hard links count separately, and links are not followed. Each scan stays on its root filesystem, with limits of 20,000 directory records and 512 levels. Restricted entries, excluded mounts, cancellation and limits produce partial results. Locations can overlap, so there is no grand total. Snapshots can become outdated while applications run. Nothing here means safe to delete: applications can need temporary files, caches can require rebuilding, and logs aid troubleshooting.\nAnalysis never changes files. Cleanup, where offered, always requires review and explicit Trash confirmation. No elevated access, permanent-delete fallback or persistent scan cache is provided. Help and original causes remain available without switching focus from other documents. Missing, inaccessible and unresolved locations are distinct. Closing or disabling cancels background work.
 Inspection failed; incomplete measurements are partial.	Inspection failed; incomplete measurements are partial.
 Refresh cancelled; previous locations retained. Measurements are stale.	Refresh cancelled; previous locations retained. Measurements are stale.
 Wait for directory navigation to finish, then Open again.	Wait for directory navigation to finish, then Open again.
@@ -2225,3 +2225,62 @@ Shared sandbox settings and potentially valuable user data; not disposable cache
 Device backups (valuable)	Device backups (valuable)
 Local iPhone/iPad backups; valuable device data, also included under User application data.	Local iPhone/iPad backups; valuable device data, also included under User application data.
 macOS application locations include installed apps, Application Support, app/group containers and local device backups. These may contain essential software or valuable user data. Backups overlap Application Support; sizes are not safe-to-delete estimates.	macOS application locations include installed apps, Application Support, app/group containers and local device backups. These may contain essential software or valuable user data. Backups overlap Application Support; sizes are not safe-to-delete estimates.
+Clean…	Clean…
+Apparent bytes are not reclaimable space.	Apparent bytes are not reclaimable space.
+Review cache cleanup	Review cache cleanup
+Only reviewed regular cache files at least 7 days old. Directories and recent files are kept. Cache files may still be in use.	Only reviewed regular cache files at least 7 days old. Directories and recent files are kept. Cache files may still be in use.
+Moves to Trash only. Restore with your desktop file manager. Trash may keep the same disk space occupied.	Moves to Trash only. Restore with your desktop file manager. Trash may keep the same disk space occupied.
+Confirmed Trash moves: {}	Confirmed Trash moves: {}
+ · partial review	 · partial review
+Preparing old cache files for review…	Preparing old cache files for review…
+Moving reviewed cache files to Trash…	Moving reviewed cache files to Trash…
+No eligible old cache files were found.	No eligible old cache files were found.
+Review ready; Clean… opens the candidate list.	Review ready; Clean… opens the candidate list.
+Cleanup review cancelled; nothing was moved.	Cleanup review cancelled; nothing was moved.
+Cleanup completed; files are in Trash. Measurements are stale.	Cleanup completed; files are in Trash. Measurements are stale.
+Cleanup stopped; completed files remain in Trash. Remaining files were retained.	Cleanup stopped; completed files remain in Trash. Remaining files were retained.
+Cleanup stopped; check Trash and refresh. Completed moves are not undone.	Cleanup stopped; check Trash and refresh. Completed moves are not undone.
+Where Clean… is offered, select the user-cache row to review regular files unchanged for at least 7 days. Only privately controlled cache data beneath your home folder is eligible. Recent files, directories, links, hard links, mounted paths, system locations, applications and backups are kept. Review defaults to Cancel. Move to Trash rechecks identities and changes; it never permanently deletes files. Stop or closing cancels remaining work; completed moves remain in Trash. Trash can retain the same disk space until emptied separately. Reviews are bounded to 10,000 files, 100,000 entries, 20,000 directories, 512 levels and 4 MiB of paths; partial reviews are labelled. Files start selected; Space or a click toggles a file, Select all/none updates the draft, and Move to Trash requires a selection. Preparation shows scanned/eligible counts. Recent, excluded and unreadable entries have separate counters. Partial inspections and failures are distinct from an empty complete inspection. Help retains the last cleanup outcome, selected/confirmed/unselected counts, native root and original errors through Analyze and Refresh.	Where Clean… is offered, select the user-cache row to review regular files unchanged for at least 7 days. Only privately controlled cache data beneath your home folder is eligible. Recent files, directories, links, hard links, mounted paths, system locations, applications and backups are kept. Review defaults to Cancel. Move to Trash rechecks identities and changes; it never permanently deletes files. Stop or closing cancels remaining work; completed moves remain in Trash. Trash can retain the same disk space until emptied separately. Reviews are bounded to 10,000 files, 100,000 entries, 20,000 directories, 512 levels and 4 MiB of paths; partial reviews are labelled. Files start selected; Space or a click toggles a file, Select all/none updates the draft, and Move to Trash requires a selection. Preparation shows scanned/eligible counts. Recent, excluded and unreadable entries have separate counters. Partial inspections and failures are distinct from an empty complete inspection. Help retains the last cleanup outcome, selected/confirmed/unselected counts, native root and original errors through Analyze and Refresh.
+Cleanup review stopped; nothing was moved.	Cleanup review stopped; nothing was moved.
+Cleanup requires a dedicated cache directory beneath your home folder.	Cleanup requires a dedicated cache directory beneath your home folder.
+This location contains protected application or personal data; cleanup is unavailable.	This location contains protected application or personal data; cleanup is unavailable.
+Cache directory changed or is not privately controlled by the current user.	Cache directory changed or is not privately controlled by the current user.
+Cache ancestors must be privately controlled real directories.	Cache ancestors must be privately controlled real directories.
+Cache file changed during review; nothing was moved	Cache file changed during review; nothing was moved
+Cache mount changed; remaining files retained	Cache mount changed; remaining files retained
+Cache file is no longer eligible; remaining files retained	Cache file is no longer eligible; remaining files retained
+Cache ancestor changed; remaining files retained	Cache ancestor changed; remaining files retained
+Cache directory changed during review	Cache directory changed during review
+Cache mount changed during review	Cache mount changed during review
+Mount identity is unavailable; cache files retained	Mount identity is unavailable; cache files retained
+Home directory is unavailable	Home directory is unavailable
+Cannot establish cache file age	Cannot establish cache file age
+No eligible cache files	No eligible cache files
+Scanned:	Scanned:
+Eligible:	Eligible:
+Recent:	Recent:
+Excluded:	Excluded:
+Unreadable:	Unreadable:
+Last cleanup:	Last cleanup:
+Not moved:	Not moved:
+Not selected:	Not selected:
+Unconfirmed:	Unconfirmed:
+Cleanup running	Cleanup running
+Cleanup completed	Cleanup completed
+Cleanup cancelled	Cleanup cancelled
+Cleanup failed	Cleanup failed
+Cleanup outcome unconfirmed	Cleanup outcome unconfirmed
+Inspection partial; no eligible files in the inspected portion.	Inspection partial; no eligible files in the inspected portion.
+Partial inspection; review the available candidates.	Partial inspection; review the available candidates.
+Cleanup inspection failed; nothing was moved.	Cleanup inspection failed; nothing was moved.
+Select at least one cache file.	Select at least one cache file.
+Select none	Select none
+Selected:	Selected:
+ · partial inspection	 · partial inspection
+Cleanup cancelled; confirmed moves remain in Trash. Check remaining items.	Cleanup cancelled; confirmed moves remain in Trash. Check remaining items.
+Cleanup failed; confirmed moves remain in Trash. Check remaining items.	Cleanup failed; confirmed moves remain in Trash. Check remaining items.
+Entry limit reached.	Entry limit reached.
+Candidate file limit reached.	Candidate file limit reached.
+Directory limit reached.	Directory limit reached.
+Directory depth limit reached.	Directory depth limit reached.
+Review path-storage limit reached.	Review path-storage limit reached.

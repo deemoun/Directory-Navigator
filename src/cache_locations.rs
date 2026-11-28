@@ -1,4 +1,4 @@
-//! Read-only, session-only cache inventory. Filesystem work belongs to workers.
+//! Session-only cache inventory and reviewed cleanup. Filesystem work belongs to workers.
 use crate::{
     app::App,
     platform_fs::{entry_identity, EntryIdentity},
@@ -11,6 +11,7 @@ use std::{
     sync::{mpsc::TryRecvError, Arc, Mutex},
 };
 mod catalog;
+mod cleanup;
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) enum Status {
     #[default]
@@ -54,11 +55,15 @@ pub(crate) struct Location {
     pub status: Status,
     pub measurement: Option<Measurement>,
     pub stale: bool,
+    pub cleanup: bool,
     pub cause: String,
 }
 impl Location {
     pub fn can_open(&self) -> bool {
         self.path.is_some() && self.identity.is_some() && self.status != Status::Changed
+    }
+    pub fn can_clean(&self) -> bool {
+        cfg!(target_os = "linux") && self.cleanup && self.can_open()
     }
     fn new(name: &'static str, purpose: &'static str, path: Option<PathBuf>) -> Self {
         Self {
@@ -69,6 +74,7 @@ impl Location {
             status: Status::Unresolved,
             measurement: None,
             stale: false,
+            cleanup: false,
             cause: String::new(),
         }
     }
@@ -81,6 +87,11 @@ pub(crate) struct Snapshot {
     pub stopping: bool,
     pub notice: String,
     pub error: String,
+    pub review: Option<Arc<cleanup::Review>>,
+    pub cleanup_scan: Option<cleanup::ScanStats>,
+    pub cleanup_preparing: bool,
+    pub cleanup_selection: cleanup::Selection,
+    pub cleanup_report: Option<cleanup::Report>,
 }
 #[derive(Clone, Copy)]
 pub(crate) enum Action {
@@ -89,10 +100,17 @@ pub(crate) enum Action {
     Stop,
     Open(usize),
     Copy(usize),
+    Clean(usize),
+    ConfirmClean,
+    DismissClean,
+    ToggleClean(usize),
+    SelectClean(bool),
 }
 struct Service {
     binding: Binding,
     refreshing: bool,
+    reviewing: bool,
+    cleaning: bool,
     worker: crate::workers::Worker<Snapshot>,
     latest: Arc<Mutex<Option<Snapshot>>>,
 }
@@ -262,6 +280,14 @@ pub(crate) fn action(app: &mut App, b: Binding, generation: u64, a: Action) {
     if !alive(app, b) || generation != app.cache_locations.view.generation {
         return;
     }
+    if matches!(a, Action::DismissClean) {
+        app.cache_locations.view.review = None;
+        app.cache_locations.view.cleanup_selection = cleanup::Selection::default();
+        return;
+    }
+    if matches!(a, Action::Clean(_) | Action::ConfirmClean) && !cfg!(target_os = "linux") {
+        return;
+    }
     if matches!(a, Action::Stop) {
         if let Some(service) = &app.cache_locations.service {
             service.worker.cancel();
@@ -303,6 +329,34 @@ pub(crate) fn action(app: &mut App, b: Binding, generation: u64, a: Action) {
     if app.cache_locations.view.busy {
         return;
     }
+    if matches!(a, Action::ToggleClean(_) | Action::SelectClean(_)) {
+        let state = &mut app.cache_locations.view;
+        if let Some(review) = &state.review {
+            match a {
+                Action::ToggleClean(i) => state.cleanup_selection.toggle(review, i),
+                Action::SelectClean(value) => state.cleanup_selection.set(review, value),
+                _ => {}
+            }
+        }
+        return;
+    }
+    if let Action::Clean(i) = a {
+        if !app
+            .cache_locations
+            .view
+            .rows
+            .get(i)
+            .is_some_and(Location::can_clean)
+        {
+            return;
+        }
+    }
+    if matches!(a, Action::ConfirmClean)
+        && (app.cache_locations.view.review.is_none()
+            || app.cache_locations.view.cleanup_selection.count == 0)
+    {
+        return;
+    }
     let Owner::Document(owner) = b.owner else {
         return;
     };
@@ -312,7 +366,36 @@ pub(crate) fn action(app: &mut App, b: Binding, generation: u64, a: Action) {
     view.busy = true;
     view.stopping = false;
     view.error.clear();
-    view.notice = if matches!(a, Action::Refresh) {
+    let reviewed = view.review.take();
+    view.cleanup_preparing = matches!(a, Action::Clean(_));
+    if view.cleanup_preparing {
+        view.cleanup_scan = Some(cleanup::ScanStats {
+            root: match a {
+                Action::Clean(i) => view.rows[i].path.clone().unwrap(),
+                _ => PathBuf::new(),
+            },
+            ..Default::default()
+        });
+    }
+    if matches!(a, Action::ConfirmClean) {
+        let review = reviewed.as_ref().unwrap();
+        view.cleanup_report = Some(cleanup::Report::new(
+            review.root.clone(),
+            view.cleanup_selection.count,
+            review
+                .paths
+                .len()
+                .saturating_sub(view.cleanup_selection.count),
+        ));
+    }
+    if !matches!(a, Action::ConfirmClean) {
+        view.cleanup_selection = cleanup::Selection::default();
+    }
+    view.notice = if matches!(a, Action::Clean(_)) {
+        "Preparing old cache files for review…"
+    } else if matches!(a, Action::ConfirmClean) {
+        "Moving reviewed cache files to Trash…"
+    } else if matches!(a, Action::Refresh) {
         "Discovering standard locations…"
     } else {
         "Analyzing apparent bytes…"
@@ -334,6 +417,44 @@ pub(crate) fn action(app: &mut App, b: Binding, generation: u64, a: Action) {
         crate::requests::Owner::Document(owner),
         "cache-locations",
         move |cancel| {
+            if let Action::Clean(i) = a {
+                let mut input = input;
+                let row = &input.rows[i];
+                let home = std::env::var_os("HOME")
+                    .map(PathBuf::from)
+                    .ok_or_else(|| std::io::Error::other("Home directory is unavailable"))?;
+                let root = row.path.clone().unwrap();
+                let id = row.identity.unwrap();
+                let review = cleanup::collect_progress(
+                    root,
+                    home,
+                    id,
+                    std::time::SystemTime::now(),
+                    &cancel,
+                    |stats| {
+                        input.cleanup_scan = Some(stats.clone());
+                        publish(&output, &input);
+                    },
+                )?;
+                input.busy = false;
+                input.cleanup_preparing = false;
+                input.cleanup_scan = Some(review.stats.clone());
+                input.notice = review.notice().into();
+                input.error.clone_from(&review.stats.first_error);
+                input.cleanup_selection.set(&review, true);
+                input.review = (!review.paths.is_empty()).then(|| Arc::new(review));
+                return Ok(input);
+            }
+            if matches!(a, Action::ConfirmClean) {
+                let selected = reviewed.unwrap().selected(&input.cleanup_selection)?;
+                return Ok(cleanup::execute(
+                    input,
+                    Arc::new(selected),
+                    cancel,
+                    output,
+                    crate::trash_support::send,
+                ));
+            }
             if let Action::Analyze(selected) = a {
                 return Ok(scan(input, selected, cancel, output));
             }
@@ -346,6 +467,8 @@ pub(crate) fn action(app: &mut App, b: Binding, generation: u64, a: Action) {
             app.cache_locations.service = Some(Service {
                 binding: b,
                 refreshing: matches!(a, Action::Refresh),
+                reviewing: matches!(a, Action::Clean(_)),
+                cleaning: matches!(a, Action::ConfirmClean),
                 worker,
                 latest,
             });
@@ -377,6 +500,20 @@ pub(crate) fn poll(app: &mut App) -> bool {
         Err(TryRecvError::Empty) => changed,
         result => {
             match result {
+                Ok(Ok(mut view))
+                    if view.generation == app.cache_locations.view.generation
+                        && service.reviewing
+                        && app.cache_locations.view.stopping =>
+                {
+                    view.review = None;
+                    view.cleanup_selection = cleanup::Selection::default();
+                    view.cleanup_preparing = false;
+                    view.busy = false;
+                    view.stopping = false;
+                    view.notice = "Cleanup review cancelled; nothing was moved.".into();
+                    view.generation = view.generation.wrapping_add(1);
+                    app.cache_locations.view = view;
+                }
                 Ok(Ok(view))
                     if view.generation == app.cache_locations.view.generation
                         && service.refreshing
@@ -398,6 +535,16 @@ pub(crate) fn poll(app: &mut App) -> bool {
                     app.cache_locations.view.generation =
                         app.cache_locations.view.generation.wrapping_add(1);
                 }
+                Ok(Err(error)) if service.reviewing => inspection_failed(
+                    &mut app.cache_locations.view,
+                    error.kind() == std::io::ErrorKind::Interrupted,
+                    &error.to_string(),
+                ),
+                Err(TryRecvError::Disconnected) if service.reviewing => inspection_failed(
+                    &mut app.cache_locations.view,
+                    false,
+                    "Background inspection ended unexpectedly",
+                ),
                 Ok(Err(error)) => failed(
                     &mut app.cache_locations.view,
                     error.kind() == std::io::ErrorKind::Interrupted,
@@ -410,11 +557,34 @@ pub(crate) fn poll(app: &mut App) -> bool {
                 ),
                 _ => {}
             }
+            if service.cleaning && !app.cache_locations.view.error.is_empty() {
+                if let Some(report) = &mut app.cache_locations.view.cleanup_report {
+                    if report.outcome == cleanup::Outcome::Running {
+                        report.stopped(
+                            cleanup::Outcome::Unconfirmed,
+                            &app.cache_locations.view.error,
+                        );
+                        app.cache_locations.view.notice = "Cleanup stopped; check Trash and refresh. Completed moves are not undone.".into();
+                    }
+                }
+            }
             app.cache_locations.view.busy = false;
             app.cache_locations.service = None;
             true
         }
     }
+}
+fn inspection_failed(view: &mut Snapshot, cancelled: bool, cause: &str) {
+    failed(view, cancelled, cause);
+    view.review = None;
+    view.cleanup_selection = cleanup::Selection::default();
+    view.cleanup_preparing = false;
+    view.notice = if cancelled {
+        "Cleanup review cancelled; nothing was moved."
+    } else {
+        "Cleanup inspection failed; nothing was moved."
+    }
+    .into();
 }
 fn failed(view: &mut Snapshot, cancelled: bool, cause: &str) {
     view.generation = view.generation.wrapping_add(1);

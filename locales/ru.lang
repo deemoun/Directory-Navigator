@@ -2172,7 +2172,7 @@ Analyze all	Анализ всех
 Copy path	Копировать путь
 Complete	Завершено
 Partial	Частично
-This read-only tool lists standard cache, temporary and diagnostic-log locations. Opening it checks locations, but never recursively scans them. Analyze measures the selection; Analyze all visits available locations sequentially. Stop or Esc cancels analysis; Esc again closes. Refresh rediscovers locations and marks retained measurements stale. Open or double-click opens the location in the originating pane; Copy path uses the OS/internal clipboard.\nSizes are apparent file lengths, not allocated or reclaimable space. Hidden entries are included, hard links count separately, and links are not followed. Each scan stays on its root filesystem, with limits of 20,000 directory records and 512 levels. Restricted entries, excluded mounts, cancellation and limits produce partial results. Locations can overlap, so there is no grand total. Snapshots can become outdated while applications run. Nothing here means safe to delete: applications can need temporary files, caches can require rebuilding, and logs aid troubleshooting.\nNo deletion, elevated access, cleanup commands or persistent scan cache is provided. Help and original causes remain available without switching focus from other documents. Missing, inaccessible and unresolved locations are distinct. Closing or disabling cancels background work.	Этот инструмент только для чтения показывает стандартные каталоги кэша, временных файлов и диагностических журналов. Открытие проверяет доступность, но не запускает рекурсивное сканирование. «Анализ» измеряет выбранный каталог; «Анализ всех» обходит доступные каталоги по очереди. «Стоп» или Esc останавливает анализ; повторный Esc закрывает окно. «Обновить» заново определяет каталоги и помечает сохранённые измерения устаревшими. «Открыть» или двойной щелчок открывает каталог в исходной панели; «Копировать путь» использует системный или внутренний буфер.\nРазмеры — суммы логических длин файлов, а не занятого или освобождаемого места. Скрытые записи включены, жёсткие ссылки считаются отдельно; переходы по ссылкам не выполняются. Сканирование не выходит за файловую систему корня. Лимиты: 20 000 каталогов и 512 уровней. Ошибки доступа, исключённые тома, отмена и лимиты дают частичный результат. Каталоги могут пересекаться, поэтому общего итога нет. Снимки устаревают при работе приложений. Ничто здесь не означает «можно безопасно удалить»: временные файлы могут быть нужны, кэш потребует восстановления, журналы помогают диагностике.\nУдаление, повышение прав, команды очистки и постоянный кэш измерений отсутствуют. Исходные причины ошибок доступны без перехвата фокуса. Отсутствие каталога, отказ доступа и неопределённый путь различаются. Закрытие и отключение плагина отменяет работу.
+This tool lists standard cache, temporary and diagnostic-log locations. Opening it checks locations, but never recursively scans them. Analyze measures the selection; Analyze all visits available locations sequentially. Stop or Esc cancels analysis; Esc again closes. Refresh rediscovers locations and marks retained measurements stale. Open or double-click opens the location in the originating pane; Copy path uses the OS/internal clipboard.\nSizes are apparent file lengths, not allocated or reclaimable space. Hidden entries are included, hard links count separately, and links are not followed. Each scan stays on its root filesystem, with limits of 20,000 directory records and 512 levels. Restricted entries, excluded mounts, cancellation and limits produce partial results. Locations can overlap, so there is no grand total. Snapshots can become outdated while applications run. Nothing here means safe to delete: applications can need temporary files, caches can require rebuilding, and logs aid troubleshooting.\nAnalysis never changes files. Cleanup, where offered, always requires review and explicit Trash confirmation. No elevated access, permanent-delete fallback or persistent scan cache is provided. Help and original causes remain available without switching focus from other documents. Missing, inaccessible and unresolved locations are distinct. Closing or disabling cancels background work.	Этот инструмент показывает стандартные каталоги кэша, временных файлов и диагностических журналов. Открытие проверяет доступность, но не запускает рекурсивное сканирование. «Анализ» измеряет выбранный каталог; «Анализ всех» обходит доступные каталоги по очереди. «Стоп» или Esc останавливает анализ; повторный Esc закрывает окно. «Обновить» заново определяет каталоги и помечает сохранённые измерения устаревшими. «Открыть» или двойной щелчок открывает каталог в исходной панели; «Копировать путь» использует системный или внутренний буфер.\nРазмеры — суммы логических длин файлов, а не занятого или освобождаемого места. Скрытые записи включены, жёсткие ссылки считаются отдельно; переходы по ссылкам не выполняются. Сканирование не выходит за файловую систему корня. Лимиты: 20 000 каталогов и 512 уровней. Ошибки доступа, исключённые тома, отмена и лимиты дают частичный результат. Каталоги могут пересекаться, поэтому общего итога нет. Снимки устаревают при работе приложений. Ничто здесь не означает «можно безопасно удалить»: временные файлы могут быть нужны, кэш потребует восстановления, журналы помогают диагностике.\nАнализ не меняет файлы. Доступная очистка требует проверки и явного подтверждения перемещения в корзину. Повышения прав, безвозвратного удаления и постоянного кэша измерений нет. Исходные причины ошибок доступны без перехвата фокуса. Отсутствие каталога, отказ доступа и неопределённый путь различаются. Закрытие и отключение плагина отменяет работу.
 Inspection failed; incomplete measurements are partial.	Проверка не завершена; неполные измерения частичные.
 Refresh cancelled; previous locations retained. Measurements are stale.	Обновление отменено; прежние каталоги сохранены. Измерения устарели.
 Wait for directory navigation to finish, then Open again.	Дождитесь завершения перехода в каталог и снова нажмите «Открыть».
@@ -2227,3 +2227,62 @@ Shared sandbox settings and potentially valuable user data; not disposable cache
 Device backups (valuable)	Резервные копии устройств
 Local iPhone/iPad backups; valuable device data, also included under User application data.	Ценные резервные копии iPhone/iPad; также входят в данные приложений пользователя.
 macOS application locations include installed apps, Application Support, app/group containers and local device backups. These may contain essential software or valuable user data. Backups overlap Application Support; sizes are not safe-to-delete estimates.	В macOS показаны установленные приложения, Application Support, контейнеры приложений и локальные резервные копии устройств. Они могут содержать необходимые программы и ценные данные. Резервные копии входят в Application Support; размеры не означают объём для безопасного удаления.
+Clean…	Очистка…
+Apparent bytes are not reclaimable space.	Логический размер не означает объём для очистки.
+Review cache cleanup	Проверка очистки кэша
+Only reviewed regular cache files at least 7 days old. Directories and recent files are kept. Cache files may still be in use.	Только проверенные обычные файлы кэша старше 7 дней. Каталоги и свежие файлы сохраняются. Кэш может ещё использоваться.
+Moves to Trash only. Restore with your desktop file manager. Trash may keep the same disk space occupied.	Только перемещение в корзину. Восстановление — через системный файловый менеджер. Корзина может продолжать занимать место.
+Confirmed Trash moves: {}	Подтверждено в корзине: {}
+ · partial review	 · частичный список
+Preparing old cache files for review…	Подготовка списка старого кэша…
+Moving reviewed cache files to Trash…	Перемещение проверенного кэша в корзину…
+No eligible old cache files were found.	Подходящих старых файлов кэша не найдено.
+Review ready; Clean… opens the candidate list.	Список готов; «Очистка…» открывает его.
+Cleanup review cancelled; nothing was moved.	Проверка отменена; ничего не перемещено.
+Cleanup completed; files are in Trash. Measurements are stale.	Очистка завершена; файлы в корзине. Измерения устарели.
+Cleanup stopped; completed files remain in Trash. Remaining files were retained.	Очистка остановлена; перемещённые файлы в корзине, остальные сохранены.
+Cleanup stopped; check Trash and refresh. Completed moves are not undone.	Очистка остановлена; проверьте корзину и обновите список. Выполненные перемещения не отменяются.
+Where Clean… is offered, select the user-cache row to review regular files unchanged for at least 7 days. Only privately controlled cache data beneath your home folder is eligible. Recent files, directories, links, hard links, mounted paths, system locations, applications and backups are kept. Review defaults to Cancel. Move to Trash rechecks identities and changes; it never permanently deletes files. Stop or closing cancels remaining work; completed moves remain in Trash. Trash can retain the same disk space until emptied separately. Reviews are bounded to 10,000 files, 100,000 entries, 20,000 directories, 512 levels and 4 MiB of paths; partial reviews are labelled. Files start selected; Space or a click toggles a file, Select all/none updates the draft, and Move to Trash requires a selection. Preparation shows scanned/eligible counts. Recent, excluded and unreadable entries have separate counters. Partial inspections and failures are distinct from an empty complete inspection. Help retains the last cleanup outcome, selected/confirmed/unselected counts, native root and original errors through Analyze and Refresh.	Если доступна «Очистка…», выберите пользовательский кэш: список включает обычные файлы, не изменявшиеся минимум 7 дней. Допускается только кэш под вашим управлением внутри домашнего каталога. Свежие файлы, каталоги, ссылки, жёсткие ссылки, точки монтирования, системные данные, приложения и резервные копии сохраняются. По умолчанию выбрана Отмена. Перед перемещением в корзину повторно проверяются файлы; безвозвратного удаления нет. Стоп или закрытие отменяет оставшуюся работу; уже перемещённые файлы остаются в корзине и могут продолжать занимать место. Лимиты списка: 10 000 файлов, 100 000 записей, 20 000 каталогов, 512 уровней и 4 МиБ путей; частичный список помечается. Файлы изначально выбраны; пробел или щелчок переключает отметку. «Выбрать все» и «Снять все» меняют черновик; для корзины нужен хотя бы один выбранный файл. При подготовке видны счётчики просмотренных и подходящих файлов; недавние, исключённые и недоступные записи считаются отдельно. Частичная проверка и ошибка отличаются от полного пустого результата. Справка сохраняет итог последней очистки, количество выбранных, перемещённых и невыбранных файлов, исходный путь и причины ошибок даже после анализа и обновления.
+Cleanup review stopped; nothing was moved.	Проверка очистки остановлена; ничего не перемещено.
+Cleanup requires a dedicated cache directory beneath your home folder.	Для очистки нужен отдельный каталог кэша внутри домашнего каталога.
+This location contains protected application or personal data; cleanup is unavailable.	Здесь находятся защищённые данные приложений или личные данные; очистка недоступна.
+Cache directory changed or is not privately controlled by the current user.	Каталог кэша изменён или не находится под исключительным управлением пользователя.
+Cache ancestors must be privately controlled real directories.	Родительские каталоги должны быть обычными каталогами под вашим управлением.
+Cache file changed during review; nothing was moved	Файл кэша изменился при проверке; ничего не перемещено
+Cache mount changed; remaining files retained	Монтирование кэша изменилось; оставшиеся файлы сохранены
+Cache file is no longer eligible; remaining files retained	Файл больше не подходит для очистки; оставшиеся файлы сохранены
+Cache ancestor changed; remaining files retained	Родительский каталог изменился; оставшиеся файлы сохранены
+Cache directory changed during review	Каталог кэша изменился при проверке
+Cache mount changed during review	Монтирование кэша изменилось при проверке
+Mount identity is unavailable; cache files retained	Идентификатор монтирования недоступен; файлы кэша сохранены
+Home directory is unavailable	Домашний каталог недоступен
+Cannot establish cache file age	Не удалось определить возраст файлов кэша
+No eligible cache files	Нет подходящих файлов кэша
+Scanned:	Просмотрено:
+Eligible:	Подходит:
+Recent:	Недавние:
+Excluded:	Исключено:
+Unreadable:	Недоступно:
+Last cleanup:	Последняя очистка:
+Not moved:	Не перенесено:
+Not selected:	Не выбрано:
+Unconfirmed:	Неясно:
+Cleanup running	Очистка выполняется
+Cleanup completed	Очистка завершена
+Cleanup cancelled	Очистка отменена
+Cleanup failed	Ошибка очистки
+Cleanup outcome unconfirmed	Результат очистки не подтверждён
+Inspection partial; no eligible files in the inspected portion.	Проверено частично; в просмотренной части подходящих файлов нет.
+Partial inspection; review the available candidates.	Проверено частично; просмотрите найденные файлы.
+Cleanup inspection failed; nothing was moved.	Не удалось проверить кэш; ничего не перемещено.
+Select at least one cache file.	Выберите хотя бы один файл кэша.
+Select none	Снять все
+Selected:	Выбрано:
+ · partial inspection	 · проверено частично
+Cleanup cancelled; confirmed moves remain in Trash. Check remaining items.	Очистка отменена; перемещённые файлы в корзине. Проверьте остальные.
+Cleanup failed; confirmed moves remain in Trash. Check remaining items.	Ошибка очистки; перемещённые файлы в корзине. Проверьте остальные.
+Entry limit reached.	Достигнут предел числа записей.
+Candidate file limit reached.	Достигнут предел числа файлов в списке.
+Directory limit reached.	Достигнут предел числа каталогов.
+Directory depth limit reached.	Достигнут предел глубины каталогов.
+Review path-storage limit reached.	Достигнут предел объёма путей в списке.

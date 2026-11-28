@@ -521,7 +521,7 @@ progress, mount exclusions, limits and partial results. Latest-snapshot delivery
 retains only the small catalog, not every scanned directory. The plugin uses
 shared list/buttons and performs no filesystem work during painting. Open and
 Copy path are typed host actions; disabling or retirement cancels work. No
-cleanup, elevated operations, persistent results or configuration fields exist.
+elevated operations, persistent results or configuration fields exist.
 
 The macOS catalog additionally names developer caches, archives, simulator data
 and installed SDK/toolchain locations. Only explicit absolute environment overrides
@@ -532,3 +532,18 @@ The macOS catalog also appends installed Applications directories, shared/user
 Application Support, user app/group containers and MobileSync backups. Existing
 read-only discovery and traversal apply; no uninstalling or application enumeration
 is introduced. Backups overlap Application Support, so no aggregate total is shown.
+
+Cleanup is a typed host action for an eligible user-cache row. Supervised workers
+prepare a bounded, identity-pinned review; a shared child page defaults to Cancel.
+Inactive completion never opens a review page or steals focus. Confirmation
+revalidates the captured root, mount, parents and files, then calls the existing
+Trash-only backend; cancellation retains the completed prefix. The host gates
+capability; presentation does not grant arbitrary-path deletion.
+
+Cleanup selections are host-owned, tied to the live review generation and mapped
+to immutable native paths. Subset execution reuses the original prepared source
+identities rather than recapturing metadata. Preparation delivers throttled
+counters through the latest-snapshot channel; rendering formats only visible
+checkbox rows. Typed scan statistics distinguish exclusions, recent files, errors
+and bounds. A typed last report retains known outcomes/errors through refresh
+and analysis; unknown delivery is not reported as source retention.

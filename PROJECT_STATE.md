@@ -1,6 +1,16 @@
 # Directory Navigator
 
-## Current status — published stable 1.1.17
+## Current status — 1.1.18 release preparation
+
+The manifest and root lockfile now target **1.1.18**, not yet published. This
+candidate includes the cache-location inventory and reviewed Linux user-cache
+cleanup, per-file selection, progress, partial-result explanations and retained
+outcomes. It also carries the existing unreleased extension filter picker
+and optional Note Trainer work. Acoustic and Note Trainer
+remain outside default builds. No configuration-version change is introduced.
+This is a preparation candidate; publication remains a separate manual action.
+
+### Last published release — stable 1.1.17
 
 Directory Navigator **1.1.17 is published** on
 [crates.io](https://crates.io/crates/directory-navigator/1.1.17). Publication used
@@ -29,6 +39,74 @@ See the [English README](README.md), [Russian README](README.ru.md) and
 safeguards and limits.
 
 ## Unreleased cache and temporary directories
+
+Cleanup polish adds host-owned per-file selections, Select all/none, checked-only
+execution against captured identities, throttled preparation counters, and
+distinct empty/partial/failed inspection messages. Unreadable entries retain their
+first original cause separately from recent files and policy exclusions. Typed
+last-cleanup reports retain selected/confirmed/unselected counts and errors
+through Analyze/Refresh; unconfirmed work is not described as retained sources.
+Validation on macOS ARM64: all 37 focused cache/cleanup tests and the full native
+run passed (1,521 passed, 15 existing ignores). Rust 1.100 strict all-target Clippy
+passed for default and combined acoustic/note-trainer features. No-default-features,
+no-audio player/settings tests, localization, workflow policy, all 44 Python
+helpers, formatting and diff checks passed. An unrelated DOSBox mock-readiness
+race found by the full run was corrected to await both complete output files;
+its new regression was demonstrated failing first, and its 17-test terminal
+suite passed twice and within the full run. No timeout or retry workaround was
+added.
+
+The locked normal release was rebuilt and reports 1.1.17. Both runs of the
+private cache terminal suite passed against that exact binary (10 tests each),
+including analysis, help, navigation, resize and terminal restoration. The
+Linux-only cleanup terminal scenario was not executed on this Mac.
+
+Linux cleanup runtime remains untested here; private FreeDesktop Trash fixtures
+exercise selected-only moves and safety checks without touching user caches.
+Full Linux x86_64/ARM64 cross-checks remain blocked by missing cross-compilers,
+and Windows by missing SDK headers in Ring. These are unavailable checks, not
+passing platform CI evidence. No CI was started.
+
+The follow-up compatibility review found two Unix-only cleanup test helpers
+guarded only by `cfg(test)`. Both now use `cfg(all(test, unix))`, matching their
+callers and avoiding unused-function failures in Windows test Clippy. An isolated
+Windows-compiler check of those exact helper declarations failed before the fix
+and passed afterward. The Linux mount-query implementation also passed isolated
+x86_64/ARM64 Clippy against the pinned libc; this does not replace full DN builds.
+Fresh native Rust 1.100 checks passed all 37 focused tests, strict all-target
+Clippy, no-default-features, localization/settings/workflow suites and 44 helper
+tests. The locked release was rebuilt again and reports 1.1.17. Full Linux and
+Windows checks were attempted again and remain blocked by the compiler/SDK
+limitations above; actual Linux cleanup and Windows runtime remain unverified.
+The broader native library run passed 512 tests (7 existing ignores), and all
+10 cache terminal tests passed against the rebuilt release with restoration.
+
+### Earlier cleanup implementation and validation
+
+Clean… now prepares a bounded review of old, regular, privately controlled user-
+cache files beneath the home folder. Confirmation defaults to Cancel and uses
+Trash only; no permanent-delete fallback or arbitrary directory selection exists.
+Links, hard links, mounted paths, recent files, directories and valuable/system
+locations are excluded. Reviewed identities are checked again, cancellation keeps
+completed Trash moves, and measurements become stale. No new dependency, setting
+or version change was added.
+
+Validation on macOS ARM64: the broad native run passed 1,511 tests (15 existing
+ignores); after the final absolute-path guard, all 29 focused cache/cleanup tests
+passed. Rust 1.100 strict all-target Clippy passed for default and combined
+optional features. No-default-features checks, no-audio player/settings tests,
+EN/RU localization, workflow policy, 44 Python helpers, formatting and diff
+checks passed. The locked release reports 1.1.17 and passed two private cache
+terminal walkthroughs with restoration. Destructive behavior was tested only
+against private FreeDesktop Trash fixtures, never personal caches. The target
+cleanup terminal scenario is present but could not run locally. The exact native
+mount-query function checked/Clippied for GNU x86_64 and ARM64 in an isolated
+crate with the real pinned libc dependency; this is not a full DN cross-build or
+runtime test. Full GNU cross-checks remain blocked by missing cross-compilers;
+Windows remains blocked by missing SDK headers in Ring. Real cleanup runtime,
+Windows runtime and Intel Mac runtime were unavailable. No CI was started.
+
+### Earlier inventory-only implementation and validation
 
 The macOS catalog also includes installed Applications folders, shared/user
 Application Support, user app/group containers and MobileSync device backups.

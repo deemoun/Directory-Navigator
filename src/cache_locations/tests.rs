@@ -430,6 +430,8 @@ fn cancelled_refresh_reply_preserves_the_previous_catalog_and_measurements() -> 
     app.cache_locations.service = Some(Service {
         binding,
         refreshing: true,
+        reviewing: false,
+        cleaning: false,
         worker,
         latest: Arc::default(),
     });
@@ -676,6 +678,8 @@ fn refresh_cancelled_before_worker_entry_preserves_rows_and_retires_actions() ->
     app.cache_locations.service = Some(Service {
         binding,
         refreshing: true,
+        reviewing: false,
+        cleaning: false,
         worker,
         latest: Arc::default(),
     });
@@ -895,5 +899,360 @@ fn mac_application_locations_are_labelled_read_only_candidates() -> io::Result<(
             assert!(row.path.is_none());
         }
     }
+    Ok(())
+}
+
+#[test]
+fn cleanup_is_limited_to_the_catalog_user_cache_and_not_arbitrary_rows() {
+    for platform in [
+        catalog::Platform::Mac,
+        catalog::Platform::Linux,
+        catalog::Platform::Windows,
+    ] {
+        let rows = catalog::candidates(platform, Default::default());
+        assert_eq!(
+            rows.iter().filter(|r| r.cleanup).count(),
+            usize::from(matches!(platform, catalog::Platform::Linux))
+        );
+        assert!(rows
+            .iter()
+            .filter(|r| r.cleanup)
+            .all(|r| r.name == "User caches"));
+        assert!(rows.iter().all(|r| !r.can_clean())); // Unresolved rows are never eligible.
+    }
+}
+
+#[cfg(unix)]
+fn cleanup_review(t: &Temp) -> io::Result<Arc<cleanup::Review>> {
+    let root = fs::canonicalize(t.0.join("cache 界"))?;
+    let path = root.join(".hidden");
+    use std::os::unix::fs::PermissionsExt;
+    for directory in [&t.0, &root] {
+        fs::set_permissions(directory, fs::Permissions::from_mode(0o700))?;
+    }
+    fs::set_permissions(&path, fs::Permissions::from_mode(0o600))?;
+    let now = std::time::SystemTime::now();
+    fs::File::options().write(true).open(path)?.set_times(
+        fs::FileTimes::new().set_modified(now - Duration::from_secs(9 * 24 * 60 * 60)),
+    )?;
+    Ok(Arc::new(cleanup::collect(
+        root.clone(),
+        fs::canonicalize(&t.0)?,
+        entry_identity(&root)?,
+        now,
+        &Cancellation::default(),
+    )?))
+}
+#[cfg(unix)]
+#[test]
+fn cleanup_review_is_owned_cancel_first_scrollable_and_immutable() -> io::Result<()> {
+    use crate::plugins::ToolPlugin;
+    use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+    let t = Temp::new()?;
+    let (mut app, binding) = t.app()?;
+    let review = cleanup_review(&t)?;
+    app.cache_locations
+        .view
+        .cleanup_selection
+        .set(&review, true);
+    app.cache_locations.view.review = Some(review);
+    let mut ctx = plugins::host::context(
+        &app,
+        binding,
+        crate::presentation::layout::Rect::new(0, 0, 80, 25),
+        Instant::now(),
+    )
+    .unwrap();
+    let mut tool = plugins::cache_directories::CacheDirectories::default();
+    ctx.active = false;
+    tool.prepare(&ctx);
+    assert!(!tool.controls(&ctx).controls.iter().any(|c| c.id == 11));
+    ctx.active = true;
+    tool.prepare(&ctx);
+    let spec = tool.controls(&ctx);
+    assert_eq!(spec.focus, 12);
+    let cancel = spec
+        .key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE))
+        .unwrap()
+        .action;
+    assert_eq!(cancel, Some(ctx.target(12)));
+    drop(spec);
+    for language in [
+        crate::localization::Language::English,
+        crate::localization::Language::Russian,
+    ] {
+        app.config.language = language;
+        app.config.palette = app
+            .config
+            .palette
+            .with_slot(crate::palette::theme::Slot::DialogText, 0x2f);
+        for (w, h) in [(80, 25), (120, 40), (80, 25)] {
+            let mut terminal = Terminal::new(TestBackend::new(w, h))?;
+            let mut old = None;
+            for _ in 0..3 {
+                terminal.draw(|f| crate::ui::draw(f, &mut app))?;
+                let pixels = terminal.backend().buffer().content.clone();
+                if let Some(previous) = old.replace(pixels.clone()) {
+                    assert_eq!(previous, pixels);
+                }
+                assert!(app
+                    .mouse
+                    .regions
+                    .iter()
+                    .all(|(r, _)| r.right() <= w && r.bottom() <= h));
+            }
+        }
+    }
+    let gen = app.cache_locations.view.generation;
+    action(&mut app, binding, gen.wrapping_add(1), Action::DismissClean);
+    assert!(app.cache_locations.view.review.is_some());
+    action(&mut app, binding, gen, Action::DismissClean);
+    assert!(app.cache_locations.view.review.is_none());
+    assert_eq!(fs::read(t.0.join("cache 界/.hidden"))?, b"12345");
+    Ok(())
+}
+#[cfg(unix)]
+#[test]
+fn stopping_a_completed_review_rejects_its_late_confirmation() -> io::Result<()> {
+    let t = Temp::new()?;
+    let (mut app, binding) = t.app()?;
+    let reply = Snapshot {
+        review: Some(cleanup_review(&t)?),
+        ..Default::default()
+    };
+    let Owner::Document(owner) = binding.owner else {
+        unreachable!()
+    };
+    let worker = app.workers.spawn(
+        "dn-clean-late-test",
+        &app.cache_locations.requests,
+        crate::requests::Owner::Document(owner),
+        "cache-locations",
+        move |_| Ok(reply),
+    )?;
+    app.cache_locations.service = Some(Service {
+        binding,
+        refreshing: false,
+        reviewing: true,
+        cleaning: false,
+        worker,
+        latest: Arc::default(),
+    });
+    app.cache_locations.view.busy = true;
+    app.cache_locations.view.stopping = true;
+    pump(&mut app, |a| !a.cache_locations.view.busy);
+    assert!(app.cache_locations.view.review.is_none());
+    assert_eq!(
+        app.cache_locations.view.notice,
+        "Cleanup review cancelled; nothing was moved."
+    );
+    assert_eq!(fs::read(t.0.join("cache 界/.hidden"))?, b"12345");
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn cleanup_checkboxes_all_none_and_space_keep_the_cursor_and_gate_confirmation() -> io::Result<()> {
+    use crate::plugins::ToolPlugin;
+    use crossterm::event::{
+        KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
+    };
+    let t = Temp::new()?;
+    let (mut app, binding) = t.app()?;
+    let review = cleanup_review(&t)?;
+    app.cache_locations
+        .view
+        .cleanup_selection
+        .set(&review, true);
+    app.cache_locations.view.review = Some(review);
+    let area = crate::presentation::layout::Rect::new(0, 0, 80, 25);
+    let context = |app: &App| {
+        let mut ctx = plugins::host::context(app, binding, area, Instant::now()).unwrap();
+        ctx.active = true;
+        ctx
+    };
+    let mut tool = plugins::cache_directories::CacheDirectories::default();
+    tool.prepare(&context(&app));
+    assert_eq!(tool.controls(&context(&app)).focus, 12);
+    assert!(
+        tool.controls(&context(&app))
+            .controls
+            .iter()
+            .find(|c| c.id == 11)
+            .unwrap()
+            .enabled
+    );
+    let apply = |app: &mut App, effects: Vec<plugins::Effect>| {
+        for effect in effects {
+            if let plugins::Effect::CacheLocations {
+                generation,
+                action: requested,
+            } = effect
+            {
+                action(app, binding, generation, requested);
+            }
+        }
+    };
+    let effects = tool.event(
+        plugins::Event::Action(plugins::ActionId(14)),
+        &context(&app),
+    );
+    apply(&mut app, effects);
+    assert_eq!(app.cache_locations.view.cleanup_selection.count, 0);
+    assert!(
+        !tool
+            .controls(&context(&app))
+            .controls
+            .iter()
+            .find(|c| c.id == 11)
+            .unwrap()
+            .enabled
+    );
+    tool.event(plugins::Event::Focus(10), &context(&app));
+    let key = KeyEvent::new(KeyCode::Char(' '), KeyModifiers::NONE);
+    assert!(!tool.uses_controls(key));
+    let effects = tool.event(plugins::Event::Key(key), &context(&app));
+    apply(&mut app, effects);
+    assert_eq!(app.cache_locations.view.cleanup_selection.count, 1);
+    let click = MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Left),
+        column: 0,
+        row: 0,
+        modifiers: KeyModifiers::NONE,
+    };
+    let effects = tool.event(
+        plugins::Event::Mouse(click, Some(plugins::ActionId(1000))),
+        &context(&app),
+    );
+    apply(&mut app, effects);
+    assert_eq!(app.cache_locations.view.cleanup_selection.count, 0);
+    let effects = tool.event(
+        plugins::Event::Action(plugins::ActionId(13)),
+        &context(&app),
+    );
+    apply(&mut app, effects);
+    assert_eq!(app.cache_locations.view.cleanup_selection.count, 1);
+    assert_eq!(fs::read(t.0.join("cache 界/.hidden"))?, b"12345");
+    Ok(())
+}
+#[test]
+fn cleanup_report_survives_analysis_and_refresh_and_failure_is_not_an_empty_result(
+) -> io::Result<()> {
+    let t = Temp::new()?;
+    let (mut app, binding) = t.app()?;
+    let mut report = cleanup::Report::new(t.0.join("cache 界"), 3, 2);
+    report.moved = 1;
+    report.stopped(cleanup::Outcome::Failed, "private Trash failure");
+    app.cache_locations.view.cleanup_report = Some(report);
+    action(&mut app, binding, 0, Action::Analyze(Some(0)));
+    pump(&mut app, |a| !a.cache_locations.view.busy);
+    let view = refresh(
+        app.cache_locations.view.clone(),
+        &Cancellation::default(),
+        |_| t.rows().unwrap(),
+    );
+    let report = view.cleanup_report.as_ref().unwrap();
+    assert_eq!(report.moved, 1);
+    assert_eq!(report.selected, 3);
+    assert_eq!(report.not_selected, 2);
+    assert_eq!(report.error, "private Trash failure");
+    let mut failed_view = view;
+    inspection_failed(&mut failed_view, false, "private inspection failure");
+    assert_eq!(
+        failed_view.notice,
+        "Cleanup inspection failed; nothing was moved."
+    );
+    assert_eq!(
+        failed_view.cleanup_report.as_ref().unwrap().error,
+        "private Trash failure"
+    );
+    inspection_failed(&mut failed_view, true, "cancelled");
+    assert_eq!(
+        failed_view.notice,
+        "Cleanup review cancelled; nothing was moved."
+    );
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn partial_review_completion_keeps_candidates_and_does_not_steal_focus() -> io::Result<()> {
+    let t = Temp::new()?;
+    let (mut app, binding) = t.app()?;
+    let mut review = (*cleanup_review(&t)?).clone();
+    review.stats.unreadable = 1;
+    review.stats.first_error = "private inaccessible child".into();
+    let mut reply = app.cache_locations.view.clone();
+    reply.cleanup_selection.set(&review, true);
+    reply.notice = review.notice().into();
+    reply.error = review.stats.first_error.clone();
+    reply.cleanup_scan = Some(review.stats.clone());
+    reply.review = Some(Arc::new(review));
+    let Owner::Document(owner) = binding.owner else {
+        unreachable!()
+    };
+    let worker = app.workers.spawn(
+        "dn-partial-clean-review",
+        &app.cache_locations.requests,
+        crate::requests::Owner::Document(owner),
+        "cache-locations",
+        move |_| Ok(reply),
+    )?;
+    app.cache_locations.service = Some(Service {
+        binding,
+        refreshing: false,
+        reviewing: true,
+        cleaning: false,
+        worker,
+        latest: Arc::default(),
+    });
+    app.cache_locations.view.busy = true;
+    crate::windowing::activate(&mut app, crate::desktop::WindowId::MANAGER);
+    pump(&mut app, |a| !a.cache_locations.view.busy);
+    assert_eq!(app.desktop.active().id, crate::desktop::WindowId::MANAGER);
+    assert!(app.cache_locations.view.review.is_some());
+    assert_eq!(
+        app.cache_locations.view.notice,
+        "Partial inspection; review the available candidates."
+    );
+    assert_eq!(app.cache_locations.view.error, "private inaccessible child");
+    Ok(())
+}
+
+#[test]
+fn lost_cleanup_worker_keeps_confirmed_counts_and_reports_uncertainty() -> io::Result<()> {
+    let t = Temp::new()?;
+    let (mut app, binding) = t.app()?;
+    let mut report = cleanup::Report::new(t.0.join("cache 界"), 3, 2);
+    report.moved = 1;
+    app.cache_locations.view.cleanup_report = Some(report);
+    let Owner::Document(owner) = binding.owner else {
+        unreachable!()
+    };
+    let worker = app.workers.spawn(
+        "dn-lost-clean-worker",
+        &app.cache_locations.requests,
+        crate::requests::Owner::Document(owner),
+        "cache-locations",
+        |_| Err(io::Error::other("private worker failure")),
+    )?;
+    app.cache_locations.service = Some(Service {
+        binding,
+        refreshing: false,
+        reviewing: false,
+        cleaning: true,
+        worker,
+        latest: Arc::default(),
+    });
+    app.cache_locations.view.busy = true;
+    pump(&mut app, |a| !a.cache_locations.view.busy);
+    let report = app.cache_locations.view.cleanup_report.as_ref().unwrap();
+    assert_eq!(report.outcome, cleanup::Outcome::Unconfirmed);
+    assert_eq!(report.moved, 1);
+    assert_eq!(report.not_selected, 2);
+    assert_eq!(report.error, "private worker failure");
+    assert!(report
+        .summary(crate::localization::Language::English)
+        .contains("Unconfirmed:"));
     Ok(())
 }

@@ -631,6 +631,74 @@ done
     s.finish()
 }
 
+fn extra_drive_launch_ready(root: &std::path::Path, folder: &std::path::Path) -> bool {
+    let arguments = std::fs::read_to_string(root.join("mount-arguments")).is_ok_and(|a| {
+        a.contains("MOUNT -u F")
+            && a.contains("MOUNT F .")
+            && a.lines().last().is_some_and(|v| v.ends_with("drive.COM"))
+    });
+    arguments
+        && std::fs::read_to_string(root.join("mount-workdir")).is_ok_and(|value| {
+            value.strip_suffix('\n').is_some_and(|path| {
+                std::fs::canonicalize(path)
+                    .ok()
+                    .zip(std::fs::canonicalize(folder).ok())
+                    .is_some_and(|(actual, expected)| actual == expected)
+            })
+        })
+}
+
+#[test]
+fn extra_drive_receipt_requires_both_completed_mock_outputs() -> io::Result<()> {
+    use std::{
+        fs,
+        path::PathBuf,
+        sync::atomic::{AtomicU64, Ordering},
+    };
+    static NEXT: AtomicU64 = AtomicU64::new(0);
+    struct Fixture(PathBuf);
+    impl Drop for Fixture {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+    let fixture = Fixture(std::env::temp_dir().join(format!(
+        "dn-mount-receipt-{}-{}",
+        std::process::id(),
+        NEXT.fetch_add(1, Ordering::Relaxed)
+    )));
+    fs::create_dir(&fixture.0)?;
+    let folder = fixture.0.join("Shared Ёжик");
+    fs::create_dir(&folder)?;
+    assert!(!extra_drive_launch_ready(&fixture.0, &folder));
+    fs::write(
+        fixture.0.join("mount-arguments"),
+        "MOUNT -u F\nMOUNT F .\ndrive.COM\n",
+    )?;
+    assert!(
+        !extra_drive_launch_ready(&fixture.0, &folder),
+        "arguments alone cannot acknowledge the working-directory write"
+    );
+    fs::write(fixture.0.join("mount-workdir"), "")?;
+    assert!(!extra_drive_launch_ready(&fixture.0, &folder));
+    fs::write(
+        fixture.0.join("mount-workdir"),
+        format!("{}\n", fixture.0.display()),
+    )?;
+    assert!(!extra_drive_launch_ready(&fixture.0, &folder));
+    fs::write(
+        fixture.0.join("mount-workdir"),
+        folder.to_string_lossy().as_bytes(),
+    )?;
+    assert!(!extra_drive_launch_ready(&fixture.0, &folder));
+    fs::write(
+        fixture.0.join("mount-workdir"),
+        format!("{}\n", folder.display()),
+    )?;
+    assert!(extra_drive_launch_ready(&fixture.0, &folder));
+    Ok(())
+}
+
 #[test]
 fn dos_extra_drive_folder_and_temp_mounts_preserve_program_and_terminal() -> io::Result<()> {
     use std::{fs, os::unix::fs::PermissionsExt};
@@ -711,11 +779,7 @@ case "${2:-$1}" in --version|-version) echo 'DOSBox Staging 0.83.0';; --help|-he
         s.text().contains("Run in DOSBox")
     })?;
     click(&mut s, "Run in DOSBox", "launch extra drive", |s| {
-        fs::read_to_string(s.root.join("mount-arguments")).is_ok_and(|a| {
-            a.contains("MOUNT -u F")
-                && a.contains("MOUNT F .")
-                && a.lines().last().is_some_and(|v| v.ends_with("drive.COM"))
-        })
+        extra_drive_launch_ready(&s.root, &folder)
     })?;
     assert_eq!(
         fs::canonicalize(fs::read_to_string(s.root.join("mount-workdir"))?.trim())?,

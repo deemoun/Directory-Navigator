@@ -2357,8 +2357,8 @@ outside this first version.
 
 ## Experimental Note Trainer
 
-Note Trainer is a separate optional source build, disabled by default in Plugins.
-It is not in the published 1.1.17 crate or the normal build. Build with
+Note Trainer is a separate optional build, disabled by default in Plugins
+and excluded from the normal build. Build with
 `cargo build --release --locked --features note-trainer --target-dir target/note-trainer-release`
 and run `./target/note-trainer-release/release/dn` (Windows: `dn.exe`). Enable
 **Note Trainer (Experimental)** in Options → Configuration → Plugins, then open
@@ -2400,7 +2400,7 @@ shared palette roles preserve meaning with custom colors and Linux tty.
 
 ## Cache and temporary directories
 
-Utilities → Cache and temporary directories… is a default-enabled, read-only
+Utilities → Cache and temporary directories… is a default-enabled
 plugin on macOS, Linux and Windows. Opening performs bounded location discovery,
 not recursive analysis. Standard user/system caches, temporary directories and
 logs are candidates for inspection, not a recommendation to delete them.
@@ -2427,8 +2427,8 @@ the originating pane is loading, Open explains the wait and does not navigate.
 Worker startup errors remain available in full (within the diagnostic bound) in
 Help, alongside the short notice. Snapshots are session-only and can become
 outdated as applications run. Locations can overlap; there is no grand total.
-Apparent sizes are not allocated or reclaimable space. There are no deletion
-actions, elevation, cleanup commands or automatic scans.
+Apparent sizes are not allocated or reclaimable space. Analysis does not change
+files, and no elevated access or automatic scans are used.
 
 macOS also lists curated developer storage: Xcode build output and archives, iOS
 device support, simulator data/assets, Cargo caches, installed Rust toolchains,
@@ -2458,3 +2458,42 @@ visible; redirected homes use the same native HOME resolution. Analysis is alway
 explicit and bounded, including inside application bundles. System applications
 under `/System/Applications` are excluded. No application enumeration or per-app
 breakdown is performed, and Linux/Windows catalogs are unchanged.
+
+Where **Clean…** is available, select the user-cache location to review regular
+files unchanged for at least seven days, then explicitly **Move to Trash**.
+Cancel is selected initially. Directories, recent files, links, mounted paths,
+installed apps, application data and backups remain untouched. Cleanup is
+limited to privately controlled cache data beneath the home folder; no custom
+folder or Clean all action is offered. Trash failures never fall back to
+permanent deletion. Completed moves remain in Trash after Stop or cancellation,
+and may still occupy disk space.
+
+Reviews are session-only and bounded to 10,000 files, 100,000 visited entries,
+20,000 directories, 512 levels and 4 MiB of native paths. Limited reviews are
+labelled partial. Hidden old files can qualify; multiply linked files, writable
+shared entries, special files and inaccessible entries do not. Native mount
+identities must be available; other mounts, including bind mounts, are excluded.
+The cache root, ancestors and each reviewed file are rechecked before Trash.
+Changed files stop remaining work; completed Trash moves are retained. Cache
+files can still be in use, so review the list before confirming. Eligibility uses
+modification time, not creation or access time. The offer covers only the
+inspected candidates; a bounded review is not an unlimited cache inventory. Refresh/Analyze
+updates stale measurements after cleanup. Closing the window or disabling the
+plugin cancels remaining work.
+
+Cleanup review has per-file checkboxes: Space/click toggles a file, and Select
+all/none changes the draft. Files start selected, Cancel stays focused, and Move
+to Trash is disabled with nothing selected. Only checked, identity-pinned files
+are moved; unchecked files are not revalidated as deletion sources. Preparation
+reports scanned/eligible counts and separates recent files, policy exclusions
+and unreadable entries. Limited/incomplete inspections are labelled even with no
+candidates; a failed inspection is not an empty result. Help retains the last
+cleanup summary and original errors after Analyze or Refresh.
+
+Unreadable entries retain a bounded first original cause in Help. An inaccessible
+root fails inspection without offering candidates; unreadable descendants produce
+a partial offer of inspected candidates. Select all applies only to this bounded
+review, never unknown or excluded entries. Selected bytes use captured metadata;
+changing an unchecked file does not prevent unrelated checked files from moving.
+Cancelled/failed jobs keep confirmed moves in Trash, report unchecked and
+unconfirmed counts accurately, and never retry or permanently delete files.

@@ -799,8 +799,7 @@ independent optional build feature, off in normal builds.
 ## Optional Note Trainer
 
 **Note Trainer (Experimental)** is disabled in Plugins by default and excluded
-from normal builds, independently of acoustic transfers. This is an unreleased
-source feature, not included in the published 1.1.17 crate. Build it separately:
+from normal builds, independently of acoustic transfers. Build it separately:
 
 ```sh
 cargo build --release --locked --features note-trainer --target-dir target/note-trainer-release
@@ -827,7 +826,7 @@ double-click opens a location in the originating pane, and Copy path uses the
 OS/internal clipboard. Sizes are apparent bytes, not reclaimable space; hidden
 entries are included, links are not followed and other mounts are excluded.
 Partial/stale results are labelled, overlapping locations have no grand total.
-This is read-only inspection, with no cleanup or elevated access. See the
+Analysis is non-destructive and uses no elevated access. See the
 [guide](docs/USER_GUIDE.md#cache-and-temporary-directories).
 
 macOS also lists curated developer storage: Xcode build output and archives, iOS
@@ -843,6 +842,24 @@ shared/user `Library/Application Support`, user `Library/Containers`,
 Installed apps, application data and device backups are clearly labelled as
 potentially valuable. Backups overlap Application Support; there is no combined
 total. These entries do not provide uninstalling or cleanup.
+
+Where **Clean…** is available, select the user-cache location to review regular
+files unchanged for at least seven days, then explicitly **Move to Trash**.
+Cancel is selected initially. Directories, recent files, links, mounted paths,
+installed apps, application data and backups remain untouched. Cleanup is
+limited to privately controlled cache data beneath the home folder; no custom
+folder or Clean all action is offered. Trash failures never fall back to
+permanent deletion. Completed moves remain in Trash after Stop or cancellation,
+and may still occupy disk space.
+
+Cleanup review has per-file checkboxes: Space/click toggles a file, and Select
+all/none changes the draft. Files start selected, Cancel stays focused, and Move
+to Trash is disabled with nothing selected. Only checked, identity-pinned files
+are moved; unchecked files are not revalidated as deletion sources. Preparation
+reports scanned/eligible counts and separates recent files, policy exclusions
+and unreadable entries. Limited/incomplete inspections are labelled even with no
+candidates; a failed inspection is not an empty result. Help retains the last
+cleanup summary and original errors after Analyze or Refresh.
 
 ## License
 

@@ -47,7 +47,7 @@ impl Prepared {
             container,
         })
     }
-    pub(super) fn verify_source(&self, path: &Path) -> io::Result<()> {
+    pub(crate) fn verify_source(&self, path: &Path) -> io::Result<()> {
         self.guards.verify_parent(path)?;
         let source = self
             .sources

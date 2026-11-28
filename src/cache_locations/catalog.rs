@@ -269,6 +269,9 @@ pub(super) fn candidates(platform: Platform, input: Inputs) -> Vec<Location> {
         );
         add("Device backups (valuable)", "Local iPhone/iPad backups; valuable device data, also included under User application data.", home.as_ref().map(|p| p.join("Library/Application Support/MobileSync/Backup")));
     }
+    if matches!(platform, Platform::Linux) {
+        rows[0].cleanup = true;
+    }
     rows
 }
 pub(super) fn resolve(mut rows: Vec<Location>, cancel: &Cancellation) -> Vec<Location> {
